@@ -12,7 +12,10 @@ export default function MainContent({
   const [filteredItems, setFilteredItems] = useState(items)
 
   const formatTime = (dateStr) => {
+    if (!dateStr) return '未知时间'
     const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return '未知时间'
+
     const now = new Date()
     const diff = Math.floor((now - date) / 1000 / 60 / 60)
     if (diff < 1) return '刚刚'
@@ -117,11 +120,17 @@ export default function MainContent({
                   <div className="flex items-center flex-wrap gap-2 text-xs">
                     <span className="font-medium text-stone-700">{item.source}</span>
                     <span className="text-stone-400">·</span>
-                    <span className="text-stone-500">{formatTime(item.publishedAt)}</span>
+                    <span className="text-stone-500">{formatTime(item.pub_date)}</span>
                     <span className="text-stone-400">·</span>
                     <span className="px-2 py-0.5 bg-stone-100 text-stone-700 rounded-md">
                       {getCategoryLabel(item.category)}
                     </span>
+                    {/* 显示标签 */}
+                    {item.extracted_keywords && item.extracted_keywords.split(',').slice(0, 2).map((tag, idx) => (
+                      <span key={idx} className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-xs">
+                        {tag.trim()}
+                      </span>
+                    ))}
                     {item.selected && (
                       <>
                         <span className="text-stone-400">·</span>
