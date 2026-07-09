@@ -9,14 +9,19 @@
     "dev": "node --watch src/server.js",
     "init-db": "node src/db/init.js"
   },
-  "keywords": ["ai", "insight", "hub"],
+  "keywords": [
+    "ai",
+    "insight",
+    "hub"
+  ],
   "author": "heyuxuan",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "node-cron": "^3.0.3",
     "axios": "^1.6.5",
-    "dotenv": "^16.3.1"
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "openai": "^6.45.0"
   }
 }
