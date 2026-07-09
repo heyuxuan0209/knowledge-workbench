@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "item_id": "cmrasc88300h6ihog8mwnmob9",
+    "action": "save",
+    "created_at": "2026-07-08T08:29:33.733Z"
+  },
+  {
+    "id": 2,
+    "item_id": "cmraw22r701jjihogh1k8hbu6",
+    "action": "save",
+    "created_at": "2026-07-08T08:39:41.821Z"
+  },
+  {
+    "id": 3,
+    "item_id": "cmrbdsefa02yjihl17gg7mhx3",
+    "action": "approve",
+    "created_at": "2026-07-08T08:39:44.349Z"
+  },
+  {
+    "id": 4,
+    "item_id": "cmrawne9601nfihogtkxwy0bs",
+    "action": "skip",
+    "created_at": "2026-07-08T08:39:55.360Z"
+  },
+  {
+    "id": 5,
+    "item_id": "cmr96dq8400pdslsmu56r8muy",
+    "action": "skip",
+    "created_at": "2026-07-08T08:39:57.723Z"
+  },
+  {
+    "id": 6,
+    "item_id": "cmr8j9weh02kxsl0dy08683oe",
+    "action": "save",
+    "created_at": "2026-07-08T08:40:04.245Z"
+  },
+  {
+    "id": 7,
+    "item_id": "cmrasc88300h6ihog8mwnmob9",
+    "action": "approve",
+    "created_at": "2026-07-08T08:42:08.959Z"
+  }
+]

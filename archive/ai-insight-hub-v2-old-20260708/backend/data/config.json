@@ -1,0 +1,20 @@
+{
+  "preferences": {
+    "keywords": {
+      "include": ["agent", "product", "startup", "cost"],
+      "exclude": []
+    },
+    "categories": ["ai-products", "tip", "industry"],
+    "min_score": 0,
+    "max_items": 100
+  },
+  "obsidian": {
+    "vault_path": "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/LLM Wiki",
+    "folder_pattern": "AI-Insights/{year}-{month}"
+  },
+  "aihot": {
+    "api_url": "https://aihot.virxact.com/api/public/items",
+    "mode": "selected",
+    "take": 100
+  }
+}

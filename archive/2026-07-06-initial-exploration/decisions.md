@@ -1,0 +1,9 @@
+- [2026-07-04] multi-ai-context 需要在 Claude、Codex、Gemini 之间共享上下文，重启后也要恢复最近讨论。
+- [2026-07-04] 对话历史落盘到 .ai-context/history.json，作为短期上下文恢复来源。
+- [2026-07-04] 共享决策写入 .ai-context/decisions.md，作为跨模型、跨重启的稳定记忆。
+- [2026-07-04] Codex 用 Reviewer 角色审查上一轮 Claude 方案时，应读取最近对话和上一轮 Claude 回复，不应要求用户重新粘贴上下文。
+- [2026-07-04] AI Twitter 内容聚合系统的 MVP 倾向轻量方案：Express.js + SQLite + 简单任务调度，先验证核心闭环，再考虑复杂架构。
+- [2026-07-04] MVP
+- [2026-07-04] MVP 使用 Express + SQLite是什么意思？我要把刚才信息源清单记录下来
+- [2026-07-05] Knowledge Workbench MVP 最终方案
+- [2026-07-06] 创建最小项目骨架 + Supabase schema
