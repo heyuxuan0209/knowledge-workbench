@@ -183,7 +183,7 @@ export default function ArticleDetail({ item, onBack }) {
           </button>
           <button
             onClick={() => {
-              const aihotUrl = `https://ai-bot.cn/article/${item.id}`
+              const aihotUrl = `https://aihot.virxact.com/items/${item.id}`
               window.open(aihotUrl, '_blank')
             }}
             className="px-5 py-2.5 bg-stone-100 text-stone-700 text-sm font-medium rounded-lg hover:bg-stone-200 transition-colors"
