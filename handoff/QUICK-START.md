@@ -7,7 +7,7 @@
 ## 1. 项目位置
 
 ```bash
-/Users/USER/Documents/项目/knowledge-workbench/ai-insight-hub-v2/
+/Users/USER/Documents/项目/knowledge-workbench/
 ```
 
 ---
@@ -16,14 +16,14 @@
 
 ### 后端（Terminal 1）
 ```bash
-cd /Users/USER/Documents/项目/knowledge-workbench/ai-insight-hub-v2/backend
+cd /Users/USER/Documents/项目/knowledge-workbench/backend
 node src/server.js
 ```
 ✅ 看到 `Server running on http://localhost:3000` 表示成功
 
 ### 前端（Terminal 2）
 ```bash
-cd /Users/USER/Documents/项目/knowledge-workbench/ai-insight-hub-v2/frontend
+cd /Users/USER/Documents/项目/knowledge-workbench/frontend
 npm run dev
 ```
 ✅ 看到 `Local: http://localhost:5173/` 表示成功
