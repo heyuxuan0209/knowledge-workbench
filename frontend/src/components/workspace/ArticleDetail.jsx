@@ -4,10 +4,13 @@ export default function ArticleDetail({ item, onBack }) {
   const [showOriginal, setShowOriginal] = useState(false)
 
   const formatTime = (dateStr) => {
+    if (!dateStr) return '未知时间'
     const date = new Date(dateStr)
-    return date.toLocaleString('zh-CN', { 
-      year: 'numeric', 
-      month: '2-digit', 
+    if (isNaN(date.getTime())) return '未知时间'
+
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
@@ -26,10 +29,10 @@ export default function ArticleDetail({ item, onBack }) {
     return labels[category] || category
   }
 
-  // Mock tags - in production these would come from API
-  const extractedTags = [
-    '机器人', 'VLA', '多模态', '开源', 'Qwen2'
-  ]
+  // 从数据库提取标签
+  const extractedTags = item.extracted_keywords
+    ? item.extracted_keywords.split(',').map(tag => tag.trim()).filter(tag => tag)
+    : []
 
   // Mock recommendation reason - in production from API
   const recommendationReason = "这是一个重要的开源项目发布，涵盖视觉-语言-动作多模态技术，在机器人领域有突破性进展。"
@@ -52,7 +55,7 @@ export default function ArticleDetail({ item, onBack }) {
         <div className="flex items-center gap-3 text-sm mb-4">
           <span className="font-medium text-stone-700">{item.source}</span>
           <span className="text-stone-400">·</span>
-          <span className="text-stone-500">{formatTime(item.publishedAt)}</span>
+          <span className="text-stone-500">{formatTime(item.pub_date)}</span>
           {item.selected && (
             <>
               <span className="text-stone-400">·</span>
@@ -179,7 +182,10 @@ export default function ArticleDetail({ item, onBack }) {
             在 X 看原推 →
           </button>
           <button
-            onClick={() => window.open(item.permalink, '_blank')}
+            onClick={() => {
+              const aihotUrl = `https://ai-bot.cn/article/${item.id}`
+              window.open(aihotUrl, '_blank')
+            }}
             className="px-5 py-2.5 bg-stone-100 text-stone-700 text-sm font-medium rounded-lg hover:bg-stone-200 transition-colors"
           >
             在 AI HOT 查看
