@@ -65,7 +65,7 @@ export function transformAIHotItem(item) {
     category: item.category || 'tip',
     score: item.score || 0,
     pub_date: item.publishedAt || new Date().toISOString(),
-    extracted_keywords: null,
+    extracted_keywords: null, // 将在同步后批量提取
     user_action: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
