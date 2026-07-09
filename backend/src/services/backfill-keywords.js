@@ -1,8 +1,15 @@
 import { getDb } from '../db/db.js';
 import { extractKeywords } from './keyword-extractor.js';
+import dotenv from 'dotenv';
+
+// 加载环境变量
+dotenv.config();
 
 // 为数据库中缺少关键词的文章提取关键词
 export async function backfillKeywords(limit = 10) {
+  console.log('🔄 Starting keyword extraction...');
+  console.log('DEEPSEEK_API_KEY:', process.env.DEEPSEEK_API_KEY ? 'exists' : 'missing');
+
   const db = getDb();
 
   // 查询缺少关键词的文章
@@ -12,6 +19,8 @@ export async function backfillKeywords(limit = 10) {
     WHERE extracted_keywords IS NULL
     LIMIT ?
   `).all(limit);
+
+  console.log(`Found ${items.length} items without keywords`);
 
   if (items.length === 0) {
     console.log('✅ All items already have keywords');
@@ -51,10 +60,14 @@ export async function backfillKeywords(limit = 10) {
 }
 
 // 如果直接运行此脚本，提取前 20 条
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && process.argv[1].includes('backfill-keywords')) {
   const limit = parseInt(process.argv[2]) || 20;
+  console.log(`Starting keyword extraction for ${limit} items...`);
   backfillKeywords(limit).then(result => {
     console.log('Result:', result);
     process.exit(result.success ? 0 : 1);
+  }).catch(err => {
+    console.error('Error:', err);
+    process.exit(1);
   });
 }
