@@ -1,160 +1,236 @@
 # Knowledge Workbench
 
-个人化 AI 信息工作台 - 帮助你从 AI 信息过载中解脱
-
-## 🎯 项目定位
-
-**不是**: AI 资讯聚合器（AI HOT 已经做了）  
-**而是**: 个人化的 AI 信息工作台 + 知识炼金术
-
-从信息过载 (100条) → 个性化推荐 (15-20条) → 知识沉淀 (Obsidian) → 内容创作
+个人 AI 资讯工作台 - 从信息到洞察的完整流程
 
 ---
 
-## 📚 核心文档
+## 📌 当前版本
 
-### 给开发者（Sonnet 5）
+**v0.2.0** - 工作区对话功能（2026-07-09）
 
-1. **[HANDOFF-SUMMARY.md](./HANDOFF-SUMMARY.md)** ⭐ 从这里开始
-   - 5分钟快速理解交接内容
-   - 已完成的工作
-   - 下一步工作
-   - 关键决策
+---
 
-2. **[MVP-HANDOFF.md](./MVP-HANDOFF.md)** 📖 开发指南
-   - 可直接开始开发的详细文档
-   - 技术栈、目录结构、数据库设计
-   - API 设计、核心算法、代码模板
-   - 开发步骤、验证清单、FAQ
+## 🎯 项目定位
 
-3. **[ARCHITECTURE.md](./ARCHITECTURE.md)** 🏗️ 完整架构
-   - 系统定位和核心价值
-   - 分层架构设计
-   - 核心模块详细设计
-   - 分 4 个 Phase 的实施计划
-   - 成本估算、风险应对
+一个专注于深度分析的 AI 资讯工具，核心差异化功能：
 
-### 给产品负责人
+1. **智能推送** - 基于兴趣的内容筛选（已完成）
+2. **工作区对话** - 与 LLM 深度分析文章（已完成）
+3. **主题追踪** - 长期追踪感兴趣的主题（未实现）
+4. **知识图谱** - 可视化知识网络（未实现）
 
-1. **[brief.md](./brief.md)** - 项目背景和初衷
-2. **[ARCHITECTURE.md](./ARCHITECTURE.md)** 第一、二章 - 了解系统定位和架构
-3. **[ai-insight-hub/output/](./ai-insight-hub/output/)** - 查看现有系统的输出示例
+---
+
+## ✨ 核心功能
+
+### v0.1.0 - 基础信息浏览
+- ✅ 三栏工作台架构
+- ✅ AI HOT 数据源集成
+- ✅ 文章列表和详情
+- ✅ 搜索和筛选
+- ✅ 评分显示
+
+### v0.2.0 - 工作区对话
+- ✅ 创建工作区
+- ✅ 多对话管理
+- ✅ Deepseek 流式对话
+- ✅ 成本统计（¥1/M tokens）
+- ✅ 材料和产出面板
+- ⏳ API Key 配置（需用户提供）
+- ⏳ 材料拖拽功能
+- ⏳ 产出结构化展示
 
 ---
 
 ## 🚀 快速开始
 
-### 如果你是开发者（Sonnet 5）
+### 1. 安装依赖
 
 ```bash
-# 1. 阅读交接文档（1小时）
-cat HANDOFF-SUMMARY.md      # 5分钟
-cat MVP-HANDOFF.md           # 30分钟
-cat ARCHITECTURE.md          # 30分钟
+# 后端
+cd backend
+npm install
 
-# 2. 查看现有系统示例
-open ai-insight-hub/output/daily-2026-07-08.html
-
-# 3. 开始开发新系统
-mkdir ai-insight-hub-v2
-cd ai-insight-hub-v2
-# 按照 MVP-HANDOFF.md 的步骤开始
+# 前端
+cd frontend
+npm install
 ```
 
-### 如果你是产品负责人
+### 2. 配置环境变量
 
 ```bash
-# 了解项目背景
-cat brief.md
-
-# 了解系统设计
-cat ARCHITECTURE.md | head -200
-
-# 查看现有输出
-open ai-insight-hub/output/daily-2026-07-08.html
+cd backend
+cp .env.example .env
+# 编辑 .env，填入 DEEPSEEK_API_KEY（从 https://platform.deepseek.com 获取）
 ```
+
+### 3. 初始化数据库
+
+```bash
+cd backend
+node src/db/init.js
+node src/services/sync-aihot.js
+sqlite3 data/app.db < src/db/schema-v2.sql
+```
+
+### 4. 启动服务
+
+```bash
+# 后端（Terminal 1）
+cd backend && node src/server.js
+
+# 前端（Terminal 2）
+cd frontend && npm run dev
+```
+
+### 5. 访问应用
+
+http://localhost:5173/
 
 ---
 
-## 📁 目录说明
+## 📂 项目结构
 
 ```
 knowledge-workbench/
+├── backend/              # 后端代码
+│   ├── src/
+│   │   ├── server.js     # Express 服务器
+│   │   ├── db/           # 数据库
+│   │   │   ├── schema.sql        # v0.1.0 表结构
+│   │   │   ├── schema-v2.sql     # v0.2.0 新增表
+│   │   │   ├── workspaces.js     # 工作区数据操作
+│   │   │   └── db.js             # 基础数据操作
+│   │   └── services/     # 业务服务
+│   │       ├── llm.js            # LLM 集成
+│   │       ├── stats.js          # 成本统计
+│   │       └── sync-aihot.js     # AI HOT 同步
+│   └── data/app.db       # SQLite 数据库
 │
-├── 📄 核心文档（根目录）
-│   ├── README.md                    # 本文档
-│   ├── HANDOFF-SUMMARY.md          # ⭐ 交接总结（从这里开始）
-│   ├── MVP-HANDOFF.md              # 📖 MVP 开发指南
-│   ├── ARCHITECTURE.md             # 🏗️ 完整架构设计
-│   ├── brief.md                    # 项目背景
-│   └── CLEANUP-PLAN.md             # 清理方案说明
+├── frontend/             # 前端代码
+│   ├── src/
+│   │   ├── App.jsx       # 路由入口
+│   │   ├── pages/
+│   │   │   ├── WorkspacePage.jsx        # 主页面
+│   │   │   ├── WorkspaceListPage.jsx    # 工作区列表
+│   │   │   ├── WorkspaceDetailPage.jsx  # 工作区详情
+│   │   │   └── ConversationPage.jsx     # 对话页面
+│   │   └── components/workspace/
+│   │       ├── Sidebar.jsx              # 左侧导航
+│   │       ├── MainContent.jsx          # 中间内容
+│   │       ├── ChatInterface.jsx        # 聊天界面
+│   │       ├── MaterialsPanel.jsx       # 材料面板
+│   │       └── CostTracker.jsx          # 成本追踪
+│   └── package.json
 │
-├── 📂 ai-insight-hub/              # 现有系统（v1，参考用）
-│   ├── scripts/                    # 脚本
-│   ├── data/                       # 数据
-│   └── output/                     # HTML 输出
+├── docs/                 # 核心文档
+│   ├── README.md
+│   └── DECISIONS.md      # 决策记录
 │
-├── 📂 ai-insight-hub-v2/           # 新系统（待开发）
-│   ├── backend/                    # 后端（Express + SQLite）
-│   ├── frontend/                   # 前端（React + Tailwind）
-│   └── docs/                       # 文档
+├── handoff/              # 交接文档
+│   ├── QUICK-CONTEXT.md
+│   └── NEW-SESSION-HANDOFF.md
 │
-└── 📂 archive/                     # 归档文档
-    ├── 2026-07-06-initial-exploration/  # 初期探索文档
-    └── history/                         # 历史记录
+├── iterations/           # 迭代记录
+│   ├── 2026-07-09-ui-redesign.md
+│   └── 2026-07-09-v0.2.0-workspace-chat.md
+│
+└── planning/
+    └── PRD.md
 ```
 
 ---
 
-## 🗓️ 项目时间线
+## 🛠 技术栈
 
-- **2026-07-05**: 项目启动，初步探索
-- **2026-07-06**: 完成 v1 原型（ai-insight-hub）
-- **2026-07-08**: 完成完整架构设计，交接给 Sonnet 5
+### 后端
+- Node.js 26 + Express
+- SQLite (node:sqlite)
+- OpenAI SDK（Deepseek 兼容）
+- SSE（流式输出）
 
----
-
-## 🎯 MVP 目标
-
-**Phase 1 (Week 1-2)**: 验证核心价值
-
-只做 3 件事：
-1. ✅ **筛选**: 从 AI HOT 100 条筛到 20 条
-2. ✅ **展示**: Web 界面浏览
-3. ✅ **保存**: 导出到 Obsidian
-
-**验证标准**:
-- 推荐准确率 >70%
-- 用户连续使用 3 天
-- 每天保存 >3 条
+### 前端
+- React 18 + Vite
+- Tailwind CSS
+- Axios
+- react-markdown
 
 ---
 
-## 💡 核心原则
+## 💰 成本控制
 
-1. **不重复造轮子** - 直接使用 AI HOT 的摘要，不重新生成
-2. **先验证价值** - MVP 只做筛选+展示+保存
-3. **渐进式迭代** - Phase 1 → 2 → 3 → 4，每阶段独立验证
-4. **成本可控** - Phase 1 不调用 LLM，预期 $0/月
+### Deepseek 定价
+- **价格**: ¥1/M tokens
+- **预算**: ¥100/月
+- **预警**: 80% 时提醒
 
----
-
-## 📧 团队
-
-- **产品负责人**: @heyuxuan
-- **架构设计**: Opus 4.8
-- **开发实施**: Sonnet 5
+### 使用建议
+- 日常分析优先 Deepseek（便宜）
+- 高质量写作考虑 Claude（可选）
+- 超预算可跳转到 Claude.ai/ChatGPT
 
 ---
 
-## 🔗 相关资源
+## 🔗 主要 API 端点
 
-- **AI HOT**: https://aihot.virxact.com
-- **AI HOT API**: https://aihot.virxact.com/api/public/items
+### 工作区
+- `POST /api/workspaces` - 创建工作区
+- `GET /api/workspaces` - 获取工作区列表
+- `GET /api/workspaces/:id` - 获取工作区详情
+
+### 对话
+- `POST /api/conversations` - 创建对话
+- `GET /api/conversations/:id` - 获取对话详情
+- `POST /api/conversations/:id/messages` - 添加消息
+- `POST /api/llm/chat` - 流式聊天（SSE）
+
+### 统计
+- `GET /api/stats/cost` - 成本统计
+
+完整 API 文档见 [handoff/NEW-SESSION-HANDOFF.md](handoff/NEW-SESSION-HANDOFF.md)
 
 ---
 
-**最后更新**: 2026-07-08  
-**文档版本**: v1.0
+## 📖 文档
 
-祝开发顺利！🚀
+- **快速上手**: [handoff/QUICK-CONTEXT.md](handoff/QUICK-CONTEXT.md)
+- **完整交接**: [handoff/NEW-SESSION-HANDOFF.md](handoff/NEW-SESSION-HANDOFF.md)
+- **决策记录**: [docs/DECISIONS.md](docs/DECISIONS.md)
+- **迭代记录**: [iterations/](iterations/)
+
+---
+
+## 🐛 已知问题
+
+1. **Deepseek API Key 需配置** - 需要用户自行申请和配置
+2. **Token 计数为估算** - 实际成本可能有偏差
+3. **材料拖拽未实现** - 无法从推送页添加文章到对话
+4. **产出面板为占位** - 结构化产出功能未实现
+5. **Claude API 未集成** - 只支持 Deepseek
+
+---
+
+## 🚧 Roadmap
+
+### v0.2.1（本周）
+- [ ] 配置 Deepseek API Key
+- [ ] 完善材料拖拽功能
+- [ ] 优化流式输出
+- [ ] 错误处理完善
+
+### v0.3.0（下周）
+- [ ] 产出面板实现
+- [ ] 主题追踪初版
+- [ ] 完整正文接入
+- [ ] 后端全文搜索
+
+### v0.4.0（未来）
+- [ ] 知识图谱
+- [ ] Claude API 集成
+- [ ] 移动端优化
+
+---
+
+**最后更新**: 2026-07-09  
+**当前版本**: v0.2.0  
+**下一步**: 配置 API Key 并测试完整流程

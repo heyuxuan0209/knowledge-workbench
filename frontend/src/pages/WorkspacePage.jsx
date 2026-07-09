@@ -3,7 +3,7 @@ import axios from 'axios'
 import Sidebar from '../components/workspace/Sidebar'
 import MainContent from '../components/workspace/MainContent'
 
-export default function WorkspacePage() {
+export default function WorkspacePage({ onNavigateToWorkspaces }) {
   const [currentView, setCurrentView] = useState('inbox')
   const [items, setItems] = useState([])
   const [selectedItem, setSelectedItem] = useState(null)
@@ -11,7 +11,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     fetchItems()
-    loadMockWorkspaces()
+    fetchWorkspaces()
   }, [])
 
   const fetchItems = async () => {
@@ -23,21 +23,31 @@ export default function WorkspacePage() {
     }
   }
 
-  const loadMockWorkspaces = () => {
-    setWorkspaces([
-      { id: 1, name: 'Multi-agent研究' },
-      { id: 2, name: '产品设计参考' }
-    ])
+  const fetchWorkspaces = async () => {
+    try {
+      const response = await axios.get('/api/workspaces')
+      setWorkspaces(response.data.data || [])
+    } catch (error) {
+      console.error('Failed to fetch workspaces:', error)
+    }
+  }
+
+  const handleViewChange = (view) => {
+    if (view === 'workspace') {
+      onNavigateToWorkspaces()
+    } else {
+      setCurrentView(view)
+    }
   }
 
   return (
     <div className="h-screen bg-stone-50 flex">
       <Sidebar
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={handleViewChange}
         workspaces={workspaces}
       />
-      
+
       <MainContent
         currentView={currentView}
         items={items}
