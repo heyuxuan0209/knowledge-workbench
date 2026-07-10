@@ -1,12 +1,40 @@
-export default function Sidebar({ 
-  currentView, 
-  onViewChange, 
+import { useState, useEffect } from 'react'
+import axios from 'axios'
+
+export default function Sidebar({
+  currentView,
+  onViewChange,
   workspaces,
-  currentWorkspace,
-  currentChat,
-  onWorkspaceSelect,
-  onChatSelect 
+  onSelectConversation,
+  selectedConversation
 }) {
+  const [expandedWorkspace, setExpandedWorkspace] = useState(null)
+  const [conversations, setConversations] = useState([])
+
+  useEffect(() => {
+    if (expandedWorkspace) {
+      fetchConversations(expandedWorkspace)
+    }
+  }, [expandedWorkspace])
+
+  const fetchConversations = async (workspaceId) => {
+    try {
+      const response = await axios.get(`/api/workspaces/${workspaceId}`)
+      setConversations(response.data.data.conversations || [])
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error)
+    }
+  }
+
+  const handleWorkspaceClick = (workspaceId) => {
+    if (expandedWorkspace === workspaceId) {
+      setExpandedWorkspace(null)
+      setConversations([])
+    } else {
+      setExpandedWorkspace(workspaceId)
+    }
+  }
+
   return (
     <div className="w-64 border-r border-stone-200 bg-white flex flex-col">
       {/* Logo */}
@@ -51,19 +79,45 @@ export default function Sidebar({
         />
       </div>
 
-      {/* Workspaces */}
+      {/* Workspaces with Conversations */}
       <div className="flex-1 overflow-y-auto p-2">
-        <div className="text-xs font-medium text-stone-500 px-3 py-2">工作区</div>
+        <div className="text-xs font-medium text-stone-500 px-3 py-2">工作区对话</div>
         {workspaces.map(workspace => (
           <div key={workspace.id} className="mb-1">
-            <button className="w-full text-left px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 rounded">
-              {workspace.name}
+            <button
+              onClick={() => handleWorkspaceClick(workspace.id)}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 rounded"
+            >
+              <span className="truncate">{workspace.name}</span>
+              <svg
+                className={`w-4 h-4 transition-transform ${expandedWorkspace === workspace.id ? 'rotate-90' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </button>
+
+            {expandedWorkspace === workspace.id && (
+              <div className="ml-3 mt-1 space-y-1">
+                {conversations.map(conv => (
+                  <button
+                    key={conv.id}
+                    onClick={() => onSelectConversation(conv.id)}
+                    className={`w-full text-left px-3 py-1.5 text-xs rounded transition-colors ${
+                      selectedConversation === conv.id
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-stone-600 hover:bg-stone-50'
+                    }`}
+                  >
+                    <div className="truncate">{conv.title}</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
-        <button className="w-full text-left px-3 py-2 text-sm text-stone-500 hover:bg-stone-50 rounded">
-          + 新工作区
-        </button>
       </div>
 
       {/* Resources */}
