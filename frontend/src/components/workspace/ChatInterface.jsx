@@ -18,6 +18,18 @@ export default function ChatInterface({ conversationId, messages: initialMessage
     scrollToBottom()
   }, [messages, streamingContent])
 
+  useEffect(() => {
+    const handleInsertMaterial = (e) => {
+      const { material } = e.detail
+      const reference = `\n\n[引用材料: ${material.title}]\n来源: ${material.source}\n摘要: ${material.summary}\n\n`
+      setInput(prev => prev + reference)
+      textareaRef.current?.focus()
+    }
+
+    window.addEventListener('insertMaterial', handleInsertMaterial)
+    return () => window.removeEventListener('insertMaterial', handleInsertMaterial)
+  }, [])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
