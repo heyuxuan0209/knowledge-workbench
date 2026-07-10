@@ -83,6 +83,12 @@ export default function ConversationPage({ workspaceId, conversationId, onBack }
         conversationId={conversationId}
         materials={conversation.materials}
         onRefresh={handleRefresh}
+        onInsertMaterial={(material) => {
+          // 通过自定义事件通知 ChatInterface
+          window.dispatchEvent(new CustomEvent('insertMaterial', {
+            detail: { material }
+          }))
+        }}
       />
     </div>
   )

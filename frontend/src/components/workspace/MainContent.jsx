@@ -101,8 +101,22 @@ export default function MainContent({
           {displayItems.slice(0, 20).map(item => (
             <div
               key={item.id}
+              draggable={true}
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/json', JSON.stringify({
+                  id: item.id,
+                  title: item.title,
+                  summary: item.summary,
+                  url: item.url,
+                  source: item.source
+                }))
+                e.currentTarget.style.opacity = '0.5'
+              }}
+              onDragEnd={(e) => {
+                e.currentTarget.style.opacity = '1'
+              }}
               onClick={() => onItemSelect(item)}
-              className="bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-300 hover:shadow-md cursor-pointer transition-all group"
+              className="bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-300 hover:shadow-md cursor-move transition-all group"
             >
               <div className="flex gap-4">
                 <div className="flex-1 min-w-0">
