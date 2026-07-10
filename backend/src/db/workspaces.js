@@ -211,6 +211,21 @@ export function getMessagesByConversation(conversationId) {
   return messages;
 }
 
+// 获取对话的材料列表
+export function getMaterialsByConversation(conversationId) {
+  const db = getDatabase();
+  const materials = db.prepare(`
+    SELECT cm.*, i.title, i.url, i.summary, i.source
+    FROM conversation_materials cm
+    JOIN items i ON cm.item_id = i.id
+    WHERE cm.conversation_id = ?
+    ORDER BY cm.added_at DESC
+  `).all(conversationId);
+
+  db.close();
+  return materials;
+}
+
 // 删除对话
 export function deleteConversation(id) {
   const db = getDatabase();
