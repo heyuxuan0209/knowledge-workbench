@@ -366,21 +366,43 @@ app.post('/api/llm/chat', async (req, res) => {
       });
     }
 
-    // 获取对话历史
-    const { getMessagesByConversation, addMessage } = await import('./db/workspaces.js');
+    // 获取对话历史和材料
+    const { getMessagesByConversation, getMaterialsByConversation, addMessage } = await import('./db/workspaces.js');
     const history = getMessagesByConversation(conversationId);
+    const materials = getMaterialsByConversation(conversationId);
 
     // 保存用户消息
     const userMessage = addMessage(conversationId, 'user', message);
 
+    // 构建材料上下文（作为用户消息的前缀）
+    let enhancedMessage = message;
+    if (materials.length > 0) {
+      let materialsContext = '# 参考材料\n\n';
+      materials.forEach((m, i) => {
+        materialsContext += `## 材料${i + 1}: ${m.title}\n`;
+        materialsContext += `来源: ${m.source || m.url}\n`;
+        if (m.summary) {
+          materialsContext += `摘要: ${m.summary}\n`;
+        }
+        materialsContext += '\n';
+      });
+      materialsContext += '---\n\n请基于以上材料回答我的问题。如果材料中有相关信息，请引用并说明。\n\n';
+      materialsContext += `问题: ${message}`;
+
+      enhancedMessage = materialsContext;
+    }
+
     // 构建消息上下文
-    const messages = [
-      ...history.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      })),
-      { role: 'user', content: message }
-    ];
+    const messages = [];
+
+    // 添加历史消息（不包括当前这条）
+    messages.push(...history.slice(0, -1).map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })));
+
+    // 添加增强后的当前用户消息
+    messages.push({ role: 'user', content: enhancedMessage });
 
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream');
@@ -416,6 +438,7 @@ app.post('/api/llm/chat', async (req, res) => {
 
     res.end();
   } catch (error) {
+    console.error('[Chat] Error:', error);
     res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
     res.end();
   }
