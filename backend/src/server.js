@@ -14,7 +14,179 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// 文章相关 API
+// ========== v3 Contents API（新架构，Feed 主页读取的是这里，不是下面的旧 /api/items） ==========
+
+app.get('/api/contents', async (req, res) => {
+  try {
+    const { getContents } = await import('./db/contents.js');
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const contents = getContents(limit, offset);
+
+    res.json({
+      success: true,
+      data: contents,
+      count: contents.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Mode 1 即兴分析：接收用户粘贴的链接/文本，归一化提取内容，并在摄入成功时自动翻译成中文
+// （一步到位，前端不需要再单独调翻译接口）。摄入失败（如无字幕/抓取失败）时跳过翻译，
+// 直接把摄入失败的原因透传给前端。对话（#8）是下一步，这里只负责「摄入 + 翻译」。
+app.post('/api/content/ingest', async (req, res) => {
+  try {
+    const { input } = req.body;
+
+    if (!input) {
+      return res.status(400).json({
+        success: false,
+        error: 'input is required'
+      });
+    }
+
+    const { ingest } = await import('./services/content-ingestion.js');
+    const ingested = await ingest(input);
+
+    if (ingested.fetchStatus !== 'success') {
+      return res.json({
+        success: false,
+        data: ingested
+      });
+    }
+
+    const { translateContent } = await import('./services/translation.js');
+    const translation = await translateContent(ingested);
+
+    res.json({
+      success: true,
+      data: { ...ingested, ...translation }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Mode 1 即兴分析对话（SSE 流式）。无状态设计：不落库，前端每次请求带上完整 messages
+// 历史；材料来自 contentIds（已入库的 Feed 内容）和/或 adHocContents（用户临时粘贴、
+// 已经过 /api/content/ingest 摄入+翻译的结果，未入库）。两者可同时存在。
+app.post('/api/chat/ephemeral', async (req, res) => {
+  try {
+    const { contentIds = [], adHocContents = [], messages } = req.body;
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'messages is required and must be a non-empty array'
+      });
+    }
+    if (contentIds.length === 0 && adHocContents.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'at least one of contentIds or adHocContents is required'
+      });
+    }
+
+    const { buildMessagesWithContext } = await import('./services/ephemeral-chat.js');
+    const contextInjectedMessages = await buildMessagesWithContext(contentIds, adHocContents, messages);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const { streamChat } = await import('./services/llm.js');
+
+    for await (const chunk of streamChat(contextInjectedMessages, 'deepseek')) {
+      if (chunk.type === 'content') {
+        res.write(`data: ${JSON.stringify({ type: 'content', content: chunk.content })}\n\n`);
+      } else if (chunk.type === 'done') {
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: chunk.tokens, cost: chunk.cost })}\n\n`);
+      } else if (chunk.type === 'error') {
+        res.write(`data: ${JSON.stringify({ type: 'error', error: chunk.error })}\n\n`);
+      }
+    }
+
+    res.end();
+  } catch (error) {
+    console.error('[Ephemeral Chat] Error:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+    res.end();
+  }
+});
+
+// 单篇内容的摘要生成（基于原文，见 content-body-resolver.js 的抓取/降级策略）。
+// 非流式：摘要生成一次性返回即可，不需要 SSE。
+app.post('/api/content/:id/summary', async (req, res) => {
+  try {
+    const { getContentById } = await import('./db/contents.js');
+    const content = getContentById(req.params.id);
+
+    if (!content) {
+      return res.status(404).json({ success: false, error: 'Content not found' });
+    }
+
+    const { generateSummary } = await import('./services/content-analysis.js');
+    const result = await generateSummary(content);
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 单篇内容的观点提取（stance + points，架构文档 §4 ai.perspectives 的数据来源）。
+app.post('/api/content/:id/perspectives', async (req, res) => {
+  try {
+    const { getContentById } = await import('./db/contents.js');
+    const content = getContentById(req.params.id);
+
+    if (!content) {
+      return res.status(404).json({ success: false, error: 'Content not found' });
+    }
+
+    const { extractPerspectives } = await import('./services/content-analysis.js');
+    const result = await extractPerspectives(content);
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/contents/:id', async (req, res) => {
+  try {
+    const { getContentById } = await import('./db/contents.js');
+    const content = getContentById(req.params.id);
+
+    if (!content) {
+      return res.status(404).json({
+        success: false,
+        error: 'Content not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: content
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 文章相关 API（v0.1 旧架构，读写 items 表，即将被上面的 /api/contents 取代，尚未移除以免破坏现有前端页面）
 app.get('/api/items', async (req, res) => {
   try {
     const { getItems } = await import('./db/db.js');
