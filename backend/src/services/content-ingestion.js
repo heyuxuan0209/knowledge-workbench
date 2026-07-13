@@ -1,10 +1,18 @@
 import axios from 'axios';
-import { ProxyAgent } from 'undici';
 import { YoutubeTranscript, YoutubeTranscriptDisabledError, YoutubeTranscriptNotAvailableError,
   YoutubeTranscriptTooManyRequestError, YoutubeTranscriptVideoUnavailableError,
   YoutubeTranscriptNotAvailableLanguageError } from 'youtube-transcript';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
+
+// Node.js 26+ 内置 undici，使用 node: 前缀导入
+let ProxyAgent;
+try {
+  const undici = await import('node:undici');
+  ProxyAgent = undici.ProxyAgent;
+} catch (err) {
+  console.warn('ProxyAgent not available:', err.message);
+}
 
 // Mode 1 即兴分析的入口：把用户丢进来的任意输入（YouTube 链接/网页链接/纯文本）
 // 归一成统一格式，供后续翻译/对话/摘要流水线使用。
