@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Workbench - Feed</title>
+    <link rel="stylesheet" href="feed-v1.css">
+</head>
+<body>
+    <div class="layout">
+        <!-- 左侧导航（可折叠 + 可拖拽宽度） -->
+        <aside class="sidebar" id="sidebar">
+            <button class="rail-toggle-btn sidebar-collapse-btn" id="sidebarCollapseBtn" title="折叠导航">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 18l-6-6 6-6"/>
+                </svg>
+            </button>
+            <div class="sidebar-content">
+                <div class="logo">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span class="logo-text">Research</span>
+                </div>
+
+                <nav class="nav">
+                    <a href="#" class="nav-item active">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                        <span>Feed</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span>Topics</span>
+                        <span class="badge" id="topicsBadge">0</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        <span>Saved</span>
+                    </a>
+                </nav>
+
+                <div class="nav-footer">
+                    <a href="#" class="nav-item" id="navSources">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        <span>信息源</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/>
+                        </svg>
+                        <span>Settings</span>
+                    </a>
+                </div>
+            </div>
+        </aside>
+        <div class="drag-handle" id="sidebarDragHandle"></div>
+
+        <!-- 折叠后露出的左侧窄条 -->
+        <button class="rail-strip left-rail" id="sidebarRail" title="展开导航">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+            </svg>
+        </button>
+
+        <!-- 主内容区 -->
+        <main class="main">
+            <!-- Feed 视图（默认显示） -->
+            <div id="feedView" class="view-container">
+                <div class="main-header">
+                    <div class="paste-bar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        <input type="text" id="pasteInput" placeholder="粘贴链接/文本开始分析...">
+                        <button class="btn-analyze" id="analyzeBtn" disabled>分析</button>
+                    </div>
+                </div>
+
+                <div class="main-content">
+                    <!-- 近期焦点：占位状态（数据依赖 Story 聚类，尚未实现） -->
+                    <section class="focus-section">
+                        <div class="focus-header">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/>
+                            </svg>
+                            <span>近期焦点</span>
+                            <span class="focus-status">尚未上线 · 依赖 Story 聚类（见 docs/WIREFRAMES.md 待确认事项）</span>
+                        </div>
+                    </section>
+
+                    <div class="feed-toolbar">
+                        <span class="toolbar-label">排序:</span>
+                        <select class="sort-select">
+                            <option>综合热度</option>
+                            <option>最新</option>
+                        </select>
+                        <span class="toolbar-label">过滤:</span>
+                        <select class="filter-select">
+                            <option>全部</option>
+                        </select>
+                        <span class="feed-count" id="feedCount"></span>
+                    </div>
+
+                    <div id="feedList" class="feed-list">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 信息源管理视图（默认隐藏） -->
+            <div id="sourcesView" class="view-container" style="display: none;">
+                <div class="main-header">
+                    <h1 class="page-title">信息源管理</h1>
+                </div>
+
+                <div class="main-content">
+                    <div class="add-source-section">
+                        <div class="add-source-input-group">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="16"/>
+                                <line x1="8" y1="12" x2="16" y2="12"/>
+                            </svg>
+                            <input type="text" id="addSourceInput" placeholder="粘贴链接（博客、GitHub、公众号文章）或输入信息源名称">
+                            <button class="btn-primary" id="addSourceBtn">添加</button>
+                        </div>
+                        <p class="add-source-hint">支持：RSS/Atom 订阅、GitHub 仓库、微信公众号文章链接</p>
+                    </div>
+
+                    <div class="sources-list">
+                        <h3 class="sources-list-title">当前追踪 (<span id="sourcesCount">0</span>)</h3>
+                        <div id="sourcesList" class="sources-grid">
+                            <div class="empty-state">尚未添加信息源</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 折叠后露出的右侧窄条 -->
+        <button class="rail-strip right-rail" id="aiPanelRail" title="展开 Quick Analysis 面板">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6"/>
+            </svg>
+            <span class="rail-badge" id="railBadge" style="display:none;">0</span>
+        </button>
+        <div class="drag-handle" id="aiPanelDragHandle"></div>
+
+        <!-- 右侧 AI 面板（可折叠 + 可拖拽宽度） -->
+        <aside class="ai-panel" id="aiPanel">
+            <button class="rail-toggle-btn ai-panel-collapse-btn" id="collapseBtn" title="折叠面板">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18l6-6-6-6"/>
+                </svg>
+            </button>
+            <div class="ai-panel-content" id="aiPanelContent">
+                <!-- 默认视图：选中材料 + 开始分析 -->
+                <div id="quickAnalysisView">
+                    <div class="ai-panel-header">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <h2>Quick Analysis</h2>
+                    </div>
+                    <p class="ai-panel-subtitle">选中内容即时分析</p>
+                    <div id="selectedItemsContainer" style="display:none;">
+                        <div class="selected-items">
+                            <div class="selected-items-title">已选中 (<span id="selectedCount">0</span>)</div>
+                            <div id="selectedItemsList"></div>
+                        </div>
+                        <button class="btn-primary" id="startAnalysisBtn">开始分析</button>
+                    </div>
+                    <div id="emptyState" class="empty-state">等待选择</div>
+                </div>
+
+                <!-- 对话视图：选中内容后切入 -->
+                <div id="chatView" class="chat-view">
+                    <div class="chat-header">
+                        <button class="btn-back" id="backBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                            </svg>
+                            <span>返回</span>
+                        </button>
+                        <span style="font-size: 0.8125rem; color: var(--text-muted);">基于 <span id="chatItemCount">0</span> 篇内容</span>
+                    </div>
+
+                    <div class="chat-messages" id="chatMessages"></div>
+
+                    <div class="chat-input-area">
+                        <textarea class="chat-input" id="chatInput" placeholder="输入你的问题..." rows="3"></textarea>
+                        <div class="chat-actions">
+                            <button class="btn-secondary" id="chatSaveBtn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                </svg>
+                                <span>保存到 Topic</span>
+                            </button>
+                            <button class="btn-primary" id="chatSendBtn" style="width:auto; flex-shrink:0; padding:0.625rem 1.25rem;">发送</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="feed-v1.js"></script>
+</body>
+</html>

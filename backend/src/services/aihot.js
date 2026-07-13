@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { parseAuthorFromAIHotSource, detectContentType } from './source-identity.js';
 
 const AIHOT_API_URL = process.env.AIHOT_API_URL || 'https://aihot.virxact.com/api/public/items';
 
@@ -54,20 +55,35 @@ export async function fetchAllTodayItems() {
   return allItems;
 }
 
+// 产出 contents 表字段 + 识别出的 sourceInfo（供 sync-aihot.js 落库时创建/关联 Source）。
+// 取代旧版输出 items 表字段的实现（v3 数据模型迁移，见 docs/WIREFRAMES.md、schema-v3.sql）。
 export function transformAIHotItem(item) {
-  return {
+  const hasEnTitle = Boolean(item.title_en && item.title_en.length > 0);
+  const now = new Date().toISOString();
+
+  const content = {
     id: item.id,
-    source: item.source || 'unknown',
-    title: item.title,
-    title_en: item.title_en || '',
+    content_type: detectContentType(item.url),
     url: item.url,
-    summary: item.summary || '',
-    category: item.category || 'tip',
-    score: item.score || 0,
-    pub_date: item.publishedAt || new Date().toISOString(),
-    extracted_keywords: null, // 将在同步后批量提取
-    user_action: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    published_at: item.publishedAt || now,
+
+    original_lang: hasEnTitle ? 'en' : 'zh',
+    has_translation: hasEnTitle ? 1 : 0,
+
+    zh_title: item.title,
+    zh_summary: item.summary || '',
+    en_title: item.title_en || null,
+
+    input_method: 'feed',
+    source_app: 'aihot',
+    fetch_status: 'success',
+    external_score: item.score || 0,
+
+    created_at: now,
+    updated_at: now
   };
+
+  const sourceInfo = parseAuthorFromAIHotSource(item.source);
+
+  return { content, sourceInfo };
 }

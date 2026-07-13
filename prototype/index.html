@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Workbench - Research Feed</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* 主色系 - 温暖米色调 */
+            --bg-base: #fcf9f0;
+            --bg-elevated: #f5f0e0;
+            --bg-sidebar: #ede8d9;
+            
+            /* 文字色 */
+            --text-primary: #2c1e12;
+            --text-secondary: #7a5c3a;
+            --text-muted: #b5a896;
+            
+            /* 强调色 */
+            --accent-primary: #b0631b;
+            --accent-secondary: #ff7f00;
+            
+            /* 边框 */
+            --border-default: #d4c4a4;
+            --border-light: #e8dfc8;
+            
+            /* 圆角 */
+            --radius-base: 1.125rem;
+            --radius-lg: 1.5rem;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 192px 1fr 320px;
+            height: 100vh;
+        }
+
+        /* 左侧导航 */
+        .sidebar {
+            background: var(--bg-sidebar);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-default);
+        }
+
+        .logo {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .logo-text {
+            margin-left: 0.5rem;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .nav {
+            flex: 1;
+            padding: 0.5rem;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.625rem 0.75rem;
+            border-radius: 0.75rem;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: rgba(176, 99, 27, 0.08);
+        }
+
+        .nav-item.active {
+            background: var(--bg-elevated);
+            font-weight: 500;
+        }
+
+        .nav-item .icon {
+            font-size: 1.125rem;
+        }
+
+        .nav-item .badge {
+            margin-left: auto;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .nav-footer {
+            padding: 1rem;
+            border-top: 1px solid var(--border-default);
+        }
+
+        /* 主内容区 */
+        .main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .main-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-light);
+            background: var(--bg-base);
+        }
+
+        .main-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-light);
+            border-radius: 0.75rem;
+            padding: 0.625rem 1rem;
+            font-size: 0.9375rem;
+            color: var(--text-primary);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(176, 99, 27, 0.1);
+        }
+
+        .filter-btn {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 0.75rem;
+            padding: 0.625rem 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }
+
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 2rem;
+        }
+
+        /* Feed 卡片 */
+        .feed-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-base);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .feed-card:hover {
+            border-color: var(--border-default);
+            box-shadow: 0 2px 12px rgba(45, 37, 32, 0.06);
+        }
+
+        .feed-card.selected {
+            border-color: var(--accent-primary);
+            border-width: 2px;
+            padding: calc(1.25rem - 1px);
+            background: linear-gradient(to right, rgba(176, 99, 27, 0.05), var(--bg-elevated));
+        }
+
+        .feed-card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 0.5rem;
+        }
+
+        .feed-card-summary {
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .feed-card-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .avatar {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+        }
+
+        .badge-platform {
+            background: rgba(176, 99, 27, 0.1);
+            color: var(--accent-primary);
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .feed-card-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-select {
+            background: transparent;
+            border: 1.5px solid var(--border-default);
+            border-radius: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .btn-select:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .btn-select.active {
+            background: rgba(176, 99, 27, 0.1);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .btn-follow {
+            background: transparent;
+            border: 1.5px solid var(--border-default);
+            border-radius: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-follow:hover {
+            border-color: var(--accent-secondary);
+            color: var(--accent-secondary);
+        }
+
+        .btn-follow.following {
+            background: rgba(255, 127, 0, 0.1);
+            border-color: var(--accent-secondary);
+            color: var(--accent-secondary);
+        }
+
+        /* 右侧 AI 面板 */
+        .ai-panel {
+            background: var(--bg-elevated);
+            border-left: 1px solid var(--border-default);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+
+        .ai-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .ai-panel-title {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .ai-panel-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .selected-items {
+            background: var(--bg-sidebar);
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .selected-items-title {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .selected-item {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            padding: 0.25rem 0;
+            display: flex;
+            align-items: start;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: #fcf9f0;
+            border: none;
+            border-radius: 9999px;
+            padding: 0.625rem 1.5rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            background: #a05818;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(176, 99, 27, 0.25);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .divider {
+            margin: 1.5rem 0;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .external-link-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .url-input {
+            background: var(--bg-base);
+            border: 1px solid var(--border-light);
+            border-radius: 0.75rem;
+            padding: 0.625rem 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .quick-questions {
+            margin-top: 1.5rem;
+        }
+
+        .quick-question {
+            padding: 0.625rem;
+            border-radius: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-bottom: 0.25rem;
+        }
+
+        .quick-question:hover {
+            background: var(--bg-sidebar);
+        }
+
+        /* 对话视图 */
+        .chat-view {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-view.active {
+            display: flex;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .btn-back {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .btn-back:hover {
+            color: var(--accent-primary);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .chat-message {
+            margin-bottom: 1.5rem;
+        }
+
+        .chat-message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .chat-message-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+        }
+
+        .chat-message-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .chat-message-content {
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            color: var(--text-primary);
+            padding-left: 32px;
+        }
+
+        .chat-input-area {
+            border-top: 1px solid var(--border-light);
+            padding-top: 1rem;
+        }
+
+        .chat-input {
+            background: var(--bg-base);
+            border: 1px solid var(--border-light);
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            font-size: 0.9375rem;
+            color: var(--text-primary);
+            resize: none;
+            width: 100%;
+            min-height: 80px;
+            margin-bottom: 0.75rem;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(176, 99, 27, 0.1);
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-secondary {
+            flex: 1;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-default);
+            border-radius: 9999px;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-sidebar);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <!-- 左侧导航 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">R</div>
+                <div class="logo-text">Research</div>
+            </div>
+            
+            <nav class="nav">
+                <a href="#" class="nav-item active">
+                    <span class="icon">📰</span>
+                    <span>Feed</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">🔖</span>
+                    <span>Sources</span>
+                    <span class="badge">12</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">🗂️</span>
+                    <span>Topics</span>
+                    <span class="badge">5</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="icon">💾</span>
+                    <span>Saved</span>
+                </a>
+            </nav>
+            
+            <div class="nav-footer">
+                <a href="#" class="nav-item">
+                    <span class="icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main">
+            <div class="main-header">
+                <h1 class="main-title">Research Feed</h1>
+                <div class="search-bar">
+                    <input type="text" class="search-input" placeholder="搜索文章...">
+                    <button class="filter-btn active">All</button>
+                    <button class="filter-btn">Followed</button>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <!-- Feed 卡片 1 -->
+                <div class="feed-card" data-id="1">
+                    <h3 class="feed-card-title">GPT-5 发布在即？OpenAI 内部泄露文档分析</h3>
+                    <p class="feed-card-summary">
+                        根据最新泄露的内部备忘录，OpenAI 正在加速 GPT-5 的训练进程。文档显示该模型在推理能力、多模态理解等方面有显著提升...
+                    </p>
+                    <div class="feed-card-meta">
+                        <div class="avatar"></div>
+                        <span>@Sam Altman</span>
+                        <span>·</span>
+                        <span class="badge-platform">YouTube</span>
+                        <span>·</span>
+                        <span>2h ago</span>
+                        <span>·</span>
+                        <span>5 min</span>
+                    </div>
+                    <div class="feed-card-actions">
+                        <button class="btn-select">
+                            <span>□</span>
+                            <span>选中</span>
+                        </button>
+                        <button class="btn-follow">
+                            <span>☆ 关注</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Feed 卡片 2 -->
+                <div class="feed-card" data-id="2">
+                    <h3 class="feed-card-title">RAG 系统的 7 个常见陷阱及解决方案</h3>
+                    <p class="feed-card-summary">
+                        许多团队在构建 RAG 系统时会遇到性能瓶颈。本文总结了从检索质量、上下文窗口管理到成本控制的 7 个关键问题...
+                    </p>
+                    <div class="feed-card-meta">
+                        <div class="avatar"></div>
+                        <span>@Eugene Yan</span>
+                        <span>·</span>
+                        <span class="badge-platform">Article</span>
+                        <span>·</span>
+                        <span>1d ago</span>
+                        <span>·</span>
+                        <span>8 min</span>
+                    </div>
+                    <div class="feed-card-actions">
+                        <button class="btn-select">
+                            <span>□</span>
+                            <span>选中</span>
+                        </button>
+                        <button class="btn-follow following">
+                            <span>★ 已关注</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Feed 卡片 3 -->
+                <div class="feed-card" data-id="3">
+                    <h3 class="feed-card-title">Agent 架构演进：从 ReAct 到 Multi-Agent 系统</h3>
+                    <p class="feed-card-summary">
+                        探讨 AI Agent 架构的演进路径，从简单的 ReAct 模式到复杂的多智能体协作系统，分析各自的适用场景和技术挑战...
+                    </p>
+                    <div class="feed-card-meta">
+                        <div class="avatar"></div>
+                        <span>@Andrew Ng</span>
+                        <span>·</span>
+                        <span class="badge-platform">Paper</span>
+                        <span>·</span>
+                        <span>3d ago</span>
+                        <span>·</span>
+                        <span>15 min</span>
+                    </div>
+                    <div class="feed-card-actions">
+                        <button class="btn-select">
+                            <span>□</span>
+                            <span>选中</span>
+                        </button>
+                        <button class="btn-follow">
+                            <span>☆ 关注</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧 AI 面板 -->
+        <aside class="ai-panel">
+            <!-- 默认视图 -->
+            <div id="quickAnalysisView">
+                <div class="ai-panel-header">
+                    <span>💬</span>
+                    <h2 class="ai-panel-title">Quick Analysis</h2>
+                </div>
+                <p class="ai-panel-subtitle">选中内容即时提问，无需创建工作区</p>
+                
+                <div id="selectedItemsContainer" style="display: none;">
+                    <div class="selected-items">
+                        <div class="selected-items-title">已选中 (<span id="selectedCount">0</span>):</div>
+                        <div id="selectedItemsList"></div>
+                    </div>
+                    
+                    <button class="btn-primary" id="startAnalysisBtn">
+                        <span>🤖</span>
+                        <span>开始分析</span>
+                    </button>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <div class="external-link-section">
+                    <div class="section-title">或粘贴外部链接：</div>
+                    <input type="text" class="url-input" placeholder="输入 YouTube、文章或论文链接...">
+                    <button class="btn-primary" disabled>
+                        <span>分析</span>
+                    </button>
+                </div>
+                
+                <div class="quick-questions">
+                    <div class="section-title">快捷问题：</div>
+                    <div class="quick-question">• 总结核心观点</div>
+                    <div class="quick-question">• 对比差异和共同点</div>
+                    <div class="quick-question">• 提取关键词和概念</div>
+                </div>
+            </div>
+
+            <!-- 对话视图 -->
+            <div id="chatView" class="chat-view">
+                <div class="chat-header">
+                    <button class="btn-back" id="backBtn">
+                        <span>←</span>
+                        <span>返回</span>
+                    </button>
+                    <span style="font-size: 0.875rem; color: var(--text-muted);">基于 <span id="chatItemCount">0</span> 篇内容</span>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <div class="chat-message-avatar"></div>
+                            <span class="chat-message-name">AI</span>
+                        </div>
+                        <div class="chat-message-content">
+                            我已经阅读了你选中的内容。这两篇文章都关注 AI 系统的实际应用场景。第一篇讨论 GPT-5 的能力提升，第二篇则聚焦 RAG 系统的工程实践。你想了解哪方面的内容？
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-area">
+                    <textarea class="chat-input" placeholder="输入你的问题..."></textarea>
+                    <div class="chat-actions">
+                        <button class="btn-secondary">💾 保存到 Topic</button>
+                        <button class="btn-primary">发送</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // 选中状态管理
+        let selectedCards = new Set();
+
+        // 卡片选择逻辑
+        document.querySelectorAll('.feed-card').forEach(card => {
+            const cardId = card.dataset.id;
+            const selectBtn = card.querySelector('.btn-select');
+            
+            // 点击卡片本身切换选中
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.btn-follow') || e.target.closest('.btn-select')) {
+                    return;
+                }
+                toggleCardSelection(card, cardId);
+            });
+            
+            // 点击选中按钮
+            selectBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleCardSelection(card, cardId);
+            });
+        });
+
+        function toggleCardSelection(card, cardId) {
+            if (selectedCards.has(cardId)) {
+                selectedCards.delete(cardId);
+                card.classList.remove('selected');
+                card.querySelector('.btn-select').classList.remove('active');
+                card.querySelector('.btn-select span:first-child').textContent = '□';
+            } else {
+                selectedCards.add(cardId);
+                card.classList.add('selected');
+                card.querySelector('.btn-select').classList.add('active');
+                card.querySelector('.btn-select span:first-child').textContent = '☑';
+            }
+            updateSelectedItems();
+        }
+
+        function updateSelectedItems() {
+            const container = document.getElementById('selectedItemsContainer');
+            const count = document.getElementById('selectedCount');
+            const list = document.getElementById('selectedItemsList');
+            const startBtn = document.getElementById('startAnalysisBtn');
+            
+            if (selectedCards.size > 0) {
+                container.style.display = 'block';
+                count.textContent = selectedCards.size;
+                
+                // 更新列表
+                list.innerHTML = '';
+                selectedCards.forEach(id => {
+                    const card = document.querySelector(`[data-id="${id}"]`);
+                    const title = card.querySelector('.feed-card-title').textContent;
+                    const item = document.createElement('div');
+                    item.className = 'selected-item';
+                    item.innerHTML = `<span>•</span><span>${title}</span>`;
+                    list.appendChild(item);
+                });
+                
+                startBtn.disabled = false;
+            } else {
+                container.style.display = 'none';
+                startBtn.disabled = true;
+            }
+        }
+
+        // 关注按钮
+        document.querySelectorAll('.btn-follow').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                btn.classList.toggle('following');
+                if (btn.classList.contains('following')) {
+                    btn.innerHTML = '<span>★ 已关注</span>';
+                } else {
+                    btn.innerHTML = '<span>☆ 关注</span>';
+                }
+            });
+        });
+
+        // 开始分析按钮
+        document.getElementById('startAnalysisBtn').addEventListener('click', () => {
+            document.getElementById('quickAnalysisView').style.display = 'none';
+            document.getElementById('chatView').classList.add('active');
+            document.getElementById('chatItemCount').textContent = selectedCards.size;
+        });
+
+        // 返回按钮
+        document.getElementById('backBtn').addEventListener('click', () => {
+            document.getElementById('chatView').classList.remove('active');
+            document.getElementById('quickAnalysisView').style.display = 'block';
+        });
+
+        // URL 输入框
+        const urlInput = document.querySelector('.url-input');
+        const urlAnalyzeBtn = urlInput.nextElementSibling;
+        
+        urlInput.addEventListener('input', (e) => {
+            urlAnalyzeBtn.disabled = e.target.value.trim().length === 0;
+        });
+    </script>
+</body>
+</html>

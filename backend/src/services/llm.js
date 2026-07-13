@@ -1,13 +1,23 @@
 import OpenAI from 'openai';
 
-// Deepseek API 配置（兼容 OpenAI SDK）
-const deepseekClient = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || '',
-  baseURL: 'https://api.deepseek.com'
-});
+// 延迟到首次调用才创建客户端（而不是模块加载时），因为 API key 来自 .env，只有先跑过
+// dotenv.config() 才读得到——ESM 的 import 在模块体自身代码之前就已解析执行完毕，如果在顶层
+// 创建客户端，任何"先 import 依赖了 llm.js 的模块、再调 dotenv.config()"的入口（比如 CLI 直接
+// `node src/services/sync-rss.js` 跑同步脚本）都会在 apiKey 为空字符串时提前抛错。
+let deepseekClient = null;
+function getDeepseekClient() {
+  if (!deepseekClient) {
+    deepseekClient = new OpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY || '',
+      baseURL: 'https://api.deepseek.com'
+    });
+  }
+  return deepseekClient;
+}
 
 // Claude API 配置（备选）
 // TODO: 后续实现 Anthropic SDK
+
 
 // 计算成本（Deepseek 价格：¥1/M tokens）
 function calculateCost(tokens, provider = 'deepseek') {
@@ -31,7 +41,7 @@ export async function* streamChat(messages, provider = 'deepseek', model = null)
     const modelName = model || 'deepseek-chat';
 
     try {
-      const stream = await deepseekClient.chat.completions.create({
+      const stream = await getDeepseekClient().chat.completions.create({
         model: modelName,
         messages: messages,
         stream: true
@@ -90,7 +100,7 @@ export async function chat(messages, provider = 'deepseek', model = null) {
     const modelName = model || 'deepseek-chat';
 
     try {
-      const response = await deepseekClient.chat.completions.create({
+      const response = await getDeepseekClient().chat.completions.create({
         model: modelName,
         messages: messages
       });

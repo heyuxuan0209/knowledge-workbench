@@ -6,11 +6,14 @@ import WorkspaceListPage from './pages/WorkspaceListPage'
 import WorkspaceDetailPage from './pages/WorkspaceDetailPage'
 import ConversationPage from './pages/ConversationPage'
 
+// 临时切回三栏布局（2026-07-13）：新的 Feed + Mode 1 弹窗（FeedPage.jsx）是按
+// ADR-011 实现的新架构入口，代码还在，没删——用户想先看一眼三栏布局再决定要不要切换，
+// 架构方向的决策先搁置，不是回退这个改动本身。要切回新版时把下面 return 换成 <FeedPage />。
 function App() {
   const [step, setStep] = useState('workspace') // onboarding | style | workspace
   const [userInterests, setUserInterests] = useState([])
 
-  // 新增：路由状态
+  // 路由状态
   const [route, setRoute] = useState('main') // main | workspace-list | workspace-detail | conversation
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState(null)
   const [currentConversationId, setCurrentConversationId] = useState(null)

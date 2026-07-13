@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Workbench - Research Feed</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="layout">
+        <!-- 左侧导航 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="logo-text">Research</div>
+            </div>
+            
+            <nav class="nav">
+                <a href="#" class="nav-item active">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    <span>Feed</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>Sources</span>
+                    <span class="badge">12</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>Topics</span>
+                    <span class="badge">5</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    <span>Saved</span>
+                </a>
+            </nav>
+            
+            <div class="nav-footer">
+                <a href="#" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/>
+                    </svg>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main">
+            <div class="main-header">
+                <h1 class="main-title">Research Feed</h1>
+                <div class="search-bar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" class="search-input" placeholder="搜索文章...">
+                    <button class="filter-btn active">All</button>
+                    <button class="filter-btn">Followed</button>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <!-- Feed 卡片 1 -->
+                <div class="feed-card" data-id="1">
+                    <h3 class="feed-card-title">GPT-5 发布在即？OpenAI 内部泄露文档分析</h3>
+                    <p class="feed-card-summary">
+                        根据最新泄露的内部备忘录，OpenAI 正在加速 GPT-5 的训练进程。文档显示该模型在推理能力、多模态理解等方面有显著提升...
+                    </p>
+                    <div class="feed-card-meta">
+                        <div class="avatar"></div>
+                        <span>Sam Altman</span>
+                        <span class="separator">·</span>
+                        <span class="badge-platform">YouTube</span>
+                        <span class="separator">·</span>
+                        <span>2h ago</span>
+                        <span class="separator">·</span>
+                        <span>5 min</span>
+                    </div>
+                    <div class="feed-card-actions">
+                        <button class="btn-select">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            </svg>
+                            <span>选中</span>
+                        </button>
+                        <button class="btn-follow">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            <span>关注</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Feed 卡片 2 -->
+                <div class="feed-card" data-id="2">
+                    <h3 class="feed-card-title">RAG 系统的 7 个常见陷阱及解决方案</h3>
+                    <p class="feed-card-summary">
+                        许多团队在构建 RAG 系统时会遇到性能瓶颈。本文总结了从检索质量、上下文窗口管理到成本控制的 7 个关键问题...
+                    </p>
+                    <div class="feed-card-meta">
+                        <div class="avatar"></div>
+                        <span>Eugene Yan</span>
+                        <span class="separator">·</span>
+                        <span class="badge-platform">Article</span>
+                        <span class="separator">·</span>
+                        <span>1d ago</span>
+                        <span class="separator">·</span>
+                        <span>8 min</span>
+                    </div>
+                    <div class="feed-card-actions">
+                        <button class="btn-select">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            </svg>
+                            <span>选中</span>
+                        </button>
+                        <button class="btn-follow following">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            <span>已关注</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Feed 卡片 3 -->
+                <div class="feed-card" data-id="3">
+                    <h3 class="feed-card-title">Agent 架构演进：从 ReAct 到 Multi-Agent 系统</h3>
+                    <p class="feed-card-summary">
+                        探讨 AI Agent 架构的演进路径，从简单的 ReAct 模式到复杂的多智能体协作系统，分析各自的适用场景和技术挑战...
+                    </p>
+                    <div class="feed-card-meta">
+                        <div class="avatar"></div>
+                        <span>Andrew Ng</span>
+                        <span class="separator">·</span>
+                        <span class="badge-platform">Paper</span>
+                        <span class="separator">·</span>
+                        <span>3d ago</span>
+                        <span class="separator">·</span>
+                        <span>15 min</span>
+                    </div>
+                    <div class="feed-card-actions">
+                        <button class="btn-select">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            </svg>
+                            <span>选中</span>
+                        </button>
+                        <button class="btn-follow">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            <span>关注</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧 AI 面板 -->
+        <aside class="ai-panel">
+            <!-- 默认视图 -->
+            <div id="quickAnalysisView">
+                <div class="ai-panel-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <h2 class="ai-panel-title">Quick Analysis</h2>
+                </div>
+                <p class="ai-panel-subtitle">选中内容即时提问，无需创建工作区</p>
+                
+                <div id="selectedItemsContainer" style="display: none;">
+                    <div class="selected-items">
+                        <div class="selected-items-title">已选中 (<span id="selectedCount">0</span>)</div>
+                        <div id="selectedItemsList"></div>
+                    </div>
+                    
+                    <button class="btn-primary" id="startAnalysisBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        <span>开始分析</span>
+                    </button>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <div class="external-link-section">
+                    <div class="section-title">或粘贴外部链接</div>
+                    <input type="text" class="url-input" placeholder="YouTube、文章或论文链接...">
+                    <button class="btn-primary" disabled>
+                        <span>分析</span>
+                    </button>
+                </div>
+                
+                <div class="quick-questions">
+                    <div class="section-title">快捷问题</div>
+                    <div class="quick-question">总结核心观点</div>
+                    <div class="quick-question">对比差异和共同点</div>
+                    <div class="quick-question">提取关键词和概念</div>
+                </div>
+            </div>
+
+            <!-- 对话视图 -->
+            <div id="chatView" class="chat-view">
+                <div class="chat-header">
+                    <button class="btn-back" id="backBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        <span>返回</span>
+                    </button>
+                    <span style="font-size: 0.875rem; color: var(--text-muted);">基于 <span id="chatItemCount">0</span> 篇内容</span>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <div class="chat-message-avatar"></div>
+                            <span class="chat-message-name">AI</span>
+                        </div>
+                        <div class="chat-message-content">
+                            我已经阅读了你选中的内容。这两篇文章都关注 AI 系统的实际应用场景。第一篇讨论 GPT-5 的能力提升，第二篇则聚焦 RAG 系统的工程实践。你想了解哪方面的内容？
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-area">
+                    <textarea class="chat-input" placeholder="输入你的问题..."></textarea>
+                    <div class="chat-actions">
+                        <button class="btn-secondary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            </svg>
+                            <span>保存到 Topic</span>
+                        </button>
+                        <button class="btn-primary">发送</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
