@@ -1,21 +1,23 @@
 import { fetchAllTodayItems, transformAIHotItem } from './aihot.js';
-import { saveItems } from '../db/db.js';
+import { upsertContents } from '../db/contents.js';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { resolve } from 'path';
 
 export async function syncAIHotData() {
   console.log('🔄 Starting AI HOT data sync...');
-  
+
   try {
     const rawItems = await fetchAllTodayItems();
-    
+
     if (rawItems.length === 0) {
       console.log('⚠️  No items fetched from AI HOT');
       return { success: false, count: 0 };
     }
 
     const transformedItems = rawItems.map(transformAIHotItem);
-    
-    const savedCount = saveItems(transformedItems);
-    
+
+    const savedCount = upsertContents(transformedItems);
+
     console.log('✅ AI HOT sync completed');
     return { success: true, count: savedCount };
   } catch (error) {
@@ -24,7 +26,7 @@ export async function syncAIHotData() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   syncAIHotData().then(result => {
     console.log('Sync result:', result);
     process.exit(result.success ? 0 : 1);
