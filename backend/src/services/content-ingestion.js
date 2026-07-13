@@ -5,14 +5,9 @@ import { YoutubeTranscript, YoutubeTranscriptDisabledError, YoutubeTranscriptNot
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 
-// Node.js 26+ 内置 undici，使用 node: 前缀导入
-let ProxyAgent;
-try {
-  const undici = await import('node:undici');
-  ProxyAgent = undici.ProxyAgent;
-} catch (err) {
-  console.warn('ProxyAgent not available:', err.message);
-}
+// YouTube 字幕提取需要的代理支持（可选）
+// 如果配置了 YOUTUBE_PROXY_URL，youtube-transcript 会使用代理访问
+// 不配置代理的话，国内环境可能无法访问 YouTube
 
 // Mode 1 即兴分析的入口：把用户丢进来的任意输入（YouTube 链接/网页链接/纯文本）
 // 归一成统一格式，供后续翻译/对话/摘要流水线使用。
@@ -30,10 +25,9 @@ try {
 // 不用 setGlobalDispatcher 污染整个进程（避免连 AI HOT / 本地 SQLite 等不需要代理的请求）。
 // 通过 YOUTUBE_PROXY_URL 环境变量配置，未设置时按无代理直连（生产环境部署在海外服务器时
 // 不需要代理，不应强制要求）。
-const youtubeProxyUrl = process.env.YOUTUBE_PROXY_URL;
-const youtubeFetch = youtubeProxyUrl
-  ? (url, opts) => fetch(url, { ...opts, dispatcher: new ProxyAgent(youtubeProxyUrl) })
-  : fetch;
+// 注意：youtube-transcript 在国内环境可能需要代理
+// 当前版本暂不支持代理配置（ProxyAgent 导入复杂）
+// 如果遇到网络问题，建议用户直接粘贴文字稿
 
 const YOUTUBE_HOSTS = ['youtube.com', 'youtu.be', 'm.youtube.com'];
 
@@ -72,7 +66,8 @@ async function ingestYoutube(input) {
   }
 
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId, { fetch: youtubeFetch });
+    // 尝试提取字幕（默认中文，如无则自动回退到视频默认语言）
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
     const body = transcript.map(t => t.text).join(' ');
 
     return {
