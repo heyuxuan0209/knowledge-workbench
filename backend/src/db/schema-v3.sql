@@ -157,6 +157,9 @@ CREATE TABLE IF NOT EXISTS contents (
     -- 外部平台的原生分数（如 AI HOT 的 score、HN 的 points），不同来源量纲不同，仅供参考
     external_score REAL,
 
+    -- 复用来源平台的标签（M2 新增，migrate-m2.js）：AI HOT 的 category/精选 等，JSON array
+    tags TEXT DEFAULT '[]',
+
     -- 用户交互
     user_read_status TEXT DEFAULT 'unread'
         CHECK (user_read_status IN ('unread', 'read', 'archived')),
@@ -280,6 +283,44 @@ CREATE TABLE IF NOT EXISTS notes (
 
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_content_id ON notes(content_id);
+
+-- ============================================================
+-- 7.6 Reports & Ideas — 节奏化简报与选题（M2 洞察层，ADR-008，migrate-m2.js）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    period_type TEXT NOT NULL
+        CHECK (period_type IN ('daily', 'weekly', 'monthly')),
+    period_key TEXT NOT NULL,           -- '2026-07-14' / '2026-W29' / '2026-07'
+    summary TEXT,                       -- AI 简报导语
+    focus TEXT DEFAULT '[]',            -- JSON: [{headline, whyHot, contentIds}]
+    tokens INTEGER DEFAULT 0,
+    cost_yuan REAL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(period_type, period_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_period ON reports(period_type, period_key DESC);
+
+CREATE TABLE IF NOT EXISTS ideas (
+    id TEXT PRIMARY KEY,
+    report_id TEXT,
+    title TEXT NOT NULL,
+    angle TEXT,
+    why_now TEXT,
+    consensus TEXT DEFAULT '[]',
+    non_consensus TEXT DEFAULT '[]',
+    supporting_content_ids TEXT DEFAULT '[]',
+    status TEXT DEFAULT 'suggested'
+        CHECK (status IN ('suggested', 'adopted', 'dismissed', 'created')),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status);
+CREATE INDEX IF NOT EXISTS idx_ideas_report ON ideas(report_id);
 
 -- ============================================================
 -- 8. Data Source Configs — 用户手动添加的信源配置

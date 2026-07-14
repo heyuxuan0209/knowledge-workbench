@@ -78,6 +78,8 @@ export function transformAIHotItem(item) {
     source_app: 'aihot',
     fetch_status: 'success',
     external_score: item.score || 0,
+    // 复用 AI HOT 的标签（ADR-012 复用优先）：category（如 tip/news）+ 精选标记
+    tags: JSON.stringify([item.category, item.selected ? '精选' : null].filter(Boolean)),
 
     created_at: now,
     updated_at: now
