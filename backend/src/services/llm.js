@@ -1,10 +1,18 @@
 import OpenAI from 'openai';
 
-// Deepseek API 配置（兼容 OpenAI SDK）
-const deepseekClient = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || '',
-  baseURL: 'https://api.deepseek.com'
-});
+// Deepseek API 配置（兼容 OpenAI SDK）。
+// 惰性初始化：ESM import 提升会让模块级 new OpenAI() 先于 CLI 脚本的 dotenv.config()
+// 执行，此时 DEEPSEEK_API_KEY 还没加载，新版 openai SDK 直接抛错。
+let _client = null;
+function deepseekClient() {
+  if (!_client) {
+    _client = new OpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY || '',
+      baseURL: 'https://api.deepseek.com'
+    });
+  }
+  return _client;
+}
 
 // Claude API 配置（备选）
 // TODO: 后续实现 Anthropic SDK
@@ -31,7 +39,7 @@ export async function* streamChat(messages, provider = 'deepseek', model = null)
     const modelName = model || 'deepseek-chat';
 
     try {
-      const stream = await deepseekClient.chat.completions.create({
+      const stream = await deepseekClient().chat.completions.create({
         model: modelName,
         messages: messages,
         stream: true
@@ -90,7 +98,7 @@ export async function chat(messages, provider = 'deepseek', model = null) {
     const modelName = model || 'deepseek-chat';
 
     try {
-      const response = await deepseekClient.chat.completions.create({
+      const response = await deepseekClient().chat.completions.create({
         model: modelName,
         messages: messages
       });

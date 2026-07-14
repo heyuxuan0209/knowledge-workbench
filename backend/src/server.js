@@ -208,6 +208,40 @@ app.post('/api/stories/rebuild', async (req, res) => {
   }
 });
 
+// ========== M2 洞察层：日报与选题（ADR-008） ==========
+
+// 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）
+app.post('/api/reports/generate', async (req, res) => {
+  try {
+    const { generateDailyReport } = await import('./services/report-generation.js');
+    const result = await generateDailyReport();
+    res.status(result.success ? 200 : 422).json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/reports/latest', async (req, res) => {
+  try {
+    const { getLatestReport } = await import('./services/report-generation.js');
+    const report = getLatestReport(req.query.period || 'daily');
+    res.json({ success: true, data: report }); // 无报告时 data 为 null，前端据此显示"生成日报"入口
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 选题状态流转：suggested → adopted（采纳）/ dismissed（忽略）/ created（已创作）
+app.patch('/api/ideas/:id', async (req, res) => {
+  try {
+    const { updateIdeaStatus } = await import('./services/report-generation.js');
+    const done = updateIdeaStatus(req.params.id, req.body?.status);
+    res.json({ success: done, message: done ? 'Idea updated' : 'Idea not found' });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // ========== M1 沉淀层：素材卡片 Notes（ADR-010） ==========
 
 app.get('/api/notes', async (req, res) => {

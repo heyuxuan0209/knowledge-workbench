@@ -1,0 +1,210 @@
+import { getDatabase } from '../db/init.js';
+import { randomUUID } from 'crypto';
+import { rebuildStories, getStories } from './story-clustering.js';
+import { chat } from './llm.js';
+
+// 日报生成（M2 洞察层核心，ADR-008）：
+// 聚类结果 + 已登记源的近期内容 → Deepseek → 今日焦点解读 + 2-3 个选题建议。
+// 节奏化：每天一份（UNIQUE period 约束，重跑覆盖），不实时刷新。
+//
+// 选题（Idea）= 切入角度 + 为什么是现在 + 共识/非共识 + 支撑素材引用，
+// 是"洞察 → 创作"的桥，不是资讯罗列。
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10); // '2026-07-14'
+}
+
+// 组装给 LLM 的素材：焦点簇（多源事件）+ 已登记源的近 48h 内容（用户明确关注的人）
+function gatherInputs(db) {
+  const stories = getStories(8);
+
+  const registeredContents = db.prepare(`
+    SELECT c.id, c.zh_title, c.zh_summary, s.display_name
+    FROM contents c
+    JOIN sources s ON c.source_id = s.id
+    WHERE s.registered_by_user = 1
+      AND datetime(COALESCE(c.published_at, c.created_at)) > datetime('now', '-2 days')
+    ORDER BY c.external_score DESC
+    LIMIT 15
+  `).all();
+
+  return { stories, registeredContents };
+}
+
+function buildPrompt(stories, registeredContents) {
+  const storyBlock = stories.map((s, i) => {
+    const members = s.members.map(m =>
+      `  - [${m.id}] ${(m.zh_title || m.en_title || '').slice(0, 80)}`
+    ).join('\n');
+    return `${i + 1}. 【${s.source_count}个来源】${s.headline}\n${members}`;
+  }).join('\n');
+
+  const registeredBlock = registeredContents.length
+    ? registeredContents.map(c => `- [${c.id}] ${c.display_name}: ${(c.zh_title || '').slice(0, 60)}`).join('\n')
+    : '（无）';
+
+  return `你是一位 AI 领域资深内容策划，服务对象是一位独立开发者/AI产品经理/自媒体人（发布渠道：X、公众号、抖音口播视频）。
+
+以下是他个人信息流最近的热点聚类（同一事件的多来源报道）和他主动关注的信息源动态：
+
+# 热点聚类
+${storyBlock}
+
+# 关注的信息源动态
+${registeredBlock}
+
+请输出 JSON（不要 markdown 代码块），结构如下：
+{
+  "summary": "50字以内的今日导语，点出最值得关注的1-2件事",
+  "focus": [
+    { "headline": "重新提炼的焦点标题（比原始标题更凝练）", "whyHot": "一句话说明为什么重要", "contentIds": ["相关内容id"] }
+  ],
+  "ideas": [
+    {
+      "title": "选题标题（吸引人但不标题党）",
+      "angle": "切入角度：具体怎么讲这个话题才有区分度",
+      "whyNow": "为什么是现在做这个选题（时间窗口/事件钩子）",
+      "consensus": ["行业已有共识点"],
+      "nonConsensus": ["有争议/各方立场不同的点"],
+      "contentIds": ["支撑素材的内容id"]
+    }
+  ]
+}
+
+要求：
+- focus 取最重要的 3-5 个，宁缺毋滥
+- ideas 出 2-3 个，优先选"有多源交叉验证 + 有争议点"的话题（争议是好内容的燃料）
+- contentIds 必须来自上面方括号里的真实 id，不得编造
+- 全部用中文`;
+}
+
+export async function generateDailyReport({ days = 7 } = {}) {
+  // 先重建聚类（本地零成本），保证日报基于最新数据
+  rebuildStories(days);
+
+  const db = getDatabase();
+  const { stories, registeredContents } = gatherInputs(db);
+
+  if (stories.length === 0 && registeredContents.length === 0) {
+    db.close();
+    return { success: false, error: '近期没有足够内容，请先同步数据源' };
+  }
+
+  const prompt = buildPrompt(stories, registeredContents);
+  const result = await chat([{ role: 'user', content: prompt }]);
+
+  if (!result.success) {
+    db.close();
+    return { success: false, error: `LLM 调用失败: ${result.error}` };
+  }
+
+  let parsed;
+  try {
+    // 容错：剥掉可能出现的 ```json 包裹
+    const cleaned = result.content.replace(/^```(json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    parsed = JSON.parse(cleaned);
+  } catch {
+    db.close();
+    return { success: false, error: `LLM 返回的不是合法 JSON: ${result.content.slice(0, 200)}` };
+  }
+
+  const validIds = new Set([
+    ...stories.flatMap(s => s.members.map(m => m.id)),
+    ...registeredContents.map(c => c.id),
+  ]);
+  const sanitizeIds = ids => (Array.isArray(ids) ? ids.filter(id => validIds.has(id)) : []);
+
+  const periodKey = todayKey();
+  const reportId = randomUUID();
+
+  db.exec('BEGIN');
+  try {
+    // 同日重跑：覆盖旧报告及其选题（保留已被用户采纳/创作的选题）
+    const old = db.prepare("SELECT id FROM reports WHERE period_type = 'daily' AND period_key = ?").get(periodKey);
+    if (old) {
+      db.prepare("DELETE FROM ideas WHERE report_id = ? AND status = 'suggested'").run(old.id);
+      db.prepare('DELETE FROM reports WHERE id = ?').run(old.id);
+    }
+
+    db.prepare(`
+      INSERT INTO reports (id, period_type, period_key, summary, focus, tokens, cost_yuan)
+      VALUES (?, 'daily', ?, ?, ?, ?, ?)
+    `).run(
+      reportId,
+      periodKey,
+      parsed.summary || '',
+      JSON.stringify((parsed.focus || []).map(f => ({
+        headline: f.headline,
+        whyHot: f.whyHot,
+        contentIds: sanitizeIds(f.contentIds),
+      }))),
+      result.tokens || 0,
+      result.cost || 0
+    );
+
+    const insertIdea = db.prepare(`
+      INSERT INTO ideas (id, report_id, title, angle, why_now, consensus, non_consensus, supporting_content_ids)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const idea of parsed.ideas || []) {
+      if (!idea.title) continue;
+      insertIdea.run(
+        randomUUID(),
+        reportId,
+        idea.title,
+        idea.angle || '',
+        idea.whyNow || '',
+        JSON.stringify(idea.consensus || []),
+        JSON.stringify(idea.nonConsensus || []),
+        JSON.stringify(sanitizeIds(idea.contentIds))
+      );
+    }
+
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    db.close();
+    throw err;
+  }
+
+  const report = getReportWithIdeas(db, reportId);
+  db.close();
+  console.log(`✅ Daily report generated: ${periodKey} (${report.ideas.length} ideas, ¥${result.cost?.toFixed(4)})`);
+  return { success: true, data: report };
+}
+
+function getReportWithIdeas(db, reportId) {
+  const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(reportId);
+  if (!report) return null;
+  report.focus = JSON.parse(report.focus || '[]');
+  report.ideas = db.prepare('SELECT * FROM ideas WHERE report_id = ? ORDER BY created_at').all(reportId)
+    .map(i => ({
+      ...i,
+      consensus: JSON.parse(i.consensus || '[]'),
+      non_consensus: JSON.parse(i.non_consensus || '[]'),
+      supporting_content_ids: JSON.parse(i.supporting_content_ids || '[]'),
+    }));
+  return report;
+}
+
+export function getLatestReport(periodType = 'daily') {
+  const db = getDatabase();
+  const row = db.prepare(
+    'SELECT id FROM reports WHERE period_type = ? ORDER BY period_key DESC LIMIT 1'
+  ).get(periodType);
+  const report = row ? getReportWithIdeas(db, row.id) : null;
+  db.close();
+  return report;
+}
+
+export function updateIdeaStatus(ideaId, status) {
+  if (!['suggested', 'adopted', 'dismissed', 'created'].includes(status)) {
+    throw new Error(`invalid status: ${status}`);
+  }
+  const db = getDatabase();
+  const result = db.prepare(
+    "UPDATE ideas SET status = ?, updated_at = datetime('now') WHERE id = ?"
+  ).run(status, ideaId);
+  db.close();
+  return result.changes > 0;
+}
