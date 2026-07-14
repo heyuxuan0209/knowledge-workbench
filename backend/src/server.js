@@ -186,6 +186,28 @@ app.get('/api/contents/:id', async (req, res) => {
   }
 });
 
+// ========== M2 洞察层：Story 聚类（近期焦点，ADR-008） ==========
+
+app.get('/api/stories', async (req, res) => {
+  try {
+    const { getStories } = await import('./services/story-clustering.js');
+    res.json({ success: true, data: getStories(parseInt(req.query.limit) || 10) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 重建聚类（纯本地计算，不调 LLM，可随手动/定时同步后触发）
+app.post('/api/stories/rebuild', async (req, res) => {
+  try {
+    const { rebuildStories } = await import('./services/story-clustering.js');
+    const result = rebuildStories(parseInt(req.body?.days) || 7);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== M1 沉淀层：素材卡片 Notes（ADR-010） ==========
 
 app.get('/api/notes', async (req, res) => {
