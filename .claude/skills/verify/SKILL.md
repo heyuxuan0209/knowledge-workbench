@@ -27,10 +27,13 @@ mkdir -p /tmp/verify-kw && cd /tmp/verify-kw && npm init -y && npm i playwright
 npx playwright install chromium --only-shell   # 首次需要
 ```
 
-驱动脚本要点（页面 http://localhost:5173）：
-- 关键选择器：`.feed-card` / `.btn-follow`（加为信息源）/ `.authority-tag.high`（已关注）/
-  `.source-add-bar input` + `.btn-analyze`（信息源识别）/ `.source-preview`（识别预览）/
-  `.btn-save-note`（保存到笔记）/ `.note-card`（素材卡片）
+驱动脚本要点（页面 http://localhost:5173，UI v2 起前缀为 .wb-*）：
+- 导航：`.wb-nav-item:has-text("素材"|"信源"|"主题"|"创作"|"设置")`；折叠 `.wb-nav-toggle` / `.wb-panel-toggle`
+- Feed：`.wb-fcard`、选中分析 `.wb-btn-outline`、`.wb-focus-row` 展开、`.wb-ideas-toggle` 选题、`.wb-acquire input`
+- 右栏：`开始分析 →`、`.wb-msg.ai`、`.wb-msg-save(.saved)`、`.wb-chat-input` + `.wb-send`
+- 素材/信源：`.wb-note-excerpt`/`.wb-note-del`、`.wb-src-preview`、`.wb-modal`（弹窗）、`.wb-toast`
+- 创作台：`.wb-seg-btn`、`.wb-draft`（textarea，用 inputValue 读）、`.wb-insert-btn`
+- 旧版选择器（FeedPage，已不挂载）：`.feed-card` / `.btn-save-note` / `.source-add-bar`
 - 删除类操作有 `confirm()`：`page.on('dialog', d => d.accept())`
 - SSE 对话真实调 Deepseek，等待 `.btn-save-note` 出现（timeout ≥ 90s）
 - 测试后清理：取消关注所有登记源、删除测试笔记，恢复 DB 初始状态
