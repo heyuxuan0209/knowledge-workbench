@@ -88,12 +88,16 @@ export function upsertContents(items) {
 
 export function getContents(limit = 20, offset = 0) {
   const db = getDatabase();
+  // 已登记信息源（ADR-007 登记处）的内容加权：等效于把发布时间前移 12 小时，
+  // 既保证"我关注的人"浮上来，又不至于把时间线彻底打乱（新热内容仍能正常冒头）。
   const rows = db.prepare(`
-    SELECT c.*, s.display_name as source_display_name, sp.platform as source_platform, sp.handle as source_handle
+    SELECT c.*, s.display_name as source_display_name, s.registered_by_user as source_registered,
+           sp.platform as source_platform, sp.handle as source_handle
     FROM contents c
     LEFT JOIN sources s ON c.source_id = s.id
     LEFT JOIN source_platforms sp ON sp.source_id = s.id
-    ORDER BY c.published_at DESC
+    ORDER BY julianday(COALESCE(c.published_at, c.created_at))
+             + CASE WHEN s.registered_by_user = 1 THEN 0.5 ELSE 0 END DESC
     LIMIT ? OFFSET ?
   `).all(limit, offset);
   db.close();
