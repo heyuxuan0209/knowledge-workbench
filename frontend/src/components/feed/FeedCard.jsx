@@ -16,22 +16,24 @@ function timeAgo(isoString) {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-export default function FeedCard({ item, selected, onToggleSelect }) {
+export default function FeedCard({ item, selected, onToggleSelect, onFollowSource }) {
   const hasAuthor = Boolean(item.display_name)
 
   return (
     <div
       className={`feed-card${selected ? ' selected' : ''}`}
       onClick={(e) => {
-        // 点「加入研究 Topic」不触发选中（与原型 bindCardEvents 一致）
-        if (e.target.closest('.btn-topic')) return
+        // 点操作按钮/原文链接不触发选中（与原型 bindCardEvents 一致）
+        if (e.target.closest('.btn-topic, .btn-follow, .card-link')) return
         onToggleSelect(item.id)
       }}
     >
       <div className="card-header">
         {hasAuthor ? (
           <div className="card-author">
-            <span className="authority-tag unrated">未标注可信度</span>
+            {item.source_registered
+              ? <span className="authority-tag high">已关注</span>
+              : <span className="authority-tag unrated">未标注可信度</span>}
             <span className="author-name">{item.display_name}</span>
             <span className="author-handle">{item.platform} · @{item.handle}</span>
           </div>
@@ -59,7 +61,14 @@ export default function FeedCard({ item, selected, onToggleSelect }) {
           </svg>
           <span>选中分析</span>
         </button>
-        <button className="btn-topic">加入研究 Topic</button>
+        {!item.source_registered && (
+          <button className="btn-topic btn-follow" onClick={() => onFollowSource?.(item.id)}>
+            ＋ 加为信息源
+          </button>
+        )}
+        {item.url && (
+          <a className="btn-topic card-link" href={item.url} target="_blank" rel="noreferrer">跳转原文</a>
+        )}
       </div>
     </div>
   )

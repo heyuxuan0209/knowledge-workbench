@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useResizablePanel } from '../hooks/useResizablePanel'
 import FeedCard from '../components/feed/FeedCard'
 import AiPanel from '../components/feed/AiPanel'
+import NotesView from '../components/feed/NotesView'
+import SourcesView from '../components/feed/SourcesView'
 import '../styles/feed.css'
 
 // Feed 主页（移植自 prototype/feed-v1.html）：三栏布局 = 左侧导航 + 中间 Feed 流 + 右侧 AI 面板。
@@ -11,6 +13,7 @@ import '../styles/feed.css'
 // 简化范围（与原型一致）：近期焦点是占位（依赖 Story 聚类，Phase 3）；Topics/Saved 是导航占位。
 
 export default function FeedPage() {
+  const [view, setView] = useState('feed') // feed | notes | sources（M1 三视图，导航切换）
   const [contents, setContents] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -32,7 +35,8 @@ export default function FeedPage() {
         ...item,
         display_name: item.source_display_name,
         platform: item.source_platform,
-        handle: item.source_handle
+        handle: item.source_handle,
+        source_registered: item.source_registered === 1
       })))
     } catch (err) {
       console.error('Failed to fetch contents:', err)
@@ -79,6 +83,23 @@ export default function FeedPage() {
     }
   }
 
+  // "把作者加为信息源"（飞轮闭环：内容 → Source，ADR-007）
+  const handleFollowSource = async (contentId) => {
+    try {
+      const res = await fetch(`/api/contents/${contentId}/follow-source`, { method: 'POST' })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      // 同一 source 的所有卡片同步变为"已关注"
+      setContents(prev => prev.map(c =>
+        (c.id === contentId || (c.source_id && c.source_id === json.data.id))
+          ? { ...c, source_id: json.data.id, display_name: c.display_name || json.data.display_name, source_registered: true }
+          : c
+      ))
+    } catch (err) {
+      alert(`加为信息源失败：${err.message}`)
+    }
+  }
+
   const selectedItems = contents.filter(c => selectedIds.has(c.id))
 
   return (
@@ -100,26 +121,33 @@ export default function FeedPage() {
                 <span className="logo-text">Research</span>
               </div>
               <nav className="nav">
-                <a href="#" className="nav-item active">
+                <a href="#" className={`nav-item${view === 'feed' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); setView('feed') }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
                     <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                   </svg>
                   <span>Feed</span>
                 </a>
+                <a href="#" className={`nav-item${view === 'notes' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); setView('notes') }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  <span>素材库</span>
+                </a>
+                <a href="#" className={`nav-item${view === 'sources' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); setView('sources') }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  <span>信息源</span>
+                </a>
                 <a href="#" className="nav-item">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                   </svg>
                   <span>Topics</span>
-                  <span className="badge">0</span>
-                </a>
-                <a href="#" className="nav-item">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  <span>Saved</span>
+                  <span className="badge">M3</span>
                 </a>
               </nav>
               <div className="nav-footer">
@@ -145,6 +173,9 @@ export default function FeedPage() {
 
       {/* 主内容区 */}
       <main className="main">
+        {view === 'notes' && <div className="main-content"><NotesView /></div>}
+        {view === 'sources' && <div className="main-content"><SourcesView /></div>}
+        {view === 'feed' && <>
         <div className="main-header">
           <div className="paste-bar">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -197,11 +228,13 @@ export default function FeedPage() {
                   item={item}
                   selected={selectedIds.has(item.id)}
                   onToggleSelect={toggleSelect}
+                  onFollowSource={handleFollowSource}
                 />
               ))
             )}
           </div>
         </div>
+        </>}
       </main>
 
       {/* 右侧 AI 面板 */}
