@@ -24,10 +24,7 @@ import { JSDOM } from 'jsdom';
 // 显式注入给 youtube-transcript 库（该库支持 config.fetch 自定义），只影响这一个请求，
 // 不用 setGlobalDispatcher 污染整个进程（避免连 AI HOT / 本地 SQLite 等不需要代理的请求）。
 // 通过 YOUTUBE_PROXY_URL 环境变量配置，未设置时按无代理直连（生产环境部署在海外服务器时
-// 不需要代理，不应强制要求）。
-// 注意：youtube-transcript 在国内环境可能需要代理
-// 当前版本暂不支持代理配置（ProxyAgent 导入复杂）
-// 如果遇到网络问题，建议用户直接粘贴文字稿
+// 不需要代理，不应强制要求）。youtube-transcript@1.3.1 支持 config.fetch 自定义。
 
 const YOUTUBE_HOSTS = ['youtube.com', 'youtu.be', 'm.youtube.com'];
 
@@ -65,9 +62,18 @@ async function ingestYoutube(input) {
     };
   }
 
+  // 国内环境走本地代理访问 YouTube（undici 不读 HTTP_PROXY 环境变量约定，必须显式注入）
+  let proxyFetch;
+  const proxyUrl = process.env.YOUTUBE_PROXY_URL;
+  if (proxyUrl) {
+    const { ProxyAgent } = await import('undici');
+    const dispatcher = new ProxyAgent(proxyUrl);
+    proxyFetch = (url, opts = {}) => fetch(url, { ...opts, dispatcher });
+  }
+
   try {
     // 尝试提取字幕（默认中文，如无则自动回退到视频默认语言）
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId, proxyFetch ? { fetch: proxyFetch } : undefined);
     const body = transcript.map(t => t.text).join(' ');
 
     return {

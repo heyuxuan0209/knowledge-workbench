@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import '../styles/workbench.css'
-import { api, streamEphemeralChat } from '../components/wb/util'
+import { api, streamEphemeralChat, sourceCapability } from '../components/wb/util'
 import {
   IconFeed, IconNotes, IconTopics, IconStudio, IconSources, IconSettings,
   IconChevronLeft,
@@ -41,14 +41,16 @@ export default function WorkbenchPage() {
   const [contents, setContents] = useState([])
   const [report, setReport] = useState(null)
   const [stories, setStories] = useState([])
+  const [ghTrending, setGhTrending] = useState({ repos: [], trend: null })
   const [notes, setNotes] = useState([])
   const [sources, setSources] = useState([])
   const topics = [] // M3：主题活页后端未上线，列表空态
 
   // 右栏（快速分析）
-  const [selectedItems, setSelectedItems] = useState([]) // {id,title,adHoc?}
+  const [selectedItems, setSelectedItems] = useState([]) // {id,title,adHoc?,capability}
   const [analysisMode, setAnalysisMode] = useState('list')
   const [chat, setChat] = useState([]) // {role:'user'|'ai', text, pending?, saved?, noteId?}
+  const [degraded, setDegraded] = useState([]) // 本轮对话中降级为摘要的材料清单（SSE meta）
   const chatHistory = useRef([]) // 发给后端的纯净历史
 
   // 弹窗
@@ -77,9 +79,12 @@ export default function WorkbenchPage() {
   }, [])
   const loadBrief = useCallback(async () => {
     try {
-      const [r, s] = await Promise.all([api('/api/reports/latest'), api('/api/stories?limit=3')])
+      const [r, s, g] = await Promise.all([
+        api('/api/reports/latest'), api('/api/stories?limit=3'), api('/api/github-trending'),
+      ])
       setReport(r.data)
       setStories(s.data || [])
+      setGhTrending(g.data || { repos: [], trend: null })
     } catch (err) { console.error('brief:', err) }
   }, [])
   const loadNotes = useCallback(async () => {
@@ -95,7 +100,7 @@ export default function WorkbenchPage() {
   const toggleSelect = (c) => {
     setSelectedItems(prev => prev.find(x => x.id === c.id)
       ? prev.filter(x => x.id !== c.id)
-      : [...prev, { id: c.id, title: c.zh_title || c.en_title || '(无标题)' }])
+      : [...prev, { id: c.id, title: c.zh_title || c.en_title || '(无标题)', capability: sourceCapability(c) }])
   }
   const removeSel = (id) => setSelectedItems(prev => prev.filter(x => x.id !== id))
 
@@ -112,7 +117,8 @@ export default function WorkbenchPage() {
       const adHocContents = items.filter(x => x.adHoc).map(x => x.adHoc)
       const full = await streamEphemeralChat(
         { contentIds, adHocContents, messages: chatHistory.current },
-        (text) => setChat(prev => patchLast(prev, { text, pending: true }))
+        (text) => setChat(prev => patchLast(prev, { text, pending: true })),
+        (deg) => setDegraded(deg)
       )
       chatHistory.current.push({ role: 'assistant', content: full })
       setChat(prev => patchLast(prev, { text: full, pending: false }))
@@ -273,7 +279,7 @@ export default function WorkbenchPage() {
   )
 
   const pageProps = {
-    showToast, contents, report, stories, notes, sources, topics,
+    showToast, contents, report, stories, ghTrending, notes, sources, topics,
     selectedItems, toggleSelect, followSource, acquire,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea,
     loadNotes, loadSources, setPage, setModal,
@@ -316,7 +322,7 @@ export default function WorkbenchPage() {
           page={page} collapsed={rightCollapsed} onToggle={() => setRightCollapsed(v => !v)}
           selectedItems={selectedItems} removeSel={removeSel}
           analysisMode={analysisMode} backList={() => setAnalysisMode('list')}
-          chat={chat} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg}
+          chat={chat} degraded={degraded} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg}
           topicView={topicView} activeTopic={activeTopic}
           studio={studio} notes={notes} insertMaterial={insertMaterial} rewriteDraft={rewriteDraft}
           showToast={showToast}

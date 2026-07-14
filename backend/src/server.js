@@ -61,12 +61,24 @@ app.post('/api/content/ingest', async (req, res) => {
       });
     }
 
+    // 长视频/长文保护：全文翻译按 20k 字符截断（2 小时视频字幕 10 万+字符，
+    // 全翻要数分钟且费用高；前段已足够支撑解读，后续 M5 做分段/按需翻译）
+    let truncated = false;
+    if (ingested.body && ingested.body.length > 20000) {
+      ingested.body = ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）';
+      if (Array.isArray(ingested.transcript)) {
+        let acc = 0;
+        ingested.transcript = ingested.transcript.filter(seg => (acc += (seg.text || '').length) <= 20000);
+      }
+      truncated = true;
+    }
+
     const { translateContent } = await import('./services/translation.js');
     const translation = await translateContent(ingested);
 
     res.json({
       success: true,
-      data: { ...ingested, ...translation }
+      data: { ...ingested, ...translation, truncated }
     });
   } catch (error) {
     res.status(500).json({
@@ -97,11 +109,14 @@ app.post('/api/chat/ephemeral', async (req, res) => {
     }
 
     const { buildMessagesWithContext } = await import('./services/ephemeral-chat.js');
-    const contextInjectedMessages = await buildMessagesWithContext(contentIds, adHocContents, messages);
+    const { messages: contextInjectedMessages, degraded } = await buildMessagesWithContext(contentIds, adHocContents, messages);
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+
+    // 开流前先发降级清单（哪些材料只拿到摘要）——前端据此显示黄色降级条（诚实承诺，决策5）
+    res.write(`data: ${JSON.stringify({ type: 'meta', degraded })}\n\n`);
 
     const { streamChat } = await import('./services/llm.js');
 
@@ -183,6 +198,24 @@ app.get('/api/contents/:id', async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// GitHub 热门 AI 项目区块（与资讯流分离：一个是产品，一个是内容）
+app.get('/api/github-trending', async (req, res) => {
+  try {
+    const { getDatabase } = await import('./db/init.js');
+    const db = getDatabase();
+    const repos = db.prepare(`
+      SELECT id, zh_title, zh_summary, en_title, url, external_score, tags, published_at
+      FROM contents WHERE source_app = 'github_trending'
+      ORDER BY external_score DESC LIMIT 10
+    `).all();
+    const metaRow = db.prepare("SELECT value FROM app_meta WHERE key = 'github_trend'").get();
+    db.close();
+    res.json({ success: true, data: { repos, trend: metaRow ? JSON.parse(metaRow.value) : null } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
