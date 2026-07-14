@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS sources (
         CHECK (status IN ('active', 'paused', 'archived')),
     tags TEXT DEFAULT '[]',                 -- JSON array
 
+    -- 用户主动登记的优质源（ADR-007 登记处）：Feed 排序加权依据（M1 新增，migrate-m1.js）
+    registered_by_user INTEGER DEFAULT 0,
+
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -55,10 +58,12 @@ CREATE TABLE IF NOT EXISTS source_platforms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id TEXT NOT NULL,
     platform TEXT NOT NULL
-        CHECK (platform IN ('X', 'YouTube', 'WeChat', 'GitHub', 'Blog', 'Newsletter', 'Reddit', 'RSS', 'HackerNews')),
+        CHECK (platform IN ('X', 'YouTube', 'WeChat', 'GitHub', 'Blog', 'Newsletter', 'Reddit', 'RSS', 'HackerNews', 'Podcast')),
     handle TEXT,                            -- @username / channelId / 公众号名称 / feed URL
+    -- 四档成本分层（ADR-007，M1 起由三档扩为四档，migrate-m1.js）：
+    -- passive=AI HOT 已覆盖零成本 / active-rss=RSS 轮询 / active-query=X、YouTube 主动查询 / link-only=公众号只跳转
     track_mode TEXT NOT NULL
-        CHECK (track_mode IN ('passive', 'active', 'link-only')),
+        CHECK (track_mode IN ('passive', 'active-rss', 'active-query', 'link-only')),
     platform_metadata TEXT DEFAULT '{}',    -- JSON: 平台特定信息（如 follower 数）
 
     created_at TEXT DEFAULT (datetime('now')),
@@ -252,6 +257,29 @@ CREATE TABLE IF NOT EXISTS ephemeral_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ephemeral_expires ON ephemeral_sessions(expires_at);
+
+-- ============================================================
+-- 7.5 Notes — 素材卡片（M1 沉淀层核心，ADR-010，migrate-m1.js）
+--     NotebookLM 模式：对话不落库，用户选择保存的片段才成为素材卡片。
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    excerpt TEXT NOT NULL,              -- 结构化摘录（Markdown，来自对话回复/解读产物）
+    note_type TEXT DEFAULT 'chat'
+        CHECK (note_type IN ('chat', 'excerpt', 'insight')),
+    stance TEXT
+        CHECK (stance IN ('agree', 'disagree', 'doubt')), -- 可空。TBD-004 预留，暂无 UI
+    content_id TEXT,                    -- 来源引用；adHoc 粘贴内容未入库时可空
+    source_title TEXT,                  -- 冗余保存，content 被删或未入库时仍可溯源
+    source_url TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notes_content_id ON notes(content_id);
 
 -- ============================================================
 -- 8. Data Source Configs — 用户手动添加的信源配置
