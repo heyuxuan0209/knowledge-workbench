@@ -1,10 +1,9 @@
-import FeedPage from './pages/FeedPage'
+import WorkbenchPage from './pages/WorkbenchPage'
 
 function App() {
-  // 新架构（v2）：直接渲染 FeedPage，去掉旧的 workspace/onboarding 流程。
-  // 旧页面已归档至 pages/_legacy（WorkspacePage / OnboardingPage / StyleSelectorPage 等）。
-  // 参考: docs/SYNTHESIZED-ARCHITECTURE.md §2（三种使用模式），handoff/HANDOFF-TO-NEW-ARCHITECTURE.md §3。
-  return <FeedPage />
+  // UI v2（2026-07-14）：按 prototype/design_handoff_knowledge_workbench 高保真重建。
+  // 旧三栏 FeedPage 保留在 pages/FeedPage.jsx 仅作参考，不再挂载。
+  return <WorkbenchPage />
 }
 
 export default App

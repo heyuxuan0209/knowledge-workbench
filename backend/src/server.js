@@ -222,6 +222,27 @@ app.post('/api/contents/:id/thread', async (req, res) => {
   }
 });
 
+// 创作助手指令改写：把左侧草稿 + 用户指令交给 Deepseek，返回改写后的整稿。
+// 不落库（Draft 实体是 M4），前端直接替换草稿区内容。
+app.post('/api/studio/rewrite', async (req, res) => {
+  try {
+    const { draft, instruction, platform = 'thread' } = req.body;
+    if (!draft?.trim() || !instruction?.trim()) {
+      return res.status(400).json({ success: false, error: 'draft and instruction are required' });
+    }
+    const platformNote = { thread: 'X thread（分条、短句）', long: '公众号长文（Markdown）', script: '口播视频脚本（口语化、有钩子）' }[platform] || '';
+    const { chat } = await import('./services/llm.js');
+    const result = await chat([{
+      role: 'user',
+      content: `你是内容创作助手。以下是一份${platformNote}草稿，请严格按用户指令改写。\n只输出改写后的完整草稿，不要解释，保留原有的 [素材N] / 引用溯源标记。\n\n# 用户指令\n${instruction}\n\n# 草稿\n${draft.slice(0, 8000)}`,
+    }]);
+    if (!result.success) throw new Error(result.error);
+    res.json({ success: true, data: { draft: result.content.trim(), note: `已按「${instruction}」改写草稿（¥${result.cost?.toFixed(4)}）`, cost: result.cost } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== M2 洞察层：日报与选题（ADR-008） ==========
 
 // 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）
