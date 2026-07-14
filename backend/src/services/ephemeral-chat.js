@@ -23,11 +23,14 @@ async function formatContentAsMaterial(content, index) {
     ? `来源：${content.source_display_name}（${content.source_platform}）`
     : '来源：未识别到具体作者';
 
-  const { body, note } = await resolveContentBody(content);
+  const { body, note, isFullText } = await resolveContentBody(content);
   const noteLine = note ? `\n⚠️ ${note}` : '';
   const bodyText = body || '（无正文内容）';
 
-  return `## 材料${index + 1}：${title}\n${sourceLine}${noteLine}\n\n${bodyText}`;
+  return {
+    text: `## 材料${index + 1}：${title}\n${sourceLine}${noteLine}\n\n${bodyText}`,
+    degraded: isFullText ? null : { title, reason: note || '未获取到原文' },
+  };
 }
 
 function formatAdHocAsMaterial(adHoc, index) {
@@ -49,9 +52,12 @@ export async function buildMessagesWithContext(contentIds, adHocContents, userMe
     .filter(Boolean);
 
   // 先并行拉取所有需要抓取原文的内容，再按固定顺序编号，避免并发导致材料编号错乱
-  const contentMaterials = await Promise.all(
+  const contentResults = await Promise.all(
     resolvedContents.map((content, i) => formatContentAsMaterial(content, i))
   );
+  const contentMaterials = contentResults.map(r => r.text);
+  // 降级清单（哪些材料只拿到摘要）——SSE 开流前作为 meta 事件发给前端显示黄条
+  const degraded = contentResults.map(r => r.degraded).filter(Boolean);
 
   const adHocMaterials = (adHocContents || [])
     .map((adHoc, i) => formatAdHocAsMaterial(adHoc, contentMaterials.length + i));
@@ -60,7 +66,7 @@ export async function buildMessagesWithContext(contentIds, adHocContents, userMe
 
   if (materials.length === 0 || userMessages.length === 0) {
     // 没有材料（理论上不应发生，前端应保证至少有一项）或没有对话历史，直接透传，不强行拼接
-    return userMessages;
+    return { messages: userMessages, degraded };
   }
 
   const materialsBlock = `# 参考材料\n\n${materials.join('\n\n---\n\n')}\n\n---\n\n请基于以上材料回答我的问题。如果某条材料标注了"无法获取原文"，请在回答时告知用户这一点，不要假装已经读过原文。如果材料中没有相关信息，请明确说明，不要编造。\n\n`;
@@ -68,8 +74,11 @@ export async function buildMessagesWithContext(contentIds, adHocContents, userMe
   const history = userMessages.slice(0, -1);
   const currentMessage = userMessages[userMessages.length - 1];
 
-  return [
-    ...history,
-    { role: 'user', content: materialsBlock + `问题：${currentMessage.content}` }
-  ];
+  return {
+    messages: [
+      ...history,
+      { role: 'user', content: materialsBlock + `问题：${currentMessage.content}` }
+    ],
+    degraded,
+  };
 }

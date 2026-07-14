@@ -45,8 +45,20 @@ export const TYPE_LABEL = {
   article: 'Article', video: 'Video', tweet: 'X', paper: 'Paper', repo: 'Repo', text: 'Text',
 }
 
-// SSE 流式对话（/api/chat/ephemeral），onDelta 增量回调，返回完整文本
-export async function streamEphemeralChat({ contentIds, adHocContents, messages }, onDelta) {
+// 来源抓取能力（NotebookLM 式来源区分）：选中时就告知用户该条能拿到什么
+// full=可抓原文 / summary=只有摘要（公众号/无链接）/ video=依赖字幕
+export function sourceCapability(c) {
+  if (!c) return { level: 'full', label: '原文' }
+  const url = c.url || ''
+  if (url.includes('mp.weixin.qq.com')) return { level: 'summary', label: '仅摘要' }
+  if (c.content_type === 'video') return { level: 'video', label: '依赖字幕' }
+  if (c.content_type === 'tweet') return { level: 'full', label: '原文' }
+  if (!url || c.content_type === 'text') return { level: 'summary', label: '仅摘要' }
+  return { level: 'full', label: '原文' }
+}
+
+// SSE 流式对话（/api/chat/ephemeral），onDelta 增量回调、onMeta 降级清单回调，返回完整文本
+export async function streamEphemeralChat({ contentIds, adHocContents, messages }, onDelta, onMeta) {
   const res = await fetch('/api/chat/ephemeral', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -70,6 +82,7 @@ export async function streamEphemeralChat({ contentIds, adHocContents, messages 
       if (!line.startsWith('data: ')) continue
       const event = JSON.parse(line.slice(6))
       if (event.type === 'content') { full += event.content; onDelta(full) }
+      else if (event.type === 'meta') { onMeta?.(event.degraded || []) }
       else if (event.type === 'error') throw new Error(event.error)
     }
   }

@@ -6,7 +6,7 @@ import { IconTag, IconExternal, IconCaret } from './Icons'
 // 视觉对齐原型 01-feed；数据全部来自后端 API。
 
 export default function FeedView({
-  contents, report, stories, selectedItems, toggleSelect, followSource, acquire,
+  contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, acquire,
   generateReport, generating, viewIdea, upgradeIdea, createFromIdea, setPage,
 }) {
   const [acquireVal, setAcquireVal] = useState('')
@@ -74,7 +74,15 @@ export default function FeedView({
                       <div key={m.id} className="wb-focus-src">
                         <div className="wb-focus-src-name">{m.source_display_name || m.source_app}</div>
                         <div className="wb-focus-src-meta">{TYPE_LABEL[m.content_type] || 'Article'} · {timeAgo(m.published_at)}</div>
-                        <div className="wb-focus-src-note">{(m.zh_title || m.en_title || '').slice(0, 40)}</div>
+                        <div className="wb-focus-src-note">
+                          {m.url
+                            ? <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}
+                                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
+                                onMouseOut={(e) => e.target.style.textDecoration = 'none'}>
+                                {(m.zh_title || m.en_title || '').slice(0, 40)} <IconExternal size={9} style={{ verticalAlign: '-1px' }} />
+                              </a>
+                            : (m.zh_title || m.en_title || '').slice(0, 40)}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -115,6 +123,38 @@ export default function FeedView({
         )}
       </div>
 
+      {ghTrending.repos.length > 0 && (
+        <div className="wb-brief" style={{ background: 'var(--surface)', borderColor: 'var(--line10)' }}>
+          <div className="wb-brief-head" style={{ marginBottom: 8 }}>
+            <div className="wb-brief-title" style={{ fontSize: 15 }}>热门 AI 项目</div>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--faint)' }}>GitHub Trending · 每日 · 高星+热门双筛</span>
+          </div>
+          {ghTrending.trend?.trend && (
+            <div className="wb-brief-label" style={{ marginBottom: 10 }}>📈 {ghTrending.trend.trend}</div>
+          )}
+          <div className="wb-focus">
+            {ghTrending.repos.map(r => (
+              <div key={r.id} className="wb-focus-item">
+                <div className="wb-focus-row" style={{ cursor: 'default', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.4 }}>
+                      <a href={r.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{r.zh_title}</a>
+                    </div>
+                    {r.zh_summary && <div style={{ fontSize: 12.5, color: 'var(--sub)', lineHeight: 1.5, marginTop: 3 }}>{r.zh_summary}</div>}
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 600, whiteSpace: 'nowrap' }}>⭐ 今日 +{Math.round(r.external_score)}</div>
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
+                      查看 <IconExternal size={9} style={{ verticalAlign: '-1px' }} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="wb-feedbar">
         <span>排序 <b>综合热度</b></span>
         <span className="wb-feedbar-sep">|</span>
@@ -140,7 +180,7 @@ export default function FeedView({
                 : <span className="wb-pill" style={{ color: '#8a8478', background: 'rgba(33,31,26,.06)' }}>未标注</span>}
               <span className="wb-fcard-author">{author}</span>
               <span className="wb-fcard-platform">{platform}</span>
-              <span className="wb-fcard-score">评分 <b>{Math.round(c.external_score || 0)}</b></span>
+              {c.heat != null && <span className="wb-fcard-score">热度 <b>{c.heat}</b></span>}
             </div>
             <div className="wb-fcard-title">{c.zh_title || c.en_title || '（无标题）'}</div>
             {c.zh_summary && <div className="wb-fcard-summary">{c.zh_summary}</div>}
@@ -152,6 +192,12 @@ export default function FeedView({
               <button className={`wb-btn-outline${checked ? ' checked' : ''}`} onClick={() => toggleSelect(c)}>
                 {checked ? '✓ 已选中' : '选中分析'}
               </button>
+              {c.permalink && (
+                <a className="wb-btn-ghost" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  href={c.permalink} target="_blank" rel="noreferrer">
+                  全文解读 <IconExternal style={{ verticalAlign: '-1px' }} />
+                </a>
+              )}
               {c.url && (
                 <a className="wb-btn-ghost" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                   href={c.url} target="_blank" rel="noreferrer">

@@ -37,9 +37,15 @@ function PanelHeader({ icon, title, sub, onToggle }) {
 }
 
 /* ---------- 快速分析 ---------- */
+const CAP_STYLE = {
+  full: { color: '#3f7350', background: 'rgba(63,115,80,.12)' },
+  summary: { color: '#8a6a1a', background: 'rgba(169,121,31,.12)' },
+  video: { color: '#3d5a80', background: 'rgba(61,90,128,.12)' },
+}
+
 function QuickAnalysis({
   onToggle, selectedItems, removeSel, analysisMode, backList,
-  chat, startAnalysis, sendChat, saveMsg, page, topicView, activeTopic,
+  chat, degraded, startAnalysis, sendChat, saveMsg, page, topicView, activeTopic,
 }) {
   const [input, setInput] = useState('')
   const endRef = useRef(null)
@@ -72,12 +78,23 @@ function QuickAnalysis({
           ) : selectedItems.length > 0 ? (
             <>
               <div className="wb-panel-label">已选中（{selectedItems.length}）</div>
-              {selectedItems.map(item => (
-                <div key={item.id} className="wb-sel-item">
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-                  <button className="wb-sel-remove" onClick={() => removeSel(item.id)}>×</button>
+              {selectedItems.map(item => {
+                const cap = item.capability
+                return (
+                  <div key={item.id} className="wb-sel-item">
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                    {cap && (
+                      <span className="wb-pill" style={{ ...CAP_STYLE[cap.level], flexShrink: 0 }}>{cap.label}</span>
+                    )}
+                    <button className="wb-sel-remove" onClick={() => removeSel(item.id)}>×</button>
+                  </div>
+                )
+              })}
+              {selectedItems.some(x => x.capability?.level !== 'full') && (
+                <div className="wb-panel-hint" style={{ marginTop: 4 }}>
+                  「仅摘要」来源（公众号等）无法抓取原文，解读基于摘要；「依赖字幕」的视频抓取到字幕才算原文。
                 </div>
-              ))}
+              )}
               <button className="wb-btn-primary" style={{ marginTop: 8 }} onClick={startAnalysis}>开始分析 →</button>
               <div className="wb-panel-hint">分析基于原文；抓取失败会显式标注基于摘要。</div>
             </>
@@ -96,6 +113,11 @@ function QuickAnalysis({
               <button className="wb-back" style={{ fontSize: 11.5 }} onClick={backList}>← 返回</button>
               基于 {selectedItems.length || 1} 篇内容 · 结构化解读
             </div>
+            {degraded?.length > 0 && (
+              <div className="wb-warnbar" style={{ marginBottom: 8, fontSize: 11.5 }}>
+                其中 {degraded.length} 篇未获取到原文，以下基于摘要：{degraded.map(d => `《${d.title.slice(0, 16)}》`).join('')}
+              </div>
+            )}
             <div className="wb-chat">
               {chat.map((m, i) => (
                 <MsgBubble key={i} msg={m} onSave={() => saveMsg(i)} />

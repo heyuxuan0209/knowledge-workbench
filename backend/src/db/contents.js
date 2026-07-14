@@ -91,8 +91,19 @@ export function upsertContents(items) {
   return upserted;
 }
 
+// 热度归一（2026-07-14 用户决策：评分逻辑要一致）：统一 0-100 的"热度"。
+// aihot 的 score 本身是 0-100 质量分直接用；HN points 用平方根映射（300 分 ≈ 87）；
+// GitHub 不进资讯流（独立区块，展示 ⭐日增星原值）；RSS 无分 → null（前端隐藏）。
+function normalizeHeat(sourceApp, externalScore) {
+  const x = externalScore || 0;
+  if (sourceApp === 'aihot') return Math.round(Math.min(100, x));
+  if (sourceApp === 'hackernews') return Math.min(99, Math.round(Math.sqrt(x) * 5));
+  return null;
+}
+
 export function getContents(limit = 20, offset = 0) {
   const db = getDatabase();
+  // GitHub Trending 不混入资讯流（产品与内容分离，走 /api/github-trending 独立区块）。
   // 已登记信息源（ADR-007 登记处）的内容加权：等效于把发布时间前移 12 小时，
   // 既保证"我关注的人"浮上来，又不至于把时间线彻底打乱（新热内容仍能正常冒头）。
   const rows = db.prepare(`
@@ -101,12 +112,13 @@ export function getContents(limit = 20, offset = 0) {
     FROM contents c
     LEFT JOIN sources s ON c.source_id = s.id
     LEFT JOIN source_platforms sp ON sp.source_id = s.id
+    WHERE c.source_app != 'github_trending'
     ORDER BY julianday(COALESCE(c.published_at, c.created_at))
              + CASE WHEN s.registered_by_user = 1 THEN 0.5 ELSE 0 END DESC
     LIMIT ? OFFSET ?
   `).all(limit, offset);
   db.close();
-  return rows;
+  return rows.map(r => ({ ...r, heat: normalizeHeat(r.source_app, r.external_score) }));
 }
 
 export function getContentById(id) {
