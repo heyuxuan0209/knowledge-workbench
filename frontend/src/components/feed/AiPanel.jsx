@@ -11,7 +11,7 @@ import { useState, useRef, useEffect } from 'react'
 
 export default function AiPanel({ selectedItems, adHocContent, onClearAdHoc }) {
   const [mode, setMode] = useState('quick') // quick | chat
-  const [messages, setMessages] = useState([]) // { role, content, streaming?, error? }
+  const [messages, setMessages] = useState([]) // { role, content, streaming?, error?, savedNoteId? }
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const historyRef = useRef([]) // 发给后端的纯净历史（不含 streaming/error 标记）
@@ -119,6 +119,38 @@ export default function AiPanel({ selectedItems, adHocContent, onClearAdHoc }) {
     }
   }
 
+  // 保存到笔记（M1 沉淀层，ADR-010 NotebookLM 模式）：只保存用户主动选择的回复片段。
+  // 来源引用：单选内容记 contentId 可溯源；多选记拼接标题；adHoc 记标题+URL（未入库，靠冗余字段）
+  const saveToNote = async (msgIndex) => {
+    const msg = messages[msgIndex]
+    if (!msg || msg.role !== 'assistant' || msg.streaming || msg.error || msg.savedNoteId) return
+
+    const sourceRef = adHocContent
+      ? {
+          contentId: adHocContent.id || null,
+          sourceTitle: adHocContent.zh_title || adHocContent.en_title || '粘贴的内容',
+          sourceUrl: adHocContent.url || null
+        }
+      : {
+          contentId: selectedItems.length === 1 ? selectedItems[0].id : null,
+          sourceTitle: selectedItems.map(i => i.zh_title || i.en_title).filter(Boolean).join(' / ').slice(0, 120) || null,
+          sourceUrl: selectedItems.length === 1 ? (selectedItems[0].url || null) : null
+        }
+
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ excerpt: msg.content, noteType: 'chat', ...sourceRef })
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, savedNoteId: json.data.id } : m))
+    } catch (err) {
+      alert(`保存失败：${err.message}`)
+    }
+  }
+
   const chatItemCount = adHocContent ? 1 : selectedItems.length
 
   return (
@@ -177,6 +209,15 @@ export default function AiPanel({ selectedItems, adHocContent, onClearAdHoc }) {
                 <div className={`chat-message-content${msg.streaming ? ' streaming' : ''}${msg.error ? ' error' : ''}`}>
                   {msg.content}
                 </div>
+                {msg.role === 'assistant' && !msg.streaming && !msg.error && (
+                  <button
+                    className={`btn-save-note${msg.savedNoteId ? ' saved' : ''}`}
+                    onClick={() => saveToNote(i)}
+                    disabled={Boolean(msg.savedNoteId)}
+                  >
+                    {msg.savedNoteId ? '✓ 已存入素材库' : '保存到笔记'}
+                  </button>
+                )}
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -197,16 +238,7 @@ export default function AiPanel({ selectedItems, adHocContent, onClearAdHoc }) {
               rows={3}
             />
             <div className="chat-actions">
-              <button
-                className="btn-secondary"
-                disabled={sending}
-                onClick={() => alert('"保存到 Topic" 功能尚未实现，依赖 Topic 相关能力（Phase 3）。')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                </svg>
-                <span>保存到 Topic</span>
-              </button>
+              <span className="chat-actions-hint">好的回答可点"保存到笔记"沉淀为素材</span>
               <button
                 className="btn-primary"
                 style={{ width: 'auto', flexShrink: 0, padding: '0.625rem 1.25rem' }}

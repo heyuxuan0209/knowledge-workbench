@@ -539,3 +539,121 @@ body {
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 4px; }
+
+/* ============ M1 沉淀层：素材库 / 信息源 / 保存到笔记 ============ */
+
+.view-header { margin-bottom: 1.25rem; }
+.view-header h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem; }
+.view-subtitle { font-size: 0.8125rem; color: var(--text-muted); }
+
+/* 素材卡片 */
+.notes-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.note-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 1rem 1.125rem;
+}
+.note-excerpt {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    color: var(--text-primary);
+}
+.note-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--border-light);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.note-source { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-source a { color: var(--text-secondary); text-decoration: none; }
+.note-source a:hover { color: var(--accent-primary); }
+.note-delete {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 0.25rem; border-radius: 4px;
+}
+.note-delete:hover { color: #c0392b; background: var(--bg-sidebar); }
+
+/* 信息源登记 */
+.source-add-bar {
+    display: flex; gap: 0.5rem; align-items: center;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+.source-add-bar input {
+    flex: 1; border: none; background: none; outline: none;
+    font-size: 0.875rem; color: var(--text-primary);
+}
+.source-error {
+    font-size: 0.8125rem; color: #c0392b;
+    padding: 0.5rem 0.75rem; margin-bottom: 1rem;
+    background: rgba(192, 57, 43, 0.06);
+    border: 1px solid rgba(192, 57, 43, 0.2);
+    border-radius: 8px;
+}
+.source-preview {
+    background: var(--bg-elevated);
+    border: 1px solid var(--accent-primary);
+    border-radius: 10px;
+    padding: 1rem 1.125rem;
+    margin-bottom: 1rem;
+}
+.source-preview-title { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.625rem; }
+.source-preview-body { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.source-preview-name {
+    font-size: 0.9375rem; font-weight: 600; color: var(--text-primary);
+    background: var(--bg-base); border: 1px solid var(--border-default);
+    border-radius: 6px; padding: 0.375rem 0.625rem; min-width: 200px;
+}
+.source-preview-note { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.625rem; }
+.source-preview-actions { display: flex; gap: 0.5rem; margin-top: 0.875rem; }
+
+.track-mode-badge {
+    font-size: 0.6875rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--bg-sidebar);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-light);
+    white-space: nowrap;
+}
+
+.sources-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.source-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+}
+.source-row-main { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+.source-name { font-size: 0.875rem; font-weight: 600; }
+.source-row-side { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+.source-count { font-size: 0.75rem; color: var(--text-muted); }
+
+/* 保存到笔记按钮（AI 回复下方） */
+.btn-save-note {
+    margin-top: 0.375rem;
+    font-size: 0.6875rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-default);
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.btn-save-note:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); }
+.btn-save-note.saved { border-color: transparent; color: var(--accent-primary); cursor: default; }
+
+.chat-actions-hint { flex: 1; font-size: 0.6875rem; color: var(--text-muted); align-self: center; }
+
+/* Feed 卡片：跳转原文链接沿用 btn-topic 外观 */
+a.card-link { text-decoration: none; display: inline-flex; align-items: center; }
