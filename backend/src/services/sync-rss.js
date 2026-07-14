@@ -18,29 +18,36 @@ import { resolve } from 'path';
 // 1. 从数据库读取已配置的 RSS 源：syncRSSData()
 // 2. 临时同步指定的 RSS 源：syncRSSData(['https://example.com/feed.xml'])
 
-// 从数据库读取已配置的 RSS 源
-// 注意：当前版本 (2026-07-12) 还没有 source_platforms 表，这是为未来预留
-// 实际使用时需要先执行数据库迁移添加 RSS 源配置
+// 从两处读取已配置的 RSS 源并合并去重：
+// 1. source_platforms 表里 track_mode='active-rss' 的登记源（M1 优质源登记处，ADR-007）
+//    handle 存的是 feed URL（Blog 平台）或 feed 地址本身（RSS 平台）
+// 2. 环境变量 RSS_FEEDS（逗号分隔，保留兼容老配置）
 async function getConfiguredRSSFeeds() {
-  try {
-    // TODO: 等 source_platforms 表实现后，从数据库读取
-    // const { getDatabase } = await import('../db/init.js');
-    // const db = getDatabase();
-    // const rows = db.prepare(`
-    //   SELECT sp.handle as feed_url, s.display_name
-    //   FROM source_platforms sp
-    //   JOIN sources s ON sp.source_id = s.id
-    //   WHERE sp.platform = 'RSS' AND sp.track_mode = 'active'
-    // `).all();
-    // return rows.map(r => ({ url: r.feed_url, title: r.display_name }));
+  const feeds = new Set();
 
-    // 临时方案：从环境变量读取（逗号分隔的 RSS URL）
-    const envFeeds = process.env.RSS_FEEDS?.split(',').map(s => s.trim()).filter(Boolean);
-    return envFeeds || [];
+  try {
+    const { getDatabase } = await import('../db/init.js');
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT sp.handle AS feed_url, sp.platform_metadata
+      FROM source_platforms sp
+      JOIN sources s ON sp.source_id = s.id
+      WHERE sp.track_mode = 'active-rss' AND s.status = 'active'
+    `).all();
+    db.close();
+    for (const row of rows) {
+      const meta = JSON.parse(row.platform_metadata || '{}');
+      const url = meta.feedUrl || row.feed_url;
+      if (url?.startsWith('http')) feeds.add(url);
+    }
   } catch (error) {
     console.error('Failed to read RSS feeds from database:', error.message);
-    return [];
   }
+
+  for (const url of process.env.RSS_FEEDS?.split(',').map(s => s.trim()).filter(Boolean) || []) {
+    feeds.add(url);
+  }
+  return [...feeds];
 }
 
 export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {

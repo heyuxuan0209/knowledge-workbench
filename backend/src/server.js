@@ -186,6 +186,108 @@ app.get('/api/contents/:id', async (req, res) => {
   }
 });
 
+// ========== M1 沉淀层：素材卡片 Notes（ADR-010） ==========
+
+app.get('/api/notes', async (req, res) => {
+  try {
+    const { getNotes } = await import('./db/notes.js');
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    res.json({ success: true, data: getNotes(limit, offset) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/notes', async (req, res) => {
+  try {
+    const { excerpt, noteType, contentId, sourceTitle, sourceUrl, stance } = req.body;
+    if (!excerpt?.trim()) {
+      return res.status(400).json({ success: false, error: 'excerpt is required' });
+    }
+    const { createNote } = await import('./db/notes.js');
+    const note = createNote({ excerpt, noteType, contentId, sourceTitle, sourceUrl, stance });
+    res.json({ success: true, data: note });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/notes/:id', async (req, res) => {
+  try {
+    const { deleteNote } = await import('./db/notes.js');
+    const deleted = deleteNote(req.params.id);
+    res.json({ success: deleted, message: deleted ? 'Note deleted' : 'Note not found' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ========== M1 沉淀层：优质源登记处 Sources（ADR-007） ==========
+
+// 识别预览（不落库）：丢链接/公众号名称 → 返回识别出的身份 + track_mode，前端确认后再 register
+app.post('/api/sources/identify', async (req, res) => {
+  try {
+    const { input } = req.body;
+    if (!input?.trim()) {
+      return res.status(400).json({ success: false, error: 'input is required' });
+    }
+    const { identifyInput } = await import('./services/source-registry.js');
+    const identified = await identifyInput(input);
+    res.json({ success: true, data: identified });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 登记：接收 identify 返回的结构（前端可修改 displayName 后提交）
+app.post('/api/sources/register', async (req, res) => {
+  try {
+    const { identified } = req.body;
+    if (!identified?.platform || !identified?.handle) {
+      return res.status(400).json({ success: false, error: 'identified (with platform + handle) is required' });
+    }
+    const { registerSource } = await import('./services/source-registry.js');
+    const source = registerSource(identified);
+    res.json({ success: true, data: source });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/sources', async (req, res) => {
+  try {
+    const { listSources } = await import('./services/source-registry.js');
+    const sources = listSources({ registeredOnly: req.query.registered === '1' });
+    res.json({ success: true, data: sources });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 取消登记（只摘标记，不删 source 记录，内容引用不受影响）
+app.delete('/api/sources/:id/register', async (req, res) => {
+  try {
+    const { unregisterSource } = await import('./services/source-registry.js');
+    const done = unregisterSource(req.params.id);
+    res.json({ success: done, message: done ? 'Source unregistered' : 'Source not found' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// "把作者加为信息源"（飞轮闭环：内容 → Source）
+app.post('/api/contents/:id/follow-source', async (req, res) => {
+  try {
+    const { followSourceOfContent } = await import('./services/source-registry.js');
+    const source = await followSourceOfContent(req.params.id);
+    res.json({ success: true, data: source });
+  } catch (error) {
+    const status = error.message === 'Content not found' ? 404 : 400;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
 // 文章相关 API（v0.1 旧架构，读写 items 表，即将被上面的 /api/contents 取代，尚未移除以免破坏现有前端页面）
 app.get('/api/items', async (req, res) => {
   try {
