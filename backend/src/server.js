@@ -208,6 +208,20 @@ app.post('/api/stories/rebuild', async (req, res) => {
   }
 });
 
+// ========== M2 轻量创作出口：单篇 → X thread（ADR-011） ==========
+
+// 基于原文生成 thread（钩子+分条+结尾），直接返回不落库（Draft 是 M4）。调用 Deepseek。
+app.post('/api/contents/:id/thread', async (req, res) => {
+  try {
+    const { generateThread } = await import('./services/thread-generation.js');
+    const result = await generateThread(req.params.id);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    const status = error.message === 'Content not found' ? 404 : 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
 // ========== M2 洞察层：日报与选题（ADR-008） ==========
 
 // 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）
