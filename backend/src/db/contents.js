@@ -35,10 +35,10 @@ export function upsertContents(items) {
     INSERT INTO contents (
       id, source_id, content_type, url, published_at,
       original_lang, has_translation,
-      zh_title, zh_summary, en_title,
-      input_method, source_app, fetch_status, external_score, tags,
+      zh_title, zh_summary, en_title, en_summary,
+      input_method, source_app, fetch_status, external_score, tags, permalink,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       source_id = excluded.source_id,
       zh_title = excluded.zh_title,
@@ -46,6 +46,7 @@ export function upsertContents(items) {
       en_title = excluded.en_title,
       external_score = excluded.external_score,
       tags = excluded.tags,
+      permalink = excluded.permalink,
       updated_at = excluded.updated_at
   `);
 
@@ -68,11 +69,13 @@ export function upsertContents(items) {
         content.zh_title,
         content.zh_summary,
         content.en_title,
+        content.en_summary ?? null,
         content.input_method,
         content.source_app,
         content.fetch_status,
         content.external_score,
         content.tags ?? '[]',   // RSS/HN 等 transform 未设置 tags 时兜底（undefined 无法绑定）
+        content.permalink ?? null,
         content.created_at,
         content.updated_at
       );

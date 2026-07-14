@@ -65,6 +65,7 @@ export function transformAIHotItem(item) {
     id: item.id,
     content_type: detectContentType(item.url),
     url: item.url,
+    permalink: item.permalink || item.attribution?.canonical || null, // AI HOT 全文解读页
     published_at: item.publishedAt || now,
 
     original_lang: hasEnTitle ? 'en' : 'zh',

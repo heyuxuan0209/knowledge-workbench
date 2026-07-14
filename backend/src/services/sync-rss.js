@@ -76,22 +76,23 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
     // 只取每个 feed 的前 N 条（避免一次性导入过多）
     const limitedItems = items.slice(0, limitPerFeed * feeds.length);
 
-    // 转换成统一的 Content 模型 + 翻译英文标题
+    // 相关性过滤（2026-07-14 数据质量轮）：AI/软件工程/科技产品与创业才入库
+    const { filterRelevant } = await import('./ai-relevance.js');
+    const pretransformed = limitedItems.map(item => transformRSSItem(item, item.feedUrl, item.feedTitle));
+    const kept = await filterRelevant(pretransformed.map(({ content }) => ({ id: content.id, title: content.en_title })));
+    const relevantItems = pretransformed.filter(({ content }) => kept.has(content.id));
+    console.log(`🧹 relevance filter: ${relevantItems.length}/${pretransformed.length} kept`);
+
+    // 翻译标题 + 摘要（contentSnippet 捡回来用，Feed 不允许光杆标题）
     const transformedItems = await Promise.all(
-      limitedItems.map(async (item) => {
-        const { content, sourceInfo } = transformRSSItem(
-          item,
-          item.feedUrl,
-          item.feedTitle
-        );
-
-        // 如果是英文内容，翻译标题（与 sync-hackernews.js 保持一致）
-        if (content.original_lang === 'en' && content.en_title) {
-          content.zh_title = await translateText(content.en_title);
+      relevantItems.map(async ({ content, sourceInfo }) => {
+        if (content.original_lang === 'en') {
+          content.zh_title = content.en_title ? await translateText(content.en_title) : null;
+          content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300)) : null;
         } else {
-          content.zh_title = content.en_title; // 中文内容直接使用
+          content.zh_title = content.en_title;
+          content.zh_summary = content.en_summary;
         }
-
         return { content, sourceInfo };
       })
     );

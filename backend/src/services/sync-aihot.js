@@ -14,7 +14,11 @@ export async function syncAIHotData() {
       return { success: false, count: 0 };
     }
 
-    const transformedItems = rawItems.map(transformAIHotItem);
+    // 只收精选（2026-07-14 用户决策）：AI HOT 已做质量筛选，非精选不入库
+    const selectedItems = rawItems.filter(item => item.selected === true);
+    console.log(`📥 ${selectedItems.length}/${rawItems.length} selected items`);
+
+    const transformedItems = selectedItems.map(transformAIHotItem);
 
     const savedCount = upsertContents(transformedItems);
 
