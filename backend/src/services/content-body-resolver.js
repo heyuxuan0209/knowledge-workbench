@@ -1,5 +1,20 @@
 import { ingestUrl } from './content-ingestion.js';
 import { translateText, detectLanguage } from './translation.js';
+import { getDatabase } from '../db/init.js';
+
+// 抓取成功后把原文与译文回写 contents（异步失败不影响本次返回，只是下次没缓存）
+function persistZhBody(contentId, rawFullText, zhBody) {
+  try {
+    const db = getDatabase();
+    db.prepare(`
+      UPDATE contents SET raw_full_text = ?, zh_body = ?, has_translation = 1, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(rawFullText, zhBody, contentId);
+    db.close();
+  } catch (err) {
+    console.error(`[body-resolver] persist cache failed for ${contentId}:`, err.message);
+  }
+}
 
 // 从「一条已入库的 content 记录」解析出它的正文，供任何需要"读原文"的模块复用
 // （即兴分析对话 ephemeral-chat.js、摘要/观点提取 content-analysis.js 均依赖这里）。
@@ -41,6 +56,12 @@ export async function resolveContentBody(content) {
     };
   }
 
+  // 缓存命中：上次已抓取并翻译过（见下方回写），直接用，避免每轮对话重复"抓取+翻译"
+  // （实测一篇 GitHub README 抓取+翻译要 30s+，无状态设计下每轮都重来是不可接受的）
+  if (content.zh_body) {
+    return { body: content.zh_body, isFullText: true, note: null };
+  }
+
   try {
     const ingested = await withTimeout(ingestUrl(content.url), FETCH_TIMEOUT_MS);
 
@@ -52,8 +73,13 @@ export async function resolveContentBody(content) {
       };
     }
 
-    const lang = detectLanguage(ingested.body);
-    const zhBody = lang === 'zh' ? ingested.body : await translateText(ingested.body);
+    // 超长原文截断后再翻译（README/长文动辄上万字，全文翻译又慢又贵，8k 字已足够支撑解读）
+    const rawBody = ingested.body.length > 8000 ? ingested.body.slice(0, 8000) + '\n…（原文过长已截断）' : ingested.body;
+    const lang = detectLanguage(rawBody);
+    const zhBody = lang === 'zh' ? rawBody : await translateText(rawBody);
+
+    // 回写缓存：contents 表存在此记录时保存译文，下一轮直接命中上面的 zh_body 分支
+    persistZhBody(content.id, ingested.body, zhBody);
 
     return { body: zhBody, isFullText: true, note: null };
   } catch (error) {
