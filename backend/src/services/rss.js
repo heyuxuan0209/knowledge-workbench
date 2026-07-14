@@ -91,7 +91,8 @@ export function transformRSSItem(item, feedUrl, feedTitle) {
 
     // RSS item 通常有 title 和 contentSnippet，但完整正文需要抓取
     zh_title: null, // 待翻译（如果是英文 feed）
-    zh_summary: null,
+    zh_summary: null, // sync-rss.js 里由 contentSnippet 翻译/截取填充（Feed 不允许光杆标题）
+    en_summary: (item.contentSnippet || '').trim().slice(0, 500) || null,
     en_title: item.title,
 
     input_method: 'feed', // 符合 schema-v3.sql 的 CHECK 约束
