@@ -1,7 +1,7 @@
 # 调研备忘：管道扩展选型（入口 ASR + 出口成片/发布）
 
 **日期**: 2026-07-15
-**来源**: `~/Desktop/link2article`（链接→中文结构化文章 skill）+ `~/Desktop/ai-shortvideo-toolkit.pdf`（AI 短视频工具全景精选）
+**来源**: `reference/link2article/`（链接→中文结构化文章 skill）+ `reference/ai-shortvideo-toolkit.pdf`（AI 短视频工具全景精选），两份材料已随仓库归档
 **性质**: 调研结论，非决策。落地时按条目升格为 ADR 写入 DECISIONS.md。
 
 ---
