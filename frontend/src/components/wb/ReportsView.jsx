@@ -5,7 +5,16 @@ import { api } from './util'
 // 周报/月报（M3 洞察层收尾）：动向（升温/降温）+ 主题活页更新 + 涌现建议 + 深度选题。
 // 数据来自 /api/reports/latest?period=weekly|monthly；生成走 /api/reports/generate-period。
 
-export default function ReportsView({ setPage, viewIdea, showToast }) {
+export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, setActiveTopic, setTopicView }) {
+  // 涌现建议 → 一键建页（自动回扫相关素材并生成初始综述，即"系统帮我发现主题"的入口）
+  const createFromSuggestion = async (t) => {
+    try {
+      const json = await api('/api/topics', { method: 'POST', body: { name: t.name, description: t.why } })
+      await loadTopics?.()
+      showToast(`已建立活页「${t.name}」${json.data.backfilled ? `，回扫到 ${json.data.backfilled} 条相关素材，AI 正在生成综述` : ''}`)
+      setActiveTopic?.(json.data); setTopicView?.('page'); setPage('topics')
+    } catch (err) { showToast(`建页失败：${err.message}`) }
+  }
   const [period, setPeriod] = useState('week')
   const periodType = period === 'week' ? 'weekly' : 'monthly'
   const [reports, setReports] = useState({ weekly: null, monthly: null })
@@ -93,7 +102,10 @@ export default function ReportsView({ setPage, viewIdea, showToast }) {
         <div className="wb-card" style={{ padding: '16px 18px', background: 'var(--brief-bg)', borderColor: 'rgba(61,90,128,.22)' }}>
           <div className="wb-report-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IconBulb />涌现建议</div>
           {(report.emergent?.newTopics || []).map((t, i) => (
-            <div key={`n${i}`} className="wb-report-line">🌱 <b>建议新活页「{t.name}」</b>：{t.why}</div>
+            <div key={`n${i}`} className="wb-report-line" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ flex: 1 }}>🌱 <b>建议新活页「{t.name}」</b>：{t.why}</span>
+              <button className="wb-brief-link" style={{ flex: 'none' }} onClick={() => createFromSuggestion(t)}>建为主题 →</button>
+            </div>
           ))}
           {(report.emergent?.links || []).map((l, i) => (
             <div key={`l${i}`} className="wb-report-line">🔗 {l}</div>

@@ -361,11 +361,40 @@ export default function WorkbenchPage() {
   }
 
   const insertMaterial = (note) => {
+    const label = note.content_zh_title || note.source_title || '素材'
     setStudio(s => ({
       ...s,
-      draft: (s.draft ? s.draft + '\n\n' : '') + `> ${note.excerpt}\n  —— 引自《${note.content_zh_title || note.source_title || '素材'}》（可溯源）`,
-      refs: [...s.refs, { note: note.content_zh_title || note.source_title || '素材', para: '新段落' }],
+      draft: (s.draft ? s.draft + '\n\n' : '') + `> ${note.excerpt}\n  —— 引自《${label}》（可溯源）`,
+      refs: [...s.refs, { note: label, para: '引块' }],
+      // 手动插入也进持久化引用链（保存草稿时随稿落库）
+      paragraphRefs: [...s.paragraphRefs, { marker: '引块', noteId: note.id, sourceTitle: label, contentId: note.content_id || null }],
     }))
+  }
+
+  // 删除引用：从引用链移除，并尽力把对应文本从草稿里清掉
+  // （[素材N] 标记删标记本身、句子保留；手动引块按摘录前缀匹配整块删除）
+  const removeRef = (index) => {
+    setStudio(s => {
+      const ref = s.paragraphRefs[index]
+      let draft = s.draft
+      if (ref) {
+        if (ref.marker?.startsWith('[素材')) {
+          draft = draft.split(ref.marker).join('')
+        } else {
+          const note = notes.find(n => n.id === ref.noteId)
+          if (note) {
+            const block = `> ${note.excerpt}\n  —— 引自《${ref.sourceTitle}》（可溯源）`
+            draft = draft.replace('\n\n' + block, '').replace(block, '')
+          }
+        }
+      }
+      return {
+        ...s, draft,
+        refs: s.refs.filter((_, i) => i !== index),
+        paragraphRefs: s.paragraphRefs.filter((_, i) => i !== index),
+      }
+    })
+    showToast('已移除该引用（草稿中的对应标记/引块已清理）')
   }
 
   const rewriteDraft = async (instruction) => {
@@ -439,7 +468,7 @@ export default function WorkbenchPage() {
           analysisMode={analysisMode} backList={() => setAnalysisMode('list')}
           chat={chat} degraded={degraded} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg}
           topicView={topicView} activeTopic={activeTopic}
-          studio={studio} notes={notes} insertMaterial={insertMaterial} rewriteDraft={rewriteDraft}
+          studio={studio} notes={notes} insertMaterial={insertMaterial} removeRef={removeRef} rewriteDraft={rewriteDraft}
           showToast={showToast}
         />
       </div>

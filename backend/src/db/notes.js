@@ -31,8 +31,11 @@ export function createNote({ excerpt, noteType = 'chat', contentId = null, sourc
 
 export function getNotes(limit = 50, offset = 0) {
   const db = getDatabase();
+  // topic_ids/topic_names：素材归属的主题（M4 创作台按当前主题筛选素材用）
   const rows = db.prepare(`
-    SELECT n.*, c.zh_title AS content_zh_title, c.url AS content_url
+    SELECT n.*, c.zh_title AS content_zh_title, c.url AS content_url,
+      (SELECT group_concat(nt.topic_id) FROM note_topics nt WHERE nt.note_id = n.id) AS topic_ids,
+      (SELECT group_concat(t.name, ' / ') FROM note_topics nt2 JOIN topics t ON t.id = nt2.topic_id WHERE nt2.note_id = n.id) AS topic_names
     FROM notes n
     LEFT JOIN contents c ON n.content_id = c.id
     ORDER BY n.created_at DESC
