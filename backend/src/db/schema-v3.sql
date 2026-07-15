@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS source_platforms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id TEXT NOT NULL,
     platform TEXT NOT NULL
-        CHECK (platform IN ('X', 'YouTube', 'WeChat', 'GitHub', 'Blog', 'Newsletter', 'Reddit', 'RSS', 'HackerNews', 'Podcast')),
+        CHECK (platform IN ('X', 'YouTube', 'WeChat', 'GitHub', 'Blog', 'Newsletter', 'Reddit', 'RSS', 'HackerNews', 'Podcast', 'Bilibili')),
     handle TEXT,                            -- @username / channelId / 公众号名称 / feed URL
     -- 四档成本分层（ADR-007，M1 起由三档扩为四档，migrate-m1.js）：
     -- passive=AI HOT 已覆盖零成本 / active-rss=RSS 轮询 / active-query=X、YouTube 主动查询 / link-only=公众号只跳转
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS contents (
     input_method TEXT NOT NULL DEFAULT 'feed'
         CHECK (input_method IN ('feed', 'url_auto', 'url_manual', 'text_paste', 'file_upload')),
     source_app TEXT DEFAULT 'unknown'
-        CHECK (source_app IN ('aihot', 'hackernews', 'reddit', 'github_trending', 'rss', 'feishu', 'obsidian', 'manual', 'unknown')),
+        CHECK (source_app IN ('aihot', 'hackernews', 'reddit', 'github_trending', 'rss', 'feishu', 'obsidian', 'manual', 'active_query', 'unknown')),
     fetch_status TEXT DEFAULT 'success'
         CHECK (fetch_status IN ('pending', 'success', 'failed', 'manual')),
     fetch_error TEXT,
