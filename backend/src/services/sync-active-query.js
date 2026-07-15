@@ -34,15 +34,17 @@ function loadActiveQuerySources() {
   return rows;
 }
 
-// 分拣：新条目（首次入库）+ 待补翻译条目（上次翻译失败留白的，重试；
-// upsert 的 ON CONFLICT 会更新 zh_title/zh_summary，所以重试结果能落库）。
-// 已有译文的条目不再送翻译——幂等重跑不重复花钱。
+// 分拣（幂等重跑不重复花钱，upsert 的 COALESCE 保证补上的字段不被后续空值抹掉）：
+// - newItems：首次入库
+// - toTranslate：库里缺 zh_title 的（含上次翻译失败留白的，自动重试）
+// - toEnrich：YouTube 条目库里缺 published_at 的 —— flat 列表拿不到简介/发布时间，
+//   逐个补取详情。published_at 兼作"已增强"标记（详情必有），真没简介的视频不会反复重取
 function partitionItems(items) {
-  if (items.length === 0) return { newItems: [], toTranslate: [] };
+  if (items.length === 0) return { newItems: [], toTranslate: [], toEnrich: [] };
   const db = getDatabase();
   const placeholders = items.map(() => '?').join(',');
   const existing = new Map(
-    db.prepare(`SELECT id, zh_title FROM contents WHERE id IN (${placeholders})`)
+    db.prepare(`SELECT id, zh_title, published_at FROM contents WHERE id IN (${placeholders})`)
       .all(...items.map(i => i.content.id)).map(r => [r.id, r])
   );
   db.close();
@@ -51,7 +53,11 @@ function partitionItems(items) {
     const row = existing.get(i.content.id);
     return !row || (!row.zh_title && i.content.en_title);
   });
-  return { newItems, toTranslate };
+  const toEnrich = items.filter(i => {
+    const row = existing.get(i.content.id);
+    return i.content.id.startsWith('yt-') && (!row || !row.published_at);
+  });
+  return { newItems, toTranslate, toEnrich };
 }
 
 async function translateNewItems(newItems) {
@@ -100,8 +106,21 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
     }
   }
 
-  const { newItems, toTranslate } = partitionItems(allItems);
-  await translateNewItems(toTranslate);
+  const { newItems, toTranslate, toEnrich } = partitionItems(allItems);
+
+  // YouTube 详情增强（简介 + 发布时间），每轮上限 8 个防积压拖长；失败静默、下轮重试
+  const { fetchYoutubeDetail } = await import('./active-query-channels.js');
+  for (const item of toEnrich.slice(0, 8)) {
+    const detail = await fetchYoutubeDetail(item.content.id.slice(3));
+    if (detail) {
+      item.content.en_summary = item.content.en_summary || detail.description;
+      item.content.published_at = item.content.published_at || detail.publishedAt;
+    }
+  }
+
+  // 翻译集合 = 缺标题的 + 刚增强出简介的（translateNewItems 内部按字段判空，不重复翻）
+  const translateSet = [...new Set([...toTranslate, ...toEnrich])];
+  await translateNewItems(translateSet);
 
   // upsert 全量（旧条目按 ON CONFLICT 更新 external_score 等，新条目插入）
   const upserted = allItems.length ? upsertContents(allItems) : 0;
