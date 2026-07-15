@@ -25,10 +25,14 @@ function cosineTF(tokensA, tokensB) {
   const a = tf(tokensA), b = tf(tokensB);
   const [small, big] = a.size <= b.size ? [a, b] : [b, a];
   let dot = 0;
+  let shared = 0;
   for (const [t, w] of small) {
     const w2 = big.get(t);
-    if (w2) dot += w * w2;
+    if (w2) { dot += w * w2; shared++; }
   }
+  // 短文档下单个泛词（本产品里 'ai' 无处不在）就能凑出高余弦——实测曾把无关素材
+  // 误配进主题并触发自动同化污染活页。至少 2 个不同共享词才算相关。
+  if (shared < 2) return 0;
   const norm = m => Math.sqrt([...m.values()].reduce((s, w) => s + w * w, 0)) || 1;
   return dot / (norm(a) * norm(b));
 }

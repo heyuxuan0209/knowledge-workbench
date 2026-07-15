@@ -330,7 +330,14 @@ app.post('/api/topics', async (req, res) => {
       return res.status(400).json({ success: false, error: 'name is required' });
     }
     const { createTopic } = await import('./services/topic-pages.js');
-    res.json({ success: true, data: createTopic({ name, description }) });
+    const topic = createTopic({ name, description });
+    // 回扫到历史素材 → 后台自动同化，新页直接长出综述（保存即同化的同一设计）
+    if (topic.pending_notes?.length) {
+      import('./services/assimilation.js').then(({ assimilate }) =>
+        assimilate(topic.id).then(r => console.log(`[Topics] 建页自动并入「${topic.name}」:`, r.success ? r.data.changelog : r.error))
+          .catch(err => console.error('[Topics] 建页自动并入异常:', err.message)));
+    }
+    res.json({ success: true, data: topic });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -344,7 +351,13 @@ app.post('/api/topics/from-idea', async (req, res) => {
       return res.status(400).json({ success: false, error: 'ideaId is required' });
     }
     const { createTopicFromIdea } = await import('./services/topic-pages.js');
-    res.json({ success: true, data: createTopicFromIdea(ideaId) });
+    const topic = createTopicFromIdea(ideaId);
+    if (topic.pending_notes?.length) {
+      import('./services/assimilation.js').then(({ assimilate }) =>
+        assimilate(topic.id).then(r => console.log(`[Topics] 升级建页自动并入「${topic.name}」:`, r.success ? r.data.changelog : r.error))
+          .catch(err => console.error('[Topics] 升级建页自动并入异常:', err.message)));
+    }
+    res.json({ success: true, data: topic });
   } catch (error) {
     const status = error.message === 'Idea not found' ? 404 : 500;
     res.status(status).json({ success: false, error: error.message });
@@ -434,12 +447,24 @@ app.post('/api/notes', async (req, res) => {
     const { createNote } = await import('./db/notes.js');
     const note = createNote({ excerpt, noteType, contentId, sourceTitle, sourceUrl, stance });
 
-    // M3 同化前置：保存即自动匹配活跃 Topic（本地 TF 余弦，零 LLM 成本），
-    // 命中的挂 pending 待并入；匹配失败不影响保存
+    // M3 同化（设计文档 §引擎B：保存素材即触发，用户不需要理解"待并入"）：
+    // 1. 自动匹配活跃 Topic（本地 TF 余弦，零成本）
+    // 2. 命中的主题后台异步同化（一次 ¥0.002 级），不阻塞保存响应；
+    //    失败不丢数据——素材停留在 pending，主题页"待并入"区可手动补并（兜底）
     let matchedTopics = [];
     try {
       const { matchNoteToTopics } = await import('./services/topic-pages.js');
       matchedTopics = matchNoteToTopics(note.id);
+      if (matchedTopics.length) {
+        import('./services/assimilation.js').then(({ assimilate }) => {
+          for (const m of matchedTopics) {
+            assimilate(m.topicId).then(r => {
+              if (r.success) console.log(`[Notes] 已自动并入「${m.name}」: ${r.data.changelog}`);
+              else console.error(`[Notes] 自动并入「${m.name}」失败: ${r.error}`);
+            }).catch(err => console.error(`[Notes] 自动并入「${m.name}」异常:`, err.message));
+          }
+        });
+      }
     } catch (err) {
       console.error('[Notes] topic match failed:', err.message);
     }
