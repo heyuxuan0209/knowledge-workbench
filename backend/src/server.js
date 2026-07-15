@@ -421,7 +421,7 @@ app.post('/api/topics', async (req, res) => {
     // 回扫到历史素材 → 后台自动同化，新页直接长出综述（保存即同化的同一设计）
     if (topic.pending_notes?.length) {
       import('./services/assimilation.js').then(({ assimilate }) =>
-        assimilate(topic.id).then(r => console.log(`[Topics] 建页自动并入「${topic.name}」:`, r.success ? r.data.changelog : r.error))
+        assimilate(topic.id, null, 0.15).then(r => console.log(`[Topics] 建页自动并入「${topic.name}」:`, r.success ? r.data.changelog : r.error))
           .catch(err => console.error('[Topics] 建页自动并入异常:', err.message)));
     }
     res.json({ success: true, data: topic });
@@ -441,7 +441,7 @@ app.post('/api/topics/from-idea', async (req, res) => {
     const topic = createTopicFromIdea(ideaId);
     if (topic.pending_notes?.length) {
       import('./services/assimilation.js').then(({ assimilate }) =>
-        assimilate(topic.id).then(r => console.log(`[Topics] 升级建页自动并入「${topic.name}」:`, r.success ? r.data.changelog : r.error))
+        assimilate(topic.id, null, 0.15).then(r => console.log(`[Topics] 升级建页自动并入「${topic.name}」:`, r.success ? r.data.changelog : r.error))
           .catch(err => console.error('[Topics] 升级建页自动并入异常:', err.message)));
     }
     res.json({ success: true, data: topic });
@@ -472,6 +472,28 @@ app.post('/api/topics/:id/assimilate', async (req, res) => {
   } catch (error) {
     const status = error.message === 'Topic not found' ? 404 : 500;
     res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// AI 改名建议（3 个短名候选，一次 Deepseek 调用）
+app.post('/api/topics/:id/suggest-names', async (req, res) => {
+  try {
+    const { suggestTopicNames } = await import('./services/topic-pages.js');
+    res.json({ success: true, data: await suggestTopicNames(req.params.id) });
+  } catch (error) {
+    const status = error.message === 'Topic not found' ? 404 : 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// 移出素材（误并撤销）：pending 纯解绑；已并入则同时 LLM 修订综述剔除其贡献
+app.delete('/api/topics/:id/notes/:noteId', async (req, res) => {
+  try {
+    const { removeNoteFromTopic } = await import('./services/assimilation.js');
+    const result = await removeNoteFromTopic(req.params.id, req.params.noteId);
+    res.status(result.success ? 200 : 404).json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -560,8 +582,9 @@ app.post('/api/notes', async (req, res) => {
       matchedTopics = matchNoteToTopics(note.id);
       if (matchedTopics.length) {
         import('./services/assimilation.js').then(({ assimilate }) => {
-          for (const m of matchedTopics) {
-            assimilate(m.topicId).then(r => {
+          // 只有高置信匹配（≥0.15）自动并入；弱匹配留在主题页"待并入"等用户确认
+          for (const m of matchedTopics.filter(x => x.relevance >= 0.15)) {
+            assimilate(m.topicId, [note.id], 0.15).then(r => {
               if (r.success) console.log(`[Notes] 已自动并入「${m.name}」: ${r.data.changelog}`);
               else console.error(`[Notes] 自动并入「${m.name}」失败: ${r.error}`);
             }).catch(err => console.error(`[Notes] 自动并入「${m.name}」异常:`, err.message));

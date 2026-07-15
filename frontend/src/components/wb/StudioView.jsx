@@ -9,7 +9,7 @@ const PLATFORMS = [
   { key: 'script', label: '🎬 口播脚本' },
 ]
 
-export default function StudioView({ studio, setStudio, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft }) {
+export default function StudioView({ studio, setStudio, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, gotoTopic }) {
   const setPlatform = (p) => {
     setStudio(s => ({ ...s, platform: p }))
     setTimeout(() => genDraft(p), 0)
@@ -29,7 +29,11 @@ export default function StudioView({ studio, setStudio, genDraft, exportMd, setP
       <div className="wb-topic-head" style={{ marginTop: 6 }}>
         <span className="wb-topic-name">创作台</span>
         <span style={{ fontSize: 12, color: 'var(--sub2)' }}>来源</span>
-        <span className="wb-studio-src">{studio.source || '手选素材（右侧插入）'}</span>
+        <span className="wb-studio-src" style={studio.sourceTopicId ? { cursor: 'pointer', textDecoration: 'underline dotted' } : undefined}
+          title={studio.sourceTopicId ? '打开来源主题页' : undefined}
+          onClick={() => studio.sourceTopicId && gotoTopic(studio.sourceTopicId)}>
+          {studio.source || '手选素材（右侧插入）'}
+        </span>
         {drafts?.length > 0 && (
           <select
             style={{ marginLeft: 'auto', fontSize: 12, padding: '5px 8px', border: '1px solid var(--line08)', borderRadius: 8, background: 'var(--surface)', color: 'var(--body2)', maxWidth: 220 }}

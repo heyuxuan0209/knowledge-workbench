@@ -138,13 +138,22 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
       <button className="wb-back" onClick={back}>← 主题库</button>
       <div className="wb-topic-head" style={{ marginTop: 6 }}>
         <span className="wb-topic-name">{topic.name}</span>
-        <button className="wb-note-del" title="重命名主题" onClick={async () => {
-          const name = prompt('新的主题名（简短好记，12 字内最佳）：', topic.name)
-          if (!name?.trim() || name.trim() === topic.name) return
+        <button className="wb-note-del" title="重命名主题（AI 会先给 3 个候选名）" onClick={async () => {
+          showToast('AI 正在想几个更好的名字…')
+          let hint = ''
+          let suggestions = []
           try {
-            await api(`/api/topics/${topic.id}`, { method: 'PATCH', body: { name: name.trim() } })
+            suggestions = (await api(`/api/topics/${topic.id}/suggest-names`, { method: 'POST' })).data || []
+            hint = suggestions.length ? `AI 建议：\n${suggestions.map((s, i) => `${i + 1}) ${s}`).join('\n')}\n\n输入数字选用，或直接输入新名字：` : '输入新的主题名：'
+          } catch { hint = '输入新的主题名（AI 建议获取失败）：' }
+          const input = prompt(hint, topic.name)
+          if (!input?.trim()) return
+          const picked = /^[123]$/.test(input.trim()) ? suggestions[parseInt(input.trim()) - 1] : input.trim()
+          if (!picked || picked === topic.name) return
+          try {
+            await api(`/api/topics/${topic.id}`, { method: 'PATCH', body: { name: picked } })
             await load()
-            showToast('主题已重命名')
+            showToast(`主题已重命名为「${picked}」`)
           } catch (err) { showToast(`重命名失败：${err.message}`) }
         }}>✎</button>
         <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} onClick={() => {
@@ -186,12 +195,50 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
       </div>
       {topic.pending_notes.map(n => (
         <div key={n.id} className="wb-card" style={{ padding: '12px 16px' }}>
-          <div style={{ fontSize: 12.5, color: 'var(--body2)', lineHeight: 1.6 }}>{n.excerpt.slice(0, 160)}{n.excerpt.length > 160 ? '…' : ''}</div>
-          <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 6 }}>
-            来源：{n.source_title || '未知'} · 匹配度 {Math.round((n.relevance || 0) * 100)}%
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{n.title || n.source_title || '未命名素材'}</div>
+              <div style={{ fontSize: 12.5, color: 'var(--body2)', lineHeight: 1.6, marginTop: 4 }}>{n.excerpt.slice(0, 120)}…</div>
+              <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 4 }}>来源：{n.source_title || '未知'} · 匹配度 {Math.round((n.relevance || 0) * 100)}%</div>
+            </div>
+            <button className="wb-note-del" style={{ flex: 'none' }} title="不属于这个主题，移除（素材本身保留）"
+              onClick={async () => {
+                try { await api(`/api/topics/${topic.id}/notes/${n.id}`, { method: 'DELETE' }); await load(); showToast('已移除（素材仍在素材库）') }
+                catch (err) { showToast(`移除失败：${err.message}`) }
+              }}>✕</button>
           </div>
         </div>
       ))}
+
+      <div className="wb-card">
+        <div className="wb-card-label">已并入素材（{topic.assimilated_notes?.length || 0}）· 综述由它们长成</div>
+        <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 8 }}>
+          自动并入的判定：保存素材时与主题名/综述做本地相似度匹配（不调 AI）。误并点 ✕ 移出——AI 会同时修订综述，剔除只有它支撑的论点。
+        </div>
+        {(topic.assimilated_notes || []).map(n => {
+          const url = n.content_url || n.source_url
+          return (
+            <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: '1px solid var(--line07)' }}>
+              <span style={{ minWidth: 0, flex: 1, fontSize: 12.5 }}>
+                <b>{n.title || n.source_title || '未命名素材'}</b>
+                {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文" style={{ marginLeft: 4, color: 'var(--accent)', textDecoration: 'none' }}>↗</a>}
+                <span style={{ color: 'var(--sub2)' }}> · {(n.assimilated_at || '').slice(5, 10)} · {n.added_by === 'user' ? '手动归入' : `自动匹配 ${Math.round((n.relevance || 0) * 100)}%`}</span>
+              </span>
+              <button className="wb-note-del" style={{ flex: 'none' }} title="移出该素材并修订综述（约 20 秒）"
+                onClick={async () => {
+                  if (!confirm(`把《${n.title || n.source_title || '素材'}》移出本主题？\nAI 会修订综述、剔除只有它支撑的论点（素材本身保留在素材库）。`)) return
+                  showToast('正在移出并修订综述（约 20 秒）…')
+                  try {
+                    const json = await api(`/api/topics/${topic.id}/notes/${n.id}`, { method: 'DELETE' })
+                    await load()
+                    showToast(json.data.revised ? '已移出，综述已修订' : '已移出（综述修订失败，请检查正文是否有残留论点）')
+                  } catch (err) { showToast(`移出失败：${err.message}`) }
+                }}>✕</button>
+            </div>
+          )
+        })}
+        {!(topic.assimilated_notes || []).length && <div style={{ fontSize: 12, color: 'var(--faint)' }}>还没有素材并入过这个主题</div>}
+      </div>
 
       <div className="wb-card">
         <div className="wb-card-label">修订记录 · 自动生成（changelog 即演进时间线）</div>

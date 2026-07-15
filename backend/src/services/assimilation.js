@@ -55,8 +55,74 @@ ${notesBlock}
 - 不得编造素材里没有的信息；全部用中文`;
 }
 
+// 移出素材（误并撤销）：
+// - pending 状态：纯解除关联，零成本
+// - 已并入：解除关联 + 一次 LLM 修订，把"仅由该素材支撑"的论点/观点从活页里剔除，
+//   写一条 'revised' changelog（修订失败不阻塞移出，如实记录综述未修订）
+export async function removeNoteFromTopic(topicId, noteId) {
+  const db = getDatabase();
+  const link = db.prepare('SELECT status FROM note_topics WHERE topic_id = ? AND note_id = ?').get(topicId, noteId);
+  if (!link) { db.close(); return { success: false, error: '该素材未关联此主题' }; }
+  const note = db.prepare('SELECT excerpt, title, source_title FROM notes WHERE id = ?').get(noteId);
+  const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(topicId);
+  const label = note?.title || note?.source_title || '素材';
+
+  db.prepare('DELETE FROM note_topics WHERE topic_id = ? AND note_id = ?').run(topicId, noteId);
+
+  if (link.status === 'pending' || !note) {
+    db.close();
+    return { success: true, data: { removed: label, revised: false } };
+  }
+
+  let body;
+  try { body = { ...EMPTY_BODY, ...JSON.parse(topic.body || '{}') }; } catch { body = { ...EMPTY_BODY }; }
+
+  let revised = false;
+  let summary = `移出素材《${label}》（综述未修订，可手动检查残留论点）`;
+  try {
+    const result = await chat([{
+      role: 'user',
+      content: `主题「${topic.name}」的活页综述中，以下素材被用户移出（不再属于该主题），请修订活页：删除**仅由这条素材支撑**的论点、观点（views 里出处指向它的条目）和共识描述；其他素材支撑的内容原样保留，不要改写。输出 JSON（不要 markdown 代码块）：{"current": "...", "views": [{"who","what","ref","conflict"}], "consensus": "...", "changelog": "一句话说明移出了什么、删了哪些论点（40字内）"}
+
+# 被移出的素材（来源：${note.source_title || '未知'}）
+${note.excerpt.slice(0, 1500)}
+
+# 当前活页
+## 当前认知
+${body.current}
+## 各方观点
+${body.views.map(v => `- ${v.who}：${v.what} [${v.ref}]`).join('\n') || '（无）'}
+## 共识/非共识
+${body.consensus}`,
+    }]);
+    if (result.success) {
+      const cleaned = result.content.replace(/^```(json)?\s*/i, '').replace(/```\s*$/, '').trim();
+      const parsed = JSON.parse(cleaned);
+      const newBody = {
+        current: typeof parsed.current === 'string' ? parsed.current : body.current,
+        views: Array.isArray(parsed.views) ? parsed.views.map(v => ({ who: String(v.who || ''), what: String(v.what || ''), ref: String(v.ref || ''), conflict: !!v.conflict })) : body.views,
+        consensus: typeof parsed.consensus === 'string' ? parsed.consensus : body.consensus,
+      };
+      db.prepare("UPDATE topics SET body = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(newBody), topicId);
+      summary = (parsed.changelog || `移出素材《${label}》并修订综述`).slice(0, 120);
+      revised = true;
+    }
+  } catch (err) {
+    console.error('[assimilation] 移出修订失败:', err.message);
+  }
+
+  db.prepare(`
+    INSERT INTO topic_changelog (id, topic_id, change_type, summary, note_ids)
+    VALUES (?, ?, 'revised', ?, ?)
+  `).run(randomUUID(), topicId, summary, JSON.stringify([noteId]));
+  db.close();
+  return { success: true, data: { removed: label, revised } };
+}
+
 // 并入：noteIds 为空 = 全部待并入素材。一批素材一次 LLM 调用。
-export async function assimilate(topicId, noteIds = null) {
+// minRelevance：自动触发场景传 0.15——弱匹配（0.06~0.15）留在待并入等用户确认，
+// 不自动写进综述（实测弱匹配误并会污染活页正文）；手动"立即并入"传 0 全量。
+export async function assimilate(topicId, noteIds = null, minRelevance = 0) {
   const db = getDatabase();
   const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(topicId);
   if (!topic) { db.close(); throw new Error('Topic not found'); }
@@ -65,8 +131,9 @@ export async function assimilate(topicId, noteIds = null) {
     SELECT n.id, n.excerpt, n.source_title
     FROM note_topics nt JOIN notes n ON nt.note_id = n.id
     WHERE nt.topic_id = ? AND nt.status = 'pending'
+      AND (nt.relevance >= ? OR nt.added_by = 'user')
   `;
-  const params = [topicId];
+  const params = [topicId, minRelevance];
   if (Array.isArray(noteIds) && noteIds.length) {
     sql += ` AND n.id IN (${noteIds.map(() => '?').join(',')})`;
     params.push(...noteIds);

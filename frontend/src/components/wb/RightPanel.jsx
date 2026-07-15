@@ -158,7 +158,7 @@ function MsgBubble({ msg, onSave, hideSave = false }) {
 }
 
 /* ---------- 创作助手 ---------- */
-function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, rewriteDraft, showToast }) {
+function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, gotoNote, rewriteDraft, showToast }) {
   const [input, setInput] = useState('')
   const [chat, setChat] = useState([]) // {role, text, pending?}
   const endRef = useRef(null)
@@ -191,7 +191,8 @@ function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, r
           return (
             <div key={i} className="wb-ref-item" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                📎 <b>{label}</b> → {r.para}
+                📎 <b style={src ? { cursor: 'pointer' } : undefined} title={src ? '在素材库中查看' : undefined}
+                  onClick={() => src && gotoNote(src.id)}>{label}</b> → {r.para}
                 {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文" style={{ marginLeft: 4, color: 'var(--accent)', textDecoration: 'none' }}>↗</a>}
               </span>
               <button className="wb-note-del" style={{ marginLeft: 'auto', flex: 'none' }} title="移除引用（同时清理草稿中的标记/引块）"
@@ -213,7 +214,8 @@ function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, r
               return (
                 <div key={n.id} className="wb-insert-item" style={{ alignItems: 'flex-start' }}>
                   <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontWeight: 600, fontSize: 12 }}>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                      title="在素材库中查看" onClick={() => gotoNote(n.id)}>
                       {isMine(n) && <span style={{ color: 'var(--accent)' }}>[本主题] </span>}
                       {(n.title || n.content_zh_title || n.source_title || '未命名素材').slice(0, 22)}
                       {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文"

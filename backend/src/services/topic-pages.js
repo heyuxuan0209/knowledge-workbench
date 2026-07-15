@@ -87,15 +87,24 @@ export function getTopicDetail(topicId) {
   `).all(topicId).map(c => ({ ...c, note_ids: JSON.parse(c.note_ids || '[]') }));
 
   topic.pending_notes = db.prepare(`
-    SELECT n.id, n.excerpt, n.source_title, n.source_url, nt.relevance, nt.created_at AS linked_at
+    SELECT n.id, n.title, n.excerpt, n.source_title, n.source_url, nt.relevance, nt.created_at AS linked_at
     FROM note_topics nt JOIN notes n ON nt.note_id = n.id
     WHERE nt.topic_id = ? AND nt.status = 'pending'
     ORDER BY nt.created_at DESC
   `).all(topicId);
 
-  topic.assimilated_count = db.prepare(
-    "SELECT COUNT(*) c FROM note_topics WHERE topic_id = ? AND status = 'assimilated'"
-  ).get(topicId).c;
+  // 已并入素材清单（可移出，见 assimilation.removeNoteFromTopic）：
+  // 用户必须能看到"这页综述由哪些素材长成"，误并才有察觉与撤销的机会
+  topic.assimilated_notes = db.prepare(`
+    SELECT n.id, n.title, n.excerpt, n.source_title, n.source_url, c.url AS content_url,
+           nt.relevance, nt.added_by, nt.assimilated_at
+    FROM note_topics nt
+    JOIN notes n ON nt.note_id = n.id
+    LEFT JOIN contents c ON n.content_id = c.id
+    WHERE nt.topic_id = ? AND nt.status = 'assimilated'
+    ORDER BY nt.assimilated_at DESC
+  `).all(topicId);
+  topic.assimilated_count = topic.assimilated_notes.length;
 
   db.close();
   return topic;
@@ -162,6 +171,31 @@ export function createTopicFromIdea(ideaId) {
   backfillMatchesForTopic(db, id);
   db.close();
   return getTopicDetail(id);
+}
+
+// AI 改名建议：基于活页综述和素材标题给 3 个短名候选（用户"想改但不知道改什么"）
+export async function suggestTopicNames(topicId) {
+  const db = getDatabase();
+  const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(topicId);
+  if (!topic) { db.close(); throw new Error('Topic not found'); }
+  let body; try { body = JSON.parse(topic.body || '{}'); } catch { body = {}; }
+  const noteTitles = db.prepare(`
+    SELECT COALESCE(n.title, n.source_title, '') t FROM note_topics nt JOIN notes n ON n.id = nt.note_id
+    WHERE nt.topic_id = ? LIMIT 8
+  `).all(topicId).map(r => r.t).filter(Boolean);
+  db.close();
+
+  const { chat } = await import('./llm.js');
+  const result = await chat([{
+    role: 'user',
+    content: `给一个知识库主题起 3 个更好的名字。要求：6-12 个字、一眼看懂在研究什么、名词短语（不要句子和标点）、彼此有区分度。只输出 3 行，每行一个名字，不要编号和解释。
+
+当前名字：${topic.name}
+综述摘要：${(body.current || topic.description || '').slice(0, 300)}
+相关素材：${noteTitles.join('；')}`,
+  }]);
+  if (!result.success) throw new Error(result.error);
+  return result.content.trim().split('\n').map(s => s.trim().replace(/^\d+[.、)]\s*/, '')).filter(Boolean).slice(0, 3);
 }
 
 // 改名/改描述（活页由选题/涌现建议自动生成时名字常常偏长，用户须可改）

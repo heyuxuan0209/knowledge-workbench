@@ -57,6 +57,15 @@ export default function WorkbenchPage() {
   const [modal, setModal] = useState(null) // 'pool'|'import'|'idea'
   const [ideaDetail, setIdeaDetail] = useState(null)
 
+  // 站内定位：从创作台/主题页点素材标题 → 跳素材库并高亮该卡片
+  const [highlightNoteId, setHighlightNoteId] = useState(null)
+  const gotoNote = (noteId) => { setHighlightNoteId(noteId); setPage('notes') }
+  // 从创作台来源芯片跳回主题详情
+  const gotoTopic = (topicId) => {
+    const tp = topics.find(t => t.id === topicId)
+    if (tp) { setActiveTopic(tp); setTopicView('page'); setPage('topics') }
+  }
+
   // 主题 / 创作台
   const [topicView, setTopicView] = useState('list')
   const [activeTopic, setActiveTopic] = useState(null)
@@ -174,11 +183,16 @@ export default function WorkbenchPage() {
       })
       setChat(prev => prev.map((m, i) => i === index ? { ...m, noteId: json.data.id } : m))
       loadNotes()
-      // 保存即同化（设计本意）：命中主题时后台自动并入，用户不需要额外操作
+      // 保存即同化：高置信匹配（≥0.15）自动并入；弱匹配挂待并入等用户在主题页确认
       const matched = json.matchedTopics || []
-      if (matched.length) {
-        showToast(`已存为素材，AI 正在把它并入主题「${matched.map(m => m.name).join('」「')}」（约半分钟，主题页可见修订）`)
+      const strong = matched.filter(m => m.relevance >= 0.15)
+      const weak = matched.filter(m => m.relevance < 0.15)
+      if (strong.length) {
+        showToast(`已存为素材，AI 正在并入主题「${strong.map(m => m.name).join('」「')}」${weak.length ? `；「${weak[0].name}」疑似相关，去主题页确认` : ''}`)
         setTimeout(loadTopics, 35000) // 同化完成后刷新主题统计
+      } else if (weak.length) {
+        loadTopics()
+        showToast(`已存为素材，疑似与主题「${weak.map(m => m.name).join('」「')}」相关——去主题页确认是否并入`)
       } else {
         showToast('已存为素材卡片。想让它进入某个主题综述？在主题页建立相关主题即可自动归入')
       }
@@ -432,6 +446,7 @@ export default function WorkbenchPage() {
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, genDraft: (...a) => genDraftRef.current(...a), exportMd,
     drafts, saveDraft, openDraft, humanizeDraft,
+    highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic,
   }
 
   return (
@@ -471,7 +486,7 @@ export default function WorkbenchPage() {
           analysisMode={analysisMode} backList={() => setAnalysisMode('list')}
           chat={chat} degraded={degraded} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg}
           topicView={topicView} activeTopic={activeTopic}
-          studio={studio} notes={notes} insertMaterial={insertMaterial} removeRef={removeRef} rewriteDraft={rewriteDraft}
+          studio={studio} notes={notes} insertMaterial={insertMaterial} removeRef={removeRef} gotoNote={gotoNote} rewriteDraft={rewriteDraft}
           showToast={showToast}
         />
       </div>

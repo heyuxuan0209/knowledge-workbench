@@ -1,11 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { timeAgo, STANCE_COLORS, STANCE_CN, api } from './util'
 import { IconClip, IconExternal, IconTrash } from './Icons'
 
 // 素材库（视觉对齐原型 02-notes）：结构化摘录 + 来源引用 + 立场徽章（可选）+ 删除。
+// highlightNoteId：从创作台/主题页点素材标题跳转过来时，滚动定位并高亮该卡片。
 
-export default function NotesView({ notes, loadNotes, showToast }) {
+export default function NotesView({ notes, loadNotes, showToast, highlightNoteId, setHighlightNoteId }) {
   const [keyword, setKeyword] = useState('')
+  const highlightRef = useRef(null)
+
+  useEffect(() => {
+    if (highlightNoteId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const timer = setTimeout(() => setHighlightNoteId?.(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [highlightNoteId, setHighlightNoteId])
 
   const del = async (note) => {
     if (!confirm('删除这张素材卡片？')) return
@@ -41,8 +51,10 @@ export default function NotesView({ notes, loadNotes, showToast }) {
         const sc = STANCE_COLORS[note.stance]
         const url = note.content_url || note.source_url
         const title = note.content_zh_title || note.source_title
+        const highlighted = note.id === highlightNoteId
         return (
-          <div key={note.id} className="wb-card">
+          <div key={note.id} className="wb-card" ref={highlighted ? highlightRef : null}
+            style={highlighted ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px rgba(61,90,128,.18)', transition: 'box-shadow .3s' } : undefined}>
             {note.title && <div style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{note.title}</div>}
             <div className="wb-note-excerpt">{note.excerpt}</div>
             <div className="wb-note-foot">
