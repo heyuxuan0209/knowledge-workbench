@@ -162,13 +162,13 @@ export default function WorkbenchPage() {
       })
       setChat(prev => prev.map((m, i) => i === index ? { ...m, noteId: json.data.id } : m))
       loadNotes()
-      // M3 同化前置：保存即自动匹配主题，命中的挂"待并入"
+      // 保存即同化（设计本意）：命中主题时后台自动并入，用户不需要额外操作
       const matched = json.matchedTopics || []
       if (matched.length) {
-        loadTopics()
-        showToast(`已存为素材卡片，匹配到主题「${matched.map(m => m.name).join('」「')}」待并入`)
+        showToast(`已存为素材，AI 正在把它并入主题「${matched.map(m => m.name).join('」「')}」（约半分钟，主题页可见修订）`)
+        setTimeout(loadTopics, 35000) // 同化完成后刷新主题统计
       } else {
-        showToast('已存为素材卡片（对话本身不落库）')
+        showToast('已存为素材卡片。想让它进入某个主题综述？在主题页建立相关主题即可自动归入')
       }
     } catch (err) { showToast(`保存失败：${err.message}`) }
   }

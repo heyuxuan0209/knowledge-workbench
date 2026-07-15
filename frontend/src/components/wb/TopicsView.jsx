@@ -48,8 +48,8 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       await loadTopics()
       setQuery('')
       showToast(json.data.backfilled
-        ? `已建立活页「${name}」，回扫匹配到 ${json.data.backfilled} 条素材待并入`
-        : `已建立活页「${name}」，保存相关素材后 AI 开始维护综述`)
+        ? `已建立活页「${name}」，找到 ${json.data.backfilled} 条相关素材，AI 正在生成综述（约半分钟后刷新可见）`
+        : `已建立活页「${name}」，之后保存的相关素材会自动并入综述`)
       setActiveTopic(json.data); setTopicView('page')
     } catch (err) { showToast(`建页失败：${err.message}`) } finally { setCreating(false) }
   }
@@ -76,7 +76,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       {topics.length === 0 && (
         <div className="wb-empty">
           还没有主题活页。<br />
-          在上方输入主题名建页；保存素材会自动匹配到相关主题，等你「并入」；<br />
+          在上方输入主题名建页——之后每次保存素材，AI 会自动把相关内容并入综述、记下修订；<br />
           简报里的选题也可以「升级为主题」在这里建页。
         </div>
       )}
@@ -165,10 +165,13 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
       </div>
 
       <div className="wb-card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 13, color: 'var(--body2)' }}>待并入素材（{topic.pending_notes.length}）</span>
+        <span style={{ fontSize: 13, color: 'var(--body2)' }}>
+          待并入素材（{topic.pending_notes.length}）
+          {topic.pending_notes.length > 0 && <span style={{ color: 'var(--sub2)' }}> · 保存时通常已自动并入，这里是失败兜底</span>}
+        </span>
         {topic.pending_notes.length > 0 && (
           <button className="wb-btn-outline" style={{ marginLeft: 'auto' }} disabled={busy} onClick={assimilate}>
-            {busy ? '并入中…' : '全部并入'}
+            {busy ? '并入中…' : '立即并入'}
           </button>
         )}
       </div>
