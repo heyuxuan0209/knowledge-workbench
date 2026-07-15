@@ -368,6 +368,33 @@ CREATE TABLE IF NOT EXISTS note_topics (
 CREATE INDEX IF NOT EXISTS idx_note_topics_topic ON note_topics(topic_id, status);
 
 -- ============================================================
+-- 7.8 Drafts — 稿件（M4 创作层，migrate-m4.js）
+--     平台分化模板 + 段落级素材引用（溯源）+ 生成来源回链
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS drafts (
+    id TEXT PRIMARY KEY,
+    platform TEXT NOT NULL
+        CHECK (platform IN ('thread', 'long', 'script')),
+    title TEXT,
+    body TEXT NOT NULL DEFAULT '',
+    paragraph_refs TEXT DEFAULT '[]',    -- JSON: [{marker, noteId, sourceTitle, contentId}]
+    source_kind TEXT
+        CHECK (source_kind IN ('topic', 'idea', 'content', 'manual')),
+    source_id TEXT,
+    source_label TEXT,
+    status TEXT DEFAULT 'draft'
+        CHECK (status IN ('draft', 'final', 'exported')),
+    tokens INTEGER DEFAULT 0,
+    cost_yuan REAL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_drafts_updated ON drafts(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_drafts_platform ON drafts(platform);
+
+-- ============================================================
 -- 8. Data Source Configs — 用户手动添加的信源配置
 --    对应 WIREFRAMES.md 第5/6/7节的三种添加方式（单账号 / 信源池 / 批量导入）
 -- ============================================================
