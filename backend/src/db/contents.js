@@ -41,12 +41,18 @@ export function upsertContents(items) {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       source_id = excluded.source_id,
-      zh_title = excluded.zh_title,
-      zh_summary = excluded.zh_summary,
-      en_title = excluded.en_title,
-      external_score = excluded.external_score,
+      -- COALESCE 语义：重复同步只用"有值"覆盖，空值不清洗已有数据。
+      -- 场景：active-query 的 YouTube 条目 flat 列表阶段 zh_title/简介/发布时间为空，
+      -- 翻译与详情增强在后续轮次补上——若直接 excluded 覆盖，会把已补好的字段又抹回 null
+      -- （翻译被抹掉 → 下轮重译 → 无限循环花钱）。
+      zh_title = COALESCE(excluded.zh_title, zh_title),
+      zh_summary = COALESCE(excluded.zh_summary, zh_summary),
+      en_title = COALESCE(excluded.en_title, en_title),
+      en_summary = COALESCE(excluded.en_summary, en_summary),
+      published_at = COALESCE(excluded.published_at, published_at),
+      external_score = COALESCE(excluded.external_score, external_score),
       tags = excluded.tags,
-      permalink = excluded.permalink,
+      permalink = COALESCE(excluded.permalink, permalink),
       updated_at = excluded.updated_at
   `);
 

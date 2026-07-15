@@ -1,4 +1,4 @@
-import { ingestUrl } from './content-ingestion.js';
+import { ingestUrl, ingest } from './content-ingestion.js';
 import { translateText, detectLanguage } from './translation.js';
 import { getDatabase } from '../db/init.js';
 
@@ -45,6 +45,36 @@ export async function resolveContentBody(content) {
       body: content.zh_summary || content.zh_body || '',
       isFullText: true,
       note: null // 推文本身就短，摘要≈全文，不算降级
+    };
+  }
+
+  // 视频类（active-query/AI HOT 拉回的 YouTube/B站视频卡片）：YouTube 走字幕提取
+  // （复用 Mode 1 万能收口的 ingest 管道），B站字幕接口需登录态（ADR-014 未解锁）→ 诚实降级
+  if (content.content_type === 'video') {
+    if (content.zh_body) {
+      return { body: content.zh_body, isFullText: true, note: null };
+    }
+    if (content.url && /youtube\.com|youtu\.be/.test(content.url)) {
+      try {
+        const ingested = await withTimeout(ingest(content.url), 30000); // 字幕提取比网页抓取慢
+        if (ingested.fetchStatus !== 'success') throw new Error(ingested.fetchError);
+        // 与 Mode 1 同款长视频保护：字幕前 20k 字符已足够支撑解读
+        const raw = ingested.body.length > 20000 ? ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）' : ingested.body;
+        const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw);
+        persistZhBody(content.id, ingested.body, zhBody);
+        return { body: zhBody, isFullText: true, note: null };
+      } catch (error) {
+        return {
+          body: content.zh_summary || '',
+          isFullText: false,
+          note: `无法获取视频字幕（${error.message}），以下基于标题与简介，请自行查看原视频核实：${content.url}`
+        };
+      }
+    }
+    return {
+      body: content.zh_summary || '',
+      isFullText: false,
+      note: 'B站视频字幕需登录态渠道（暂未解锁），以下基于标题与简介，深入分析请查看原视频'
     };
   }
 

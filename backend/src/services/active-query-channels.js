@@ -134,6 +134,24 @@ export async function queryGithub({ handle, displayName }, limit = 5) {
     }));
 }
 
+// YouTube 单视频详情（flat 列表拿不到简介/发布时间，对新条目逐个补取；
+// 失败返回 null 不阻塞——下轮同步会因字段仍空而自动重试）
+export async function fetchYoutubeDetail(videoId) {
+  try {
+    const args = ['--dump-json', '--no-download', '--skip-download', `https://www.youtube.com/watch?v=${videoId}`];
+    if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
+    const d = await runJson('yt-dlp', args, 60000);
+    return {
+      description: (d.description || '').trim().slice(0, 500) || null,
+      publishedAt: d.timestamp
+        ? new Date(d.timestamp * 1000).toISOString()
+        : (d.upload_date ? `${d.upload_date.slice(0, 4)}-${d.upload_date.slice(4, 6)}-${d.upload_date.slice(6, 8)}T00:00:00Z` : null),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // UP 主资料（登记时取真实昵称用；失败返回 null，调用方自行兜底）
 export async function fetchBiliUser(uidOrName) {
   try {
