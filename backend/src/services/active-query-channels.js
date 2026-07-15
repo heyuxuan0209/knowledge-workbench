@@ -19,9 +19,20 @@ const pexec = promisify(execFile);
 const PIP_BIN = join(homedir(), 'Library/Python/3.10/bin');
 const CLI_ENV = { ...process.env, PATH: `${PIP_BIN}:${process.env.PATH || ''}` };
 
+// 单次重试：B站等上游有瞬时风控/网络抖动（实测同一命令间隔几秒即恢复），
+// 定时任务场景一次轻量重试能消化大部分偶发失败；连续两次失败才如实上抛。
+// execFile 的 error.message 只有 "Command failed"，真实原因在 stderr——拼进错误信息。
 async function runJson(cmd, args, timeout = 90000) {
-  const { stdout } = await pexec(cmd, args, { env: CLI_ENV, timeout, maxBuffer: 16 * 1024 * 1024 });
-  return JSON.parse(stdout);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const { stdout } = await pexec(cmd, args, { env: CLI_ENV, timeout, maxBuffer: 16 * 1024 * 1024 });
+      return JSON.parse(stdout);
+    } catch (err) {
+      const detail = (err.stderr || err.message || '').toString().trim().slice(0, 300);
+      if (attempt >= 1) throw new Error(`${cmd} ${args[0]} 失败: ${detail}`);
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
 }
 
 function nowIso() {
