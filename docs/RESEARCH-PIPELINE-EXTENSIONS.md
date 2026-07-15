@@ -22,6 +22,7 @@
 
 ### M3 后（skills 管道 / active-query 执行器）
 - **Agent-Reach**（本地 cookie、零 API 费，X/Reddit/YouTube/GitHub/B站/小红书）——active-query 主候选，顺带补中文渠道
+  - ✅ 已验证并采纳（2026-07-15，ADR-014）：v1.5.0 + bili-cli v0.6.2 装于本机（skill-vetter 体检 + 人工复核通过）；doctor 6/15 渠道可用（GitHub/YouTube/V2EX/RSS/网页/B站免登录）；执行器"拆开用"——backend 直调底层 CLI，登录态渠道（X/小红书等）后置且解锁前需用户授权
 - OpenBiliClaw（跨平台主动内容发现 Agent）——可选的"发现"补充
 
 ### M4（创作台完整版）

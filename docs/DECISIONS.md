@@ -336,6 +336,31 @@ Source 是"优质源登记处"：丢入公众号名称 / X 链接 / 网页链接
 
 ---
 
+## ADR-014: active-query 执行器选型 = Agent-Reach 本地 CLI 家族
+
+**日期**: 2026-07-15  
+**状态**: ✅ 已采纳（本机实测验证后，见 RESEARCH-PIPELINE-EXTENSIONS.md §三）  
+**决策者**: 产品负责人
+
+### 背景
+ADR-007 的 active-query 档（X / YouTube 且 AI HOT 未覆盖的登记源"轻量定期查询"）一直没有执行器。ADR-012 原定"经 follow-builders / ai-insight-hub skills 管道"，但该管道是面向 Claude 会话的 skill，不适合 backend 定时脚本消费。
+
+### 决策
+**本条修订 ADR-012 的执行器方案**：active-query 改由 Agent-Reach（Panniantong/Agent-Reach，56k★，MIT）安装的本地 CLI 家族执行：
+
+- **集成方式（拆开用）**：backend 定时脚本 `child_process` 直调底层 CLI 的 `--json/--yaml` 结构化输出（bili-cli / yt-dlp / gh），**不依赖 Agent-Reach 本身**——它是安装器/路由器/体检器（`agent-reach doctor --json` 探活）。未来 active-query 升格为 Agent 时（ADR-006 预留方向），Agent-Reach 才作为 skill 整体进场
+- **零 API 费**：全部走本地 CLI + 平台公开接口，无按量计费
+- **顺带补齐中文渠道**：B站（bili-cli 免登录搜索/UP主视频列表/详情）、V2EX；这是原 skills 管道方案没有的能力
+- **第一期范围（2026-07-15 实测 6/15 渠道可用）**：只接免登录渠道——B站 / YouTube（yt-dlp）/ GitHub（gh）；RSS 维持现有 sync-rss.js
+- **登录态渠道后置**：Twitter/X、小红书、Reddit 等需从本地浏览器提取 cookie（`agent-reach install --channels xxx`），属**知情决策**——解锁前必须征得用户明确授权，且用专用小号；小红书平台风控最激进 + 用户协议禁自动化（合规红线见 RESEARCH-PIPELINE-EXTENSIONS.md §四），即使解锁也仅限只读低频
+
+### 风险与对策
+- **上游接口非官方**，随平台改版随时可能失效 → `agent-reach doctor` 是探活手段；执行器对单渠道失败要隔离（一个源失败不阻塞其余），失败如实计入结果
+- **本地环境耦合**：CLI 装在 `~/Library/Python/3.10/bin`（pip user 级），执行器需显式补 PATH；部署到服务器时需重装并重跑 doctor
+- **频控**：轻量低频（每源每次只拉最新 N 条，建议每日 1-2 次），不做高频轮询
+
+---
+
 ## 待决策事项
 
 ### TBD-001: 是否接入自有 LLM API
