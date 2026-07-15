@@ -322,6 +322,20 @@ Source 是"优质源登记处"：丢入公众号名称 / X 链接 / 网页链接
 
 ---
 
+## ADR-013: 理解入口强化 — Jina Reader 兜底 + 解读模板 v2
+
+**日期**: 2026-07-15  
+**状态**: ✅ 已采纳（源自 RESEARCH-PIPELINE-EXTENSIONS.md §二"近期可落"）  
+**决策者**: 产品负责人
+
+### 决策
+- **Jina Reader 兜底**：`ingestUrl` 直抓（readability）失败或正文 < 50 字时，重试 `r.jina.ai/<url>`（只读、免 key、免费档 20 RPM）。改在 `content-ingestion.js` 一处，万能收口与 Feed 全文解读（content-body-resolver 复用同函数）同时受益
+- **诚实约束延续（决策5）**：Jina 会把上游 403/404 包成 200 返回，靠元数据 `Warning: Target URL returned error` 行识别；正文 < 300 字视为验证页/占位页，如实失败并合并两层原因，不把垃圾喂给翻译/解读。返回体新增 `via: 'readability' | 'jina'` 标注取材路径
+- **解读模板 v2**（吸收 link2article 结构，唯一落点 WorkbenchPage `startAnalysis`）：TL;DR / 核心观点 / 论据·数据·案例 / 金句（材料带时间戳才标注，不编造）/ **可复用素材（选题角度·数据案例·争议钩子）** / **局限与存疑**。收掉 M2 遗留的"结构化解读升级"
+- 实测：OpenAI 官网等 SPA 页由"失败"变为 Jina 兜底成功（1.8 万字正文）；真实公众号文章直抓本就可达（维持 ADR-007 不逆向抓取，只是单篇跳转的补充读取）
+
+---
+
 ## 待决策事项
 
 ### TBD-001: 是否接入自有 LLM API

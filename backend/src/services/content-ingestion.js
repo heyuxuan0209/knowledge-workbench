@@ -120,41 +120,84 @@ function classifyYoutubeError(error) {
   return `获取字幕时发生未分类错误：${error.message}。这可能是网络无法访问 YouTube，也可能是该库依赖的 YouTube 内部接口发生变化，请尝试直接粘贴文字稿`;
 }
 
+// Jina Reader 兜底（RESEARCH-PIPELINE-EXTENSIONS.md §二 / ADR-013）：readability 抓不到
+// （SPA/反爬/公众号单篇）时重试 r.jina.ai。只读、合规、免 key；免费档限 20 RPM，
+// 单用户产品够用。返回体是带元数据头的纯文本：
+//   Title: xxx / URL Source: xxx / Markdown Content:\n<正文>
+async function fetchViaJina(url) {
+  const response = await axios.get(`https://r.jina.ai/${url}`, {
+    timeout: 15000, // 与 content-body-resolver 的 FETCH_TIMEOUT_MS 对齐，Jina 渲染慢于直抓
+    headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+  });
+
+  const raw = String(response.data || '');
+
+  // Jina 会把上游错误（403/404 等）包装成 200 返回，靠元数据头里的 Warning 行识别
+  const upstreamError = raw.match(/^Warning:\s*Target URL returned error (\d+.*)$/m)?.[1];
+  if (upstreamError) {
+    throw new Error(`目标站点对 Jina Reader 返回 ${upstreamError.trim()}`);
+  }
+
+  // 注意 [ \t] 不能写 \s：\s 会匹配换行，标题为空时会吞掉换行误抓下一行元数据
+  const title = raw.match(/^Title:[ \t]*(.+)$/m)?.[1]?.trim() || null;
+  const marker = raw.indexOf('Markdown Content:');
+  const body = (marker >= 0 ? raw.slice(marker + 'Markdown Content:'.length) : raw).trim();
+
+  // 门槛 300 字：验证页/占位页（如微信"Parameter error"页 ~100 字样板文案）会伪装成
+  // 成功返回，真实文章正文极少短于此；宁可如实失败也不把垃圾喂给翻译/解读
+  if (body.length < 300) {
+    throw new Error('Jina Reader 也未提取到有效正文（疑似验证页/占位页）');
+  }
+  return { title, body };
+}
+
 export async function ingestUrl(input) {
+  const url = input.trim();
+  let directError; // 直抓失败原因，Jina 也失败时合并报告，不掩盖第一手信息
+
   try {
-    const response = await axios.get(input.trim(), {
+    const response = await axios.get(url, {
       timeout: 10000,
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
       maxRedirects: 5
     });
 
-    const dom = new JSDOM(response.data, { url: input.trim() });
+    const dom = new JSDOM(response.data, { url });
     const article = new Readability(dom.window.document).parse();
 
-    if (!article || !article.textContent || article.textContent.trim().length < 50) {
+    if (article?.textContent && article.textContent.trim().length >= 50) {
       return {
-        title: null,
-        body: null,
+        title: article.title || null,
+        body: article.textContent.trim(),
         type: 'article',
-        fetchStatus: 'failed',
-        fetchError: '无法从该页面提取到有效正文（可能是动态渲染页面，暂不支持），请尝试直接粘贴文本'
+        via: 'readability',
+        fetchStatus: 'success',
+        fetchError: null
       };
     }
+    directError = '无法从该页面提取到有效正文（可能是动态渲染页面）';
+  } catch (error) {
+    directError = `抓取失败：${error.message}`;
+  }
 
+  // 直抓失败 → Jina Reader 兜底
+  try {
+    const jina = await fetchViaJina(url);
     return {
-      title: article.title || null,
-      body: article.textContent.trim(),
+      title: jina.title,
+      body: jina.body,
       type: 'article',
+      via: 'jina',
       fetchStatus: 'success',
       fetchError: null
     };
-  } catch (error) {
+  } catch (jinaError) {
     return {
       title: null,
       body: null,
       type: 'article',
       fetchStatus: 'failed',
-      fetchError: `抓取失败：${error.message}`
+      fetchError: `${directError}；Jina Reader 兜底同样失败（${jinaError.message}），请尝试直接粘贴文本`
     };
   }
 }
