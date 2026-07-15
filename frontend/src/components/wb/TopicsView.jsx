@@ -98,7 +98,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
             <div className="wb-topic-actions">
               <button className="wb-btn-primary" onClick={() => { setActiveTopic(tp); setTopicView('page') }}>打开主题 →</button>
               <button className="wb-btn-ghost" onClick={() => {
-                setStudio(s => ({ ...s, source: `Topic：${tp.name}`, platform: 'thread' })); setPage('studio')
+                setStudio(s => ({ ...s, source: `Topic：${tp.name}`, sourceTopicId: tp.id, platform: 'long', draft: '', draftId: null, title: null, refs: [], paragraphRefs: [] })); setPage('studio')
               }}>开始创作</button>
               <button className="wb-note-del" style={{ marginLeft: 'auto' }} title="删除主题"
                 onClick={() => deleteTopic(tp)}><IconTrash /></button>
@@ -139,7 +139,7 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
       <div className="wb-topic-head" style={{ marginTop: 6 }}>
         <span className="wb-topic-name">{topic.name}</span>
         <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} onClick={() => {
-          setStudio(s => ({ ...s, source: `Topic：${topic.name}`, platform: 'thread' })); setPage('studio')
+          setStudio(s => ({ ...s, source: `Topic：${topic.name}`, sourceTopicId: topic.id, platform: 'long', draft: '', draftId: null, title: null, refs: [], paragraphRefs: [] })); setPage('studio')
         }}>开始创作</button>
         <button className="wb-note-del" title="删除主题" onClick={() => onDelete(topic)}><IconTrash /></button>
       </div>

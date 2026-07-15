@@ -9,7 +9,7 @@ const PLATFORMS = [
   { key: 'script', label: '🎬 口播脚本' },
 ]
 
-export default function StudioView({ studio, setStudio, genDraft, exportMd, setPage, showToast }) {
+export default function StudioView({ studio, setStudio, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft }) {
   const setPlatform = (p) => {
     setStudio(s => ({ ...s, platform: p }))
     setTimeout(() => genDraft(p), 0)
@@ -30,6 +30,19 @@ export default function StudioView({ studio, setStudio, genDraft, exportMd, setP
         <span className="wb-topic-name">创作台</span>
         <span style={{ fontSize: 12, color: 'var(--sub2)' }}>来源</span>
         <span className="wb-studio-src">{studio.source || '手选素材（右侧插入）'}</span>
+        {drafts?.length > 0 && (
+          <select
+            style={{ marginLeft: 'auto', fontSize: 12, padding: '5px 8px', border: '1px solid var(--line08)', borderRadius: 8, background: 'var(--surface)', color: 'var(--body2)', maxWidth: 220 }}
+            value={studio.draftId || ''}
+            onChange={(e) => { const d = drafts.find(x => x.id === e.target.value); if (d) openDraft(d) }}>
+            <option value="">草稿箱（{drafts.length}）…</option>
+            {drafts.map(d => (
+              <option key={d.id} value={d.id}>
+                {{ thread: '𝕏', long: '📄', script: '🎬' }[d.platform]} {(d.title || d.body.slice(0, 24)).slice(0, 26)} · {(d.updated_at || '').slice(5, 10)}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="wb-page-sub">同一素材集，按平台分化模板 · 每段可溯源到素材卡片</div>
 
@@ -56,6 +69,9 @@ export default function StudioView({ studio, setStudio, genDraft, exportMd, setP
         <button className="wb-btn-outline" disabled={studio.busy} onClick={() => genDraft()}>
           {studio.busy ? '生成中…' : '重新生成'}
         </button>
+        <button className="wb-btn-primary" onClick={saveDraft}>{studio.draftId ? '保存修改' : '保存草稿'}</button>
+        <button className="wb-btn-outline" disabled={studio.busy} title="三遍审校：去 AI 高频词 / 拆套路句式 / 加入第一人称判断"
+          onClick={humanizeDraft}>去 AI 味</button>
         <button className="wb-btn-ghost" onClick={copyAll}>复制全文</button>
         <button className="wb-btn-ghost" onClick={exportMd}>导出 Markdown</button>
       </div>

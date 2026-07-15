@@ -273,8 +273,78 @@ app.post('/api/contents/:id/thread', async (req, res) => {
   }
 });
 
+// ========== M4 创作层：Draft 稿件 + 活页起稿 + 去AI味 ==========
+
+// 从活页一键起稿（活页综述做骨架 + 已并入素材可溯源引用），生成即落库
+app.post('/api/topics/:id/draft', async (req, res) => {
+  try {
+    const { generateFromTopic } = await import('./services/draft-generation.js');
+    const draft = await generateFromTopic(req.params.id, req.body?.platform || 'long');
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    const status = error.message === 'Topic not found' ? 404 : 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// 去 AI 味审校（三遍法一道工序）：返回改写稿，由前端决定是否替换，不自动落库
+app.post('/api/studio/humanize', async (req, res) => {
+  try {
+    const { draft, platform } = req.body;
+    if (!draft?.trim()) return res.status(400).json({ success: false, error: 'draft is required' });
+    const { humanize } = await import('./services/draft-generation.js');
+    const result = await humanize(draft, platform || 'long');
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/drafts', async (req, res) => {
+  try {
+    const { listDrafts } = await import('./db/drafts.js');
+    res.json({ success: true, data: listDrafts({ platform: req.query.platform || null }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/drafts', async (req, res) => {
+  try {
+    const { platform, title, body, paragraphRefs, sourceKind, sourceId, sourceLabel } = req.body;
+    if (!platform || !body?.trim()) {
+      return res.status(400).json({ success: false, error: 'platform and body are required' });
+    }
+    const { createDraft } = await import('./db/drafts.js');
+    res.json({ success: true, data: createDraft({ platform, title, body, paragraphRefs, sourceKind, sourceId, sourceLabel }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.patch('/api/drafts/:id', async (req, res) => {
+  try {
+    const { updateDraft } = await import('./db/drafts.js');
+    const draft = updateDraft(req.params.id, req.body || {});
+    if (!draft) return res.status(404).json({ success: false, error: 'Draft not found' });
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/drafts/:id', async (req, res) => {
+  try {
+    const { deleteDraft } = await import('./db/drafts.js');
+    const done = deleteDraft(req.params.id);
+    res.json({ success: done, message: done ? 'Draft deleted' : 'Draft not found' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 创作助手指令改写：把左侧草稿 + 用户指令交给 Deepseek，返回改写后的整稿。
-// 不落库（Draft 实体是 M4），前端直接替换草稿区内容。
+// 前端直接替换草稿区内容（保存与否由用户在创作台决定）。
 app.post('/api/studio/rewrite', async (req, res) => {
   try {
     const { draft, instruction, platform = 'thread' } = req.body;

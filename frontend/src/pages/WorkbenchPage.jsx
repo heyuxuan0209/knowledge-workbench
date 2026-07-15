@@ -62,7 +62,13 @@ export default function WorkbenchPage() {
   const [activeTopic, setActiveTopic] = useState(null)
   const [studio, setStudio] = useState({
     platform: 'thread', source: null, refs: [], draft: '', busy: false,
+    // M4：草稿落库 + 活页起稿 + 段落级溯源持久化
+    draftId: null, title: null, sourceTopicId: null, paragraphRefs: [],
   })
+  const [drafts, setDrafts] = useState([]) // 草稿箱
+  const loadDrafts = useCallback(async () => {
+    try { setDrafts((await api('/api/drafts')).data || []) } catch (err) { console.error(err) }
+  }, [])
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -97,7 +103,7 @@ export default function WorkbenchPage() {
     try { setTopics((await api('/api/topics')).data || []) } catch (err) { console.error(err) }
   }, [])
 
-  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics])
+  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics(); loadDrafts() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics, loadDrafts])
 
   // ---- 快速分析 ----
   const toggleSelect = (c) => {
@@ -271,6 +277,25 @@ export default function WorkbenchPage() {
   // ---- 创作台 ----
   const genDraftRef = useRef(() => {})
   genDraftRef.current = async (platform = studio.platform, sourceContentId = studio.sourceContentId) => {
+    // 活页起稿（M4）：活页综述做骨架 + 已并入素材可溯源引用，生成即落库
+    if (studio.sourceTopicId) {
+      setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在基于主题活页起稿（约 30 秒）…' }))
+      try {
+        const json = await api(`/api/topics/${studio.sourceTopicId}/draft`, { method: 'POST', body: { platform } })
+        const d = json.data
+        setStudio(s => ({
+          ...s, busy: false, draft: d.body, title: d.title, draftId: d.id,
+          paragraphRefs: d.paragraph_refs,
+          refs: d.paragraph_refs.map(r => ({ note: r.sourceTitle || '素材', para: r.marker })),
+        }))
+        loadDrafts()
+        showToast(`已基于活页起稿并存入草稿箱（引用 ${d.paragraph_refs.length} 条素材，¥${d.cost_yuan?.toFixed(3)}）`)
+        return
+      } catch (err) {
+        setStudio(s => ({ ...s, busy: false }))
+        showToast(`起稿失败：${err.message}，已填入模板`)
+      }
+    }
     if (platform === 'thread' && sourceContentId) {
       setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在基于原文生成 thread…' }))
       try {
@@ -285,6 +310,54 @@ export default function WorkbenchPage() {
       }
     }
     setStudio(s => ({ ...s, draft: DRAFT_TEMPLATES[platform] }))
+  }
+
+  // 保存草稿（已有 draftId 则更新，否则新建）
+  const saveDraft = async () => {
+    if (!studio.draft.trim()) { showToast('草稿为空'); return }
+    try {
+      if (studio.draftId) {
+        await api(`/api/drafts/${studio.draftId}`, { method: 'PATCH', body: { body: studio.draft, title: studio.title, paragraphRefs: studio.paragraphRefs } })
+      } else {
+        const json = await api('/api/drafts', {
+          method: 'POST',
+          body: {
+            platform: studio.platform, title: studio.title || studio.draft.split('\n')[0].slice(0, 60),
+            body: studio.draft, paragraphRefs: studio.paragraphRefs,
+            sourceKind: studio.sourceTopicId ? 'topic' : 'manual',
+            sourceId: studio.sourceTopicId, sourceLabel: studio.source,
+          },
+        })
+        setStudio(s => ({ ...s, draftId: json.data.id }))
+      }
+      loadDrafts()
+      showToast('草稿已保存（关页不丢）')
+    } catch (err) { showToast(`保存失败：${err.message}`) }
+  }
+
+  // 打开草稿箱中的稿件
+  const openDraft = (d) => {
+    setStudio(s => ({
+      ...s, platform: d.platform, draft: d.body, title: d.title, draftId: d.id,
+      source: d.source_label, sourceTopicId: d.source_kind === 'topic' ? d.source_id : null,
+      paragraphRefs: d.paragraph_refs || [],
+      refs: (d.paragraph_refs || []).map(r => ({ note: r.sourceTitle || '素材', para: r.marker })),
+    }))
+  }
+
+  // 去 AI 味（三遍审校一道工序），改写后替换草稿区，由用户决定是否保存
+  const humanizeDraft = async () => {
+    if (!studio.draft.trim()) { showToast('草稿为空'); return }
+    setStudio(s => ({ ...s, busy: true }))
+    showToast('正在去 AI 味审校（约 30 秒）…')
+    try {
+      const json = await api('/api/studio/humanize', { method: 'POST', body: { draft: studio.draft, platform: studio.platform } })
+      setStudio(s => ({ ...s, busy: false, draft: json.data.text }))
+      showToast(`已完成去 AI 味改写（¥${json.data.cost?.toFixed(3)}），满意请点保存`)
+    } catch (err) {
+      setStudio(s => ({ ...s, busy: false }))
+      showToast(`审校失败：${err.message}`)
+    }
   }
 
   const insertMaterial = (note) => {
@@ -326,6 +399,7 @@ export default function WorkbenchPage() {
     loadNotes, loadSources, loadTopics, setPage, setModal,
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, genDraft: (...a) => genDraftRef.current(...a), exportMd,
+    drafts, saveDraft, openDraft, humanizeDraft,
   }
 
   return (
