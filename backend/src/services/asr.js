@@ -65,6 +65,39 @@ async function downloadAudio(url, workDir) {
   return audioFile;
 }
 
+// 直链音频转写（小宇宙等给出 m4a/mp3 直链的场景，M5）：下载 → 本地转写。
+// 返回同 transcribeVideo；失败上抛由调用方降级。
+export async function transcribeAudioUrl(audioUrl) {
+  const workDir = join(tmpdir(), 'kw-asr', `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  await mkdir(workDir, { recursive: true });
+  try {
+    const ext = audioUrl.match(/\.(m4a|mp3|wav|opus)(\?|$)/i)?.[1] || 'm4a';
+    const file = join(workDir, `audio.${ext}`);
+    const { default: axios } = await import('axios');
+    const { createWriteStream } = await import('fs');
+    const res = await axios.get(audioUrl, {
+      responseType: 'stream', timeout: DOWNLOAD_TIMEOUT,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    });
+    await new Promise((resolve, reject) => {
+      const w = createWriteStream(file);
+      res.data.pipe(w);
+      w.on('finish', resolve);
+      w.on('error', reject);
+      res.data.on('error', reject);
+    });
+
+    const { stdout } = await pexec('python3', [
+      join(__dirname, '../../scripts/transcribe.py'), file, '--max-seconds', String(MAX_AUDIO_SECONDS),
+    ], { env: CLI_ENV, timeout: TRANSCRIBE_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
+    const result = JSON.parse(stdout);
+    if (!result.text || result.text.length < 20) throw new Error('转写结果为空');
+    return result;
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 // 转写视频音频 → { text, language, truncated, duration }。失败上抛，调用方决定降级话术。
 export async function transcribeVideo(url) {
   const workDir = join(tmpdir(), 'kw-asr', `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);

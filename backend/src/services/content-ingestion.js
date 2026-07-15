@@ -38,8 +38,66 @@ function detectInputType(input) {
     return 'text';
   }
 
+  if (url.hostname.includes('xiaoyuzhoufm.com') && url.pathname.includes('/episode/')) return 'xiaoyuzhou';
   const isYoutube = YOUTUBE_HOSTS.some(host => url.hostname.includes(host));
   return isYoutube ? 'youtube' : 'url';
+}
+
+// 小宇宙单集（M5，RESEARCH-PIPELINE-EXTENSIONS §M5"小宇宙音频直链"）：
+// 单集页是 SSR，__NEXT_DATA__ 里有完整元数据 + m4a 直链。
+// 正文 = 前 15 分钟音频本地转写（ADR-015 管道）+ 节目 shownotes（骨架），
+// 转写失败降级为纯 shownotes（如实标注）。播客多为中文 → 翻译层自动跳过。
+async function ingestXiaoyuzhou(input) {
+  const url = input.trim();
+  const fail = (msg) => ({ title: null, body: null, type: 'podcast', fetchStatus: 'failed', fetchError: msg });
+
+  let ep;
+  try {
+    const response = await axios.get(url, {
+      timeout: 15000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    });
+    const m = String(response.data).match(/<script id="__NEXT_DATA__" type="application\/json">(.+?)<\/script>/s);
+    if (!m) return fail('小宇宙页面结构变化，未找到数据块（__NEXT_DATA__）');
+    ep = JSON.parse(m[1])?.props?.pageProps?.episode;
+    if (!ep?.title) return fail('小宇宙数据块里没有单集信息（可能是会员专享或已下架）');
+  } catch (error) {
+    return fail(`小宇宙页面抓取失败：${error.message}`);
+  }
+
+  const audioUrl = ep.enclosure?.url || ep.media?.source?.url || null;
+  const shownotes = (ep.shownotes || ep.description || '')
+    .replace(/<[^>]+>/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const metadata = {
+    originalTitle: ep.title,
+    author: [ep.podcast?.title, ep.podcast?.author].filter(Boolean).join(' · ') || null,
+    platform: '小宇宙播客',
+    publishedAt: ep.pubDate?.slice(0, 10) || null,
+  };
+  const durationMin = ep.duration ? Math.round(ep.duration / 60) : null;
+
+  let transcriptPart = null;
+  if (audioUrl) {
+    try {
+      const { transcribeAudioUrl } = await import('./asr.js');
+      const asr = await transcribeAudioUrl(audioUrl);
+      transcriptPart = `【音频转写${asr.truncated ? `（节目共 ${durationMin ?? '?'} 分钟，以下为前 15 分钟，可能存在少量听写误差）` : '（可能存在少量听写误差）'}】\n${asr.text}`;
+    } catch (err) {
+      console.log(`[ingest] 小宇宙音频转写失败（${err.message}），降级为 shownotes`);
+    }
+  }
+
+  const parts = [transcriptPart, shownotes ? `【节目 shownotes】\n${shownotes}` : null].filter(Boolean);
+  if (!parts.length) return fail('该单集既无法转写音频也没有 shownotes');
+
+  return {
+    title: ep.title,
+    body: parts.join('\n\n---\n\n'),
+    type: 'podcast',
+    metadata,
+    fetchStatus: 'success',
+    fetchError: null,
+  };
 }
 
 function extractYoutubeVideoId(input) {
@@ -253,6 +311,10 @@ export async function ingest(input) {
 
   let result;
   switch (inputType) {
+    case 'xiaoyuzhou':
+      result = await ingestXiaoyuzhou(input);
+      return { ...result, inputMethod: 'url_auto' };
+
     case 'youtube':
       result = await ingestYoutube(input);
       return { ...result, inputMethod: 'url_auto' };
