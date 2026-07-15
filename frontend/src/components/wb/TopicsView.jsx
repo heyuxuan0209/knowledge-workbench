@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { IconBolt, IconDoc } from './Icons'
+import { IconBolt, IconDoc, IconTrash } from './Icons'
 import { api, timeAgo } from './util'
 
 // 主题库 + 活页详情（M3 知识层，ADR-009）。
@@ -17,8 +17,21 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
 
+  const deleteTopic = async (tp, { fromDetail = false } = {}) => {
+    if (!confirm(`删除主题「${tp.name}」？综述与修订记录会一并删除（素材卡片保留）。`)) return false
+    try {
+      await api(`/api/topics/${tp.id}`, { method: 'DELETE' })
+      await loadTopics()
+      if (fromDetail) setTopicView('list')
+      showToast(`已删除主题「${tp.name}」`)
+      return true
+    } catch (err) { showToast(`删除失败：${err.message}`); return false }
+  }
+
   if (topicView === 'page' && activeTopic) {
-    return <TopicDetail topicId={activeTopic.id} back={() => { setTopicView('list'); loadTopics() }} setPage={setPage} setStudio={setStudio} showToast={showToast} />
+    return <TopicDetail topicId={activeTopic.id} back={() => { setTopicView('list'); loadTopics() }}
+      onDelete={(tp) => deleteTopic(tp, { fromDetail: true })}
+      setPage={setPage} setStudio={setStudio} showToast={showToast} />
   }
 
   const filtered = query.trim()
@@ -87,6 +100,8 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
               <button className="wb-btn-ghost" onClick={() => {
                 setStudio(s => ({ ...s, source: `Topic：${tp.name}`, platform: 'thread' })); setPage('studio')
               }}>开始创作</button>
+              <button className="wb-note-del" style={{ marginLeft: 'auto' }} title="删除主题"
+                onClick={() => deleteTopic(tp)}><IconTrash /></button>
             </div>
           </div>
         )
@@ -95,7 +110,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
   )
 }
 
-function TopicDetail({ topicId, back, setPage, setStudio, showToast }) {
+function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast }) {
   const [topic, setTopic] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -126,6 +141,7 @@ function TopicDetail({ topicId, back, setPage, setStudio, showToast }) {
         <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} onClick={() => {
           setStudio(s => ({ ...s, source: `Topic：${topic.name}`, platform: 'thread' })); setPage('studio')
         }}>开始创作</button>
+        <button className="wb-note-del" title="删除主题" onClick={() => onDelete(topic)}><IconTrash /></button>
       </div>
 
       <div className="wb-card">

@@ -160,9 +160,10 @@ export function createTopicFromIdea(ideaId) {
   return getTopicDetail(id);
 }
 
-export function archiveTopic(topicId) {
+// 删除活页：changelog / note_topics 级联清除（FK CASCADE），素材卡片本身保留不动
+export function deleteTopic(topicId) {
   const db = getDatabase();
-  const r = db.prepare("UPDATE topics SET status = 'archived', updated_at = datetime('now') WHERE id = ?").run(topicId);
+  const r = db.prepare('DELETE FROM topics WHERE id = ?').run(topicId);
   db.close();
   return r.changes > 0;
 }

@@ -375,12 +375,12 @@ app.post('/api/topics/:id/assimilate', async (req, res) => {
   }
 });
 
-// 归档（不删数据，素材关联与 changelog 保留）
+// 删除活页（changelog 与素材关联级联清除，素材卡片本身保留）
 app.delete('/api/topics/:id', async (req, res) => {
   try {
-    const { archiveTopic } = await import('./services/topic-pages.js');
-    const done = archiveTopic(req.params.id);
-    res.json({ success: done, message: done ? 'Topic archived' : 'Topic not found' });
+    const { deleteTopic } = await import('./services/topic-pages.js');
+    const done = deleteTopic(req.params.id);
+    res.json({ success: done, message: done ? 'Topic deleted' : 'Topic not found' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
