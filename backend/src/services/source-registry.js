@@ -5,7 +5,8 @@ import { randomUUID } from 'crypto';
 // 登记后的效果只有两个：该源内容进 Feed + 高权重排序（getContents 加权）。不是订阅系统。
 //
 // track_mode 判定（成本分层硬约束）：
-// - X / YouTube / GitHub  → active-query（主动查询，M2 接 skills 管道，本版只登记不拉取）
+// - X / YouTube / GitHub / B站 → active-query（sync-active-query.js 执行器，ADR-014；
+//   免登录渠道 B站/YouTube/GitHub 已接，X 属登录态渠道执行器暂跳过）
 // - 网页有 RSS/Atom feed  → active-rss（sync-rss.js 会从 source_platforms 读取并轮询）
 // - 网页无 feed / 公众号  → link-only（只标记 + 跳转，不抓取）
 
@@ -72,7 +73,7 @@ export async function identifyInput(rawInput) {
       platform: 'X',
       handle,
       trackMode: 'active-query',
-      note: 'AI HOT 已覆盖的 builder 会自动推送；未覆盖部分待 M2 接入 skills 管道主动查询',
+      note: 'AI HOT 已覆盖的 builder 会自动推送；X 主动查询属登录态渠道，解锁需授权（ADR-014），当前执行器跳过',
     };
   }
 
@@ -91,6 +92,25 @@ export async function identifyInput(rawInput) {
       platform: 'YouTube',
       handle,
       trackMode: 'active-query',
+    };
+  }
+
+  // ---- Bilibili：space.bilibili.com/UID（UP 主主页，ADR-014 免登录渠道） ----
+  if (host === 'space.bilibili.com') {
+    const uid = url.pathname.split('/').filter(Boolean)[0];
+    if (!uid || !/^\d+$/.test(uid)) {
+      throw new Error('无法从该 B站 链接识别出 UP 主，请使用主页链接（space.bilibili.com/UID）');
+    }
+    // 尽力取真实昵称（bili-cli 免登录），拿不到用 UID 占位、登记后可改
+    const { fetchBiliUser } = await import('./active-query-channels.js');
+    const profile = await fetchBiliUser(uid);
+    return {
+      sourceType: 'Person',
+      displayName: profile?.name || `B站 UP 主 ${uid}`,
+      platform: 'Bilibili',
+      handle: uid,
+      trackMode: 'active-query',
+      note: '每日主动查询该 UP 主最新视频（bili-cli 免登录，ADR-014）',
     };
   }
 
