@@ -184,13 +184,21 @@ function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, r
       <div className="wb-panel-body">
         <div className="wb-panel-label">已引用（{studio.refs.length}）</div>
         {studio.refs.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)' }}>尚未引用素材</div>}
-        {studio.refs.map((r, i) => (
-          <div key={i} className="wb-ref-item" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>📎 <b>{r.note}</b> → {r.para}</span>
-            <button className="wb-note-del" style={{ marginLeft: 'auto', flex: 'none' }} title="移除引用（同时清理草稿中的标记/引块）"
-              onClick={() => removeRef(i)}>✕</button>
-          </div>
-        ))}
+        {studio.refs.map((r, i) => {
+          const src = notes.find(n => n.id === studio.paragraphRefs[i]?.noteId)
+          const label = src?.title || r.note
+          const url = src?.content_url || src?.source_url
+          return (
+            <div key={i} className="wb-ref-item" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                📎 <b>{label}</b> → {r.para}
+                {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文" style={{ marginLeft: 4, color: 'var(--accent)', textDecoration: 'none' }}>↗</a>}
+              </span>
+              <button className="wb-note-del" style={{ marginLeft: 'auto', flex: 'none' }} title="移除引用（同时清理草稿中的标记/引块）"
+                onClick={() => removeRef(i)}>✕</button>
+            </div>
+          )
+        })}
 
         {(() => {
           // 当前主题的素材排前并打标（无主题上下文时按时间原序）
@@ -200,24 +208,29 @@ function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, r
           return <>
             <div className="wb-panel-label">可插入素材（{notes.length}）{tid ? ' · 本主题的排在前' : ''}</div>
             {notes.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)' }}>素材库为空 · 在快速分析里「保存到笔记」</div>}
-            {sorted.slice(0, 12).map(n => (
-              <div key={n.id} className="wb-insert-item" style={{ alignItems: 'flex-start' }}>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontWeight: 600, fontSize: 12 }}>
-                    {isMine(n) && <span style={{ color: 'var(--accent)' }}>[本主题] </span>}
-                    {(n.content_zh_title || n.source_title || '未知来源').slice(0, 24)}
-                    <span style={{ color: 'var(--faint)', fontWeight: 400 }}> · {(n.created_at || '').slice(5, 10)}</span>
+            {sorted.slice(0, 12).map(n => {
+              const url = n.content_url || n.source_url
+              return (
+                <div key={n.id} className="wb-insert-item" style={{ alignItems: 'flex-start' }}>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: 12 }}>
+                      {isMine(n) && <span style={{ color: 'var(--accent)' }}>[本主题] </span>}
+                      {(n.title || n.content_zh_title || n.source_title || '未命名素材').slice(0, 22)}
+                      {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文"
+                        style={{ marginLeft: 4, color: 'var(--accent)', textDecoration: 'none' }}>↗</a>}
+                      <span style={{ color: 'var(--faint)', fontWeight: 400 }}> · {(n.created_at || '').slice(5, 10)}</span>
+                    </span>
+                    <span style={{ display: 'block', color: 'var(--sub2)', fontSize: 11.5, marginTop: 2 }}>
+                      {n.excerpt.replace(/[#>*\n-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 42)}…
+                    </span>
+                    {n.topic_names && !isMine(n) && (
+                      <span style={{ display: 'block', color: 'var(--faint)', fontSize: 11, marginTop: 2 }}>主题：{n.topic_names.slice(0, 20)}</span>
+                    )}
                   </span>
-                  <span style={{ display: 'block', color: 'var(--sub2)', fontSize: 11.5, marginTop: 2 }}>
-                    {n.excerpt.replace(/[#>*\n]+/g, ' ').trim().slice(0, 42)}…
-                  </span>
-                  {n.topic_names && !isMine(n) && (
-                    <span style={{ display: 'block', color: 'var(--faint)', fontSize: 11, marginTop: 2 }}>主题：{n.topic_names.slice(0, 20)}</span>
-                  )}
-                </span>
-                <button className="wb-insert-btn" onClick={() => insertMaterial(n)}>插入</button>
-              </div>
-            ))}
+                  <button className="wb-insert-btn" onClick={() => insertMaterial(n)}>插入</button>
+                </div>
+              )
+            })}
           </>
         })()}
 

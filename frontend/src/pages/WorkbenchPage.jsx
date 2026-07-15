@@ -159,6 +159,9 @@ export default function WorkbenchPage() {
     if (!msg || msg.role !== 'ai' || msg.pending || msg.error || msg.noteId) return
     const real = selectedItems.filter(x => !x.adHoc)
     const single = real.length === 1 ? contents.find(c => c.id === real[0].id) : null
+    // 粘贴内容的素材也要记源链接（唯一材料是 adHoc 时取它的 url），否则素材永远回不到原文
+    const adHocs = selectedItems.filter(x => x.adHoc)
+    const adHocUrl = !real.length && adHocs.length === 1 ? adHocs[0].adHoc.url : null
     try {
       const json = await api('/api/notes', {
         method: 'POST',
@@ -166,7 +169,7 @@ export default function WorkbenchPage() {
           excerpt: msg.text, noteType: 'chat',
           contentId: single?.id || null,
           sourceTitle: selectedItems.map(x => x.title).join(' / ').slice(0, 120) || null,
-          sourceUrl: single?.url || null,
+          sourceUrl: single?.url || adHocUrl || null,
         },
       })
       setChat(prev => prev.map((m, i) => i === index ? { ...m, noteId: json.data.id } : m))

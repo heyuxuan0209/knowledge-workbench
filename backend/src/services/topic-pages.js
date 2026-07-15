@@ -164,6 +164,26 @@ export function createTopicFromIdea(ideaId) {
   return getTopicDetail(id);
 }
 
+// 改名/改描述（活页由选题/涌现建议自动生成时名字常常偏长，用户须可改）
+export function updateTopicMeta(topicId, { name, description }) {
+  const db = getDatabase();
+  const topic = db.prepare('SELECT id FROM topics WHERE id = ?').get(topicId);
+  if (!topic) { db.close(); throw new Error('Topic not found'); }
+  if (name?.trim()) {
+    const dup = db.prepare("SELECT id FROM topics WHERE name = ? AND status != 'archived' AND id != ?").get(name.trim(), topicId);
+    if (dup) { db.close(); throw new Error(`主题「${name.trim()}」已存在`); }
+  }
+  db.prepare(`
+    UPDATE topics SET
+      name = COALESCE(?, name),
+      description = COALESCE(?, description),
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(name?.trim() || null, description ?? null, topicId);
+  db.close();
+  return getTopicDetail(topicId);
+}
+
 // 删除活页：changelog / note_topics 级联清除（FK CASCADE），素材卡片本身保留不动
 export function deleteTopic(topicId) {
   const db = getDatabase();

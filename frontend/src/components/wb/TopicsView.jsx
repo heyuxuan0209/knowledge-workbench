@@ -138,6 +138,15 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
       <button className="wb-back" onClick={back}>← 主题库</button>
       <div className="wb-topic-head" style={{ marginTop: 6 }}>
         <span className="wb-topic-name">{topic.name}</span>
+        <button className="wb-note-del" title="重命名主题" onClick={async () => {
+          const name = prompt('新的主题名（简短好记，12 字内最佳）：', topic.name)
+          if (!name?.trim() || name.trim() === topic.name) return
+          try {
+            await api(`/api/topics/${topic.id}`, { method: 'PATCH', body: { name: name.trim() } })
+            await load()
+            showToast('主题已重命名')
+          } catch (err) { showToast(`重命名失败：${err.message}`) }
+        }}>✎</button>
         <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} onClick={() => {
           setStudio(s => ({ ...s, source: `Topic：${topic.name}`, sourceTopicId: topic.id, platform: 'long', draft: '', draftId: null, title: null, refs: [], paragraphRefs: [] })); setPage('studio')
         }}>开始创作</button>

@@ -14,8 +14,17 @@ const DB_PATH = process.env.DB_PATH || join(__dirname, '../../data/app.db');
 export function migrateM4() {
   const db = new DatabaseSync(DB_PATH);
 
+  const hasColumn = (table, column) =>
+    db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
+
   db.exec('BEGIN');
   try {
+    // notes.title —— 素材的人话标题（保存时 AI 生成，≤12 字；创作台/素材库辨识用。
+    // 此前素材只有摘录和来源，粘贴链接场景下用户完全认不出哪张是哪张）
+    if (!hasColumn('notes', 'title')) {
+      db.exec('ALTER TABLE notes ADD COLUMN title TEXT;');
+    }
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS drafts (
           id TEXT PRIMARY KEY,

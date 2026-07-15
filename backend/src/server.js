@@ -475,6 +475,17 @@ app.post('/api/topics/:id/assimilate', async (req, res) => {
   }
 });
 
+// 改名/改描述（自动建页的名字常偏长，必须可改）
+app.patch('/api/topics/:id', async (req, res) => {
+  try {
+    const { updateTopicMeta } = await import('./services/topic-pages.js');
+    res.json({ success: true, data: updateTopicMeta(req.params.id, req.body || {}) });
+  } catch (error) {
+    const status = error.message === 'Topic not found' ? 404 : 400;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
 // 删除活页（changelog 与素材关联级联清除，素材卡片本身保留）
 app.delete('/api/topics/:id', async (req, res) => {
   try {
@@ -533,6 +544,11 @@ app.post('/api/notes', async (req, res) => {
     }
     const { createNote } = await import('./db/notes.js');
     const note = createNote({ excerpt, noteType, contentId, sourceTitle, sourceUrl, stance });
+
+    // 后台起人话标题（≤12 字），不阻塞保存；下次 loadNotes 即可见
+    import('./services/note-title.js')
+      .then(({ generateNoteTitle }) => generateNoteTitle(note.id, note.excerpt))
+      .catch(err => console.error('[Notes] title generation failed:', err.message));
 
     // M3 同化（设计文档 §引擎B：保存素材即触发，用户不需要理解"待并入"）：
     // 1. 自动匹配活跃 Topic（本地 TF 余弦，零成本）

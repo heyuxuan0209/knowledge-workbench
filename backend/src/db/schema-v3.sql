@@ -272,6 +272,7 @@ CREATE INDEX IF NOT EXISTS idx_ephemeral_expires ON ephemeral_sessions(expires_a
 
 CREATE TABLE IF NOT EXISTS notes (
     id TEXT PRIMARY KEY,
+    title TEXT,                         -- 人话标题（保存时 AI 生成 ≤12 字，M4 migrate-m4.js）
     excerpt TEXT NOT NULL,              -- 结构化摘录（Markdown，来自对话回复/解读产物）
     note_type TEXT DEFAULT 'chat'
         CHECK (note_type IN ('chat', 'excerpt', 'insight')),

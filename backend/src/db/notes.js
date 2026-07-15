@@ -4,10 +4,20 @@ import { randomUUID } from 'crypto';
 // 素材卡片（ADR-010 NotebookLM 模式）：只有用户主动"保存到笔记"的片段才落库。
 // content_id 引用可空：adHoc 粘贴的内容未入库，此时靠 source_title/source_url 冗余字段溯源。
 
-export function createNote({ excerpt, noteType = 'chat', contentId = null, sourceTitle = null, sourceUrl = null, stance = null }) {
+// AI 回复常见开场白（"好的，以下是…的结构化解读。"）对素材是噪音，保存时剥掉首行
+function stripPreamble(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length > 1 && /^(好的|当然|以下是|这是)/.test(lines[0]) && /解读|材料|总结|分析/.test(lines[0])) {
+    return lines.slice(1).join('\n').trim();
+  }
+  return text.trim();
+}
+
+export function createNote({ excerpt, noteType = 'chat', contentId = null, sourceTitle = null, sourceUrl = null, stance = null, title = null }) {
   if (!excerpt || !excerpt.trim()) {
     throw new Error('excerpt is required');
   }
+  excerpt = stripPreamble(excerpt);
 
   const db = getDatabase();
 
@@ -20,13 +30,20 @@ export function createNote({ excerpt, noteType = 'chat', contentId = null, sourc
 
   const id = randomUUID();
   db.prepare(`
-    INSERT INTO notes (id, excerpt, note_type, stance, content_id, source_title, source_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, excerpt.trim(), noteType, stance, validContentId, sourceTitle, sourceUrl);
+    INSERT INTO notes (id, title, excerpt, note_type, stance, content_id, source_title, source_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, excerpt, noteType, stance, validContentId, sourceTitle, sourceUrl);
 
   const row = db.prepare('SELECT * FROM notes WHERE id = ?').get(id);
   db.close();
   return row;
+}
+
+export function setNoteTitle(id, title) {
+  const db = getDatabase();
+  const r = db.prepare("UPDATE notes SET title = ?, updated_at = datetime('now') WHERE id = ?").run(title, id);
+  db.close();
+  return r.changes > 0;
 }
 
 export function getNotes(limit = 50, offset = 0) {

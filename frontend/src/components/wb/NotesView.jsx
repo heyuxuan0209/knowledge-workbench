@@ -16,7 +16,7 @@ export default function NotesView({ notes, loadNotes, showToast }) {
   }
 
   const filtered = keyword.trim()
-    ? notes.filter(n => (n.excerpt + (n.source_title || '') + (n.content_zh_title || '')).includes(keyword.trim()))
+    ? notes.filter(n => ((n.title || '') + n.excerpt + (n.source_title || '') + (n.content_zh_title || '')).includes(keyword.trim()))
     : notes
 
   return (
@@ -43,6 +43,7 @@ export default function NotesView({ notes, loadNotes, showToast }) {
         const title = note.content_zh_title || note.source_title
         return (
           <div key={note.id} className="wb-card">
+            {note.title && <div style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{note.title}</div>}
             <div className="wb-note-excerpt">{note.excerpt}</div>
             <div className="wb-note-foot">
               <span className="wb-note-src"><IconClip />来源 <b>{title || '（未记录）'}</b></span>
