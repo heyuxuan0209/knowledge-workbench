@@ -55,7 +55,7 @@ function gatherTopicMaterials(topicId) {
   return { topic, body, notes };
 }
 
-function buildPrompt(topic, body, notes, platform) {
+function buildPrompt(topic, body, notes, platform, viewpoint) {
   const spec = PLATFORM_SPECS[platform];
   const viewsBlock = (body.views || []).length
     ? body.views.map(v => `- ${v.who}：${v.what}${v.conflict ? '（⚡与他方冲突）' : ''}`).join('\n')
@@ -64,8 +64,14 @@ function buildPrompt(topic, body, notes, platform) {
     ? notes.map((n, i) => `[素材${i + 1}]（来源：${n.source_title || '未知'}）\n${n.excerpt.slice(0, 800)}`).join('\n\n')
     : '（暂无素材，基于活页综述创作）';
 
-  return `你是一位独立开发者/AI产品经理的内容创作伙伴。基于他知识库中主题「${topic.name}」的活页综述和素材，${spec.spec}
+  // 观点入口（创作层的分水岭）：有作者立场 → 全文为它服务，AI 只补论证不替立场；
+  // 没有 → 判断段落必须显式标注"AI 提议"，不许伪装成作者观点（诚实原则，决策5）
+  const stanceBlock = viewpoint?.trim()
+    ? `\n# 作者立场（最高优先级）\n作者想说的是：「${viewpoint.trim()}」\n全文围绕这个立场组织：观点段/判断段必须从它出发展开论证（可以补充论据、承认反方，但不得偷换或稀释这个立场）。\n`
+    : `\n# 立场说明\n作者未提供立场。涉及"我的判断/倾向"的段落，开头必须标注"（AI 提议的判断，请替换为你的观点）"，不要伪装成作者本人的观点。\n`;
 
+  return `你是一位独立开发者/AI产品经理的内容创作伙伴。基于他知识库中主题「${topic.name}」的活页综述和素材，${spec.spec}
+${stanceBlock}
 # 活页综述
 ## 当前认知
 ${body.current || topic.description || '（空）'}
@@ -101,12 +107,13 @@ function extractRefs(bodyText, notes) {
   return refs;
 }
 
-// 从活页起稿：一次 LLM 调用 → 落库为 Draft（含溯源引用）
-export async function generateFromTopic(topicId, platform = 'long') {
+// 从活页起稿：一次 LLM 调用 → 落库为 Draft（含溯源引用）。
+// viewpoint = 作者立场（观点入口），可空——空时判断段落如实标注"AI 提议"
+export async function generateFromTopic(topicId, platform = 'long', viewpoint = null) {
   if (!PLATFORM_SPECS[platform]) throw new Error(`invalid platform: ${platform}`);
   const { topic, body, notes } = gatherTopicMaterials(topicId);
 
-  const result = await chat([{ role: 'user', content: buildPrompt(topic, body, notes, platform) }]);
+  const result = await chat([{ role: 'user', content: buildPrompt(topic, body, notes, platform, viewpoint) }]);
   if (!result.success) throw new Error(`LLM 调用失败: ${result.error}`);
 
   const text = result.content.trim();

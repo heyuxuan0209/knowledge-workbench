@@ -74,8 +74,8 @@ export default function WorkbenchPage() {
   const [activeTopic, setActiveTopic] = useState(null)
   const [studio, setStudio] = useState({
     platform: 'thread', source: null, refs: [], draft: '', busy: false,
-    // M4：草稿落库 + 活页起稿 + 段落级溯源持久化
-    draftId: null, title: null, sourceTopicId: null, paragraphRefs: [],
+    // M4：草稿落库 + 活页起稿 + 段落级溯源持久化 + 观点入口（作者立场）
+    draftId: null, title: null, sourceTopicId: null, paragraphRefs: [], viewpoint: '',
   })
   const [drafts, setDrafts] = useState([]) // 草稿箱
   const loadDrafts = useCallback(async () => {
@@ -301,7 +301,7 @@ export default function WorkbenchPage() {
     if (studio.sourceTopicId) {
       setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在基于主题活页起稿（约 30 秒）…' }))
       try {
-        const json = await api(`/api/topics/${studio.sourceTopicId}/draft`, { method: 'POST', body: { platform } })
+        const json = await api(`/api/topics/${studio.sourceTopicId}/draft`, { method: 'POST', body: { platform, viewpoint: studio.viewpoint || null } })
         const d = json.data
         setStudio(s => ({
           ...s, busy: false, draft: d.body, title: d.title, draftId: d.id,
@@ -365,19 +365,59 @@ export default function WorkbenchPage() {
     }))
   }
 
-  // 去 AI 味（三遍审校一道工序），改写后替换草稿区，由用户决定是否保存
+  // 去 AI 味（三遍审校一道工序），改写后替换草稿区，由用户决定是否保存。
+  // 覆盖前把上一版存进 prevDraft —— 改坏了可一步撤销
   const humanizeDraft = async () => {
     if (!studio.draft.trim()) { showToast('草稿为空'); return }
     setStudio(s => ({ ...s, busy: true }))
     showToast('正在去 AI 味审校（约 30 秒）…')
     try {
       const json = await api('/api/studio/humanize', { method: 'POST', body: { draft: studio.draft, platform: studio.platform } })
-      setStudio(s => ({ ...s, busy: false, draft: json.data.text }))
-      showToast(`已完成去 AI 味改写（¥${json.data.cost?.toFixed(3)}），满意请点保存`)
+      setStudio(s => ({ ...s, busy: false, prevDraft: s.draft, draft: json.data.text }))
+      showToast(`已完成去 AI 味改写（¥${json.data.cost?.toFixed(3)}），不满意可点「撤销改写」`)
     } catch (err) {
       setStudio(s => ({ ...s, busy: false }))
       showToast(`审校失败：${err.message}`)
     }
+  }
+
+  // 一步撤销：换回改写前的版本（再点一次可换回来，两版互换）
+  const undoRewrite = () => {
+    setStudio(s => (s.prevDraft ? { ...s, draft: s.prevDraft, prevDraft: s.draft } : s))
+    showToast('已切换到另一版（可再点切回）')
+  }
+
+  // 删除当前打开的草稿
+  const deleteCurrentDraft = async () => {
+    if (!studio.draftId) return
+    if (!confirm('删除这份草稿？（不可恢复）')) return
+    try {
+      await api(`/api/drafts/${studio.draftId}`, { method: 'DELETE' })
+      setStudio(s => ({ ...s, draftId: null, draft: '', title: null, refs: [], paragraphRefs: [], prevDraft: null }))
+      loadDrafts()
+      showToast('草稿已删除')
+    } catch (err) { showToast(`删除失败：${err.message}`) }
+  }
+
+  // 标题候选（长文）：5 个风格错开的标题供挑选
+  const suggestTitles = async () => {
+    if (!studio.draft.trim()) { showToast('草稿为空'); return }
+    showToast('AI 正在拟 5 个标题…')
+    try {
+      const titles = (await api('/api/studio/titles', { method: 'POST', body: { draft: studio.draft } })).data
+      const input = prompt(`标题候选：\n${titles.map((t, i) => `${i + 1}) ${t}`).join('\n')}\n\n输入数字选用，或直接输入自己的标题：`, '')
+      if (!input?.trim()) return
+      const picked = /^[1-5]$/.test(input.trim()) ? titles[parseInt(input.trim()) - 1] : input.trim()
+      if (!picked) return
+      setStudio(s => {
+        // 长文首行是标题：替换首行；否则插到最前
+        const lines = s.draft.split('\n')
+        const firstLineIsTitle = /^#?\s*.{4,60}$/.test(lines[0]) && !lines[0].startsWith('>')
+        const draft = firstLineIsTitle ? [`# ${picked}`, ...lines.slice(1)].join('\n') : `# ${picked}\n\n${s.draft}`
+        return { ...s, title: picked, draft }
+      })
+      showToast(`已换标题：「${picked}」`)
+    } catch (err) { showToast(`标题生成失败：${err.message}`) }
   }
 
   const insertMaterial = (note) => {
@@ -419,18 +459,30 @@ export default function WorkbenchPage() {
 
   const rewriteDraft = async (instruction) => {
     const json = await api('/api/studio/rewrite', { method: 'POST', body: { draft: studio.draft, instruction, platform: studio.platform } })
-    setStudio(s => ({ ...s, draft: json.data.draft }))
+    setStudio(s => ({ ...s, prevDraft: s.draft, draft: json.data.draft }))
     return json.data.note || `已按要求改写草稿：${instruction}`
   }
 
+  // 导出发布版：剥掉 [素材N] 行内标记（对读者是噪音），文末附参考来源列表。
+  // 草稿原文不动——工作台里保留溯源标记，导出物才做清洗
   const exportMd = () => {
-    const blob = new Blob([studio.draft], { type: 'text/markdown;charset=utf-8' })
+    let text = studio.draft.replace(/\s*\[素材\d+\]/g, '')
+    const markers = [...new Set([...studio.draft.matchAll(/\[素材\d+\]/g)].map(m => m[0]))]
+    const usedRefs = studio.paragraphRefs.filter(r => r.marker === '引块' || markers.includes(r.marker))
+    if (usedRefs.length) {
+      text += '\n\n---\n\n**参考来源**\n\n' + usedRefs.map((r, i) => {
+        const note = notes.find(n => n.id === r.noteId)
+        const url = note?.content_url || note?.source_url
+        return `${i + 1}. ${note?.title || r.sourceTitle || '素材'}${url ? `：${url}` : ''}`
+      }).join('\n')
+    }
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `draft-${studio.platform}-${new Date().toISOString().slice(0, 10)}.md`
     a.click()
     URL.revokeObjectURL(a.href)
-    showToast('已导出 Markdown')
+    showToast(`已导出发布版 Markdown（溯源标记已转为文末来源列表${usedRefs.length ? `，${usedRefs.length} 条` : ''}）`)
   }
 
   // ---- 渲染 ----
@@ -448,7 +500,7 @@ export default function WorkbenchPage() {
     loadNotes, loadSources, loadTopics, setPage, setModal,
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, genDraft: (...a) => genDraftRef.current(...a), exportMd,
-    drafts, saveDraft, openDraft, humanizeDraft,
+    drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, suggestTitles,
     highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack,
   }
 

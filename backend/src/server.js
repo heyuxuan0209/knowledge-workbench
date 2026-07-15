@@ -279,11 +279,29 @@ app.post('/api/contents/:id/thread', async (req, res) => {
 app.post('/api/topics/:id/draft', async (req, res) => {
   try {
     const { generateFromTopic } = await import('./services/draft-generation.js');
-    const draft = await generateFromTopic(req.params.id, req.body?.platform || 'long');
+    const draft = await generateFromTopic(req.params.id, req.body?.platform || 'long', req.body?.viewpoint || null);
     res.json({ success: true, data: draft });
   } catch (error) {
     const status = error.message === 'Topic not found' ? 404 : 500;
     res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// 长文标题候选（标题决定打开率，单独生成 5 个供挑选）
+app.post('/api/studio/titles', async (req, res) => {
+  try {
+    const { draft } = req.body;
+    if (!draft?.trim()) return res.status(400).json({ success: false, error: 'draft is required' });
+    const { chat } = await import('./services/llm.js');
+    const result = await chat([{
+      role: 'user',
+      content: `为这篇公众号文章生成 5 个标题候选。要求：吸引点击但不标题党（不夸大、不隐瞒立场）、25 字以内、风格错开（悬念式/观点式/数字式/对比式/提问式各给一个）。只输出 5 行标题，不要编号和解释。\n\n${draft.slice(0, 3000)}`,
+    }]);
+    if (!result.success) throw new Error(result.error);
+    const titles = result.content.trim().split('\n').map(s => s.trim().replace(/^\d+[.、)]\s*/, '')).filter(Boolean).slice(0, 5);
+    res.json({ success: true, data: titles });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -427,6 +445,27 @@ app.post('/api/topics', async (req, res) => {
     res.json({ success: true, data: topic });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 建议主题（三信号合流：热点聚类 + 近期素材 + 涌现建议；每日缓存，点"建页"才生效）
+app.get('/api/topics/suggestions', async (req, res) => {
+  try {
+    const { getTopicSuggestions } = await import('./services/topic-suggestions.js');
+    res.json({ success: true, data: await getTopicSuggestions({ force: req.query.force === '1' }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/topics/suggestions/dismiss', async (req, res) => {
+  try {
+    if (!req.body?.name) return res.status(400).json({ success: false, error: 'name is required' });
+    const { dismissSuggestion } = await import('./services/topic-suggestions.js');
+    dismissSuggestion(req.body.name);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

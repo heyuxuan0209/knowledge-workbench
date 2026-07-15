@@ -17,6 +17,24 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
 
+  // 建议主题（系统提议、用户拍板）：热点聚类 + 近期素材 + 涌现建议，每日一算
+  const [suggestions, setSuggestions] = useState([])
+  useEffect(() => {
+    api('/api/topics/suggestions').then(j => setSuggestions(j.data || [])).catch(() => {})
+  }, [])
+  const adoptSuggestion = async (s) => {
+    try {
+      const json = await api('/api/topics', { method: 'POST', body: { name: s.name, description: s.why } })
+      setSuggestions(prev => prev.filter(x => x.name !== s.name))
+      await loadTopics()
+      showToast(`已建立活页「${s.name}」${json.data.backfilled ? `，回扫到 ${json.data.backfilled} 条相关素材` : ''}`)
+    } catch (err) { showToast(`建页失败：${err.message}`) }
+  }
+  const dismissSug = async (s) => {
+    setSuggestions(prev => prev.filter(x => x.name !== s.name))
+    api('/api/topics/suggestions/dismiss', { method: 'POST', body: { name: s.name } }).catch(() => {})
+  }
+
   const deleteTopic = async (tp, { fromDetail = false } = {}) => {
     if (!confirm(`删除主题「${tp.name}」？综述与修订记录会一并删除（素材卡片保留）。`)) return false
     try {
@@ -72,6 +90,21 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
         <span className="wb-feedbar-sep">|</span>
         <span>保存素材后自动匹配主题 · 并入时 AI 更新综述</span>
       </div>
+
+      {suggestions.length > 0 && (
+        <div className="wb-card" style={{ padding: '14px 18px', background: 'var(--brief-bg)', borderColor: 'rgba(61,90,128,.22)' }}>
+          <div className="wb-card-label">💡 建议主题 · 从你的信息流和素材里发现（每日更新）</div>
+          {suggestions.map(s => (
+            <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+              <span style={{ minWidth: 0, flex: 1, fontSize: 13 }}>
+                <b>{s.name}</b><span style={{ color: 'var(--sub2)' }}> — {s.why}</span>
+              </span>
+              <button className="wb-brief-link" style={{ flex: 'none' }} onClick={() => adoptSuggestion(s)}>建页 →</button>
+              <button className="wb-note-del" style={{ flex: 'none' }} title="不感兴趣，今后不再建议" onClick={() => dismissSug(s)}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {topics.length === 0 && (
         <div className="wb-empty">
