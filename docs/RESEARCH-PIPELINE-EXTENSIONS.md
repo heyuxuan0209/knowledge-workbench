@@ -30,6 +30,9 @@
 - huashu-skills（花叔 11 技能）——脚本/大纲 prompt 可参考，选题引擎我们已有
 
 ### M5（ASR / 多渠道音视频）
+
+> ✅ 最小版已前移落地（2026-07-15，ADR-015）：faster-whisper small 本地转写，
+> B站/无字幕 YouTube 的解读兜底（15 分钟截断 + zh_body 缓存）。以下完整版规划维持。
 - **架构基线 = link2article 两步走**：确定性脚本（渠道分流：YouTube 无字幕→ASR、小宇宙音频直链、抖音 yt-dlp+去水印兜底、音频直链、本地文件）→ LLM 翻译+结构化
 - **引擎升级 = whisperX**（词级时间戳 + 说话人分离，优于 faster-whisper；金句可标时间点、访谈可分说话人）
 - 落法：link2article.py 作为 backend 转写子进程（child_process），material 产物进现有翻译+解读管道，落 contents 不落散文件
