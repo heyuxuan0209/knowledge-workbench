@@ -44,7 +44,7 @@ export default function WorkbenchPage() {
   const [ghTrending, setGhTrending] = useState({ repos: [], trend: null })
   const [notes, setNotes] = useState([])
   const [sources, setSources] = useState([])
-  const topics = [] // M3：主题活页后端未上线，列表空态
+  const [topics, setTopics] = useState([]) // M3 主题活页（/api/topics）
 
   // 右栏（快速分析）
   const [selectedItems, setSelectedItems] = useState([]) // {id,title,adHoc?,capability}
@@ -93,8 +93,11 @@ export default function WorkbenchPage() {
   const loadSources = useCallback(async () => {
     try { setSources((await api('/api/sources?registered=1')).data || []) } catch (err) { console.error(err) }
   }, [])
+  const loadTopics = useCallback(async () => {
+    try { setTopics((await api('/api/topics')).data || []) } catch (err) { console.error(err) }
+  }, [])
 
-  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources() }, [loadContents, loadBrief, loadNotes, loadSources])
+  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics])
 
   // ---- 快速分析 ----
   const toggleSelect = (c) => {
@@ -150,7 +153,14 @@ export default function WorkbenchPage() {
       })
       setChat(prev => prev.map((m, i) => i === index ? { ...m, noteId: json.data.id } : m))
       loadNotes()
-      showToast('已存为素材卡片（对话本身不落库）')
+      // M3 同化前置：保存即自动匹配主题，命中的挂"待并入"
+      const matched = json.matchedTopics || []
+      if (matched.length) {
+        loadTopics()
+        showToast(`已存为素材卡片，匹配到主题「${matched.map(m => m.name).join('」「')}」待并入`)
+      } else {
+        showToast('已存为素材卡片（对话本身不落库）')
+      }
     } catch (err) { showToast(`保存失败：${err.message}`) }
   }
 
@@ -221,9 +231,16 @@ export default function WorkbenchPage() {
   // ---- 选题 ----
   const viewIdea = (idea) => { setIdeaDetail(idea); setModal('idea') }
   const upgradeIdea = async (idea) => {
-    try { await api(`/api/ideas/${idea.id}`, { method: 'PATCH', body: { status: 'adopted' } }) } catch { /* 忽略 */ }
-    setModal(null); setPage('topics'); setTopicView('list')
-    showToast('已采纳选题（主题活页 M3 上线后自动建页）')
+    setModal(null)
+    try {
+      const json = await api('/api/topics/from-idea', { method: 'POST', body: { ideaId: idea.id } })
+      await loadTopics()
+      setActiveTopic(json.data); setTopicView('page'); setPage('topics')
+      showToast(`已升级为主题活页「${json.data.name}」，AI 将随素材并入持续维护综述`)
+    } catch (err) {
+      setPage('topics'); setTopicView('list')
+      showToast(`建页失败：${err.message}`)
+    }
   }
   const dismissIdea = async (idea) => {
     try { await api(`/api/ideas/${idea.id}`, { method: 'PATCH', body: { status: 'dismissed' } }) } catch { /* 忽略 */ }
@@ -292,7 +309,7 @@ export default function WorkbenchPage() {
     showToast, contents, report, stories, ghTrending, notes, sources, topics,
     selectedItems, toggleSelect, followSource, acquire,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea,
-    loadNotes, loadSources, setPage, setModal,
+    loadNotes, loadSources, loadTopics, setPage, setModal,
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, genDraft: (...a) => genDraftRef.current(...a), exportMd,
   }

@@ -101,6 +101,10 @@ CREATE TABLE IF NOT EXISTS topics (
     created_by TEXT DEFAULT 'user'
         CHECK (created_by IN ('user', 'ai_suggested')),
 
+    -- M3 活页（ADR-009，migrate-m3.js）：Topic = AI 维护的活文档，不是文件夹
+    body TEXT,                              -- JSON: {current, views: [{who, what, ref, conflict}], consensus}
+    origin_idea_id TEXT,                    -- 由选题升级建页时回链 Idea
+
     last_active_at TEXT DEFAULT (datetime('now')),
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
@@ -295,6 +299,10 @@ CREATE TABLE IF NOT EXISTS reports (
     period_key TEXT NOT NULL,           -- '2026-07-14' / '2026-W29' / '2026-07'
     summary TEXT,                       -- AI 简报导语
     focus TEXT DEFAULT '[]',            -- JSON: [{headline, whyHot, contentIds}]
+    -- M3 周报/月报字段（migrate-m3.js）
+    trends TEXT DEFAULT '[]',           -- JSON: [{theme, direction: rising|cooling, evidence}]
+    page_changes TEXT DEFAULT '[]',     -- JSON: [{topicId, topicName, summary, conflict}]
+    emergent TEXT DEFAULT '{}',         -- JSON: {newTopics[], links[], conflicts[]}（涌现建议）
     tokens INTEGER DEFAULT 0,
     cost_yuan REAL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
@@ -321,6 +329,43 @@ CREATE TABLE IF NOT EXISTS ideas (
 
 CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status);
 CREATE INDEX IF NOT EXISTS idx_ideas_report ON ideas(report_id);
+
+-- ============================================================
+-- 7.7 Topic 活页（M3 知识层，ADR-009，migrate-m3.js）
+--     同化机制：素材保存 → 自动匹配活跃 Topic（pending）→ 用户"并入" →
+--     LLM 更新 topics.body + 写一条 topic_changelog（changelog 即演进时间线）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS topic_changelog (
+    id TEXT PRIMARY KEY,
+    topic_id TEXT NOT NULL,
+    change_type TEXT NOT NULL
+        CHECK (change_type IN ('created', 'assimilated', 'revised', 'conflict')),
+    summary TEXT NOT NULL,              -- 一句话修订说明（AI 生成）
+    note_ids TEXT DEFAULT '[]',         -- JSON: 本次并入的素材 id
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_topic_changelog_topic ON topic_changelog(topic_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_topic_changelog_created ON topic_changelog(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS note_topics (
+    note_id TEXT NOT NULL,
+    topic_id TEXT NOT NULL,
+    status TEXT DEFAULT 'pending'
+        CHECK (status IN ('pending', 'assimilated')),
+    relevance REAL DEFAULT 1.0,         -- 自动匹配的相似度；用户手动指定为 1.0
+    added_by TEXT DEFAULT 'ai'
+        CHECK (added_by IN ('ai', 'user')),
+    created_at TEXT DEFAULT (datetime('now')),
+    assimilated_at TEXT,
+    PRIMARY KEY (note_id, topic_id),
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_note_topics_topic ON note_topics(topic_id, status);
 
 -- ============================================================
 -- 8. Data Source Configs — 用户手动添加的信源配置
