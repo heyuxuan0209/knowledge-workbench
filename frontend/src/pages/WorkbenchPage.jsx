@@ -57,9 +57,12 @@ export default function WorkbenchPage() {
   const [modal, setModal] = useState(null) // 'pool'|'import'|'idea'
   const [ideaDetail, setIdeaDetail] = useState(null)
 
-  // 站内定位：从创作台/主题页点素材标题 → 跳素材库并高亮该卡片
+  // 站内定位：从创作台/主题页点素材标题 → 跳素材库并高亮该卡片；
+  // returnPage 记住出发页，素材库顶部给「← 返回」（左导航主动切页时清除）
   const [highlightNoteId, setHighlightNoteId] = useState(null)
-  const gotoNote = (noteId) => { setHighlightNoteId(noteId); setPage('notes') }
+  const [returnPage, setReturnPage] = useState(null)
+  const gotoNote = (noteId) => { setReturnPage(page); setHighlightNoteId(noteId); setPage('notes') }
+  const goBack = () => { if (returnPage) { setPage(returnPage); setReturnPage(null) } }
   // 从创作台来源芯片跳回主题详情
   const gotoTopic = (topicId) => {
     const tp = topics.find(t => t.id === topicId)
@@ -432,7 +435,7 @@ export default function WorkbenchPage() {
 
   // ---- 渲染 ----
   const navItem = (n) => (
-    <button key={n.key} className={`wb-nav-item${page === n.key ? ' active' : ''}`} onClick={() => { setPage(n.key); setModal(null) }}>
+    <button key={n.key} className={`wb-nav-item${page === n.key ? ' active' : ''}`} onClick={() => { setPage(n.key); setModal(null); setReturnPage(null) }}>
       <span className="wb-nav-icon"><n.Icon /></span>
       <span className="wb-nav-label">{n.label}</span>
     </button>
@@ -446,7 +449,7 @@ export default function WorkbenchPage() {
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, genDraft: (...a) => genDraftRef.current(...a), exportMd,
     drafts, saveDraft, openDraft, humanizeDraft,
-    highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic,
+    highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack,
   }
 
   return (

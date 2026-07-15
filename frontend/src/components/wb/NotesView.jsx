@@ -5,7 +5,9 @@ import { IconClip, IconExternal, IconTrash } from './Icons'
 // 素材库（视觉对齐原型 02-notes）：结构化摘录 + 来源引用 + 立场徽章（可选）+ 删除。
 // highlightNoteId：从创作台/主题页点素材标题跳转过来时，滚动定位并高亮该卡片。
 
-export default function NotesView({ notes, loadNotes, showToast, highlightNoteId, setHighlightNoteId }) {
+const PAGE_LABEL = { studio: '创作台', topics: '主题库', feed: '资讯' }
+
+export default function NotesView({ notes, loadNotes, showToast, highlightNoteId, setHighlightNoteId, returnPage, goBack }) {
   const [keyword, setKeyword] = useState('')
   const highlightRef = useRef(null)
 
@@ -31,6 +33,9 @@ export default function NotesView({ notes, loadNotes, showToast, highlightNoteId
 
   return (
     <>
+      {returnPage && (
+        <button className="wb-back" onClick={goBack}>← 返回{PAGE_LABEL[returnPage] || '上一页'}（草稿还在）</button>
+      )}
       <div className="wb-page-title">素材库</div>
       <div className="wb-page-sub">{notes.length} 张素材卡片 · 在 AI 对话里点「保存到笔记」沉淀 · 创作台按段引用</div>
 
