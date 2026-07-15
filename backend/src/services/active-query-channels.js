@@ -134,14 +134,20 @@ export async function queryGithub({ handle, displayName }, limit = 5) {
     }));
 }
 
-// YouTube 单视频详情（flat 列表拿不到简介/发布时间，对新条目逐个补取；
-// 失败返回 null 不阻塞——下轮同步会因字段仍空而自动重试）
+// YouTube 单视频详情。两处消费：
+// - sync-active-query：flat 列表缺简介/发布时间，对新条目逐个补取
+// - content-ingestion（即时分析输入管道）：官方标题/频道名等元数据必须随字幕
+//   一起喂给模型——只喂纯字幕时模型会从语音猜人名（曾把 Thariq Shihipar
+//   误作 "Tarik Shaupar"），这是元数据块的根治点
+// 失败返回 null 不阻塞，调用方自行降级
 export async function fetchYoutubeDetail(videoId) {
   try {
     const args = ['--dump-json', '--no-download', '--skip-download', `https://www.youtube.com/watch?v=${videoId}`];
     if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
     const d = await runJson('yt-dlp', args, 60000);
     return {
+      title: d.title || null,
+      channel: d.channel || d.uploader || null,
       description: (d.description || '').trim().slice(0, 500) || null,
       publishedAt: d.timestamp
         ? new Date(d.timestamp * 1000).toISOString()

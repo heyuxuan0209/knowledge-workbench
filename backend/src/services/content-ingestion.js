@@ -72,15 +72,26 @@ async function ingestYoutube(input) {
   }
 
   try {
-    // 尝试提取字幕（默认中文，如无则自动回退到视频默认语言）
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId, proxyFetch ? { fetch: proxyFetch } : undefined);
+    // 字幕与官方元数据并行取。元数据（标题/频道/日期）是即时分析输入管道的
+    // 必备件（HANDOFF-2026-07-15）：只喂纯字幕时模型会从语音猜人名/自称无链接。
+    // yt-dlp 元数据失败不阻塞字幕主流程（metadata 为 null 时材料块如实标"未知"）
+    const [transcript, detail] = await Promise.all([
+      YoutubeTranscript.fetchTranscript(videoId, proxyFetch ? { fetch: proxyFetch } : undefined),
+      import('./active-query-channels.js').then(m => m.fetchYoutubeDetail(videoId)).catch(() => null),
+    ]);
     const body = transcript.map(t => t.text).join(' ');
 
     return {
-      title: null, // youtube-transcript 不返回视频标题，由调用方决定是否用 zh_title 占位
+      title: detail?.title || null,
       body,
       type: 'youtube',
       transcript, // 保留带时间戳的原始片段，供 zh_chapters 分段使用（翻译流水线阶段处理）
+      metadata: detail ? {
+        originalTitle: detail.title,
+        author: detail.channel,
+        publishedAt: detail.publishedAt?.slice(0, 10) || null,
+        platform: 'YouTube',
+      } : { platform: 'YouTube' },
       fetchStatus: 'success',
       fetchError: null
     };
@@ -171,6 +182,12 @@ export async function ingestUrl(input) {
         body: article.textContent.trim(),
         type: 'article',
         via: 'readability',
+        metadata: {
+          originalTitle: article.title || null,
+          author: article.byline || null,
+          platform: new URL(url).hostname.replace(/^www\./, ''),
+          publishedAt: article.publishedTime?.slice(0, 10) || null,
+        },
         fetchStatus: 'success',
         fetchError: null
       };
@@ -188,6 +205,12 @@ export async function ingestUrl(input) {
       body: jina.body,
       type: 'article',
       via: 'jina',
+      metadata: {
+        originalTitle: jina.title || null,
+        author: null,
+        platform: new URL(url).hostname.replace(/^www\./, ''),
+        publishedAt: null,
+      },
       fetchStatus: 'success',
       fetchError: null
     };

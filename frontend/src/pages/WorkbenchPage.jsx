@@ -131,19 +131,22 @@ export default function WorkbenchPage() {
     }
   }
 
-  // 解读模板 v2（RESEARCH-PIPELINE-EXTENSIONS.md §二，吸收 link2article 结构）：
-  // 新增「可复用素材」（直通创作选题）与「局限与存疑」（诚实原则，决策5）
-  const startAnalysis = () => runChat(
-    '请对以上内容做结构化解读，按以下结构输出：\n' +
-    '① TL;DR（3 句以内讲清这是什么、为什么值得看）\n' +
-    '② 核心观点（分条）\n' +
-    '③ 论据 / 数据 / 案例\n' +
-    '④ 金句（可直接引用；若材料自带时间戳则标注，没有就不要编造）\n' +
-    '⑤ 可复用素材：选题角度 · 数据案例 · 争议钩子（供后续创作直接取用）\n' +
-    '⑥ 局限与存疑：材料没讲清、证据不足或值得质疑的地方，如实指出\n' +
-    '多篇材料时在②③中标注观点间的异同或冲突。',
-    { fresh: true }
-  )
+  // 即时分析模板（HANDOFF-2026-07-15）：prompt 维护在 reference/prompts/instant-analysis.md，
+  // 经 /api/prompts/instant-analysis 拉取（首次拉取后缓存），改文件即改行为。
+  // 拉取失败时用内置精简版兜底（不阻塞分析）。
+  const analysisPromptRef = useRef(null)
+  const FALLBACK_ANALYSIS_PROMPT =
+    '请基于材料的元数据和正文写一篇结构化中文精读稿，让我不看原文也能完整理解：' +
+    '讲述脉络（详尽）/ 关键案例与细节 / 值得记住的表述（限量直引）/ 局限与存疑 / 给我的 idea 钩子。' +
+    '只写材料里真实存在的内容，无法确认的标注"存疑"。'
+  const startAnalysis = async () => {
+    if (!analysisPromptRef.current) {
+      try {
+        analysisPromptRef.current = (await api('/api/prompts/instant-analysis')).data.prompt
+      } catch { analysisPromptRef.current = FALLBACK_ANALYSIS_PROMPT }
+    }
+    runChat(analysisPromptRef.current, { fresh: true })
+  }
 
   const saveMsg = async (index) => {
     const msg = chat[index]
@@ -182,13 +185,15 @@ export default function WorkbenchPage() {
       const d = json.data
       const title = d.zhTitle || d.zh_title || d.enTitle || d.en_title || d.title || input.slice(0, 28)
       // 只保留解读需要的字段：完整摄入结果里的 transcript（几千段带时间戳）会把
-      // 后续每轮对话请求撑到数 MB（曾触发 PayloadTooLarge）
+      // 后续每轮对话请求撑到数 MB（曾触发 PayloadTooLarge）。
+      // metadata（原题/作者/平台/日期）必须随行——即时分析管道要求带元数据块
       const adHoc = {
         zhTitle: title,
         enTitle: d.enTitle || d.en_title || d.title || null,
         zhBody: d.zhBody || d.zh_body || null,
         body: (d.zhBody || d.zh_body) ? null : (d.body || null),
         url: input.startsWith('http') ? input : null,
+        metadata: d.metadata || null,
       }
       setSelectedItems(prev => [...prev.filter(x => x.id !== 'paste'), { id: 'paste', title: `[粘贴] ${title}`, adHoc }])
       setRightCollapsed(false)

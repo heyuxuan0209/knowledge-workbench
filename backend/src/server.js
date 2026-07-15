@@ -38,6 +38,23 @@ app.get('/api/contents', async (req, res) => {
   }
 });
 
+// 即时分析模板（HANDOFF-2026-07-15）：prompt 以文件形式维护在 reference/prompts/，
+// 改文件即改产品行为，前端 startAnalysis 拉取后作为分析指令。
+// <运行时注入：X> 占位符在此解析（当前背景为静态文本，未来可接用户配置）。
+app.get('/api/prompts/instant-analysis', async (req, res) => {
+  try {
+    const { readFileSync } = await import('fs');
+    const { fileURLToPath } = await import('url');
+    const { dirname, join } = await import('path');
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const raw = readFileSync(join(__dirname, '../../reference/prompts/instant-analysis.md'), 'utf-8');
+    const prompt = raw.replace(/<运行时注入：([^>]+)>/g, '$1');
+    res.json({ success: true, data: { prompt } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Mode 1 即兴分析：接收用户粘贴的链接/文本，归一化提取内容，并在摄入成功时自动翻译成中文
 // （一步到位，前端不需要再单独调翻译接口）。摄入失败（如无字幕/抓取失败）时跳过翻译，
 // 直接把摄入失败的原因透传给前端。对话（#8）是下一步，这里只负责「摄入 + 翻译」。

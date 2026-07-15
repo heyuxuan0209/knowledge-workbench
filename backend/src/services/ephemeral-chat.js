@@ -17,18 +17,40 @@ import { resolveContentBody } from './content-body-resolver.js';
 // 原文抓取策略见 content-body-resolver.js 顶部注释（这是 content-analysis.js 共用的逻辑，
 // 抽成独立模块，不在这里重复实现）。
 
+// 元数据块（HANDOFF-2026-07-15 即时分析管道修复）：喂给模型的材料必须带
+// 标题/作者/平台/链接/日期，不能只有字幕/正文纯文本——只喂纯字幕时模型会从
+// 语音猜人名（曾把 Thariq Shihipar 误作 "Tarik Shaupar"）、声称"没有可验证链接"。
+// 字段缺失时如实写"未知"，让模型知道"没有"而不是自行脑补。
+function metadataBlock({ originalTitle, author, platform, url, publishedAt }) {
+  return [
+    '【元数据】',
+    `- 原题：${originalTitle || '未知'}`,
+    `- 作者/演讲者：${author || '未知（正文中的人名可能是自动字幕的误听，请谨慎对待）'}`,
+    `- 平台/场合：${platform || '未知'}`,
+    `- 链接：${url || '无'}`,
+    `- 日期：${publishedAt || '未知'}`,
+  ].join('\n');
+}
+
 async function formatContentAsMaterial(content, index) {
   const title = content.zh_title || content.en_title || '（无标题）';
-  const sourceLine = content.source_display_name
-    ? `来源：${content.source_display_name}（${content.source_platform}）`
-    : '来源：未识别到具体作者';
 
   const { body, note, isFullText } = await resolveContentBody(content);
   const noteLine = note ? `\n⚠️ ${note}` : '';
   const bodyText = body || '（无正文内容）';
 
+  const meta = metadataBlock({
+    originalTitle: content.en_title || content.zh_title,
+    author: content.source_display_name
+      ? `${content.source_display_name}${content.source_handle ? `（${content.source_handle}）` : ''}`
+      : null,
+    platform: content.source_platform || content.source_app,
+    url: content.url,
+    publishedAt: content.published_at?.slice(0, 10),
+  });
+
   return {
-    text: `## 材料${index + 1}：${title}\n${sourceLine}${noteLine}\n\n${bodyText}`,
+    text: `## 材料${index + 1}：${title}\n${meta}${noteLine}\n【正文/字幕】\n${bodyText}`,
     degraded: isFullText ? null : { title, reason: note || '未获取到原文' },
   };
 }
@@ -36,7 +58,15 @@ async function formatContentAsMaterial(content, index) {
 function formatAdHocAsMaterial(adHoc, index) {
   const title = adHoc.zhTitle || adHoc.enTitle || '（用户提供的内容）';
   const body = adHoc.zhBody || adHoc.body || '';
-  return `## 材料${index + 1}：${title}\n${body}`;
+  const m = adHoc.metadata || {};
+  const meta = metadataBlock({
+    originalTitle: m.originalTitle || adHoc.enTitle,
+    author: m.author,
+    platform: m.platform,
+    url: adHoc.url,
+    publishedAt: m.publishedAt,
+  });
+  return `## 材料${index + 1}：${title}\n${meta}\n【正文/字幕】\n${body}`;
 }
 
 // 构建注入材料前缀后的完整消息数组。异步：多篇 content 的原文抓取用 Promise.all 并行，
