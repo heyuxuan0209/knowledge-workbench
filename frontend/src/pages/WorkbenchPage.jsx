@@ -160,8 +160,18 @@ export default function WorkbenchPage() {
     try {
       const json = await api('/api/content/ingest', { method: 'POST', body: { input } })
       if (!json.success) throw new Error(json.data?.fetchError || json.error || '摄入失败')
-      const title = json.data.zh_title || json.data.en_title || input.slice(0, 28)
-      setSelectedItems(prev => [...prev.filter(x => x.id !== 'paste'), { id: 'paste', title: `[粘贴] ${title}`, adHoc: json.data }])
+      const d = json.data
+      const title = d.zhTitle || d.zh_title || d.enTitle || d.en_title || d.title || input.slice(0, 28)
+      // 只保留解读需要的字段：完整摄入结果里的 transcript（几千段带时间戳）会把
+      // 后续每轮对话请求撑到数 MB（曾触发 PayloadTooLarge）
+      const adHoc = {
+        zhTitle: title,
+        enTitle: d.enTitle || d.en_title || d.title || null,
+        zhBody: d.zhBody || d.zh_body || null,
+        body: (d.zhBody || d.zh_body) ? null : (d.body || null),
+        url: input.startsWith('http') ? input : null,
+      }
+      setSelectedItems(prev => [...prev.filter(x => x.id !== 'paste'), { id: 'paste', title: `[粘贴] ${title}`, adHoc }])
       setRightCollapsed(false)
       setTimeout(() => {
         setAnalysisMode('chat')
