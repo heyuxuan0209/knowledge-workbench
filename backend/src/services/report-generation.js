@@ -177,6 +177,10 @@ function getReportWithIdeas(db, reportId) {
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(reportId);
   if (!report) return null;
   report.focus = JSON.parse(report.focus || '[]');
+  // M3 周报/月报字段（日报为空值，前端按 period_type 取用）
+  report.trends = JSON.parse(report.trends || '[]');
+  report.page_changes = JSON.parse(report.page_changes || '[]');
+  report.emergent = JSON.parse(report.emergent || '{}');
   report.ideas = db.prepare('SELECT * FROM ideas WHERE report_id = ? ORDER BY created_at').all(reportId)
     .map(i => ({
       ...i,

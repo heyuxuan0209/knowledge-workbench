@@ -311,6 +311,107 @@ app.patch('/api/ideas/:id', async (req, res) => {
   }
 });
 
+// ========== M3 知识层：Topic 活页 + 同化（ADR-009） ==========
+
+app.get('/api/topics', async (req, res) => {
+  try {
+    const { listTopics } = await import('./services/topic-pages.js');
+    res.json({ success: true, data: listTopics() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 手动建页（主题库搜索框输入新主题）。零 LLM，建页时回扫已有素材挂为待并入。
+app.post('/api/topics', async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    if (!name?.trim()) {
+      return res.status(400).json({ success: false, error: 'name is required' });
+    }
+    const { createTopic } = await import('./services/topic-pages.js');
+    res.json({ success: true, data: createTopic({ name, description }) });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 选题升级建页（洞察 → 知识库闭环，幂等：同一选题重复升级返回已有活页）
+app.post('/api/topics/from-idea', async (req, res) => {
+  try {
+    const { ideaId } = req.body;
+    if (!ideaId) {
+      return res.status(400).json({ success: false, error: 'ideaId is required' });
+    }
+    const { createTopicFromIdea } = await import('./services/topic-pages.js');
+    res.json({ success: true, data: createTopicFromIdea(ideaId) });
+  } catch (error) {
+    const status = error.message === 'Idea not found' ? 404 : 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// 活页详情：正文 + 修订时间线 + 待并入素材
+app.get('/api/topics/:id', async (req, res) => {
+  try {
+    const { getTopicDetail } = await import('./services/topic-pages.js');
+    const topic = getTopicDetail(req.params.id);
+    if (!topic) return res.status(404).json({ success: false, error: 'Topic not found' });
+    res.json({ success: true, data: topic });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 同化：把待并入素材合进活页正文（一批一次 Deepseek 调用，noteIds 缺省 = 全部）
+app.post('/api/topics/:id/assimilate', async (req, res) => {
+  try {
+    const { assimilate } = await import('./services/assimilation.js');
+    const result = await assimilate(req.params.id, req.body?.noteIds);
+    res.status(result.success ? 200 : 422).json(result);
+  } catch (error) {
+    const status = error.message === 'Topic not found' ? 404 : 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// 归档（不删数据，素材关联与 changelog 保留）
+app.delete('/api/topics/:id', async (req, res) => {
+  try {
+    const { archiveTopic } = await import('./services/topic-pages.js');
+    const done = archiveTopic(req.params.id);
+    res.json({ success: done, message: done ? 'Topic archived' : 'Topic not found' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 手动把素材归入主题（仍走 pending → 并入流程，同化入口唯一）
+app.post('/api/notes/:id/topics', async (req, res) => {
+  try {
+    const { topicId } = req.body;
+    if (!topicId) {
+      return res.status(400).json({ success: false, error: 'topicId is required' });
+    }
+    const { linkNoteToTopic } = await import('./services/topic-pages.js');
+    linkNoteToTopic(req.params.id, topicId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 周报/月报生成（涌现：新活页建议 + 跨页关联 + 矛盾预警 + 深度选题）
+app.post('/api/reports/generate-period', async (req, res) => {
+  try {
+    const { generatePeriodReport } = await import('./services/period-report.js');
+    const result = await generatePeriodReport(req.body?.period || 'weekly');
+    res.status(result.success ? 200 : 422).json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== M1 沉淀层：素材卡片 Notes（ADR-010） ==========
 
 app.get('/api/notes', async (req, res) => {
@@ -332,7 +433,18 @@ app.post('/api/notes', async (req, res) => {
     }
     const { createNote } = await import('./db/notes.js');
     const note = createNote({ excerpt, noteType, contentId, sourceTitle, sourceUrl, stance });
-    res.json({ success: true, data: note });
+
+    // M3 同化前置：保存即自动匹配活跃 Topic（本地 TF 余弦，零 LLM 成本），
+    // 命中的挂 pending 待并入；匹配失败不影响保存
+    let matchedTopics = [];
+    try {
+      const { matchNoteToTopics } = await import('./services/topic-pages.js');
+      matchedTopics = matchNoteToTopics(note.id);
+    } catch (err) {
+      console.error('[Notes] topic match failed:', err.message);
+    }
+
+    res.json({ success: true, data: note, matchedTopics });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
