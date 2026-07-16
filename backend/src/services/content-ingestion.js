@@ -28,7 +28,10 @@ import { JSDOM } from 'jsdom';
 
 const YOUTUBE_HOSTS = ['youtube.com', 'youtu.be', 'm.youtube.com'];
 
-function detectInputType(input) {
+// 导出给 content-body-resolver 复用：平台路由表只此一份（2026-07-16 教训：
+// resolver 曾自带一套 URL 判断，与这里漂移——收口认识小宇宙、resolver 不认识，
+// 导致 Feed 精读/读全文对播客全军覆没）。新增平台只改这里。
+export function detectInputType(input) {
   const trimmed = input.trim();
 
   let url;

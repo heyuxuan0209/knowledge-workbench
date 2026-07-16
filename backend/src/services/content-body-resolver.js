@@ -1,4 +1,4 @@
-import { ingestUrl, ingest } from './content-ingestion.js';
+import { ingestUrl, ingest, detectInputType } from './content-ingestion.js';
 import { translateText, detectLanguage } from './translation.js';
 import { getDatabase } from '../db/init.js';
 
@@ -61,6 +61,29 @@ export async function resolveContentBody(content) {
 
     const isYoutube = content.url && /youtube\.com|youtu\.be/.test(content.url);
     const isBilibili = content.url && /bilibili\.com|b23\.tv/.test(content.url);
+    // 平台判断复用万能收口的分类器（唯一路由表），不在此处另写 URL 正则
+    const isXiaoyuzhou = content.url && detectInputType(content.url) === 'xiaoyuzhou';
+
+    // ⓪ 小宇宙播客（追更入库时 content_type='video'，见 active-query-channels.js）：
+    // 万能收口已有完整管道（音频直链转写 + shownotes 骨架 + 诚实降级声明），直接复用。
+    // 不套 30s 超时——首次转写分钟级（ADR-015），下载/转写超时由 asr.js 内部控制
+    if (isXiaoyuzhou) {
+      try {
+        const ingested = await ingest(content.url);
+        if (ingested.fetchStatus !== 'success') throw new Error(ingested.fetchError);
+        const raw = ingested.body.length > 20000 ? ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）' : ingested.body;
+        const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw);
+        persistZhBody(content.id, ingested.body, zhBody);
+        // 转写标注/「仅 shownotes」声明已由 ingestXiaoyuzhou 内嵌在正文里，此处不再重复
+        return { body: zhBody, isFullText: true, note: null };
+      } catch (podcastError) {
+        return {
+          body: content.zh_summary || '',
+          isFullText: false,
+          note: `无法获取播客音频与 shownotes（${podcastError.message}），以下基于标题与简介，请自行收听原节目核实：${content.url}`
+        };
+      }
+    }
 
     // ① 字幕（仅 YouTube；B站字幕接口需登录态渠道，ADR-014 未解锁）
     if (isYoutube) {
