@@ -24,6 +24,32 @@ const CLI_ENV = { ...process.env, PATH: `${PIP_BIN}:${process.env.PATH || ''}` }
 export const MAX_AUDIO_SECONDS = 900;
 const DOWNLOAD_TIMEOUT = 5 * 60000;
 const TRANSCRIBE_TIMEOUT = 15 * 60000;
+const DIARIZE_TIMEOUT = 25 * 60000; // 分离管道（whisperX+pyannote）CPU 上明显更慢
+
+// 转写调度（M5 完整版，2026-07-16）：
+// diarize=true 且配了 HF_TOKEN → whisperX 说话人分离管道（transcribe-diarize.py），
+// 输出【说话人A】【说话人B】标签文本；无 token 或分离失败 → 回落普通管道，
+// 渐进增强不硬依赖。播客（访谈居多）默认请求分离，视频口播默认不用。
+async function runTranscriber(audioFile, { diarize = false } = {}) {
+  if (diarize && process.env.HF_TOKEN) {
+    try {
+      const { stdout } = await pexec('python3', [
+        join(__dirname, '../../scripts/transcribe-diarize.py'), audioFile, '--max-seconds', String(MAX_AUDIO_SECONDS),
+      ], { env: CLI_ENV, timeout: DIARIZE_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
+      const result = JSON.parse(stdout);
+      if (!result.error && result.text?.length >= 20) return { ...result, diarized: true };
+      console.log(`[asr] 分离管道无有效输出（${result.error || '文本过短'}），回落普通转写`);
+    } catch (err) {
+      console.log(`[asr] 分离管道失败（${(err.stderr || err.message || '').toString().slice(0, 150)}），回落普通转写`);
+    }
+  }
+  const { stdout } = await pexec('python3', [
+    join(__dirname, '../../scripts/transcribe.py'), audioFile, '--max-seconds', String(MAX_AUDIO_SECONDS),
+  ], { env: CLI_ENV, timeout: TRANSCRIBE_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
+  const result = JSON.parse(stdout);
+  if (!result.text || result.text.length < 20) throw new Error('转写结果为空（可能是纯音乐/无人声内容）');
+  return { ...result, diarized: false };
+}
 
 async function findAudioFile(dir) {
   const files = await readdir(dir, { recursive: true });
@@ -67,7 +93,7 @@ async function downloadAudio(url, workDir) {
 
 // 直链音频转写（小宇宙等给出 m4a/mp3 直链的场景，M5）：下载 → 本地转写。
 // 返回同 transcribeVideo；失败上抛由调用方降级。
-export async function transcribeAudioUrl(audioUrl) {
+export async function transcribeAudioUrl(audioUrl, { diarize = false } = {}) {
   const workDir = join(tmpdir(), 'kw-asr', `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   await mkdir(workDir, { recursive: true });
   try {
@@ -87,12 +113,7 @@ export async function transcribeAudioUrl(audioUrl) {
       res.data.on('error', reject);
     });
 
-    const { stdout } = await pexec('python3', [
-      join(__dirname, '../../scripts/transcribe.py'), file, '--max-seconds', String(MAX_AUDIO_SECONDS),
-    ], { env: CLI_ENV, timeout: TRANSCRIBE_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
-    const result = JSON.parse(stdout);
-    if (!result.text || result.text.length < 20) throw new Error('转写结果为空');
-    return result;
+    return await runTranscriber(file, { diarize });
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
@@ -105,17 +126,7 @@ export async function transcribeVideo(url) {
 
   try {
     const audioFile = await downloadAudio(url, workDir);
-    const { stdout } = await pexec('python3', [
-      join(__dirname, '../../scripts/transcribe.py'),
-      audioFile,
-      '--max-seconds', String(MAX_AUDIO_SECONDS),
-    ], { env: CLI_ENV, timeout: TRANSCRIBE_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
-
-    const result = JSON.parse(stdout);
-    if (!result.text || result.text.length < 20) {
-      throw new Error('转写结果为空（可能是纯音乐/无人声内容）');
-    }
-    return result;
+    return await runTranscriber(audioFile, { diarize: false }); // 视频多为单人口播，不做分离
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
