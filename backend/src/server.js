@@ -156,6 +156,34 @@ app.post('/api/chat/ephemeral', async (req, res) => {
   }
 });
 
+// 站内全文阅读（2026-07-16 用户反馈：非 AI HOT 的 Feed 内容要能读全文，英文出译文）。
+// 复用 resolveContentBody 全套策略：抓原文（readability→Jina 兜底）/视频字幕→ASR、
+// 英文自动翻译、结果缓存 zh_body（首次约半分钟，视频分钟级；之后秒开）。
+app.get('/api/contents/:id/fulltext', async (req, res) => {
+  try {
+    const { getContentById } = await import('./db/contents.js');
+    const content = getContentById(req.params.id);
+    if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+    const { resolveContentBody } = await import('./services/content-body-resolver.js');
+    const result = await resolveContentBody(content);
+    res.json({
+      success: true,
+      data: {
+        title: content.zh_title || content.en_title,
+        enTitle: content.en_title,
+        body: result.body,
+        isFullText: result.isFullText,
+        note: result.note,
+        url: content.url,
+        contentType: content.content_type,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 单篇内容的摘要生成（基于原文，见 content-body-resolver.js 的抓取/降级策略）。
 // 非流式：摘要生成一次性返回即可，不需要 SSE。
 app.post('/api/content/:id/summary', async (req, res) => {

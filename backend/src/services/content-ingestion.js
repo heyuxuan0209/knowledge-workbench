@@ -80,8 +80,10 @@ async function ingestXiaoyuzhou(input) {
   if (audioUrl) {
     try {
       const { transcribeAudioUrl } = await import('./asr.js');
-      const asr = await transcribeAudioUrl(audioUrl);
-      transcriptPart = `【音频转写${asr.truncated ? `（节目共 ${durationMin ?? '?'} 分钟，以下为前 15 分钟，可能存在少量听写误差）` : '（可能存在少量听写误差）'}】\n${asr.text}`;
+      // 播客访谈居多 → 请求说话人分离（配了 HF_TOKEN 才生效，否则自动回落普通转写）
+      const asr = await transcribeAudioUrl(audioUrl, { diarize: true });
+      const speakerNote = asr.diarized ? `，${asr.speakers} 位说话人已区分` : '';
+      transcriptPart = `【音频转写${asr.truncated ? `（节目共 ${durationMin ?? '?'} 分钟，以下为前 15 分钟${speakerNote}，可能存在少量听写误差）` : `（${speakerNote.replace(/^，/, '') || '可能存在少量听写误差'}）`}】\n${asr.text}`;
     } catch (err) {
       console.log(`[ingest] 小宇宙音频转写失败（${err.message}），降级为 shownotes`);
     }
@@ -195,8 +197,12 @@ function classifyYoutubeError(error) {
 //   Title: xxx / URL Source: xxx / Markdown Content:\n<正文>
 async function fetchViaJina(url) {
   const response = await axios.get(`https://r.jina.ai/${url}`, {
-    timeout: 15000, // 与 content-body-resolver 的 FETCH_TIMEOUT_MS 对齐，Jina 渲染慢于直抓
-    headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    timeout: 25000, // Jina 渲染慢于直抓；上层 resolver 的 40s 超时覆盖"直抓失败+兜底"全链
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      // 源头剔除导航/cookie 同意组件（Cookiebot 等的整段文案会被当正文抓走）
+      'X-Remove-Selector': 'header, footer, nav, aside, [id*="cookie" i], [class*="cookie" i], [id*="consent" i], [class*="consent" i]',
+    },
   });
 
   const raw = String(response.data || '');
@@ -210,7 +216,18 @@ async function fetchViaJina(url) {
   // 注意 [ \t] 不能写 \s：\s 会匹配换行，标题为空时会吞掉换行误抓下一行元数据
   const title = raw.match(/^Title:[ \t]*(.+)$/m)?.[1]?.trim() || null;
   const marker = raw.indexOf('Markdown Content:');
-  const body = (marker >= 0 ? raw.slice(marker + 'Markdown Content:'.length) : raw).trim();
+  const body = (marker >= 0 ? raw.slice(marker + 'Markdown Content:'.length) : raw)
+    // Jina 的 Markdown 会带图片标记/链接/cookie 横幅等噪音，全文阅读与翻译都不需要：
+    // 图片整体删除；行内链接降为纯文本（URL 对阅读是噪音、对翻译是浪费 token）；
+    // 短链接列表行（导航/cookie 同意条）整行删除
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    // [[#占位符#]](url)（IAB/cookie 组件）整体删除——注意双层括号会让普通链接正则失配
+    .replace(/\[\[[^\]]*\]\]\([^)]*\)/g, '')
+    .replace(/^\s*\*?\s*\[[^\]]{0,12}\]\([^)]*\)\s*$/gm, '')
+    .replace(/\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[#[^\]]*#\]/g, '') // [#GPC_BANNER_ICON#] 类组件占位符
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   // 门槛 300 字：验证页/占位页（如微信"Parameter error"页 ~100 字样板文案）会伪装成
   // 成功返回，真实文章正文极少短于此；宁可如实失败也不把垃圾喂给翻译/解读

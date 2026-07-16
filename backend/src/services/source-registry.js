@@ -41,6 +41,33 @@ function looksLikeFeedUrl(url) {
   return /\/(feed|rss|atom)(\.xml)?\/?$/i.test(url) || /\.(rss|atom)$/i.test(url);
 }
 
+// 探测链第 2 步（RESEARCH-MULTI-SOURCE-AGGREGATION §二）：常见路径猜测。
+// 实证：仅 35.9% 的网站通过 <link rel=alternate> 暴露 feed，只靠自动发现会漏掉
+// 大多数真实存在的 feed（Product Hunt 有 /feed 但首页无 link 标签，就死在这）。
+const FEED_PROBE_PATHS = ['/feed', '/rss', '/atom.xml', '/index.xml', '/feed.xml', '/rss.xml'];
+
+async function probeFeedPaths(origin) {
+  for (const path of FEED_PROBE_PATHS) {
+    const candidate = origin + path;
+    try {
+      const res = await fetch(candidate, {
+        signal: AbortSignal.timeout(5000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KnowledgeWorkbench/0.1)' },
+        redirect: 'follow',
+      });
+      if (!res.ok) continue;
+      const contentType = res.headers.get('content-type') || '';
+      const head = (await res.text()).slice(0, 500);
+      const isFeed = contentType.includes('xml') || /^\s*<\?xml|<rss[\s>]|<feed[\s>]/i.test(head);
+      if (isFeed) {
+        const title = head.match(/<title[^>]*>(?:<!\[CDATA\[)?([^<\]]+)/i)?.[1]?.trim();
+        return { feedUrl: candidate, feedTitle: title || null };
+      }
+    } catch { /* 下一个路径 */ }
+  }
+  return null;
+}
+
 // 自动识别输入 → 身份预览（不落库）。返回结构给前端确认后再 register。
 export async function identifyInput(rawInput) {
   const input = rawInput.trim();
@@ -171,16 +198,46 @@ export async function identifyInput(rawInput) {
         siteUrl: input,
       };
     }
+
+    // 探测链第 2 步：link 标签没有 ≠ 没有 feed，按常见路径猜（Product Hunt 类救回来）
+    const probed = await probeFeedPaths(url.origin);
+    if (probed) {
+      return {
+        sourceType: 'Blog',
+        displayName: probed.feedTitle || title,
+        platform: 'Blog',
+        handle: probed.feedUrl,
+        trackMode: 'active-rss',
+        feedUrl: probed.feedUrl,
+        siteUrl: input,
+        note: `页面未声明 feed，但探测到 ${probed.feedUrl.replace(url.origin, '')} 可用`,
+      };
+    }
+
     return {
       sourceType: 'Blog',
       displayName: title,
       platform: 'Blog',
       handle: input,
       trackMode: 'link-only',
-      note: '该网站未发现 RSS feed，只能标记 + 跳转，无法持续追踪',
+      note: '该网站未发现 RSS feed（含常见路径探测），只能标记 + 跳转，无法持续追踪',
     };
   } catch (err) {
-    throw new Error(`无法访问该网页（${err.message}），请检查链接或网络`);
+    // 首页抓不到（反爬/超时）≠ 没有 feed：探测链照走一遍再下结论
+    const probed = await probeFeedPaths(url.origin).catch(() => null);
+    if (probed) {
+      return {
+        sourceType: 'Blog',
+        displayName: probed.feedTitle || host,
+        platform: 'Blog',
+        handle: probed.feedUrl,
+        trackMode: 'active-rss',
+        feedUrl: probed.feedUrl,
+        siteUrl: input,
+        note: `站点首页拒绝抓取，但探测到 feed：${probed.feedUrl}`,
+      };
+    }
+    throw new Error(`无法访问该网页（${err.message}），且常见 feed 路径均不可用，请检查链接或网络`);
   }
 }
 

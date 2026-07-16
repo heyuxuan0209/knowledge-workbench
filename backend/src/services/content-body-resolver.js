@@ -28,7 +28,9 @@ function persistZhBody(contentId, rawFullText, zhBody) {
 // - article/paper/repo 且有 url：实时抓取原文（复用 content-ingestion.js 的 ingestUrl），
 //   抓取成功才用原文，失败或超时则降级回摘要，且必须显式告知"无法获取原文"——不掩盖事实
 const FETCHABLE_TYPES = ['article', 'paper', 'repo'];
-const FETCH_TIMEOUT_MS = 15000;
+// 40s：ingestUrl 现在是两段式（直抓失败 → Jina 兜底再试一次），15s 只够单段，
+// 曾把本可成功的 Jina 兜底掐死在半路、静默退化成摘要
+const FETCH_TIMEOUT_MS = 40000;
 
 async function withTimeout(promise, ms) {
   return Promise.race([
