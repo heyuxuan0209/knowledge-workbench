@@ -2,46 +2,71 @@ import { useState, useEffect } from 'react'
 import { timeAgo, TYPE_LABEL, api } from './util'
 import { IconTag, IconExternal, IconCaret } from './Icons'
 
-// 站内全文阅读器（2026-07-16）：非 AI HOT 内容的全文入口。
-// 首次打开走 抓取→翻译→缓存（文章约半分钟、视频转写分钟级），之后秒开。
+// 站内阅读器（2026-07-16 用户反馈改版）：默认「精读稿」——与即时分析同模板的
+// 结构化中文解读（讲述脉络/关键案例/表述/idea 钩子），不是逐字译文；
+// 「原文译文」作为次级标签保留。首次生成走 全文获取+LLM（文章约 1 分钟、
+// 视频转写分钟级），产物缓存后秒开。
 function ReaderModal({ content, onClose }) {
-  const [state, setState] = useState({ loading: true, data: null, error: null })
+  const [tab, setTab] = useState('interp') // 'interp' | 'raw'
+  const [interp, setInterp] = useState({ loading: true, data: null, error: null })
+  const [raw, setRaw] = useState({ loading: false, data: null, error: null })
+
   useEffect(() => {
     let alive = true
-    api(`/api/contents/${content.id}/fulltext`)
-      .then(j => { if (alive) setState({ loading: false, data: j.data, error: null }) })
-      .catch(err => { if (alive) setState({ loading: false, data: null, error: err.message }) })
+    api(`/api/contents/${content.id}/interpretation`)
+      .then(j => { if (alive) setInterp({ loading: false, data: j.data, error: null }) })
+      .catch(err => { if (alive) setInterp({ loading: false, data: null, error: err.message }) })
     return () => { alive = false }
   }, [content.id])
-  const d = state.data
+
+  useEffect(() => {
+    if (tab !== 'raw' || raw.data || raw.loading) return
+    setRaw({ loading: true, data: null, error: null })
+    api(`/api/contents/${content.id}/fulltext`)
+      .then(j => setRaw({ loading: false, data: j.data, error: null }))
+      .catch(err => setRaw({ loading: false, data: null, error: err.message }))
+  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadingHint = content.content_type === 'video'
+    ? '正在提取字幕/转写并生成精读稿…（视频首次可能要几分钟，之后秒开）'
+    : '正在获取全文并生成精读稿…（首次约 1 分钟，之后秒开）'
+
   return (
     <div className="wb-modal-mask" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="wb-modal" style={{ maxWidth: 720, maxHeight: '82vh', display: 'flex', flexDirection: 'column' }}>
         <div className="wb-modal-head">
           <div className="wb-modal-title" style={{ fontFamily: 'var(--serif)' }}>{content.zh_title || content.en_title}</div>
+          <div className="wb-seg-toggle" style={{ marginLeft: 'auto', marginRight: 10 }}>
+            <button className={tab === 'interp' ? 'active' : ''} onClick={() => setTab('interp')}>精读稿</button>
+            <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}>原文译文</button>
+          </div>
           <button className="wb-modal-close" onClick={onClose}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '4px 2px' }}>
-          {state.loading && (
-            <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--sub2)', fontSize: 13 }}>
-              正在获取全文并翻译…{content.content_type === 'video' ? '（视频需提取字幕/转写，首次可能要几分钟）' : '（首次约半分钟，之后秒开）'}
+          {tab === 'interp' && <>
+            {interp.loading && <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--sub2)', fontSize: 13 }}>{loadingHint}</div>}
+            {interp.error && <div className="wb-warnbar">生成失败：{interp.error}</div>}
+            {interp.data && <>
+              {interp.data.note && <div className="wb-warnbar" style={{ marginBottom: 10 }}>{interp.data.note}</div>}
+              <div style={{ fontSize: 14, lineHeight: 1.85, color: 'var(--body2)', whiteSpace: 'pre-wrap' }}>{interp.data.text}</div>
+            </>}
+          </>}
+          {tab === 'raw' && <>
+            {raw.loading && <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--sub2)', fontSize: 13 }}>正在获取原文译文…</div>}
+            {raw.error && <div className="wb-warnbar">获取失败：{raw.error}</div>}
+            {raw.data && <>
+              {raw.data.enTitle && raw.data.enTitle !== raw.data.title && (
+                <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 10 }}>原题：{raw.data.enTitle}</div>
+              )}
+              {raw.data.note && <div className="wb-warnbar" style={{ marginBottom: 10 }}>{raw.data.note}</div>}
+              <div style={{ fontSize: 14, lineHeight: 1.85, color: 'var(--body2)', whiteSpace: 'pre-wrap' }}>{raw.data.body || '（未获取到正文）'}</div>
+            </>}
+          </>}
+          {content.url && (
+            <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--line08)' }}>
+              <a className="wb-brief-link" href={content.url} target="_blank" rel="noreferrer">跳转原文 ↗</a>
             </div>
           )}
-          {state.error && <div className="wb-warnbar">获取失败：{state.error}</div>}
-          {d && <>
-            {d.enTitle && d.enTitle !== d.title && (
-              <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 10 }}>原题：{d.enTitle}</div>
-            )}
-            {d.note && <div className="wb-warnbar" style={{ marginBottom: 10 }}>{d.note}</div>}
-            <div style={{ fontSize: 14, lineHeight: 1.85, color: 'var(--body2)', whiteSpace: 'pre-wrap' }}>
-              {d.body || '（未获取到正文）'}
-            </div>
-            {d.url && (
-              <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--line08)' }}>
-                <a className="wb-brief-link" href={d.url} target="_blank" rel="noreferrer">跳转原文 ↗</a>
-              </div>
-            )}
-          </>}
         </div>
       </div>
     </div>
@@ -246,8 +271,8 @@ export default function FeedView({
                 </a>
               )}
               {!c.permalink && c.url && c.content_type !== 'tweet' && (
-                <button className="wb-btn-ghost" title="站内读全文（英文自动翻译，首次约半分钟）"
-                  onClick={() => setReaderContent(c)}>读全文</button>
+                <button className="wb-btn-ghost" title="结构化精读稿（与即时分析同款）+ 原文译文，首次生成约 1 分钟"
+                  onClick={() => setReaderContent(c)}>精读</button>
               )}
               {c.url && (
                 <a className="wb-btn-ghost" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}

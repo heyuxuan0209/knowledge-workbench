@@ -43,15 +43,23 @@ app.get('/api/contents', async (req, res) => {
 // <运行时注入：X> 占位符在此解析（当前背景为静态文本，未来可接用户配置）。
 app.get('/api/prompts/instant-analysis', async (req, res) => {
   try {
-    const { readFileSync } = await import('fs');
-    const { fileURLToPath } = await import('url');
-    const { dirname, join } = await import('path');
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const raw = readFileSync(join(__dirname, '../../reference/prompts/instant-analysis.md'), 'utf-8');
-    const prompt = raw.replace(/<运行时注入：([^>]+)>/g, '$1');
-    res.json({ success: true, data: { prompt } });
+    const { loadInstantAnalysisPrompt } = await import('./services/interpretation.js');
+    res.json({ success: true, data: { prompt: loadInstantAnalysisPrompt() } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 结构化精读稿（2026-07-16：读全文 = 精读稿，与即时分析同模板同形式）。
+// 首次：全文获取（含翻译/字幕/ASR）+ 一次 Deepseek 生成，之后缓存秒开；?force=1 重新生成
+app.get('/api/contents/:id/interpretation', async (req, res) => {
+  try {
+    const { getOrGenerateInterpretation } = await import('./services/interpretation.js');
+    const result = await getOrGenerateInterpretation(req.params.id, { force: req.query.force === '1' });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    const status = error.message === 'Content not found' ? 404 : 500;
+    res.status(status).json({ success: false, error: error.message });
   }
 });
 

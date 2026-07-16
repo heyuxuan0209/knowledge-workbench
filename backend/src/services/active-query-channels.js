@@ -55,7 +55,9 @@ export async function queryBilibili({ handle, displayName }, limit = 5) {
       original_lang: 'zh',
       has_translation: 0,
       zh_title: v.title || null,
-      zh_summary: (v.description || '').trim().slice(0, 300) || null,
+      // 完整描述给到摘要生成用（sync 侧对新条目 batchSummarize 出完整一句话，
+      // 不再硬截断半句话进 Feed）
+      zh_summary: (v.description || '').trim().slice(0, 800) || null,
       en_title: null,
       input_method: 'feed',
       source_app: 'active_query',

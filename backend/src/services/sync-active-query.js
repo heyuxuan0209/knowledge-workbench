@@ -122,6 +122,25 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
   const translateSet = [...new Set([...toTranslate, ...toEnrich])];
   await translateNewItems(translateSet);
 
+  // 新条目生成完整一句话摘要（2026-07-16 用户反馈：原始描述被硬截断当摘要，
+  // Feed 卡片显示半句话）。沿用 M2 "摘要必有"惯例，batchSummarize 一次调用
+  if (newItems.length) {
+    try {
+      const { batchSummarize } = await import('./ai-relevance.js');
+      const summaries = await batchSummarize(newItems.map(i => ({
+        id: i.content.id,
+        title: i.content.zh_title || i.content.en_title || '',
+        excerpt: i.content.zh_summary || i.content.en_summary || '',
+      })));
+      for (const i of newItems) {
+        const s = summaries.get(i.content.id);
+        if (s) i.content.zh_summary = s;
+      }
+    } catch (err) {
+      console.error('  ⚠️ 摘要生成失败（保留原始描述）:', err.message);
+    }
+  }
+
   // upsert 全量（旧条目按 ON CONFLICT 更新 external_score 等，新条目插入）
   const upserted = allItems.length ? upsertContents(allItems) : 0;
 
