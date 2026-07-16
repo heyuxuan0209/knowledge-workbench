@@ -82,8 +82,14 @@ async function ingestXiaoyuzhou(input) {
       const { transcribeAudioUrl } = await import('./asr.js');
       // 播客访谈居多 → 请求说话人分离（配了 HF_TOKEN 才生效，否则自动回落普通转写）
       const asr = await transcribeAudioUrl(audioUrl, { diarize: true });
+      // 非分离的中文转写补排版（加标点分段）；分离文本已有说话人分行结构
+      let asrText = asr.text;
+      if (!asr.diarized && /[一-龥]/.test(asrText.slice(0, 200))) {
+        const { formatTranscript } = await import('./translation.js');
+        asrText = await formatTranscript(asrText);
+      }
       const speakerNote = asr.diarized ? `，${asr.speakers} 位说话人已区分` : '';
-      transcriptPart = `【音频转写${asr.truncated ? `（节目共 ${durationMin ?? '?'} 分钟，以下为前 15 分钟${speakerNote}，可能存在少量听写误差）` : `（${speakerNote.replace(/^，/, '') || '可能存在少量听写误差'}）`}】\n${asr.text}`;
+      transcriptPart = `【音频转写${asr.truncated ? `（节目共 ${durationMin ?? '?'} 分钟，以下为前 15 分钟${speakerNote}，可能存在少量听写误差）` : `（${speakerNote.replace(/^，/, '') || '可能存在少量听写误差'}）`}】\n${asrText}`;
     } catch (err) {
       console.log(`[ingest] 小宇宙音频转写失败（${err.message}），降级为 shownotes`);
     }
@@ -91,6 +97,11 @@ async function ingestXiaoyuzhou(input) {
 
   const parts = [transcriptPart, shownotes ? `【节目 shownotes】\n${shownotes}` : null].filter(Boolean);
   if (!parts.length) return fail('该单集既无法转写音频也没有 shownotes');
+  // 诚实声明（决策5）：没拿到转写时必须显式告知——否则解读层会基于 shownotes
+  // 脑补出"完整内容"的假象（2026-07-16 用户实际踩到）
+  if (!transcriptPart) {
+    parts.unshift('【重要声明】本次未能获取音频转写，以下仅为节目 shownotes（大纲/简介），不代表节目完整内容。解读时请明确基于 shownotes 的局限性，不要推测正文细节。');
+  }
 
   return {
     title: ep.title,

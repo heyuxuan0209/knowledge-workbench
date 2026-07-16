@@ -83,7 +83,9 @@ export async function resolveContentBody(content) {
         const { transcribeVideo, MAX_AUDIO_SECONDS } = await import('./asr.js');
         const asr = await transcribeVideo(content.url);
         const raw = asr.text.length > 20000 ? asr.text.slice(0, 20000) + '\n…（内容过长，已截取前段解读）' : asr.text;
-        const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw);
+        // 中文转写走排版（加标点分段，不改字词）；英文走翻译（翻译天然重排）
+        const { formatTranscript } = await import('./translation.js');
+        const zhBody = detectLanguage(raw) === 'zh' ? await formatTranscript(raw) : await translateText(raw);
         persistZhBody(content.id, asr.text, zhBody);
         return {
           body: zhBody,

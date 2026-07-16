@@ -30,8 +30,9 @@ def main():
     segments, info = model.transcribe(
         args.audio,
         vad_filter=True,  # 跳过静音段，B站片头/BGM 场景显著提速
-        # 引导中文输出简体（whisper 对中文默认时常吐繁体）；对英文音频无副作用
-        initial_prompt="以下是简体中文普通话的内容。",
+        # 引导中文输出简体（whisper 对中文默认时常吐繁体）+ 标点（否则大段无标点难读）；
+        # 对英文音频无副作用
+        initial_prompt="以下是简体中文普通话的内容，使用规范的标点符号。",
     )
 
     texts = []

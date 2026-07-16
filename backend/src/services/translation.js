@@ -101,6 +101,27 @@ export async function translateText(text) {
   return translated.join('');
 }
 
+// ASR 转写排版（2026-07-16 用户反馈：B站等转写无标点难读）：加标点、按语义分段，
+// 严禁增删改字词（同音字听写错误保留原样，由解读层按上下文理解）。
+// 分块处理，失败返回原文不阻塞。
+export async function formatTranscript(text) {
+  if (!text || text.trim().length === 0) return text;
+  const chunks = splitIntoChunks(text, MAX_CHUNK_LENGTH);
+  const formatted = [];
+  for (const chunk of chunks) {
+    try {
+      const result = await chat([{
+        role: 'user',
+        content: `为下面的语音转写文本添加标点符号并按语义分段（空行分隔段落）。硬约束：不得增加、删除或改动任何字词——包括明显的同音字错误也保留原样；只输出排版后的文本。\n\n${chunk}`,
+      }]);
+      formatted.push(result.success ? result.content.trim() : chunk);
+    } catch {
+      formatted.push(chunk);
+    }
+  }
+  return formatted.join('\n\n');
+}
+
 // 仅用于 YouTube transcript：按时间戳将原始转录分成若干逻辑章节，标题译成中文。
 // 过长的 transcript（>8000 字符）直接跳过，返回空数组——Phase 1 不追求处理任意长度视频，
 // 分段质量随文本变长而下降，与其做差不如先不做。
