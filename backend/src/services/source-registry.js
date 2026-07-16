@@ -73,15 +73,28 @@ export async function identifyInput(rawInput) {
   const input = rawInput.trim();
   if (!input) throw new Error('input is required');
 
-  // ---- 非 URL：按公众号名称处理（ADR-007：公众号恒 link-only） ----
+  // ---- 非 URL：先认 @handle（X 账号），再按公众号名称处理 ----
+  // 2026-07-16 反馈：用户输入 @AnthropicAI 被当成公众号登记——@ 开头的 ASCII handle
+  // 是 X 的通用写法，必须识别为 X 账号（借道 AI HOT，与 x.com 链接同路）
   if (!/^https?:\/\//i.test(input)) {
+    const atHandle = input.match(/^@([A-Za-z0-9_]{1,15})$/);
+    if (atHandle) {
+      return {
+        sourceType: 'Person',
+        displayName: atHandle[1],
+        platform: 'X',
+        handle: atHandle[1],
+        trackMode: 'passive',
+        note: 'X 暂不支持直接抓取（需登录态）。已登记借道 AI HOT：该作者被 AI HOT 转载的热门内容会自动归属此源、进 Feed 并加权',
+      };
+    }
     return {
       sourceType: 'Media',
       displayName: input,
       platform: 'WeChat',
       handle: input,
       trackMode: 'link-only',
-      note: '公众号不抓取，只标记 + 等 AI HOT 推送 + 跳转原文',
+      note: '公众号不抓取，只标记 + 等 AI HOT 推送 + 跳转原文。若想登记 X 账号，请输入 @用户名 或 x.com 链接',
     };
   }
 
