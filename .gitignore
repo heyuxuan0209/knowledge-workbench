@@ -33,10 +33,14 @@ explorations/temp/
 scratch/
 *.draft.md
 
-# 归档（不提交截图和临时笔记）
-archive/screenshots/
-archive/meeting-notes/
-archive/old-versions/
+# 仅本地保留，不入公开仓库（2026-07-16 决定：开发脚手架/未发布内容/竞品调研/旧项目/
+# 尚不成熟的架构文档——公开仓库只保留代码 + prompt + skills，这些留本地）
+handoff/            # 会话交接脚手架（含真名与内部决策）
+docs/               # 架构/调研文档，暂不成熟，本地打磨
+drafts/             # 未发布内容草稿（发布前不公开）
+archive/            # 上一代废弃项目 + 旧真实数据
+iterations/         # 开发迭代日志
+reference/video-digests/   # 第三方视频转写精读（版权灰色 + 个人笔记）
 
 # IDE
 .vscode/
