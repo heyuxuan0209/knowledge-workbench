@@ -37,6 +37,30 @@ export default function WorkbenchPage() {
   const [toast, setToast] = useState('')
   const toastTimer = useRef(null)
 
+  // 可拖拽三栏（2026-07-16 反馈 #3，修订 ADR-004 固定宽）：宽度记 localStorage；
+  // 右栏另有"展开至半屏"一键切换——长解读比逐像素拖更常用
+  const [leftW, setLeftW] = useState(() => parseInt(localStorage.getItem('wb-left-w')) || 196)
+  const [rightW, setRightW] = useState(() => parseInt(localStorage.getItem('wb-right-w')) || 322)
+  const [rightWide, setRightWide] = useState(false)
+  const startDrag = (side) => (e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = side === 'left' ? leftW : rightW
+    const calc = (ev) => side === 'left'
+      ? Math.min(340, Math.max(150, startW + ev.clientX - startX))
+      : Math.min(680, Math.max(262, startW - ev.clientX + startX))
+    const move = (ev) => (side === 'left' ? setLeftW : setRightW)(calc(ev))
+    const up = (ev) => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      document.body.style.cursor = ''
+      localStorage.setItem(side === 'left' ? 'wb-left-w' : 'wb-right-w', String(calc(ev)))
+    }
+    document.body.style.cursor = 'col-resize'
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
   // 数据
   const [contents, setContents] = useState([])
   const [report, setReport] = useState(null)
@@ -83,6 +107,15 @@ export default function WorkbenchPage() {
   const loadDrafts = useCallback(async () => {
     try { setDrafts((await api('/api/drafts')).data || []) } catch (err) { console.error(err) }
   }, [])
+  // 平台模板动态化（P1 文件化）：列表来自 reference/prompts/creation/platforms/ 目录，
+  // 加文件=加平台；接口失败时回落内置三平台，创作台不至于空白
+  const [platforms, setPlatforms] = useState(FALLBACK_PLATFORMS)
+  const loadPlatforms = useCallback(async () => {
+    try {
+      const list = (await api('/api/studio/platforms')).data
+      if (list?.length) setPlatforms(list)
+    } catch (err) { console.error('platforms:', err) }
+  }, [])
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -117,7 +150,42 @@ export default function WorkbenchPage() {
     try { setTopics((await api('/api/topics')).data || []) } catch (err) { console.error(err) }
   }, [])
 
-  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics(); loadDrafts() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics, loadDrafts])
+  // 星标切换（M7 轻量收藏）：返回新状态供 FeedView 同步本地筛选列表
+  const toggleStar = useCallback(async (id) => {
+    try {
+      const json = await api(`/api/contents/${id}/star`, { method: 'POST' })
+      setContents(prev => prev.map(c => c.id === id ? { ...c, starred: json.data.starred } : c))
+      return json.data.starred
+    } catch (err) { showToast(`星标失败：${err.message}`); return null }
+  }, [showToast])
+
+  // 素材库 tab（2026-07-16 反馈：选题建议迁入素材库，Feed 一行入口跳过来）
+  const [notesTab, setNotesTab] = useState('mine') // 'mine' | 'ideas'
+
+  // 素材卡选中分析（2026-07-16 反馈：素材要能用右侧 AI 助手）：
+  // 有原文回链的走 Feed 同款管道（全文获取）；多篇聚合产物把摘录本身作 adHoc 材料
+  const toggleSelectNote = (note) => {
+    if (note.content_id) {
+      toggleSelect({
+        id: note.content_id,
+        zh_title: note.title || note.content_zh_title || note.source_title,
+        content_type: note.content_content_type,
+        url: note.content_url,
+      })
+      return
+    }
+    const id = `note-${note.id}`
+    setSelectedItems(prev => prev.find(x => x.id === id)
+      ? prev.filter(x => x.id !== id)
+      : [...prev, {
+          id,
+          title: `[素材] ${(note.title || note.source_title || '摘录').slice(0, 24)}`,
+          adHoc: { zhTitle: note.title || note.source_title || '素材摘录', zhBody: note.excerpt, url: note.source_url || null, metadata: null },
+          capability: { level: 'full', label: '素材' },
+        }])
+  }
+
+  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics(); loadDrafts(); loadPlatforms() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics, loadDrafts, loadPlatforms])
 
   // ---- 快速分析 ----
   const toggleSelect = (c) => {
@@ -127,19 +195,31 @@ export default function WorkbenchPage() {
   }
   const removeSel = (id) => setSelectedItems(prev => prev.filter(x => x.id !== id))
 
+  // 对话上下文指纹：主题探讨与选中内容分析共用一个右栏对话区，上下文变了
+  // （换主题 / 主题↔选中切换）就自动重开对话，避免材料串台
+  const chatContextRef = useRef(null)
+
   const runChat = async (userText, { fresh = false } = {}) => {
     const items = selectedItems
-    if (!items.length) return
+    // 主题详情页 = 探讨模式（P0，V3「沉淀=探讨」入口）：材料为主题综述+已并入素材。
+    // 主题页优先于选中列表——右栏此时显示的就是"上下文：本主题"
+    const onTopicPage = page === 'topics' && topicView === 'page' && activeTopic
+    if (!items.length && !onTopicPage) return
+    const topicId = onTopicPage ? activeTopic.id : null
+
+    const contextKey = topicId ? `topic:${topicId}` : `items:${items.map(x => x.id).join(',')}`
+    if (chatContextRef.current !== contextKey) { fresh = true; chatContextRef.current = contextKey }
+
     const history = fresh ? [] : chatHistory.current
     const userMsg = { role: 'user', content: userText }
     chatHistory.current = [...history, userMsg]
     setAnalysisMode('chat')
     setChat(prev => [...(fresh ? [] : prev), { role: 'user', text: userText }, { role: 'ai', text: '', pending: true }])
     try {
-      const contentIds = items.filter(x => !x.adHoc).map(x => x.id)
-      const adHocContents = items.filter(x => x.adHoc).map(x => x.adHoc)
+      const contentIds = topicId ? [] : items.filter(x => !x.adHoc).map(x => x.id)
+      const adHocContents = topicId ? [] : items.filter(x => x.adHoc).map(x => x.adHoc)
       const full = await streamEphemeralChat(
-        { contentIds, adHocContents, messages: chatHistory.current },
+        { contentIds, adHocContents, topicId, messages: chatHistory.current },
         (text) => setChat(prev => patchLast(prev, { text, pending: true })),
         (deg) => setDegraded(deg)
       )
@@ -346,7 +426,24 @@ export default function WorkbenchPage() {
         showToast(`生成失败：${err.message}，已填入模板`)
       }
     }
-    setStudio(s => ({ ...s, draft: DRAFT_TEMPLATES[platform] }))
+    // 手动/粘贴稿（无生成来源）：有实质内容 → 平台裂变（把当前稿改写为目标平台版，
+    // 2026-07-16 用户实测：粘贴文章点「小红书图文」曾无反应）；内容太短 → 占位模板。
+    // 转换成功后 draftId 置空 = 成为新稿——保存时另存，不覆盖草稿箱里的原稿
+    if (studio.draft.trim().length >= 50) {
+      const label = platforms.find(p => p.key === platform)?.label || platform
+      if (!confirm(`把当前草稿改写为「${label}」版本？\n改写后是一份新稿（原稿仍在草稿箱），也可「撤销改写」回退`)) return
+      setStudio(s => ({ ...s, busy: true }))
+      try {
+        const json = await api('/api/studio/adapt', { method: 'POST', body: { draft: studio.draft, platform } })
+        setStudio(s => ({ ...s, busy: false, prevDraft: s.draft, draft: json.data.draft, draftId: null, source: s.source || '平台转换稿' }))
+        showToast(json.data.note + '，点「保存草稿」另存')
+      } catch (err) {
+        setStudio(s => ({ ...s, busy: false }))
+        showToast(`平台转换失败：${err.message}`)
+      }
+      return
+    }
+    setStudio(s => ({ ...s, draft: DRAFT_TEMPLATES[platform] || '' }))
   }
 
   // 保存草稿（已有 draftId 则更新，否则新建）
@@ -511,12 +608,13 @@ export default function WorkbenchPage() {
   )
 
   const pageProps = {
-    showToast, contents, report, stories, ghTrending, notes, sources, topics,
+    showToast, contents, report, stories, ghTrending, notes, sources, topics, toggleStar,
     selectedItems, toggleSelect, followSource, acquire, syncing, syncAllSources,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea,
-    loadNotes, loadSources, loadTopics, setPage, setModal,
+    loadNotes, loadSources, loadTopics, loadBrief, setPage, setModal,
+    notesTab, setNotesTab, toggleSelectNote,
     topicView, setTopicView, activeTopic, setActiveTopic,
-    studio, setStudio, genDraft: (...a) => genDraftRef.current(...a), exportMd,
+    studio, setStudio, platforms, genDraft: (...a) => genDraftRef.current(...a), exportMd,
     drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, suggestTitles,
     highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack,
   }
@@ -532,13 +630,14 @@ export default function WorkbenchPage() {
       </header>
 
       <div className="wb-body">
-        <nav className={`wb-nav${leftCollapsed ? ' collapsed' : ''}`}>
+        <nav className={`wb-nav${leftCollapsed ? ' collapsed' : ''}`} style={leftCollapsed ? undefined : { width: leftW, transition: 'none' }}>
           <button className="wb-nav-toggle" onClick={() => setLeftCollapsed(v => !v)} title={leftCollapsed ? '展开导航' : '折叠导航'}>
             <IconChevronLeft />
           </button>
           <div className="wb-nav-group">{NAV_TOP.map(navItem)}</div>
           <div className="wb-nav-group wb-nav-bottom">{NAV_BOTTOM.map(navItem)}</div>
         </nav>
+        {!leftCollapsed && <div className="wb-resizer" onMouseDown={startDrag('left')} title="拖拽调整宽度" />}
 
         <main className="wb-main">
           <div className="wb-main-inner" key={page + topicView}>
@@ -552,7 +651,9 @@ export default function WorkbenchPage() {
           </div>
         </main>
 
+        {!rightCollapsed && <div className="wb-resizer" onMouseDown={startDrag('right')} title="拖拽调整宽度" />}
         <RightPanel
+          width={rightWide ? '55vw' : rightW} wide={rightWide} onToggleWide={() => setRightWide(v => !v)}
           page={page} collapsed={rightCollapsed} onToggle={() => setRightCollapsed(v => !v)}
           selectedItems={selectedItems} removeSel={removeSel}
           analysisMode={analysisMode} backList={() => setAnalysisMode('list')}
@@ -576,6 +677,13 @@ export default function WorkbenchPage() {
     </div>
   )
 }
+
+// /api/studio/platforms 不可达时的兜底列表（与 platforms/ 目录内置三平台一致）
+const FALLBACK_PLATFORMS = [
+  { key: 'thread', label: 'thread', icon: '𝕏' },
+  { key: 'long', label: '公众号长文', icon: '📄' },
+  { key: 'script', label: '口播脚本', icon: '🎬' },
+]
 
 const DRAFT_TEMPLATES = {
   thread: '1/ （钩子：制造好奇缺口，60 字内）\n\n2/ （第一个独立观点）\n\n3/ （第二个独立观点 + 数据/对比）\n\n4/ （分歧点：最值得聊的争议）\n\n5/ （收尾：一句总结 + 互动提问）',

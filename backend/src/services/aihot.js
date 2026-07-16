@@ -35,7 +35,9 @@ export async function fetchAllTodayItems() {
   const take = 100;
   let hasNext = true;
 
-  while (hasNext && skip < 200) {
+  // 500：错过一天没同步也能补上（2026-07-16 反馈 #5：旧上限 200 只够当天窗口，
+  // 配合定时同步后这是兜底而非主路径）
+  while (hasNext && skip < 500) {
     const result = await fetchAIHotItems(take, skip);
     
     if (!result.success) {

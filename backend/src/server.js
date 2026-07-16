@@ -23,7 +23,11 @@ app.get('/api/contents', async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = parseInt(req.query.offset) || 0;
 
-    const contents = getContents(limit, offset);
+    // q：多关键词搜索；starred=1：只看星标（2026-07-16 反馈 #2：内容被新条目推下去后找不回）
+    const contents = getContents(limit, offset, {
+      q: req.query.q || null,
+      starred: req.query.starred === '1',
+    });
 
     res.json({
       success: true,
@@ -35,6 +39,18 @@ app.get('/api/contents', async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// 星标切换（轻量收藏：一键钉住，无需归属；升级为素材卡才需要主题）
+app.post('/api/contents/:id/star', async (req, res) => {
+  try {
+    const { toggleStar } = await import('./db/contents.js');
+    const starred = toggleStar(req.params.id);
+    if (starred === null) return res.status(404).json({ success: false, error: 'Content not found' });
+    res.json({ success: true, data: { id: req.params.id, starred } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -119,7 +135,7 @@ app.post('/api/content/ingest', async (req, res) => {
 // 已经过 /api/content/ingest 摄入+翻译的结果，未入库）。两者可同时存在。
 app.post('/api/chat/ephemeral', async (req, res) => {
   try {
-    const { contentIds = [], adHocContents = [], messages } = req.body;
+    const { contentIds = [], adHocContents = [], topicId = null, messages } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({
@@ -127,15 +143,16 @@ app.post('/api/chat/ephemeral', async (req, res) => {
         error: 'messages is required and must be a non-empty array'
       });
     }
-    if (contentIds.length === 0 && adHocContents.length === 0) {
+    // topicId：主题页探讨模式（P0）——以主题综述+已并入素材为材料，可单独使用
+    if (contentIds.length === 0 && adHocContents.length === 0 && !topicId) {
       return res.status(400).json({
         success: false,
-        error: 'at least one of contentIds or adHocContents is required'
+        error: 'at least one of contentIds, adHocContents or topicId is required'
       });
     }
 
     const { buildMessagesWithContext } = await import('./services/ephemeral-chat.js');
-    const { messages: contextInjectedMessages, degraded } = await buildMessagesWithContext(contentIds, adHocContents, messages);
+    const { messages: contextInjectedMessages, degraded } = await buildMessagesWithContext(contentIds, adHocContents, messages, topicId);
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -323,15 +340,26 @@ app.post('/api/topics/:id/draft', async (req, res) => {
   }
 });
 
-// 长文标题候选（标题决定打开率，单独生成 5 个供挑选）
+// 平台模板列表（P1 文件化：platforms/ 目录扫描，加文件=加平台，前端动态渲染）
+app.get('/api/studio/platforms', async (req, res) => {
+  try {
+    const { listPlatforms } = await import('./services/creation-prompts.js');
+    res.json({ success: true, data: listPlatforms().map(({ key, label, icon, note }) => ({ key, label, icon, note })) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 长文标题候选（标题决定打开率，单独生成 5 个供挑选；prompt 见 creation/titles.md）
 app.post('/api/studio/titles', async (req, res) => {
   try {
     const { draft } = req.body;
     if (!draft?.trim()) return res.status(400).json({ success: false, error: 'draft is required' });
     const { chat } = await import('./services/llm.js');
+    const { loadPrompt, render } = await import('./services/creation-prompts.js');
     const result = await chat([{
       role: 'user',
-      content: `为这篇公众号文章生成 5 个标题候选。要求：吸引点击但不标题党（不夸大、不隐瞒立场）、25 字以内、风格错开（悬念式/观点式/数字式/对比式/提问式各给一个）。只输出 5 行标题，不要编号和解释。\n\n${draft.slice(0, 3000)}`,
+      content: render(loadPrompt('titles.md'), { draft: draft.slice(0, 3000) }),
     }]);
     if (!result.success) throw new Error(result.error);
     const titles = result.content.trim().split('\n').map(s => s.trim().replace(/^\d+[.、)]\s*/, '')).filter(Boolean).slice(0, 5);
@@ -405,14 +433,109 @@ app.post('/api/studio/rewrite', async (req, res) => {
     if (!draft?.trim() || !instruction?.trim()) {
       return res.status(400).json({ success: false, error: 'draft and instruction are required' });
     }
-    const platformNote = { thread: 'X thread（分条、短句）', long: '公众号长文（Markdown）', script: '口播视频脚本（口语化、有钩子）' }[platform] || '';
     const { chat } = await import('./services/llm.js');
+    const { loadPrompt, render, getPlatform } = await import('./services/creation-prompts.js');
+    let platformNote = '';
+    try { platformNote = getPlatform(platform).note; } catch { /* 平台未知不阻塞改写 */ }
     const result = await chat([{
       role: 'user',
-      content: `你是内容创作助手。以下是一份${platformNote}草稿，请严格按用户指令改写。\n只输出改写后的完整草稿，不要解释，保留原有的 [素材N] / 引用溯源标记。\n\n# 用户指令\n${instruction}\n\n# 草稿\n${draft.slice(0, 8000)}`,
+      content: render(loadPrompt('rewrite.md'), { platformNote, instruction, draft: draft.slice(0, 8000) }),
     }]);
     if (!result.success) throw new Error(result.error);
     res.json({ success: true, data: { draft: result.content.trim(), note: `已按「${instruction}」改写草稿（¥${result.cost?.toFixed(4)}）`, cost: result.cost } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 平台裂变（2026-07-16 用户实测反馈：粘贴的文章点平台按钮"没反应"）：把当前稿
+// 改写为目标平台规格版——V3 §三.5 浅线「定稿后裂变为各平台版」的第一块。
+// 与 rewrite 的区别：rewrite 按用户指令改，adapt 按目标平台规格文件（platforms/*.md）改
+app.post('/api/studio/adapt', async (req, res) => {
+  try {
+    const { draft, platform } = req.body;
+    if (!draft?.trim() || !platform) {
+      return res.status(400).json({ success: false, error: 'draft and platform are required' });
+    }
+    const { chat } = await import('./services/llm.js');
+    const { loadPrompt, render, getPlatform } = await import('./services/creation-prompts.js');
+    const target = getPlatform(platform); // 未知平台在此抛错
+    const result = await chat([{
+      role: 'user',
+      content: render(loadPrompt('adapt.md'), { targetSpec: target.spec, draft: draft.slice(0, 8000) }),
+    }]);
+    if (!result.success) throw new Error(result.error);
+    res.json({
+      success: true,
+      data: { draft: result.content.trim(), note: `已改写为「${target.label}」版（¥${result.cost?.toFixed(4)}）`, cost: result.cost },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// LLM 返回的 JSON 偶带 markdown 代码块围栏，统一剥掉再解析（同 thread-generation 处理）
+function parseLlmJson(content) {
+  const cleaned = content.replace(/^```(json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  return JSON.parse(cleaned);
+}
+
+// 批评人格审稿（P2，方法论：批评人格法/Sudowrite Beta Read 模式）：三个固定视角
+// 通读草稿输出 3-6 条具体批注（不改稿）。设计红线：AI 产出只是建议，
+// 用户点「按此修改」才触发改写；"没问题就说没问题"写进了 prompt（Canvas 反模式教训）
+app.post('/api/studio/critique', async (req, res) => {
+  try {
+    const { draft, platform } = req.body;
+    if (!draft?.trim()) return res.status(400).json({ success: false, error: 'draft is required' });
+    const { chat } = await import('./services/llm.js');
+    const { loadPrompt, render, getPlatform } = await import('./services/creation-prompts.js');
+    let platformNote = '文稿';
+    try { platformNote = getPlatform(platform).note; } catch { /* 平台未知不阻塞审稿 */ }
+    const result = await chat([{
+      role: 'user',
+      content: render(loadPrompt('critique.md'), { platformNote, draft: draft.slice(0, 8000) }),
+    }]);
+    if (!result.success) throw new Error(result.error);
+    const parsed = parseLlmJson(result.content);
+    res.json({
+      success: true,
+      data: {
+        verdict: parsed.verdict || '',
+        points: Array.isArray(parsed.points) ? parsed.points : [],
+        cost: result.cost,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 选段 N 个改法（P2，方法论：多候选卡片/Sudowrite 多卡模式）：对选中片段
+// 给 3 个策略不同的候选（锋利/具体/简洁），用户挑一个原位替换，不满意全部放弃
+app.post('/api/studio/variants', async (req, res) => {
+  try {
+    const { draft, selection, platform } = req.body;
+    if (!draft?.trim() || !selection?.trim()) {
+      return res.status(400).json({ success: false, error: 'draft and selection are required' });
+    }
+    const { chat } = await import('./services/llm.js');
+    const { loadPrompt, render, getPlatform } = await import('./services/creation-prompts.js');
+    let platformNote = '文稿';
+    try { platformNote = getPlatform(platform).note; } catch { /* 平台未知不阻塞 */ }
+    const result = await chat([{
+      role: 'user',
+      content: render(loadPrompt('variants.md'), {
+        platformNote,
+        draft: draft.slice(0, 8000),
+        selection: selection.slice(0, 2000),
+      }),
+    }]);
+    if (!result.success) throw new Error(result.error);
+    const parsed = parseLlmJson(result.content);
+    if (!Array.isArray(parsed.variants) || parsed.variants.length === 0) {
+      throw new Error('LLM 未返回 variants 数组');
+    }
+    res.json({ success: true, data: { variants: parsed.variants.slice(0, 3), cost: result.cost } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -444,8 +567,11 @@ app.get('/api/reports/latest', async (req, res) => {
 // 选题状态流转：suggested → adopted（采纳）/ dismissed（忽略）/ created（已创作）
 app.patch('/api/ideas/:id', async (req, res) => {
   try {
-    const { updateIdeaStatus } = await import('./services/report-generation.js');
-    const done = updateIdeaStatus(req.params.id, req.body?.status);
+    const rg = await import('./services/report-generation.js');
+    // removeContentId：从选题移除一条支撑素材（用户裁决 AI 聚合结果）
+    const done = req.body?.removeContentId
+      ? rg.removeIdeaSupport(req.params.id, req.body.removeContentId)
+      : rg.updateIdeaStatus(req.params.id, req.body?.status);
     res.json({ success: done, message: done ? 'Idea updated' : 'Idea not found' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -633,8 +759,19 @@ app.get('/api/notes', async (req, res) => {
         q: req.query.q || null,
         topicId: req.query.topicId || null,
         source: req.query.source || null,
+        ctype: req.query.ctype || null,
       }),
     });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 未归类素材聚合建议（2026-07-16 反馈 #4：AI 提议"哪些放一起、为什么"，本地零 LLM）
+app.get('/api/notes/cluster-suggestions', async (req, res) => {
+  try {
+    const { getClusterSuggestions } = await import('./services/note-clusters.js');
+    res.json({ success: true, data: getClusterSuggestions() });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -664,6 +801,14 @@ app.post('/api/notes', async (req, res) => {
       .then(({ generateNoteTitle }) => generateNoteTitle(note.id, note.excerpt))
       .catch(err => console.error('[Notes] title generation failed:', err.message));
 
+    // 后台提取关键词标签（M7：补搜索召回），复用 keyword-extractor，不阻塞保存
+    Promise.all([import('./services/keyword-extractor.js'), import('./db/notes.js')])
+      .then(async ([{ extractKeywords }, { setNoteKeywords }]) => {
+        const kw = await extractKeywords(sourceTitle || '素材摘录', excerpt.slice(0, 600));
+        if (kw) setNoteKeywords(note.id, kw.split(/[,，、]\s*/).filter(Boolean).slice(0, 6));
+      })
+      .catch(err => console.error('[Notes] keyword extraction failed:', err.message));
+
     // M3 同化（设计文档 §引擎B：保存素材即触发，用户不需要理解"待并入"）：
     // 1. 自动匹配活跃 Topic（本地 TF 余弦，零成本）
     // 2. 命中的主题后台异步同化（一次 ¥0.002 级），不阻塞保存响应；
@@ -688,6 +833,30 @@ app.post('/api/notes', async (req, res) => {
     }
 
     res.json({ success: true, data: note, matchedTopics });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 摘除素材的某个主题关联（AI 自动匹配错了 / 用户归错了）
+app.delete('/api/notes/:id/topics/:topicId', async (req, res) => {
+  try {
+    const { unlinkNoteFromTopic } = await import('./services/topic-pages.js');
+    const done = unlinkNoteFromTopic(req.params.id, req.params.topicId);
+    res.json({ success: done, message: done ? 'Unlinked' : 'Link not found' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 修改素材标题（AI 起的人话标题写错/不贴切时手动改）
+app.patch('/api/notes/:id', async (req, res) => {
+  try {
+    const title = req.body?.title?.trim();
+    if (!title) return res.status(400).json({ success: false, error: 'title is required' });
+    const { setNoteTitle } = await import('./db/notes.js');
+    const done = setNoteTitle(req.params.id, title);
+    res.json({ success: done, message: done ? 'Title updated' : 'Note not found' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -866,7 +1035,8 @@ app.post('/api/sync', async (req, res) => {
 
 // 全量同步（2026-07-16 反馈 #7：此前前端"刷新"只走 AI HOT，登记的 RSS/主动查询源
 // 永远不会因刷新出新内容）。三条链顺序跑、单链失败不阻塞其余，逐渠道返回结果与跳过原因。
-app.post('/api/sync-all', async (req, res) => {
+// 抽成函数供定时任务复用（2026-07-16 反馈 #5：无定时同步 → 不手动刷新的日子内容永久错过）
+async function syncAllChannels() {
   const channels = {};
   const run = async (name, fn) => {
     try { channels[name] = await fn(); }
@@ -877,8 +1047,38 @@ app.post('/api/sync-all', async (req, res) => {
   await run('rss', async () => (await import('./services/sync-rss.js')).syncRSSData());
   await run('activeQuery', async () => (await import('./services/sync-active-query.js')).syncActiveQuery());
 
+  // 记录同步时间（漏跑补偿的判断依据，见下方 catchUpSyncIfStale）
+  try {
+    const { writeFileSync } = await import('fs');
+    const { fileURLToPath } = await import('url');
+    writeFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)),
+      JSON.stringify({ at: new Date().toISOString() }));
+  } catch (err) { console.error('[sync] 写入 last-sync 失败:', err.message); }
+
   const total = (channels.aihot?.count || 0) + (channels.rss?.count || 0) + (channels.activeQuery?.inserted || 0);
-  res.json({ success: true, data: { total, channels } });
+  return { total, channels };
+}
+
+// 漏跑补偿（2026-07-16：launchd 常驻后，合盖睡眠时 cron 到点不触发——
+// 距上次同步超 12 小时就补跑一轮。启动 20s 后查一次 + 每小时兜底一次）
+async function catchUpSyncIfStale() {
+  try {
+    const { readFileSync } = await import('fs');
+    const { fileURLToPath } = await import('url');
+    const { at } = JSON.parse(readFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)), 'utf-8'));
+    if (Date.now() - new Date(at).getTime() < 12 * 3600 * 1000) return;
+  } catch { /* 无记录 → 视为过期 */ }
+  console.log('[cron] 距上次同步超过 12 小时（睡眠/关机漏跑），开始补偿同步…');
+  try {
+    const { total } = await syncAllChannels();
+    console.log(`[cron] 补偿同步完成：+${total} 条`);
+  } catch (err) { console.error('[cron] 补偿同步失败:', err.message); }
+}
+setTimeout(catchUpSyncIfStale, 20 * 1000);
+setInterval(catchUpSyncIfStale, 3600 * 1000);
+
+app.post('/api/sync-all', async (req, res) => {
+  res.json({ success: true, data: await syncAllChannels() });
 });
 
 // ========== v0.2.0 工作区对话 API ==========
@@ -1248,3 +1448,21 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`✨ v0.2.0 - Workspace Chat APIs enabled`);
 });
+
+// 定时全渠道同步：每天 08:10 / 20:10（2026-07-16 反馈 #2/#5 的共同根因：
+// 此前同步只在手动刷新时发生，AI HOT 翻页窗口有限，不刷新的日子内容永久错过——
+// DB 实证 7 天里只有 4 天有数据）。node-cron 随 server 常驻，失败只记日志不中断服务。
+import('node-cron').then(({ default: cron }) => {
+  cron.schedule('10 8,20 * * *', async () => {
+    console.log('[cron] scheduled sync-all start');
+    try {
+      const { total, channels } = await syncAllChannels();
+      console.log(`[cron] sync-all done: +${total} 条`, Object.fromEntries(
+        Object.entries(channels).map(([k, v]) => [k, v.error || (v.count ?? v.inserted ?? 0)])
+      ));
+    } catch (err) {
+      console.error('[cron] sync-all failed:', err.message);
+    }
+  });
+  console.log('⏰ 定时同步已注册：每天 08:10 / 20:10');
+}).catch(err => console.error('node-cron 加载失败（定时同步不可用）:', err.message));

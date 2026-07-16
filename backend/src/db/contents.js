@@ -109,24 +109,49 @@ function normalizeHeat(sourceApp, externalScore) {
   return null;
 }
 
-export function getContents(limit = 20, offset = 0) {
+export function getContents(limit = 20, offset = 0, { q = null, starred = false } = {}) {
   const db = getDatabase();
   // GitHub Trending 不混入资讯流（产品与内容分离，走 /api/github-trending 独立区块）。
   // 已登记信息源（ADR-007 登记处）的内容加权：等效于把发布时间前移 12 小时，
   // 既保证"我关注的人"浮上来，又不至于把时间线彻底打乱（新热内容仍能正常冒头）。
+  // q/starred（2026-07-16 反馈 #2）：Feed 搜索与星标过滤，与素材库同款多关键词 AND 语义。
+  // 星标视图不排除 GitHub 项目——星标是用户主动选择，不受"不混入资讯流"规则限制
+  const where = [];
+  if (!starred) where.push("c.source_app != 'github_trending'");
+  const params = [];
+  if (q?.trim()) {
+    for (const kw of q.trim().split(/\s+/).slice(0, 5)) {
+      where.push('(c.zh_title LIKE ? OR c.en_title LIKE ? OR c.zh_summary LIKE ?)');
+      const like = `%${kw}%`;
+      params.push(like, like, like);
+    }
+  }
+  if (starred) where.push('c.starred = 1');
+
   const rows = db.prepare(`
     SELECT c.*, s.display_name as source_display_name, s.registered_by_user as source_registered,
            sp.platform as source_platform, sp.handle as source_handle
     FROM contents c
     LEFT JOIN sources s ON c.source_id = s.id
     LEFT JOIN source_platforms sp ON sp.source_id = s.id
-    WHERE c.source_app != 'github_trending'
+    WHERE ${where.join(' AND ')}
     ORDER BY julianday(COALESCE(c.published_at, c.created_at))
              + CASE WHEN s.registered_by_user = 1 THEN 0.5 ELSE 0 END DESC
     LIMIT ? OFFSET ?
-  `).all(limit, offset);
+  `).all(...params, limit, offset);
   db.close();
   return rows.map(r => ({ ...r, heat: normalizeHeat(r.source_app, r.external_score) }));
+}
+
+// 星标切换（M7）：返回新状态；内容不存在返回 null
+export function toggleStar(id) {
+  const db = getDatabase();
+  const row = db.prepare('SELECT starred FROM contents WHERE id = ?').get(id);
+  if (!row) { db.close(); return null; }
+  const next = row.starred ? 0 : 1;
+  db.prepare("UPDATE contents SET starred = ?, updated_at = datetime('now') WHERE id = ?").run(next, id);
+  db.close();
+  return next;
 }
 
 export function getContentById(id) {

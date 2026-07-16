@@ -1,21 +1,12 @@
 import { getDatabase } from '../db/init.js';
 import { resolveContentBody } from './content-body-resolver.js';
 import { chat } from './llm.js';
+import { loadPrompt, render } from './creation-prompts.js';
 
 // 单篇内容 → X thread 快速生成（M2 轻量创作出口，ADR-011）。
 // 完整创作台（大纲/长文/口播脚本 + Draft 落库）是 M4，这里只做"读完一篇就能发"的最短路径：
 // 基于原文（复用 resolveContentBody 的抓取/降级策略）生成钩子+分条+结尾，直接返回不落库。
-
-const THREAD_PROMPT = `你是一位在 X（Twitter）上有影响力的 AI 领域博主，中文写作。
-基于以下材料写一条 thread（4-7 条推文）。
-
-要求：
-- 第 1 条是钩子：制造好奇缺口或反直觉观点，不超过 60 字，禁止"今天聊聊""分享一篇"这类开场
-- 中间每条讲一个独立的点，口语化、短句、有信息密度；适当用数字/对比增强说服力
-- 最后一条收尾：一句总结观点 + 自然的互动引导（提问或立场邀请），不要"关注我"这种硬广
-- 观点要有立场，不做纯翻译转述；如果材料里有争议点，放大它
-- 每条推文不超过 260 字
-- 输出 JSON（不要 markdown 代码块）：{"tweets": ["...", "..."]}`;
+// prompt 措辞在 reference/prompts/creation/thread-single.md（P1 文件化）。
 
 export async function generateThread(contentId) {
   const db = getDatabase();
@@ -41,7 +32,7 @@ export async function generateThread(contentId) {
   ].filter(v => v !== null).join('\n');
 
   const result = await chat([
-    { role: 'user', content: `${THREAD_PROMPT}\n\n# 材料\n${material.slice(0, 12000)}` },
+    { role: 'user', content: render(loadPrompt('thread-single.md'), { material: material.slice(0, 12000) }) },
   ]);
 
   if (!result.success) throw new Error(`LLM 调用失败: ${result.error}`);

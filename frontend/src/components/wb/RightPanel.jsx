@@ -6,7 +6,7 @@ import { IconChat, IconChevronRight, IconChevronLeft, IconSend, IconStudio } fro
 // 创作助手 = 已引用 / 可插入素材 / 指令改写（AI 直接改左侧草稿）。
 
 export default function RightPanel(props) {
-  const { page, collapsed, onToggle } = props
+  const { page, collapsed, onToggle, width } = props
   const isStudio = page === 'studio'
 
   if (collapsed) {
@@ -17,20 +17,26 @@ export default function RightPanel(props) {
     )
   }
 
+  // width 来自 WorkbenchPage（拖拽/半屏切换，2026-07-16 反馈 #3）；transition 关掉避免拖拽回弹
   return (
-    <aside className={`wb-panel${isStudio ? ' studio' : ''}`}>
+    <aside className={`wb-panel${isStudio ? ' studio' : ''}`} style={width ? { width, transition: 'none' } : undefined}>
       {isStudio ? <StudioAssistant {...props} /> : <QuickAnalysis {...props} />}
     </aside>
   )
 }
 
-function PanelHeader({ icon, title, sub, onToggle }) {
+function PanelHeader({ icon, title, sub, onToggle, onToggleWide, wide }) {
   return (
     <div className="wb-panel-header">
       <div style={{ flex: 1 }}>
         <div className="wb-panel-title">{icon}{title}</div>
         <div className="wb-panel-sub">{sub}</div>
       </div>
+      {onToggleWide && (
+        <button className="wb-panel-toggle" onClick={onToggleWide} title={wide ? '恢复常规宽度' : '展开至半屏（长内容更好读）'}>
+          {wide ? '⇥' : '⇤'}
+        </button>
+      )}
       <button className="wb-panel-toggle" onClick={onToggle}><IconChevronRight /></button>
     </div>
   )
@@ -44,7 +50,7 @@ const CAP_STYLE = {
 }
 
 function QuickAnalysis({
-  onToggle, selectedItems, removeSel, analysisMode, backList,
+  onToggle, onToggleWide, wide, selectedItems, removeSel, analysisMode, backList,
   chat, degraded, startAnalysis, sendChat, saveMsg, page, topicView, activeTopic,
 }) {
   const [input, setInput] = useState('')
@@ -64,7 +70,7 @@ function QuickAnalysis({
 
   return (
     <>
-      <PanelHeader icon={<IconChat />} title="快速分析" sub={sub} onToggle={onToggle} />
+      <PanelHeader icon={<IconChat />} title="快速分析" sub={sub} onToggle={onToggle} onToggleWide={onToggleWide} wide={wide} />
 
       {!chatMode && (
         <div className="wb-panel-body">
@@ -111,7 +117,7 @@ function QuickAnalysis({
           <div className="wb-panel-body">
             <div className="wb-chat-meta">
               <button className="wb-back" style={{ fontSize: 11.5 }} onClick={backList}>← 返回</button>
-              基于 {selectedItems.length || 1} 篇内容 · 结构化解读
+              {onTopicPage ? `探讨主题《${activeTopic.name}》· 综述+素材做弹药` : `基于 ${selectedItems.length || 1} 篇内容 · 结构化解读`}
             </div>
             {degraded?.length > 0 && (
               <div className="wb-warnbar" style={{ marginBottom: 8, fontSize: 11.5 }}>
@@ -158,7 +164,7 @@ function MsgBubble({ msg, onSave, hideSave = false }) {
 }
 
 /* ---------- 创作助手 ---------- */
-function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, gotoNote, rewriteDraft, showToast }) {
+function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, insertMaterial, removeRef, gotoNote, rewriteDraft, showToast }) {
   const [input, setInput] = useState('')
   const [chat, setChat] = useState([]) // {role, text, pending?}
   const endRef = useRef(null)
@@ -180,7 +186,7 @@ function StudioAssistant({ onToggle, studio, notes, insertMaterial, removeRef, g
 
   return (
     <>
-      <PanelHeader icon={<IconStudio />} title="创作助手" sub="素材引用 + 指令改写，直接改左侧草稿" onToggle={onToggle} />
+      <PanelHeader icon={<IconStudio />} title="创作助手" sub="素材引用 + 指令改写，直接改左侧草稿" onToggle={onToggle} onToggleWide={onToggleWide} wide={wide} />
       <div className="wb-panel-body">
         <div className="wb-panel-label">已引用（{studio.refs.length}）</div>
         {studio.refs.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)' }}>尚未引用素材</div>}

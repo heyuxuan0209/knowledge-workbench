@@ -66,11 +66,11 @@ export function sourceCapability(c) {
 }
 
 // SSE 流式对话（/api/chat/ephemeral），onDelta 增量回调、onMeta 降级清单回调，返回完整文本
-export async function streamEphemeralChat({ contentIds, adHocContents, messages }, onDelta, onMeta) {
+export async function streamEphemeralChat({ contentIds, adHocContents, topicId, messages }, onDelta, onMeta) {
   const res = await fetch('/api/chat/ephemeral', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contentIds, adHocContents, messages }),
+    body: JSON.stringify({ contentIds, adHocContents, topicId, messages }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

@@ -376,8 +376,9 @@ CREATE INDEX IF NOT EXISTS idx_note_topics_topic ON note_topics(topic_id, status
 
 CREATE TABLE IF NOT EXISTS drafts (
     id TEXT PRIMARY KEY,
-    platform TEXT NOT NULL
-        CHECK (platform IN ('thread', 'long', 'script')),
+    -- platform 无 CHECK（M8）：平台清单唯一来源是 reference/prompts/creation/platforms/
+    -- 目录（服务层 getPlatform 校验），schema 持有枚举会让"加文件=加平台"失效
+    platform TEXT NOT NULL,
     title TEXT,
     body TEXT NOT NULL DEFAULT '',
     paragraph_refs TEXT DEFAULT '[]',    -- JSON: [{marker, noteId, sourceTitle, contentId}]

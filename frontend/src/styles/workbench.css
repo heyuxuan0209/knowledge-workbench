@@ -91,7 +91,9 @@ input, textarea { font-family: inherit; }
 
 /* 中栏 */
 .wb-main { flex: 1; min-width: 0; overflow-y: auto; }
-.wb-main-inner { max-width: 720px; margin: 0 auto; padding: 24px 28px 60px; animation: rwUp 0.25s; }
+/* 1000px（2026-07-16 反馈：720px 两侧留白太多，Feed 一多一直下滑）——
+   加宽 + 卡片纵向收紧，提升单屏信息密度 */
+.wb-main-inner { max-width: 1000px; margin: 0 auto; padding: 20px 24px 60px; animation: rwUp 0.25s; }
 
 /* 右栏 */
 .wb-panel {
@@ -218,9 +220,89 @@ input, textarea { font-family: inherit; }
 .wb-feedbar-sep { color: rgba(33, 31, 26, 0.18); }
 .wb-feedbar-count { margin-left: auto; }
 
+/* Feed 搜索（2026-07-16 反馈 #2） */
+.wb-feed-search {
+  flex: 1; min-width: 140px; max-width: 300px;
+  border: 1px solid var(--line12, rgba(33,31,26,.12)); border-radius: 7px;
+  padding: 5px 10px; font-size: 12.5px; background: var(--surface);
+  color: var(--text); outline: none;
+}
+.wb-feed-search:focus { border-color: var(--accent); }
+
+/* 星标（轻量收藏）：默认淡出，悬停/已星标时显形 */
+.wb-star {
+  margin-left: auto; border: none; background: none; cursor: pointer;
+  font-size: 15px; line-height: 1; color: var(--faint); padding: 0 2px;
+  flex: 0 0 auto;
+}
+.wb-star:hover { color: var(--amber); }
+.wb-star.on { color: var(--amber); }
+
+/* 三栏拖拽手柄（2026-07-16 反馈 #3，修订 ADR-004 固定宽） */
+.wb-resizer {
+  width: 5px; flex: 0 0 auto; cursor: col-resize;
+  background: transparent; transition: background 0.12s;
+}
+.wb-resizer:hover, .wb-resizer:active { background: rgba(61, 90, 128, 0.22); }
+
+/* 素材库主题分组（2026-07-16 反馈 #1） */
+.wb-note-group-head {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 20px 2px 8px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--line10, rgba(33,31,26,.1));
+}
+.wb-note-group-name { font-family: var(--serif); font-size: 14.5px; font-weight: 600; color: var(--text); }
+.wb-note-group-count {
+  font-size: 11px; color: var(--sub2); background: rgba(33,31,26,.07);
+  border-radius: 9px; padding: 1px 7px;
+}
+.wb-note-group-hint { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+.wb-note-assign {
+  border: 1px solid var(--line12, rgba(33,31,26,.12)); border-radius: 6px;
+  font-size: 11px; color: var(--sub2); background: var(--surface);
+  padding: 2px 4px; max-width: 110px; cursor: pointer;
+}
+.wb-card.selected { border-color: var(--accent); }
+
+/* 聚合建议卡（2026-07-16 反馈 #4：AI 提议哪些放一起，用户勾选裁决） */
+.wb-cluster-card {
+  background: rgba(61, 90, 128, 0.05); border: 1px dashed rgba(61, 90, 128, 0.35);
+  border-radius: 12px; padding: 13px 16px; margin-top: 12px;
+}
+.wb-cluster-head { font-size: 13.5px; font-weight: 600; }
+.wb-cluster-why { margin-left: 10px; font-size: 11.5px; font-weight: 400; color: var(--sub2); }
+.wb-cluster-item {
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px;
+  padding: 3px 0; cursor: pointer; color: var(--body2);
+}
+.wb-cluster-name {
+  border: 1px solid var(--line12, rgba(33,31,26,.12)); border-radius: 7px;
+  padding: 4px 9px; font-size: 12.5px; background: var(--surface); color: var(--text);
+  outline: none; max-width: 220px;
+}
+.wb-cluster-name:focus { border-color: var(--accent); }
+
+/* 主题 tab chips（素材库，2026-07-16 反馈：点选即切换该主题的素材） */
+.wb-topic-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 2px; }
+.wb-topic-chip {
+  border: 1px solid var(--line12, rgba(33,31,26,.12)); border-radius: 14px;
+  background: var(--surface); color: var(--sub2); font-size: 12px;
+  padding: 3px 11px; cursor: pointer; transition: all 0.12s;
+}
+.wb-topic-chip:hover { border-color: var(--accent); color: var(--accent); }
+.wb-topic-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 主题 pill：逐个显示 + 可摘除（AI 自动匹配的虚线边框区分） */
+.wb-topic-pill { display: inline-flex; align-items: center; gap: 3px; }
+.wb-topic-pill-x {
+  border: none; background: none; cursor: pointer; padding: 0 1px;
+  font-size: 12px; line-height: 1; color: inherit; opacity: 0.55;
+}
+.wb-topic-pill-x:hover { opacity: 1; }
+
 .wb-fcard {
   background: var(--surface); border: 1px solid var(--line10);
-  border-radius: 12px; padding: 17px 19px; margin-top: 14px;
+  border-radius: 12px; padding: 13px 17px; margin-top: 10px;
 }
 .wb-fcard.selected { border-color: var(--accent); }
 .wb-fcard-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
@@ -228,7 +310,7 @@ input, textarea { font-family: inherit; }
 .wb-fcard-platform { font-size: 11.5px; color: var(--sub2); }
 .wb-fcard-score { margin-left: auto; font-size: 12px; color: var(--sub2); }
 .wb-fcard-score b { font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--accent); }
-.wb-fcard-title { font-family: var(--serif); font-size: 17.5px; line-height: 1.32; font-weight: 600; margin: 9px 0 7px; }
+.wb-fcard-title { font-family: var(--serif); font-size: 16.5px; line-height: 1.32; font-weight: 600; margin: 6px 0 5px; }
 .wb-fcard-summary { font-size: 13.5px; line-height: 1.6; color: var(--body2); }
 .wb-fcard-chips { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; flex-wrap: wrap; }
 .wb-chip {

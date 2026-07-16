@@ -277,6 +277,15 @@ export function linkNoteToTopic(noteId, topicId) {
   return true;
 }
 
+// 摘除素材与主题的关联（2026-07-16 反馈：AI 自动匹配的主题用户要能摘掉、归错了要能改）。
+// 注：若该素材已被并入主题综述，综述文本不回滚——下次同化会基于剩余素材演进
+export function unlinkNoteFromTopic(noteId, topicId) {
+  const db = getDatabase();
+  const r = db.prepare('DELETE FROM note_topics WHERE note_id = ? AND topic_id = ?').run(noteId, topicId);
+  db.close();
+  return r.changes > 0;
+}
+
 // 建页时回扫近期素材（最近 90 天、上限 200 条），相关的挂 pending
 function backfillMatchesForTopic(db, topicId) {
   const topic = db.prepare('SELECT id, name, description, body FROM topics WHERE id = ?').get(topicId);

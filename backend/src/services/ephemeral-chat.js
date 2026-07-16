@@ -1,4 +1,5 @@
 import { getContentById } from '../db/contents.js';
+import { getDatabase } from '../db/init.js';
 import { resolveContentBody } from './content-body-resolver.js';
 
 // Mode 1 即兴分析的对话上下文构建（架构文档 §2）。无状态设计：不落库对话历史，
@@ -69,14 +70,54 @@ function formatAdHocAsMaterial(adHoc, index) {
   return `## 材料${index + 1}：${title}\n${meta}\n【正文/字幕】\n${body}`;
 }
 
+// 主题页探讨（P0，V3 §三.4「沉淀=探讨」的入口）：以主题页综述 + 已并入素材为材料，
+// 供主题详情页右栏对话使用。此前该 UI 已铺但逻辑未接（2026-07-16 前端调查确认的 bug）。
+// 素材上限 12 条与 draft-generation gatherTopicMaterials 对齐；数据只读，不触发同化。
+function formatTopicAsMaterial(topicId) {
+  const db = getDatabase();
+  const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(topicId);
+  if (!topic) { db.close(); return null; }
+
+  let body;
+  try { body = JSON.parse(topic.body || '{}'); } catch { body = {}; }
+  const notes = db.prepare(`
+    SELECT n.excerpt, n.source_title
+    FROM note_topics nt JOIN notes n ON nt.note_id = n.id
+    WHERE nt.topic_id = ? AND nt.status = 'assimilated'
+    ORDER BY nt.assimilated_at DESC LIMIT 12
+  `).all(topicId);
+  db.close();
+
+  const views = (body.views || []).length
+    ? body.views.map(v => `- ${v.who}：${v.what}${v.conflict ? '（⚡与他方冲突）' : ''}`).join('\n')
+    : '（暂无）';
+  const notesBlock = notes.length
+    ? notes.map((n, i) => `[素材${i + 1}]（来源：${n.source_title || '未知'}）\n${(n.excerpt || '').slice(0, 600)}`).join('\n\n')
+    : '（暂无已并入素材）';
+
+  return `## 材料：主题页《${topic.name}》
+这是用户长期维护的知识主题，包含 AI 综述与已并入素材。用户是带着问题来探讨的：请引用材料里的证据回答、指出观点间的矛盾、必要时提出反例；材料之外的推测要明确标注。
+【当前认知】
+${body.current || topic.description || '（空）'}
+【各方观点】
+${views}
+【共识 / 非共识】
+${body.consensus || '（暂无）'}
+【已并入素材】
+${notesBlock}`;
+}
+
 // 构建注入材料前缀后的完整消息数组。异步：多篇 content 的原文抓取用 Promise.all 并行，
 // 避免串行等待导致响应变慢（每篇最多 15 秒超时，见 FETCH_TIMEOUT_MS）。
 // 沿用 server.js 里 /api/llm/chat 已有的既定模式：材料前缀注入到「当前这一轮」的最新用户
 // 消息（不是固定的第一条），历史消息原样保留、不重复注入。每轮都重新拼接材料是有意为之
 // 的简单方案（对应 Phase 1 的无状态设计），成本随对话轮次线性增长，Phase 2 若要优化可改为
 // 服务端持久化对话+材料只注入一次。
-// contentIds: string[]，adHocContents: 已翻译的 ingest+translate 结果数组，userMessages: 对话历史
-export async function buildMessagesWithContext(contentIds, adHocContents, userMessages) {
+// contentIds: string[]，adHocContents: 已翻译的 ingest+translate 结果数组，userMessages: 对话历史，
+// topicId: 主题页探讨模式（可与前两者并存，主题材料排在最前）
+export async function buildMessagesWithContext(contentIds, adHocContents, userMessages, topicId = null) {
+  const topicMaterial = topicId ? formatTopicAsMaterial(topicId) : null;
+
   const resolvedContents = (contentIds || [])
     .map(id => getContentById(id))
     .filter(Boolean);
@@ -92,7 +133,11 @@ export async function buildMessagesWithContext(contentIds, adHocContents, userMe
   const adHocMaterials = (adHocContents || [])
     .map((adHoc, i) => formatAdHocAsMaterial(adHoc, contentMaterials.length + i));
 
-  const materials = [...contentMaterials, ...adHocMaterials];
+  const materials = [
+    ...(topicMaterial ? [topicMaterial] : []),
+    ...contentMaterials,
+    ...adHocMaterials,
+  ];
 
   if (materials.length === 0 || userMessages.length === 0) {
     // 没有材料（理论上不应发生，前端应保证至少有一项）或没有对话历史，直接透传，不强行拼接

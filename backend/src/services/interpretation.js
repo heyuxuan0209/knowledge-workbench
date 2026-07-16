@@ -18,6 +18,13 @@ export function loadInstantAnalysisPrompt() {
   return raw.replace(/<运行时注入：([^>]+)>/g, '$1');
 }
 
+// GitHub 仓库用产品视角速览模板（2026-07-16 反馈 #4：README 翻译对产品人无用，
+// 要回答"对我产品的启发/值不值得写"）。同款文件外置约定，改文件即改行为
+export function loadRepoQuickscanPrompt() {
+  const raw = readFileSync(join(__dirname, '../../../reference/prompts/repo-quickscan.md'), 'utf-8');
+  return raw.replace(/<运行时注入：([^>]+)>/g, '$1');
+}
+
 export async function getOrGenerateInterpretation(contentId, { force = false } = {}) {
   const content = getContentById(contentId);
   if (!content) throw new Error('Content not found');
@@ -45,7 +52,8 @@ export async function getOrGenerateInterpretation(contentId, { force = false } =
     body,
   ].filter(Boolean).join('\n');
 
-  const prompt = `${material}\n\n---\n\n${loadInstantAnalysisPrompt()}`;
+  const isRepo = content.content_type === 'repo' || content.source_app === 'github_trending';
+  const prompt = `${material}\n\n---\n\n${isRepo ? loadRepoQuickscanPrompt() : loadInstantAnalysisPrompt()}`;
   const result = await chat([{ role: 'user', content: prompt }]);
   if (!result.success) throw new Error(`LLM 调用失败: ${result.error}`);
 

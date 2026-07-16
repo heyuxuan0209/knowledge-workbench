@@ -243,6 +243,18 @@ export function getLatestReport(periodType = 'daily') {
   return report;
 }
 
+// 从选题移除一条支撑素材（2026-07-16 反馈：AI 聚合的选题，用户可移走不合适的文章）
+export function removeIdeaSupport(ideaId, contentId) {
+  const db = getDatabase();
+  const row = db.prepare('SELECT supporting_content_ids FROM ideas WHERE id = ?').get(ideaId);
+  if (!row) { db.close(); return false; }
+  const ids = JSON.parse(row.supporting_content_ids || '[]').filter(x => x !== contentId);
+  db.prepare("UPDATE ideas SET supporting_content_ids = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(JSON.stringify(ids), ideaId);
+  db.close();
+  return true;
+}
+
 export function updateIdeaStatus(ideaId, status) {
   if (!['suggested', 'adopted', 'dismissed', 'created'].includes(status)) {
     throw new Error(`invalid status: ${status}`);
