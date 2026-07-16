@@ -534,6 +534,21 @@ export default function WorkbenchPage() {
     } catch (err) { showToast(`标题生成失败：${err.message}`) }
   }
 
+  // 可插入素材按「与当前草稿的相关度」排序（2026-07-16 用户实测：原来按保存时间倒序，
+  // 写 A 主题却推 B 主题素材）。本地 TF 余弦，debounce 600ms 避免每次击键都请求。
+  const [rankedNotes, setRankedNotes] = useState(null)
+  useEffect(() => {
+    if (page !== 'studio') return
+    const t = setTimeout(async () => {
+      try {
+        const draftText = `${studio.title || ''}\n${studio.draft || ''}`.slice(0, 4000)
+        const json = await api('/api/studio/rank-materials', { method: 'POST', body: { draft: draftText, topicId: studio.sourceTopicId || null } })
+        setRankedNotes(json.data || [])
+      } catch (err) { console.error('rank-materials:', err); setRankedNotes(null) }
+    }, 600)
+    return () => clearTimeout(t)
+  }, [page, studio.draft, studio.title, studio.sourceTopicId, notes])
+
   const insertMaterial = (note) => {
     const label = note.content_zh_title || note.source_title || '素材'
     setStudio(s => ({
@@ -659,7 +674,7 @@ export default function WorkbenchPage() {
           analysisMode={analysisMode} backList={() => setAnalysisMode('list')}
           chat={chat} degraded={degraded} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg}
           topicView={topicView} activeTopic={activeTopic}
-          studio={studio} notes={notes} insertMaterial={insertMaterial} removeRef={removeRef} gotoNote={gotoNote} rewriteDraft={rewriteDraft}
+          studio={studio} notes={notes} rankedNotes={rankedNotes} insertMaterial={insertMaterial} removeRef={removeRef} gotoNote={gotoNote} rewriteDraft={rewriteDraft}
           showToast={showToast}
         />
       </div>

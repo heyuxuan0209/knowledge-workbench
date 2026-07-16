@@ -164,7 +164,7 @@ function MsgBubble({ msg, onSave, hideSave = false }) {
 }
 
 /* ---------- 创作助手 ---------- */
-function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, insertMaterial, removeRef, gotoNote, rewriteDraft, showToast }) {
+function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, rankedNotes, insertMaterial, removeRef, gotoNote, rewriteDraft, showToast }) {
   const [input, setInput] = useState('')
   const [chat, setChat] = useState([]) // {role, text, pending?}
   const endRef = useRef(null)
@@ -208,14 +208,18 @@ function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, insertMa
         })}
 
         {(() => {
-          // 当前主题的素材排前并打标（无主题上下文时按时间原序）
+          // 相关度排序（后端 TF 余弦，rankedNotes）；未就绪时回落到时间序 + 本主题优先
           const tid = studio.sourceTopicId
-          const isMine = n => tid && (n.topic_ids || '').split(',').includes(tid)
-          const sorted = tid ? [...notes].sort((a, b) => isMine(b) - isMine(a)) : notes
+          const isMine = n => n.isMine ?? (tid && (n.topic_ids || '').split(',').includes(tid))
+          const ranked = rankedNotes || (tid ? [...notes].sort((a, b) => isMine(b) - isMine(a)) : notes)
+          const hasDraft = studio.draft.trim().length > 0
+          const relLabel = rankedNotes && hasDraft
+            ? ' · 按与当前草稿的相关度排序'
+            : (tid ? ' · 本主题的排在前' : '')
           return <>
-            <div className="wb-panel-label">可插入素材（{notes.length}）{tid ? ' · 本主题的排在前' : ''}</div>
-            {notes.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)' }}>素材库为空 · 在快速分析里「保存到笔记」</div>}
-            {sorted.slice(0, 12).map(n => {
+            <div className="wb-panel-label">可插入素材（{ranked.length}）{relLabel}</div>
+            {ranked.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)' }}>素材库为空 · 在快速分析里「保存到笔记」</div>}
+            {ranked.slice(0, 12).map(n => {
               const url = n.content_url || n.source_url
               return (
                 <div key={n.id} className="wb-insert-item" style={{ alignItems: 'flex-start' }}>
@@ -233,6 +237,11 @@ function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, insertMa
                     </span>
                     {n.topic_names && !isMine(n) && (
                       <span style={{ display: 'block', color: 'var(--faint)', fontSize: 11, marginTop: 2 }}>主题：{n.topic_names.slice(0, 20)}</span>
+                    )}
+                    {rankedNotes && hasDraft && (
+                      n.related
+                        ? n.relTerms?.length > 0 && <span style={{ display: 'block', color: '#3f7350', fontSize: 11, marginTop: 2 }}>相关：{n.relTerms.slice(0, 4).join('·')}</span>
+                        : <span style={{ display: 'block', color: 'var(--faint)', fontSize: 11, marginTop: 2 }}>与当前草稿关联弱</span>
                     )}
                   </span>
                   <button className="wb-insert-btn" onClick={() => insertMaterial(n)}>插入</button>

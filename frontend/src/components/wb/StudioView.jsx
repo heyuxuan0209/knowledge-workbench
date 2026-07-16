@@ -27,18 +27,28 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     } catch (err) { showToast(`审稿失败：${err.message}`) }
     setCritiqueBusy(false)
   }
+  // 应用批注 = 记录该次改写的前后快照，撤销按钮跟在条目后面（2026-07-16 反馈：
+  // 连续应用多条后，全局撤销分不清撤的是哪次）。全局「撤销改写」只管整稿类操作
   const applyCritique = async (point, idx) => {
     setApplyingIdx(idx)
     try {
+      const before = studio.draft
       const json = await api('/api/studio/rewrite', {
         method: 'POST',
-        body: { draft: studio.draft, instruction: `${point.problem}——${point.suggestion}`, platform: studio.platform },
+        body: { draft: before, instruction: `${point.problem}——${point.suggestion}`, platform: studio.platform },
       })
-      setStudio(s => ({ ...s, prevDraft: s.draft, draft: json.data.draft }))
-      setCritique(c => c && { ...c, points: c.points.filter((_, i) => i !== idx) })
-      showToast('已按批注改写，不满意可「撤销改写」')
+      setStudio(s => ({ ...s, draft: json.data.draft }))
+      setCritique(c => c && { ...c, points: c.points.map((p, i) => i === idx ? { ...p, applied: { before, after: json.data.draft } } : p) })
+      showToast('已按批注改写，该条后面可「撤销」')
     } catch (err) { showToast(`改写失败：${err.message}`) }
     setApplyingIdx(null)
+  }
+  const undoCritique = (point, idx) => {
+    if (studio.draft !== point.applied.after &&
+      !confirm('这次改写之后草稿又有过修改，撤销会回到这次改写前的版本、丢掉之后的修改。继续？')) return
+    setStudio(s => ({ ...s, draft: point.applied.before }))
+    setCritique(c => c && { ...c, points: c.points.map((p, i) => i === idx ? { ...p, applied: null } : p) })
+    showToast('已撤销该条改写')
   }
 
   // ---- P2：选段 3 个改法 ----
@@ -61,10 +71,19 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     } catch (err) { showToast(`生成失败：${err.message}`) }
     setVariantsBusy(false)
   }
-  const applyVariant = (opt) => {
-    setStudio(s => ({ ...s, prevDraft: s.draft, draft: s.draft.slice(0, variants.start) + opt + s.draft.slice(variants.end) }))
-    setVariants(null)
-    showToast('已替换选段，不满意可「撤销改写」')
+  const applyVariant = (opt, idx) => {
+    const before = studio.draft
+    const after = before.slice(0, variants.start) + opt + before.slice(variants.end)
+    setStudio(s => ({ ...s, draft: after }))
+    setVariants(v => ({ ...v, applied: { idx, before, after } }))
+    showToast('已替换选段，该改法后面可「撤销」')
+  }
+  const undoVariant = () => {
+    if (studio.draft !== variants.applied.after &&
+      !confirm('替换之后草稿又有过修改，撤销会回到替换前的版本、丢掉之后的修改。继续？')) return
+    setStudio(s => ({ ...s, draft: variants.applied.before }))
+    setVariants(v => ({ ...v, applied: null })) // 撤销后三个候选恢复可选
+    showToast('已撤销替换')
   }
   const setPlatform = (p) => {
     setStudio(s => ({ ...s, platform: p }))
@@ -185,8 +204,16 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               <div style={{ margin: '6px 0 4px', color: 'var(--body2)' }}>{p.problem}</div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <span style={{ color: 'var(--sub2)', fontSize: 12.5, flex: 1 }}>建议：{p.suggestion}</span>
-                <button className="wb-btn-ghost" style={{ flex: 'none' }} disabled={applyingIdx !== null}
-                  onClick={() => applyCritique(p, i)}>{applyingIdx === i ? '改写中…' : '按此修改'}</button>
+                {p.applied ? (
+                  <>
+                    <span className="wb-pill" style={{ color: '#3f7350', background: 'rgba(63,115,80,.12)', flex: 'none' }}>✅ 已应用</span>
+                    <button className="wb-btn-ghost" style={{ flex: 'none' }} title="回到这条改写之前的版本"
+                      onClick={() => undoCritique(p, i)}>撤销</button>
+                  </>
+                ) : (
+                  <button className="wb-btn-ghost" style={{ flex: 'none' }} disabled={applyingIdx !== null}
+                    onClick={() => applyCritique(p, i)}>{applyingIdx === i ? '改写中…' : '按此修改'}</button>
+                )}
               </div>
             </div>
           ))}
@@ -203,10 +230,18 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             <button className="wb-note-del" style={{ flex: 'none' }} title="全部放弃" onClick={() => setVariants(null)}>✕</button>
           </div>
           {variants.options.map((opt, i) => (
-            <div key={i} style={{ borderTop: '1px solid var(--line08)', padding: '10px 0 8px', fontSize: 13 }}>
+            <div key={i} style={{ borderTop: '1px solid var(--line08)', padding: '10px 0 8px', fontSize: 13, opacity: variants.applied && variants.applied.idx !== i ? 0.5 : 1 }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
                 <span className="wb-pill" style={{ color: '#3f7350', background: 'rgba(63,115,80,.12)', flex: 'none' }}>{VARIANT_TAGS[i] || `改法${i + 1}`}</span>
-                <button className="wb-btn-ghost" style={{ marginLeft: 'auto', flex: 'none' }} onClick={() => applyVariant(opt)}>用这个替换</button>
+                {variants.applied?.idx === i ? (
+                  <>
+                    <span className="wb-pill" style={{ marginLeft: 'auto', color: '#3f7350', background: 'rgba(63,115,80,.12)', flex: 'none' }}>✅ 已替换</span>
+                    <button className="wb-btn-ghost" style={{ flex: 'none' }} title="撤销这次替换，三个候选恢复可选"
+                      onClick={undoVariant}>撤销</button>
+                  </>
+                ) : !variants.applied && (
+                  <button className="wb-btn-ghost" style={{ marginLeft: 'auto', flex: 'none' }} onClick={() => applyVariant(opt, i)}>用这个替换</button>
+                )}
               </div>
               <div style={{ marginTop: 6, color: 'var(--body2)', whiteSpace: 'pre-wrap' }}>{opt}</div>
             </div>

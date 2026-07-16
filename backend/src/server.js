@@ -340,6 +340,18 @@ app.post('/api/topics/:id/draft', async (req, res) => {
   }
 });
 
+// 可插入素材相关性排序（2026-07-16 用户实测：右侧素材按时间倒序，与当前草稿无关）。
+// 用主题匹配同款 TF 余弦（本地零成本）按草稿正文排序；draft 为空则退化为本主题优先+时间序。
+app.post('/api/studio/rank-materials', async (req, res) => {
+  try {
+    const { draft = '', topicId = null } = req.body;
+    const { rankMaterials } = await import('./services/material-ranking.js');
+    res.json({ success: true, data: rankMaterials(draft, topicId) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 平台模板列表（P1 文件化：platforms/ 目录扫描，加文件=加平台，前端动态渲染）
 app.get('/api/studio/platforms', async (req, res) => {
   try {

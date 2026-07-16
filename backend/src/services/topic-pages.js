@@ -17,7 +17,7 @@ const MATCH_THRESHOLD = 0.06;
 
 // 返回 { score, terms }：terms 是命中的共享关键词（按贡献权重排序，取前 8），
 // 随匹配结果存进 note_topics.matched_terms —— 用户必须能看到"为什么这条被并进来"
-function cosineTF(tokensA, tokensB) {
+export function cosineTF(tokensA, tokensB) {
   const empty = { score: 0, terms: [] };
   if (!tokensA.length || !tokensB.length) return empty;
   const tf = tokens => {
