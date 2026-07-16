@@ -1,4 +1,4 @@
-# instant-analysis · 即时分析
+# read-anything · 即时分析
 
 丢一个链接给你的 AI agent，得到一篇**基于真实原文/转写的中文结构化解读**，
 然后像 NotebookLM 一样围绕这份材料继续追问。
@@ -56,7 +56,7 @@ Agent：（只基于转写材料回答，带时间戳）
 ## 文件结构
 
 ```
-instant-analysis/
+read-anything/
 ├── SKILL.md          # Claude Code 触发入口（薄壳）
 ├── PLAYBOOK.md       # 通用剧本：路由/材料规范/降级链/诚实守则（agent 无关）★
 ├── templates/        # 解读模板（deep-read / brief / interview / paper / ideas + 你自己的）
