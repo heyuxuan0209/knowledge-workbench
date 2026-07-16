@@ -4,7 +4,7 @@
 
 它从信息洪流中筛出真正值得吸收的部分，沉淀加工成你自己的认知与产品灵感，再打磨成内容分发到多个平台；发布后的反馈回流进系统，让选题、信源与判断随每一次复盘持续进化。影响力不是目标本身，而是这条循环转起来之后的自然产物。
 
-**里程碑**：M1 沉淀层 → M5 多模态接入 已全部完成（2026-07-16）。当前阶段：手动跑通「探讨 → 深稿 → 发布 → 复盘」完整环路（见 [docs/VISION-V3.md](docs/VISION-V3.md) §六）。
+**里程碑**：M1 沉淀层 → M5 多模态接入 已全部完成（2026-07-16）。当前阶段：手动跑通「探讨 → 深稿 → 发布 → 复盘」完整环路。
 
 ---
 
@@ -106,13 +106,10 @@ knowledge-workbench/
 ├── frontend/src/
 │   ├── pages/WorkbenchPage.jsx    # 主壳：三栏工作台
 │   └── components/wb/             # 资讯/素材/主题/创作/信源/报告 各视图
-├── docs/
-│   ├── VISION-V3.md               # 蓝图：目标函数与完整环路 ★ 先读这个
-│   ├── PRODUCT-DESIGN-V2.md       # M1-M5 产品设计
-│   ├── DECISIONS.md               # 架构决策记录（ADR-001~015）
-│   └── RESEARCH-*.md              # 专项调研（多源接入/主题匹配/管道扩展）
 └── reference/prompts/             # 产品化 prompt（文件即行为，改文件即改产品）
 ```
+
+> 设计蓝图、架构决策记录（ADR）、专项调研等文档在本地维护，暂未随仓库公开。
 
 ---
 
@@ -127,14 +124,6 @@ knowledge-workbench/
 | 验证 | Playwright 驱动真实 UI 的端到端验证 |
 
 **成本原则：本地零成本优先。** 主题匹配（TF 余弦）、热度统计、关键词动向全部本地计算不走 LLM；LLM 只用在翻译、摘要、同化、起稿等真正需要语言能力的环节，且批量合并调用。
-
----
-
-## 📖 延伸阅读
-
-- [docs/VISION-V3.md](docs/VISION-V3.md) —— 目标函数、沙漏模型、八个环节、落地顺序
-- [docs/DECISIONS.md](docs/DECISIONS.md) —— 为什么这么做（ADR-001~015）
-- [docs/RESEARCH-TOPIC-MATCHING.md](docs/RESEARCH-TOPIC-MATCHING.md) —— 主题匹配的下一步
 
 ---
 
