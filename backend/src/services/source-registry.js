@@ -89,6 +89,9 @@ export async function identifyInput(rawInput) {
   const host = url.hostname.replace(/^www\./, '');
 
   // ---- X / Twitter：从链接提取用户名（支持个人主页和推文链接） ----
+  // 借道 AI HOT（2026-07-16 用户拍板）：X 直接抓取属登录态渠道（后置），登记为 passive——
+  // AI HOT 转载的同 handle 内容会按 platform+handle 自动归属此源并进 Feed 加权，
+  // 不再标 active-query（那档只会被 sync 永远跳过，用户看到的就是"加了没反应"）
   if (host === 'x.com' || host === 'twitter.com') {
     const handle = url.pathname.split('/').filter(Boolean)[0];
     if (!handle || ['home', 'search', 'explore', 'i'].includes(handle)) {
@@ -99,8 +102,8 @@ export async function identifyInput(rawInput) {
       displayName: handle,
       platform: 'X',
       handle,
-      trackMode: 'active-query',
-      note: 'AI HOT 已覆盖的 builder 会自动推送；X 主动查询属登录态渠道，解锁需授权（ADR-014），当前执行器跳过',
+      trackMode: 'passive',
+      note: 'X 暂不支持直接抓取（需登录态）。已登记借道 AI HOT：该作者被 AI HOT 转载的热门内容会自动归属此源、进 Feed 并加权',
     };
   }
 
@@ -241,6 +244,36 @@ export async function identifyInput(rawInput) {
   }
 }
 
+// 官方源包（2026-07-16 反馈 #9：想关注 Claude/OpenAI/Anthropic/ChatGPT/Google 官方动态与研究）。
+// 每条 feed 都实测可达后才入包（2026-07-16 验证）。Anthropic 官网不提供 RSS（/rss.xml 404），
+// 用社区维护的镜像 feed（Olshansk/rss-feeds，逐日从官网生成）；OpenAI/Google 系为官方 feed。
+export const OFFICIAL_PACK = [
+  { displayName: 'Anthropic News（Claude 官方动态）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml', siteUrl: 'https://www.anthropic.com/news' },
+  { displayName: 'Anthropic Engineering（工程博客）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml', siteUrl: 'https://www.anthropic.com/engineering' },
+  { displayName: 'Anthropic Research（研究文章）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_research.xml', siteUrl: 'https://www.anthropic.com/research' },
+  { displayName: 'OpenAI News（含 ChatGPT 发布动态）', feedUrl: 'https://openai.com/news/rss.xml', siteUrl: 'https://openai.com/news' },
+  { displayName: 'Google AI Blog', feedUrl: 'https://blog.google/technology/ai/rss/', siteUrl: 'https://blog.google/technology/ai/' },
+  { displayName: 'Google Research Blog', feedUrl: 'https://research.google/blog/rss/', siteUrl: 'https://research.google/blog/' },
+  { displayName: 'Google DeepMind Blog', feedUrl: 'https://deepmind.google/blog/rss.xml', siteUrl: 'https://deepmind.google/blog/' },
+];
+
+// 一键登记官方源包（findOrCreate 幂等，重复点击不会建重）
+export function registerOfficialPack() {
+  const results = [];
+  for (const p of OFFICIAL_PACK) {
+    try {
+      const source = registerSource({
+        sourceType: 'Blog', displayName: p.displayName, platform: 'RSS',
+        handle: p.feedUrl, trackMode: 'active-rss', feedUrl: p.feedUrl, siteUrl: p.siteUrl,
+      });
+      results.push({ displayName: p.displayName, success: true, sourceId: source.id });
+    } catch (err) {
+      results.push({ displayName: p.displayName, success: false, error: err.message });
+    }
+  }
+  return results;
+}
+
 // 登记：findOrCreate（按 platform+handle 判重，与 contents.js 的 findOrCreateSource 同约定）
 // 已存在的 Source（如 AI HOT 同步时自动建的）→ 标记 registered_by_user=1，不重复建。
 export function registerSource(identified) {
@@ -248,8 +281,10 @@ export function registerSource(identified) {
   const db = getDatabase();
 
   try {
+    // handle 大小写不敏感（X/GitHub/YouTube 的 handle 均不区分大小写）：
+    // 用户登记 karpathy、AI HOT 写 Karpathy 时必须合并成同一个源，否则借道归属失效
     const existing = db
-      .prepare('SELECT source_id FROM source_platforms WHERE platform = ? AND handle = ?')
+      .prepare('SELECT source_id FROM source_platforms WHERE platform = ? AND handle = ? COLLATE NOCASE')
       .get(platform, handle);
 
     let sourceId;

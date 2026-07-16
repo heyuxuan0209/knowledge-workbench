@@ -93,14 +93,17 @@ export async function* streamChat(messages, provider = 'deepseek', model = null)
 }
 
 // 非流式聊天（用于测试）
-export async function chat(messages, provider = 'deepseek', model = null) {
+// options.temperature：报告类生成传 0——同样的输入尽量给同样的输出，
+// 否则"重新生成"每次内容都变，用户无法信任报告（2026-07-16 反馈 #1）
+export async function chat(messages, provider = 'deepseek', model = null, options = {}) {
   if (provider === 'deepseek') {
     const modelName = model || 'deepseek-chat';
 
     try {
       const response = await deepseekClient().chat.completions.create({
         model: modelName,
-        messages: messages
+        messages: messages,
+        ...(options.temperature !== undefined ? { temperature: options.temperature } : {})
       });
 
       const content = response.choices[0]?.message?.content || '';

@@ -357,6 +357,7 @@ CREATE TABLE IF NOT EXISTS note_topics (
     status TEXT DEFAULT 'pending'
         CHECK (status IN ('pending', 'assimilated')),
     relevance REAL DEFAULT 1.0,         -- 自动匹配的相似度；用户手动指定为 1.0
+    matched_terms TEXT,                 -- 匹配命中的共享关键词（JSON 数组，M6：可解释性到关键词级）
     added_by TEXT DEFAULT 'ai'
         CHECK (added_by IN ('ai', 'user')),
     created_at TEXT DEFAULT (datetime('now')),

@@ -23,12 +23,20 @@ export function timeAgo(isoString) {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-// track_mode 四档配色与中文（与原型 MODES 一致）
+// track_mode 四档配色与中文（人话版，2026-07-16 反馈 #7：每个源的真实能力必须写明白）
 export const MODES = {
-  'passive': { fg: '#706b60', bg: 'rgba(33,31,26,.08)', cn: '仅标记加权' },
-  'active-rss': { fg: '#3f7350', bg: 'rgba(63,115,80,.12)', cn: 'RSS 轮询' },
-  'active-query': { fg: '#3d5a80', bg: 'rgba(61,90,128,.12)', cn: '主动查询' },
-  'link-only': { fg: '#a9791f', bg: 'rgba(169,121,31,.12)', cn: '仅标记跳转' },
+  'passive': { fg: '#706b60', bg: 'rgba(33,31,26,.08)', cn: '借道推送' },
+  'active-rss': { fg: '#3f7350', bg: 'rgba(63,115,80,.12)', cn: 'RSS 自动抓取' },
+  'active-query': { fg: '#3d5a80', bg: 'rgba(61,90,128,.12)', cn: '每日主动查询' },
+  'link-only': { fg: '#a9791f', bg: 'rgba(169,121,31,.12)', cn: '仅登记跳转' },
+}
+
+// 信源真实能力的人话说明（只在需要解释时返回，如 X 借道 / 公众号不抓取）
+export function sourceModeNote(p) {
+  if (p.platform === 'X') return 'X 暂不能直接抓取（需登录态）：该作者被 AI HOT 转载的热门内容会自动归属此源并加权进 Feed'
+  if (p.platform === 'WeChat') return '公众号无公开接口：只登记不抓取；其文章被 AI HOT 收录时会进入 Feed'
+  if (p.track_mode === 'link-only') return '该网站未发现 RSS：只登记跳转，无法自动追踪更新'
+  return null
 }
 
 export const STANCE_COLORS = {

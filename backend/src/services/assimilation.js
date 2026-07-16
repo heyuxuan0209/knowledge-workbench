@@ -23,9 +23,9 @@ function buildPrompt(topic, body, notes) {
     ? body.views.map(v => `- ${v.who}：${v.what}${v.conflict ? '（⚡与他方冲突）' : ''} [${v.ref}]`).join('\n')
     : '（暂无）';
 
-  return `你是一位知识库维护者，负责维护主题「${topic.name}」的活页综述（一份持续演进的认知文档）。
+  return `你是一位知识库维护者，负责维护主题「${topic.name}」的主题页综述（一份持续演进的认知文档）。
 
-# 活页现状
+# 主题页现状
 ## 当前认知
 ${body.current || '（空白——这是第一次并入素材，请从零写出综述）'}
 
@@ -38,7 +38,7 @@ ${body.consensus || '（暂无）'}
 # 新并入的素材
 ${notesBlock}
 
-请把新素材同化进活页：补充新证据、修正过时论断、标记观点冲突。输出 JSON（不要 markdown 代码块）：
+请把新素材同化进主题页：补充新证据、修正过时论断、标记观点冲突。输出 JSON（不要 markdown 代码块）：
 {
   "current": "更新后的当前认知综述（300字内，保留仍然成立的旧结论，融入新信息）",
   "views": [
@@ -82,12 +82,12 @@ export async function removeNoteFromTopic(topicId, noteId) {
   try {
     const result = await chat([{
       role: 'user',
-      content: `主题「${topic.name}」的活页综述中，以下素材被用户移出（不再属于该主题），请修订活页：删除**仅由这条素材支撑**的论点、观点（views 里出处指向它的条目）和共识描述；其他素材支撑的内容原样保留，不要改写。输出 JSON（不要 markdown 代码块）：{"current": "...", "views": [{"who","what","ref","conflict"}], "consensus": "...", "changelog": "一句话说明移出了什么、删了哪些论点（40字内）"}
+      content: `主题「${topic.name}」的主题页综述中，以下素材被用户移出（不再属于该主题），请修订综述：删除**仅由这条素材支撑**的论点、观点（views 里出处指向它的条目）和共识描述；其他素材支撑的内容原样保留，不要改写。输出 JSON（不要 markdown 代码块）：{"current": "...", "views": [{"who","what","ref","conflict"}], "consensus": "...", "changelog": "一句话说明移出了什么、删了哪些论点（40字内）"}
 
 # 被移出的素材（来源：${note.source_title || '未知'}）
 ${note.excerpt.slice(0, 1500)}
 
-# 当前活页
+# 当前主题页
 ## 当前认知
 ${body.current}
 ## 各方观点

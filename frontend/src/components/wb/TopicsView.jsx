@@ -13,7 +13,7 @@ const PHASE = {
   archived: { label: '已归档', fg: '#706b60', bg: 'rgba(33,31,26,.08)' },
 }
 
-export default function TopicsView({ topics, loadTopics, topicView, setTopicView, activeTopic, setActiveTopic, setPage, setStudio, showToast }) {
+export default function TopicsView({ topics, loadTopics, topicView, setTopicView, activeTopic, setActiveTopic, setPage, setStudio, showToast, returnPage, goBack }) {
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
 
@@ -27,7 +27,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       const json = await api('/api/topics', { method: 'POST', body: { name: s.name, description: s.why } })
       setSuggestions(prev => prev.filter(x => x.name !== s.name))
       await loadTopics()
-      showToast(`已建立活页「${s.name}」${json.data.backfilled ? `，回扫到 ${json.data.backfilled} 条相关素材` : ''}`)
+      showToast(`已建立主题页「${s.name}」${json.data.backfilled ? `，回扫到 ${json.data.backfilled} 条相关素材` : ''}`)
     } catch (err) { showToast(`建页失败：${err.message}`) }
   }
   const dismissSug = async (s) => {
@@ -49,6 +49,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
   if (topicView === 'page' && activeTopic) {
     return <TopicDetail topicId={activeTopic.id} back={() => { setTopicView('list'); loadTopics() }}
       onDelete={(tp) => deleteTopic(tp, { fromDetail: true })}
+      returnPage={returnPage} goBack={goBack}
       setPage={setPage} setStudio={setStudio} showToast={showToast} />
   }
 
@@ -66,8 +67,8 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       await loadTopics()
       setQuery('')
       showToast(json.data.backfilled
-        ? `已建立活页「${name}」，找到 ${json.data.backfilled} 条相关素材，AI 正在生成综述（约半分钟后刷新可见）`
-        : `已建立活页「${name}」，之后保存的相关素材会自动并入综述`)
+        ? `已建立主题页「${name}」，找到 ${json.data.backfilled} 条相关素材，AI 正在生成综述（约半分钟后刷新可见）`
+        : `已建立主题页「${name}」，之后保存的相关素材会自动并入综述`)
       setActiveTopic(json.data); setTopicView('page')
     } catch (err) { showToast(`建页失败：${err.message}`) } finally { setCreating(false) }
   }
@@ -78,12 +79,12 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       <div className="wb-page-sub">每个主题是一篇 AI 帮你持续维护的综述：存进新素材，它自动更新正文、标出分歧，并记下每次修改</div>
 
       <div className="wb-acquire" style={{ marginTop: 16 }}>
-        <input placeholder="搜索已有主题，或输入新主题名建立活页…" value={query}
+        <input placeholder="搜索已有主题，或输入新主题名建立主题页…" value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && filtered.length === 0) createTopic() }} />
         <button className="wb-btn-primary" disabled={creating} onClick={() => {
           if (filtered.length === 0 && query.trim()) createTopic()
-        }}>{creating ? '建页中…' : (query.trim() && filtered.length === 0 ? '建立活页' : '搜索')}</button>
+        }}>{creating ? '建页中…' : (query.trim() && filtered.length === 0 ? '建立主题页' : '搜索')}</button>
       </div>
       <div className="wb-feedbar" style={{ margin: '12px 0 0' }}>
         <span>排序 <b>最近活跃</b></span>
@@ -108,7 +109,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
 
       {topics.length === 0 && (
         <div className="wb-empty">
-          还没有主题活页。<br />
+          还没有主题页。<br />
           在上方输入主题名建页——之后每次保存素材，AI 会自动把相关内容并入综述、记下修订；<br />
           简报里的选题也可以「升级为主题」在这里建页。
         </div>
@@ -143,7 +144,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
   )
 }
 
-function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast }) {
+function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast, returnPage, goBack }) {
   const [topic, setTopic] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -169,6 +170,9 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
   return (
     <>
       <button className="wb-back" onClick={back}>← 主题库</button>
+      {returnPage === 'reports' && (
+        <button className="wb-back" style={{ marginLeft: 10 }} onClick={goBack}>← 返回周报</button>
+      )}
       <div className="wb-topic-head" style={{ marginTop: 6 }}>
         <span className="wb-topic-name">{topic.name}</span>
         <button className="wb-note-del" title="重命名主题（AI 会先给 3 个候选名）" onClick={async () => {
@@ -232,7 +236,10 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{n.title || n.source_title || '未命名素材'}</div>
               <div style={{ fontSize: 12.5, color: 'var(--body2)', lineHeight: 1.6, marginTop: 4 }}>{n.excerpt.slice(0, 120)}…</div>
-              <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 4 }}>来源：{n.source_title || '未知'} · 匹配度 {Math.round((n.relevance || 0) * 100)}%</div>
+              <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 4 }}>
+                来源：{n.source_title || '未知'} · 匹配度 {Math.round((n.relevance || 0) * 100)}%
+                {(n.matched_terms || []).length > 0 && <> · 因共享「{n.matched_terms.slice(0, 5).join('」「')}」被匹配</>}
+              </div>
             </div>
             <button className="wb-note-del" style={{ flex: 'none' }} title="不属于这个主题，移除（素材本身保留）"
               onClick={async () => {
@@ -255,7 +262,11 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast })
               <span style={{ minWidth: 0, flex: 1, fontSize: 12.5 }}>
                 <b>{n.title || n.source_title || '未命名素材'}</b>
                 {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文" style={{ marginLeft: 4, color: 'var(--accent)', textDecoration: 'none' }}>↗</a>}
-                <span style={{ color: 'var(--sub2)' }}> · {(n.assimilated_at || '').slice(5, 10)} · {n.added_by === 'user' ? '手动归入' : `自动匹配 ${Math.round((n.relevance || 0) * 100)}%`}</span>
+                <span style={{ color: 'var(--sub2)' }}
+                  title={(n.matched_terms || []).length ? `匹配依据（共享关键词）：${n.matched_terms.join('、')}` : undefined}>
+                  {' '}· {(n.assimilated_at || '').slice(5, 10)} · {n.added_by === 'user' ? '手动归入' : `自动匹配 ${Math.round((n.relevance || 0) * 100)}%`}
+                  {n.added_by !== 'user' && (n.matched_terms || []).length > 0 && <>（共享「{n.matched_terms.slice(0, 3).join('」「')}」）</>}
+                </span>
               </span>
               <button className="wb-note-del" style={{ flex: 'none' }} title="移出该素材并修订综述（约 20 秒）"
                 onClick={async () => {

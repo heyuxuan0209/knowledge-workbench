@@ -56,7 +56,7 @@ export async function getTopicSuggestions({ force = false } = {}) {
 
   const result = await chat([{
     role: 'user',
-    content: `你是知识库管理者。根据一位 AI 产品经理/自媒体人的近期信息流信号，建议 2-3 个值得建立长期研究主题（活页）的方向。
+    content: `你是知识库管理者。根据一位 AI 产品经理/自媒体人的近期信息流信号，建议 2-3 个值得建立长期研究主题（主题页）的方向。
 
 # 近期热点聚类（他信息流里的多源事件）
 ${stories.map(s => `- 【${s.source_count}源】${s.headline}`).join('\n') || '（无）'}

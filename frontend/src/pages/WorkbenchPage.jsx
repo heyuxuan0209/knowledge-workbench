@@ -63,10 +63,12 @@ export default function WorkbenchPage() {
   const [returnPage, setReturnPage] = useState(null)
   const gotoNote = (noteId) => { setReturnPage(page); setHighlightNoteId(noteId); setPage('notes') }
   const goBack = () => { if (returnPage) { setPage(returnPage); setReturnPage(null) } }
-  // 从创作台来源芯片跳回主题详情
-  const gotoTopic = (topicId) => {
+  // 从创作台来源芯片/周报跳到主题详情；remember=true 时记住来路（周报里点主题跳走要能返回）
+  const gotoTopic = (topicId, { remember = false } = {}) => {
     const tp = topics.find(t => t.id === topicId)
-    if (tp) { setActiveTopic(tp); setTopicView('page'); setPage('topics') }
+    if (!tp) { showToast('该主题页已被删除'); return }
+    if (remember) setReturnPage(page)
+    setActiveTopic(tp); setTopicView('page'); setPage('topics')
   }
 
   // 主题 / 创作台
@@ -243,6 +245,21 @@ export default function WorkbenchPage() {
   }, [selectedItems, analysisMode])
 
   // ---- 信源 ----
+  // 全量同步（反馈 #7：旧"刷新"只走 AI HOT，登记的 RSS/主动查询源永远不出新内容）
+  const [syncing, setSyncing] = useState(false)
+  const syncAllSources = async () => {
+    if (syncing) return
+    setSyncing(true)
+    showToast('正在同步全部信源（AI HOT + RSS + 主动查询），可能需要 1-3 分钟…')
+    try {
+      const json = await api('/api/sync-all', { method: 'POST' })
+      const ch = json.data.channels || {}
+      const skipped = ch.activeQuery?.skipped?.length || 0
+      showToast(`同步完成：AI HOT ${ch.aihot?.count ?? 0} 条 · RSS ${ch.rss?.count ?? 0} 条 · 主动查询新增 ${ch.activeQuery?.inserted ?? 0} 条${skipped ? `；${skipped} 个源暂不支持直接抓取（见信源页说明）` : ''}`)
+      loadContents(); loadSources(); loadBrief()
+    } catch (err) { showToast(`同步失败：${err.message}`) } finally { setSyncing(false) }
+  }
+
   const followSource = async (contentId) => {
     try {
       const json = await api(`/api/contents/${contentId}/follow-source`, { method: 'POST' })
@@ -276,7 +293,7 @@ export default function WorkbenchPage() {
       const json = await api('/api/topics/from-idea', { method: 'POST', body: { ideaId: idea.id } })
       await loadTopics()
       setActiveTopic(json.data); setTopicView('page'); setPage('topics')
-      showToast(`已升级为主题活页「${json.data.name}」，AI 将随素材并入持续维护综述`)
+      showToast(`已升级为主题页「${json.data.name}」，AI 将随素材并入持续维护综述`)
     } catch (err) {
       setPage('topics'); setTopicView('list')
       showToast(`建页失败：${err.message}`)
@@ -299,7 +316,7 @@ export default function WorkbenchPage() {
   genDraftRef.current = async (platform = studio.platform, sourceContentId = studio.sourceContentId) => {
     // 活页起稿（M4）：活页综述做骨架 + 已并入素材可溯源引用，生成即落库
     if (studio.sourceTopicId) {
-      setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在基于主题活页起稿（约 30 秒）…' }))
+      setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在基于主题页起稿（约 30 秒）…' }))
       try {
         const json = await api(`/api/topics/${studio.sourceTopicId}/draft`, { method: 'POST', body: { platform, viewpoint: studio.viewpoint || null } })
         const d = json.data
@@ -309,7 +326,7 @@ export default function WorkbenchPage() {
           refs: d.paragraph_refs.map(r => ({ note: r.sourceTitle || '素材', para: r.marker })),
         }))
         loadDrafts()
-        showToast(`已基于活页起稿并存入草稿箱（引用 ${d.paragraph_refs.length} 条素材，¥${d.cost_yuan?.toFixed(3)}）`)
+        showToast(`已基于主题页起稿并存入草稿箱（引用 ${d.paragraph_refs.length} 条素材，¥${d.cost_yuan?.toFixed(3)}）`)
         return
       } catch (err) {
         setStudio(s => ({ ...s, busy: false }))
@@ -495,7 +512,7 @@ export default function WorkbenchPage() {
 
   const pageProps = {
     showToast, contents, report, stories, ghTrending, notes, sources, topics,
-    selectedItems, toggleSelect, followSource, acquire,
+    selectedItems, toggleSelect, followSource, acquire, syncing, syncAllSources,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea,
     loadNotes, loadSources, loadTopics, setPage, setModal,
     topicView, setTopicView, activeTopic, setActiveTopic,

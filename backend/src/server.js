@@ -625,9 +625,26 @@ app.post('/api/reports/generate-period', async (req, res) => {
 app.get('/api/notes', async (req, res) => {
   try {
     const { getNotes } = await import('./db/notes.js');
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = parseInt(req.query.offset) || 0;
-    res.json({ success: true, data: getNotes(limit, offset) });
+    res.json({
+      success: true,
+      data: getNotes({
+        limit: parseInt(req.query.limit) || 50,
+        offset: parseInt(req.query.offset) || 0,
+        q: req.query.q || null,
+        topicId: req.query.topicId || null,
+        source: req.query.source || null,
+      }),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 素材来源下拉选项（按素材数排序）
+app.get('/api/notes/sources', async (req, res) => {
+  try {
+    const { getNoteSources } = await import('./db/notes.js');
+    res.json({ success: true, data: getNoteSources() });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -713,6 +730,16 @@ app.post('/api/sources/register', async (req, res) => {
     const { registerSource } = await import('./services/source-registry.js');
     const source = registerSource(identified);
     res.json({ success: true, data: source });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 一键登记官方源包（Anthropic/OpenAI/Google 系，feed 均已实测；幂等可重复点）
+app.post('/api/sources/register-pack', async (req, res) => {
+  try {
+    const { registerOfficialPack } = await import('./services/source-registry.js');
+    res.json({ success: true, data: registerOfficialPack() });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -835,6 +862,23 @@ app.post('/api/sync', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// 全量同步（2026-07-16 反馈 #7：此前前端"刷新"只走 AI HOT，登记的 RSS/主动查询源
+// 永远不会因刷新出新内容）。三条链顺序跑、单链失败不阻塞其余，逐渠道返回结果与跳过原因。
+app.post('/api/sync-all', async (req, res) => {
+  const channels = {};
+  const run = async (name, fn) => {
+    try { channels[name] = await fn(); }
+    catch (error) { channels[name] = { success: false, error: error.message }; }
+  };
+
+  await run('aihot', async () => (await import('./services/sync-aihot.js')).syncAIHotData());
+  await run('rss', async () => (await import('./services/sync-rss.js')).syncRSSData());
+  await run('activeQuery', async () => (await import('./services/sync-active-query.js')).syncActiveQuery());
+
+  const total = (channels.aihot?.count || 0) + (channels.rss?.count || 0) + (channels.activeQuery?.inserted || 0);
+  res.json({ success: true, data: { total, channels } });
 });
 
 // ========== v0.2.0 工作区对话 API ==========

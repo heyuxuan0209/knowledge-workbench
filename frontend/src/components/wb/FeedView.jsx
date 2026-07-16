@@ -78,7 +78,7 @@ function ReaderModal({ content, onClose }) {
 
 export default function FeedView({
   contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, acquire,
-  generateReport, generating, viewIdea, upgradeIdea, createFromIdea, setPage,
+  generateReport, generating, viewIdea, upgradeIdea, createFromIdea, setPage, syncing, syncAllSources,
 }) {
   const [acquireVal, setAcquireVal] = useState('')
   const [ingesting, setIngesting] = useState(false)
@@ -231,6 +231,10 @@ export default function FeedView({
         <span>排序 <b>综合热度</b></span>
         <span className="wb-feedbar-sep">|</span>
         <span>过滤 <b>全部</b></span>
+        <button className="wb-brief-link" disabled={syncing} onClick={syncAllSources}
+          title="同步全部信源：AI HOT + RSS 抓取 + B站/YouTube/GitHub 主动查询">
+          {syncing ? '同步中…' : '↻ 同步信源'}
+        </button>
         <span className="wb-feedbar-count">共 {contents.length} 条</span>
       </div>
 

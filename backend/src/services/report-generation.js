@@ -188,7 +188,49 @@ function getReportWithIdeas(db, reportId) {
       non_consensus: JSON.parse(i.non_consensus || '[]'),
       supporting_content_ids: JSON.parse(i.supporting_content_ids || '[]'),
     }));
+  resolveReportRefs(db, report);
   return report;
+}
+
+// 读取时把报告里的 contentIds/noteIds 解析成可点击的 {id, title, url}（2026-07-16 反馈：
+// 周报每句话都要能点过去验证）。读取时解析而非落库冗余：内容被删后自然消失，不会留死链。
+// 兼容旧报告：emergent.links/conflicts 的字符串条目归一为 {text}。
+function resolveReportRefs(db, report) {
+  const contentIds = new Set();
+  const noteIds = new Set();
+  const collect = (item) => {
+    (item?.contentIds || []).forEach(id => contentIds.add(id));
+    (item?.noteIds || []).forEach(id => noteIds.add(id));
+  };
+
+  for (const t of report.trends) collect(t);
+  const em = report.emergent || {};
+  for (const key of ['newTopics', 'links', 'conflicts']) {
+    em[key] = (em[key] || []).map(item => (typeof item === 'string' ? { text: item } : item));
+    em[key].forEach(collect);
+  }
+  for (const idea of report.ideas) (idea.supporting_content_ids || []).forEach(id => contentIds.add(id));
+
+  const inClause = (ids) => ids.map(() => '?').join(',');
+  const contentMap = new Map(contentIds.size
+    ? db.prepare(`SELECT id, COALESCE(zh_title, en_title) AS title, url FROM contents WHERE id IN (${inClause([...contentIds])})`)
+        .all(...contentIds).map(r => [r.id, r])
+    : []);
+  const noteMap = new Map(noteIds.size
+    ? db.prepare(`SELECT id, COALESCE(title, source_title, substr(excerpt, 1, 40)) AS title FROM notes WHERE id IN (${inClause([...noteIds])})`)
+        .all(...noteIds).map(r => [r.id, r])
+    : []);
+
+  const attach = (item) => {
+    if (!item) return;
+    if (item.contentIds?.length) item.articles = item.contentIds.map(id => contentMap.get(id)).filter(Boolean);
+    if (item.noteIds?.length) item.notes = item.noteIds.map(id => noteMap.get(id)).filter(Boolean);
+  };
+  report.trends.forEach(attach);
+  for (const key of ['newTopics', 'links', 'conflicts']) em[key].forEach(attach);
+  for (const idea of report.ideas) {
+    idea.supporting_contents = (idea.supporting_content_ids || []).map(id => contentMap.get(id)).filter(Boolean);
+  }
 }
 
 export function getLatestReport(periodType = 'daily') {

@@ -6,8 +6,10 @@ import { randomUUID } from 'crypto';
 function findOrCreateSource(db, sourceInfo) {
   if (!sourceInfo) return null;
 
+  // handle 大小写不敏感：AI HOT 的 @Handle 写法与用户登记的 handle 大小写可能不同，
+  // 必须合并成同一个源（X 借道归属依赖这一点）
   const existing = db
-    .prepare('SELECT source_id FROM source_platforms WHERE platform = ? AND handle = ?')
+    .prepare('SELECT source_id FROM source_platforms WHERE platform = ? AND handle = ? COLLATE NOCASE')
     .get(sourceInfo.platform, sourceInfo.handle);
 
   if (existing) return existing.source_id;

@@ -19,9 +19,9 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
       const r = result.data;
       console.log(`\n📰 ${r.period_key} ${periodType === 'weekly' ? '周报' : '月报'}`);
       console.log(`导语: ${r.summary}`);
-      console.log(`动向 ${r.trends.length} 条 / 活页更新 ${r.page_changes.length} 项 / 选题 ${r.ideas.length} 个`);
+      console.log(`动向 ${r.trends.length} 条 / 主题页更新 ${r.page_changes.length} 项 / 选题 ${r.ideas.length} 个`);
       for (const t of r.trends) console.log(`  ${t.direction === 'rising' ? '↗' : '↘'} ${t.theme}：${t.evidence}`);
-      for (const n of r.emergent.newTopics || []) console.log(`  🌱 建议新活页「${n.name}」：${n.why}`);
+      for (const n of r.emergent.newTopics || []) console.log(`  🌱 建议新主题页「${n.name}」：${n.why}`);
       for (const c of r.emergent.conflicts || []) console.log(`  ⚡ ${c}`);
       for (const idea of r.ideas) console.log(`  💡 ${idea.title}`);
     } else {

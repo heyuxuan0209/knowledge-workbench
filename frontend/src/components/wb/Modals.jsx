@@ -34,7 +34,17 @@ export function IdeaModal({ idea, onClose, onUpgrade, onCreate, onDismiss }) {
       <Label>非共识（{idea.non_consensus.length}）</Label>
       <Body>{idea.non_consensus.length ? idea.non_consensus.map((c, i) => <div key={i}>· {c}</div>) : '（无）'}</Body>
       <Label>支撑素材（{(idea.supporting_content_ids || []).length}）</Label>
-      <Body style={{ color: 'var(--sub)' }}>来自你的信息流，创作时可溯源引用</Body>
+      <Body>
+        {(idea.supporting_contents || []).length
+          ? idea.supporting_contents.map(c => (
+            <div key={c.id}>
+              · {c.url
+                ? <a href={c.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>{c.title || '(无标题)'} ↗</a>
+                : (c.title || '(无标题)')}
+            </div>
+          ))
+          : <span style={{ color: 'var(--sub)' }}>{(idea.supporting_content_ids || []).length ? '（原文已从信息流删除）' : '（本选题没有引用具体文章）'}</span>}
+      </Body>
       <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
         <button className="wb-btn-primary" onClick={onUpgrade}>升级为常驻主题</button>
         <button className="wb-btn-outline" onClick={() => onCreate('thread')}>创作 thread</button>

@@ -15,8 +15,11 @@ export const EMPTY_BODY = { current: '', views: [], consensus: '' };
 // 匹配结果只是"待并入"建议（pending），误挂由用户在并入前把关，宁可略松。
 const MATCH_THRESHOLD = 0.06;
 
+// 返回 { score, terms }：terms 是命中的共享关键词（按贡献权重排序，取前 8），
+// 随匹配结果存进 note_topics.matched_terms —— 用户必须能看到"为什么这条被并进来"
 function cosineTF(tokensA, tokensB) {
-  if (!tokensA.length || !tokensB.length) return 0;
+  const empty = { score: 0, terms: [] };
+  if (!tokensA.length || !tokensB.length) return empty;
   const tf = tokens => {
     const m = new Map();
     for (const t of tokens) m.set(t, (m.get(t) || 0) + 1);
@@ -25,16 +28,19 @@ function cosineTF(tokensA, tokensB) {
   const a = tf(tokensA), b = tf(tokensB);
   const [small, big] = a.size <= b.size ? [a, b] : [b, a];
   let dot = 0;
-  let shared = 0;
+  const hits = [];
   for (const [t, w] of small) {
     const w2 = big.get(t);
-    if (w2) { dot += w * w2; shared++; }
+    if (w2) { dot += w * w2; hits.push([t, w * w2]); }
   }
   // 短文档下单个泛词（本产品里 'ai' 无处不在）就能凑出高余弦——实测曾把无关素材
   // 误配进主题并触发自动同化污染活页。至少 2 个不同共享词才算相关。
-  if (shared < 2) return 0;
+  if (hits.length < 2) return empty;
   const norm = m => Math.sqrt([...m.values()].reduce((s, w) => s + w * w, 0)) || 1;
-  return dot / (norm(a) * norm(b));
+  return {
+    score: dot / (norm(a) * norm(b)),
+    terms: hits.sort((x, y) => y[1] - x[1]).slice(0, 8).map(([t]) => t),
+  };
 }
 
 function parseBody(row) {
@@ -86,24 +92,29 @@ export function getTopicDetail(topicId) {
     SELECT * FROM topic_changelog WHERE topic_id = ? ORDER BY created_at DESC LIMIT 50
   `).all(topicId).map(c => ({ ...c, note_ids: JSON.parse(c.note_ids || '[]') }));
 
-  topic.pending_notes = db.prepare(`
-    SELECT n.id, n.title, n.excerpt, n.source_title, n.source_url, nt.relevance, nt.created_at AS linked_at
+  const parseTerms = rows => rows.map(r => {
+    try { return { ...r, matched_terms: JSON.parse(r.matched_terms || '[]') }; }
+    catch { return { ...r, matched_terms: [] }; }
+  });
+
+  topic.pending_notes = parseTerms(db.prepare(`
+    SELECT n.id, n.title, n.excerpt, n.source_title, n.source_url, nt.relevance, nt.matched_terms, nt.created_at AS linked_at
     FROM note_topics nt JOIN notes n ON nt.note_id = n.id
     WHERE nt.topic_id = ? AND nt.status = 'pending'
     ORDER BY nt.created_at DESC
-  `).all(topicId);
+  `).all(topicId));
 
   // 已并入素材清单（可移出，见 assimilation.removeNoteFromTopic）：
   // 用户必须能看到"这页综述由哪些素材长成"，误并才有察觉与撤销的机会
-  topic.assimilated_notes = db.prepare(`
+  topic.assimilated_notes = parseTerms(db.prepare(`
     SELECT n.id, n.title, n.excerpt, n.source_title, n.source_url, c.url AS content_url,
-           nt.relevance, nt.added_by, nt.assimilated_at
+           nt.relevance, nt.matched_terms, nt.added_by, nt.assimilated_at
     FROM note_topics nt
     JOIN notes n ON nt.note_id = n.id
     LEFT JOIN contents c ON n.content_id = c.id
     WHERE nt.topic_id = ? AND nt.status = 'assimilated'
     ORDER BY nt.assimilated_at DESC
-  `).all(topicId);
+  `).all(topicId));
   topic.assimilated_count = topic.assimilated_notes.length;
 
   db.close();
@@ -129,7 +140,7 @@ export function createTopic({ name, description = null }) {
 
   db.prepare(`
     INSERT INTO topic_changelog (id, topic_id, change_type, summary) VALUES (?, ?, 'created', ?)
-  `).run(randomUUID(), id, `建立活页「${name.trim()}」`);
+  `).run(randomUUID(), id, `建立主题页「${name.trim()}」`);
 
   const linked = backfillMatchesForTopic(db, id);
   db.close();
@@ -240,14 +251,14 @@ export function matchNoteToTopics(noteId) {
 
   const matched = [];
   const link = db.prepare(`
-    INSERT OR IGNORE INTO note_topics (note_id, topic_id, status, relevance, added_by)
-    VALUES (?, ?, 'pending', ?, 'ai')
+    INSERT OR IGNORE INTO note_topics (note_id, topic_id, status, relevance, matched_terms, added_by)
+    VALUES (?, ?, 'pending', ?, ?, 'ai')
   `);
   for (const t of topics) {
-    const sim = cosineTF(noteTokens, topicMatchTokens(t));
-    if (sim >= MATCH_THRESHOLD) {
-      link.run(noteId, t.id, Math.round(sim * 100) / 100);
-      matched.push({ topicId: t.id, name: t.name, relevance: sim });
+    const { score, terms } = cosineTF(noteTokens, topicMatchTokens(t));
+    if (score >= MATCH_THRESHOLD) {
+      link.run(noteId, t.id, Math.round(score * 100) / 100, JSON.stringify(terms));
+      matched.push({ topicId: t.id, name: t.name, relevance: score, matchedTerms: terms });
     }
   }
   db.close();
@@ -277,13 +288,16 @@ function backfillMatchesForTopic(db, topicId) {
   `).all();
 
   const link = db.prepare(`
-    INSERT OR IGNORE INTO note_topics (note_id, topic_id, status, relevance, added_by)
-    VALUES (?, ?, 'pending', ?, 'ai')
+    INSERT OR IGNORE INTO note_topics (note_id, topic_id, status, relevance, matched_terms, added_by)
+    VALUES (?, ?, 'pending', ?, ?, 'ai')
   `);
   let count = 0;
   for (const n of notes) {
-    const sim = cosineTF(tokenize(`${n.source_title || ''} ${n.excerpt}`), tTokens);
-    if (sim >= MATCH_THRESHOLD) { link.run(n.id, topicId, Math.round(sim * 100) / 100); count++; }
+    const { score, terms } = cosineTF(tokenize(`${n.source_title || ''} ${n.excerpt}`), tTokens);
+    if (score >= MATCH_THRESHOLD) {
+      link.run(n.id, topicId, Math.round(score * 100) / 100, JSON.stringify(terms));
+      count++;
+    }
   }
   return count;
 }
