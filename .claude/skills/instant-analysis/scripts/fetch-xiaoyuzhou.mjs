@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 // 小宇宙播客单集抓取（零 npm 依赖，Node 18+ / 系统 curl）。
-// 单集页是 SSR，__NEXT_DATA__ 里有完整元数据 + m4a 音频直链，免登录。
+// 单集页是 SSR，__NEXT_DATA__ 里有完整元数据 + 音频直链（m4a/mp3），免登录。
 // 网络层用 curl（读代理环境变量；Node fetch 不读，见 fetch-article.mjs 注释）。
+//
+// 同步指引：knowledge-workbench backend（content-ingestion.js ingestXiaoyuzhou）
+// 有一份并行实现。对页面结构（__NEXT_DATA__）、风控（短时密集请求 503）、
+// 音频字段（enclosure.url / media.source.url）的认知变更，两边需通过 handoff
+// 文档互相同步——同一逻辑多份拷贝必然漂移（2026-07-16 backend 路由表漂移的教训）。
 //
 // 用法: node fetch-xiaoyuzhou.mjs <episode_url>
 // 输出: JSON { ok, title, author, publishedAt, durationMin, audioUrl, shownotes, error }
@@ -17,12 +22,25 @@ if (!url || !url.includes('xiaoyuzhoufm.com')) {
   process.exit(1);
 }
 
+// 小宇宙对短时密集请求返回 503（backend 2026-07-16 实测），间隔 8 秒重试一次可消化。
+// curl 加 -f：HTTP 4xx/5xx 按失败处理（退出码 22），进入重试
+async function fetchPage(target) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await pexec('curl', [
+        '-sSf', '-L', '--max-time', '15',
+        '-A', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        target,
+      ], { maxBuffer: 16 * 1024 * 1024 });
+    } catch (err) {
+      if (attempt >= 1) throw err;
+      await new Promise(r => setTimeout(r, 8000));
+    }
+  }
+}
+
 try {
-  const { stdout: html } = await pexec('curl', [
-    '-sS', '-L', '--max-time', '15',
-    '-A', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-    url.trim(),
-  ], { maxBuffer: 16 * 1024 * 1024 });
+  const { stdout: html } = await fetchPage(url.trim());
 
   const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.+?)<\/script>/s);
   if (!m) throw new Error('小宇宙页面结构变化，未找到数据块（__NEXT_DATA__）');

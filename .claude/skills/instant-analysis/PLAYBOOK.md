@@ -89,7 +89,7 @@ node scripts/fetch-xiaoyuzhou.mjs "<episode_url>"
 mkdir -p /tmp/instant-analysis/audio
 # YouTube / B站：
 yt-dlp -f bestaudio -o "/tmp/instant-analysis/audio/a.%(ext)s" --no-playlist "<url>"
-# 小宇宙：直接下载 audioUrl
+# 小宇宙：直接下载 audioUrl（直链可能是 m4a 或 mp3，后缀不影响解码——PyAV 按内容探测）
 curl -sL -o /tmp/instant-analysis/audio/a.m4a "<audioUrl>"
 
 # 转写（只转前 15 分钟，small 模型约等 5 分钟；免 ffmpeg）
@@ -98,8 +98,12 @@ python3 scripts/transcribe.py /tmp/instant-analysis/audio/a.m4a --max-seconds 90
 
 注意：
 - 转写前告知用户「本地转写约需几分钟」；音频不出本机、零 API 费
+  （实测参考：faster-whisper small，CPU int8，15 分钟音频约转 5 分钟）
+- 长节目音频直链可达上百 MB（实测 123 分钟播客 mp3 = 113MB），下载本身也要时间
 - 下载失败重试 1 次（隔 5 秒，B站会临时限速）；再失败如实降级
 - 结束后清理 `/tmp/instant-analysis/`
+- 进阶（本 skill 不内置）：whisperX + pyannote 可做说话人分离，但 CPU 上同样
+  15 分钟音频约需 21 分钟（实测 M1 Pro），开启前把成本告知用户
 
 ### X / Twitter
 
@@ -174,7 +178,10 @@ Embedding→嵌入、Fine-tuning→微调；其余术语首次出现附英文。
 2. 每一级降级都显式声明，并给出原链接让用户可自行核实
 3. 抓取/转写失败时如实合并报告各层原因，不猜测、不掩盖第一手错误信息
 4. ASR 转写产物必须标注「音频转写生成，可能存在少量听写误差」；
-   展示转写原文时只加标点分段，**严禁增删改字词**（同音字错误保留原样）
+   展示转写原文时只加标点分段，**严禁增删改字词**（同音字错误保留原样）。
+   whisper small 中文同音字误差是实测常态（"Momenta"→"萌萌塔"、
+   "数据驱动"→"数据去动"）：解读时按上下文默默纠正即可，但**引用金句、
+   人名、产品名、数字前必须核对原节目/原视频**，核对不了就不引用
 5. 拿不到转写只有 shownotes 时，材料头部必须加显式声明（见话术模板），
    防止解读稿基于大纲脑补出"完整内容"的假象
 
