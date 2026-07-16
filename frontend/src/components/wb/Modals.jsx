@@ -62,8 +62,8 @@ export function PoolModal({ onClose, showToast }) {
       <Label>类型</Label>
       <div className="wb-filterbar" style={{ marginTop: 0 }}>
         <button className="wb-filter-chip" style={{ borderColor: 'var(--accent)', color: 'var(--accent)', fontWeight: 600 }}>GitHub Trending</button>
-        <button className="wb-filter-chip" onClick={() => showToast('Reddit / HN 池：后续接入')}>Reddit ▾</button>
-        <button className="wb-filter-chip" onClick={() => showToast('Reddit / HN 池：后续接入')}>Hacker News ▾</button>
+        <button className="wb-filter-chip" onClick={() => showToast('Hacker News 已内置：每天 7:30 自动同步进资讯流，无需添加')}>Hacker News（已内置）</button>
+        <button className="wb-filter-chip" onClick={() => showToast('Reddit 池：后续接入')}>Reddit ▾</button>
       </div>
       <Label>范围与过滤</Label>
       <Body>AI/ML 相关仓库 · 按日增 star 排序 · 每日同步</Body>

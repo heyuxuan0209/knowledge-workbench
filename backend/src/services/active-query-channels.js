@@ -160,6 +160,70 @@ export async function fetchYoutubeDetail(videoId) {
   }
 }
 
+// ---- 小宇宙播客（2026-07-16 反馈：播客节目要能追更） ----
+// 小宇宙不提供公开 RSS，但节目页是 Next.js 应用，__NEXT_DATA__ 里嵌着完整节目列表
+// （标题/描述/发布时间/播放量），免登录直接抓页面即可。中文内容零翻译成本。
+// 单集链接已被万能收口支持（M5 转写+shownotes），Feed 里点"精读"同样能走该管道。
+
+const XYZ_UA = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'zh-CN,zh;q=0.9',
+};
+
+// 短时间密集请求会触发小宇宙 503 风控（实测），间隔重试一次；定时任务频率下不会命中
+async function fetchXyzPage(url) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { headers: XYZ_UA, signal: AbortSignal.timeout(20000) });
+    if (res.ok) return res.text();
+    if (attempt >= 1) throw new Error(`小宇宙页面请求失败（HTTP ${res.status}，可能触发风控，稍后重试）`);
+    await new Promise(r => setTimeout(r, 8000));
+  }
+}
+
+function parseNextData(html) {
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
+  if (!m) throw new Error('小宇宙页面结构变化（未找到 __NEXT_DATA__ 数据块）');
+  return JSON.parse(m[1]);
+}
+
+// 节目页元信息（identify 登记时取节目名；支持 /podcast/<pid> 与 /episode/<eid> 两种链接）
+export async function fetchXiaoyuzhouMeta(inputUrl) {
+  const data = parseNextData(await fetchXyzPage(inputUrl));
+  const props = data?.props?.pageProps || {};
+  // 节目页直接有 podcast；单集页从 episode.podcast 取所属节目
+  const podcast = props.podcast || props.episode?.podcast;
+  if (!podcast?.pid || !podcast?.title) throw new Error('未能从小宇宙页面解析出节目信息');
+  return { pid: podcast.pid, title: podcast.title, brief: podcast.brief || null };
+}
+
+export async function queryXiaoyuzhou({ handle, displayName }, limit = 5) {
+  const data = parseNextData(await fetchXyzPage(`https://www.xiaoyuzhoufm.com/podcast/${handle}`));
+  const podcast = data?.props?.pageProps?.podcast;
+  if (!Array.isArray(podcast?.episodes)) throw new Error('小宇宙节目页没有节目列表（可能已下架）');
+
+  return podcast.episodes.slice(0, limit).map(ep => ({
+    content: {
+      id: `xyz-${ep.eid}`,
+      content_type: 'video', // schema 无 podcast 类型；音频与视频同走"转写→精读"管道，语义最近
+      url: `https://www.xiaoyuzhoufm.com/episode/${ep.eid}`,
+      published_at: ep.pubDate || null,
+      original_lang: 'zh',
+      has_translation: 0,
+      zh_title: ep.title || null,
+      zh_summary: (ep.description || '').trim().slice(0, 800) || null,
+      en_title: null,
+      input_method: 'feed',
+      source_app: 'active_query',
+      fetch_status: 'success',
+      external_score: ep.playCount ?? null,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    },
+    sourceInfo: { platform: 'Podcast', handle, displayName: podcast.title || displayName },
+  }));
+}
+
 // UP 主资料（登记时取真实昵称用；失败返回 null，调用方自行兜底）
 export async function fetchBiliUser(uidOrName) {
   try {
@@ -173,8 +237,10 @@ export async function fetchBiliUser(uidOrName) {
 }
 
 // 平台 → 适配器路由。登录态渠道（X 等）不在表内，sync 侧如实跳过。
+// Podcast 平台当前 = 小宇宙（handle 为节目 pid）；未来接 Apple 播客等再按 handle 分流
 export const CHANNEL_ADAPTERS = {
   Bilibili: queryBilibili,
   YouTube: queryYoutube,
   GitHub: queryGithub,
+  Podcast: queryXiaoyuzhou,
 };

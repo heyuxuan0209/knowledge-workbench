@@ -170,6 +170,29 @@ export async function identifyInput(rawInput) {
     };
   }
 
+  // ---- 小宇宙播客：节目页 /podcast/<pid> 或单集页 /episode/<eid>（自动归到所属节目） ----
+  // 小宇宙无公开 RSS，走 active-query：每日抓节目页 __NEXT_DATA__ 追更（免登录零成本）
+  if (host === 'xiaoyuzhoufm.com') {
+    if (!/\/(podcast|episode)\//.test(url.pathname)) {
+      throw new Error('请使用小宇宙节目页链接（xiaoyuzhoufm.com/podcast/…）或任意单集链接');
+    }
+    const { fetchXiaoyuzhouMeta } = await import('./active-query-channels.js');
+    const meta = await fetchXiaoyuzhouMeta(input);
+    return {
+      sourceType: 'Media',
+      displayName: meta.title,
+      platform: 'Podcast',
+      handle: meta.pid,
+      trackMode: 'active-query',
+      note: '每日抓取该节目最新单集进 Feed（小宇宙无公开 RSS，走页面数据，免登录）。单集可点"精读"转写解读',
+    };
+  }
+
+  // ---- Hacker News：内置源，无需登记 ----
+  if (host === 'news.ycombinator.com') {
+    throw new Error('无需登记：Hacker News 是内置源，每天 7:30 自动同步进 Feed（登记反而会造成重复入库）');
+  }
+
   // ---- 微信公众号文章链接 ----
   if (host === 'mp.weixin.qq.com') {
     return {

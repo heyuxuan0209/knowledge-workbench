@@ -41,10 +41,24 @@ export function migrateM6() {
     cleaned += db.prepare(`UPDATE ideas SET ${col} = REPLACE(${col}, '活页', '主题页') WHERE ${col} LIKE '%活页%'`).run().changes;
   }
 
+  // 4. 小宇宙源修复（2026-07-16 反馈：播客节目页被误登记为 Blog/link-only 不可追踪）：
+  //    转为 Podcast/active-query（handle = 节目 pid），display_name 去掉站点后缀。幂等。
+  let xyzFixed = 0;
+  const xyzRows = db.prepare(
+    "SELECT sp.id, sp.source_id, sp.handle FROM source_platforms sp WHERE sp.platform = 'Blog' AND sp.handle LIKE '%xiaoyuzhoufm.com/podcast/%'"
+  ).all();
+  for (const r of xyzRows) {
+    const pid = r.handle.match(/\/podcast\/([a-z0-9]+)/i)?.[1];
+    if (!pid) continue;
+    db.prepare("UPDATE source_platforms SET platform = 'Podcast', handle = ?, track_mode = 'active-query' WHERE id = ?").run(pid, r.id);
+    db.prepare("UPDATE sources SET display_name = REPLACE(display_name, ' | 小宇宙 - 听播客，上小宇宙', ''), updated_at = datetime('now') WHERE id = ?").run(r.source_id);
+    xyzFixed++;
+  }
+
   const ok = hasColumn('note_topics', 'matched_terms');
   db.close();
-  console.log('✅ M6 migration done:', { note_topics_matched_terms: ok, x_sources_repathed: xFixed, huoye_cleaned_rows: cleaned });
-  return { note_topics_matched_terms: ok, x_sources_repathed: xFixed, huoye_cleaned_rows: cleaned };
+  console.log('✅ M6 migration done:', { note_topics_matched_terms: ok, x_sources_repathed: xFixed, huoye_cleaned_rows: cleaned, xiaoyuzhou_repathed: xyzFixed });
+  return { note_topics_matched_terms: ok, x_sources_repathed: xFixed, huoye_cleaned_rows: cleaned, xiaoyuzhou_repathed: xyzFixed };
 }
 
 // 路径含中文目录，不能用 import.meta.url === `file://${argv[1]}` 判断入口（百分号编码问题）
