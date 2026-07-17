@@ -68,6 +68,17 @@ async function probeFeedPaths(origin) {
   return null;
 }
 
+// 已知无 RSS 站点的社区镜像 feed（与 OFFICIAL_PACK 同源：Olshansk/rss-feeds，逐日从官网生成）。
+// 2026-07-17 反馈：用户贴 claude.com/blog 文章链接被登记为 link-only（"加了没反应"）——
+// 该站确实无 feed（<link> 无声明 + 常见路径全 404，实测），但镜像可用，应直接升级为 active-rss。
+// 匹配规则：host 相同（已去 www）且路径落在 pathPrefix 下（含文章内页链接）。
+const KNOWN_FEED_MIRRORS = [
+  { host: 'claude.com', pathPrefix: '/blog', displayName: 'Claude Blog（官方博客）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_claude.xml', siteUrl: 'https://claude.com/blog' },
+  { host: 'anthropic.com', pathPrefix: '/news', displayName: 'Anthropic News（Claude 官方动态）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml', siteUrl: 'https://www.anthropic.com/news' },
+  { host: 'anthropic.com', pathPrefix: '/engineering', displayName: 'Anthropic Engineering（工程博客）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml', siteUrl: 'https://www.anthropic.com/engineering' },
+  { host: 'anthropic.com', pathPrefix: '/research', displayName: 'Anthropic Research（研究文章）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_research.xml', siteUrl: 'https://www.anthropic.com/research' },
+];
+
 // 自动识别输入 → 身份预览（不落库）。返回结构给前端确认后再 register。
 export async function identifyInput(rawInput) {
   const input = rawInput.trim();
@@ -205,6 +216,23 @@ export async function identifyInput(rawInput) {
     };
   }
 
+  // ---- 已知无 RSS 站点 → 社区镜像 feed（升级为 active-rss，而不是降级 link-only） ----
+  const mirror = KNOWN_FEED_MIRRORS.find(
+    (m) => m.host === host && (url.pathname === m.pathPrefix || url.pathname.startsWith(m.pathPrefix + '/'))
+  );
+  if (mirror) {
+    return {
+      sourceType: 'Blog',
+      displayName: mirror.displayName,
+      platform: 'RSS',
+      handle: mirror.feedUrl,
+      trackMode: 'active-rss',
+      feedUrl: mirror.feedUrl,
+      siteUrl: mirror.siteUrl,
+      note: '官网不提供 RSS，已自动改用社区镜像 feed（Olshansk/rss-feeds，逐日从官网生成）持续追踪',
+    };
+  }
+
   // ---- 通用网页：尝试 RSS 发现 ----
   try {
     const res = await fetchWithTimeout(input);
@@ -284,6 +312,7 @@ export async function identifyInput(rawInput) {
 // 每条 feed 都实测可达后才入包（2026-07-16 验证）。Anthropic 官网不提供 RSS（/rss.xml 404），
 // 用社区维护的镜像 feed（Olshansk/rss-feeds，逐日从官网生成）；OpenAI/Google 系为官方 feed。
 export const OFFICIAL_PACK = [
+  { displayName: 'Claude Blog（官方博客）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_claude.xml', siteUrl: 'https://claude.com/blog' },
   { displayName: 'Anthropic News（Claude 官方动态）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml', siteUrl: 'https://www.anthropic.com/news' },
   { displayName: 'Anthropic Engineering（工程博客）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml', siteUrl: 'https://www.anthropic.com/engineering' },
   { displayName: 'Anthropic Research（研究文章）', feedUrl: 'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_research.xml', siteUrl: 'https://www.anthropic.com/research' },
