@@ -104,7 +104,7 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
 // 视觉对齐原型 01-feed；数据全部来自后端 API。
 
 export default function FeedView({
-  contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, acquire,
+  contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, followingIds, acquire,
   generateReport, generating, setPage, setNotesTab, syncing, syncAllSources,
   toggleStar, showToast, loadNotes,
 }) {
@@ -346,7 +346,9 @@ export default function FeedView({
                 </a>
               )}
               {!followed && c.source_id !== undefined && (
-                <button className="wb-btn-ghost" onClick={() => followSource(c.id)}>＋ 加为信息源</button>
+                <button className="wb-btn-ghost" disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)}>
+                  {followingIds?.has(c.id) ? '识别中…' : '＋ 加为信息源'}
+                </button>
               )}
             </div>
           </div>

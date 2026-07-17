@@ -120,7 +120,8 @@ export default function WorkbenchPage() {
   const showToast = useCallback((msg) => {
     setToast(msg)
     clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(''), 2600)
+    // 长文案（如 link-only 的解释）2.6 秒读不完，按长度自适应，上限 7 秒
+    toastTimer.current = setTimeout(() => setToast(''), Math.min(7000, Math.max(2600, msg.length * 90)))
   }, [])
 
   // ---- 数据加载 ----
@@ -340,15 +341,28 @@ export default function WorkbenchPage() {
     } catch (err) { showToast(`同步失败：${err.message}`) } finally { setSyncing(false) }
   }
 
+  // 2026-07-17 反馈："点了没反应"——慢路径（首次识别的站点）后端要抓网页 + 探测 RSS，
+  // 可达十几秒，必须有即时反馈 + 按钮态；结果按 track_mode 差异化说明，仅跳转不能装成追更成功
+  const [followingIds, setFollowingIds] = useState(() => new Set())
   const followSource = async (contentId) => {
+    if (followingIds.has(contentId)) return
+    setFollowingIds(prev => new Set(prev).add(contentId))
+    showToast('正在识别来源（新站点需抓取网页探测 RSS，可能要十几秒）…')
     try {
       const json = await api(`/api/contents/${contentId}/follow-source`, { method: 'POST' })
       setContents(prev => prev.map(c =>
         (c.id === contentId || (c.source_id && c.source_id === json.data.id))
           ? { ...c, source_id: json.data.id, source_registered: 1 } : c))
       loadSources()
-      showToast(`已把 ${json.data.display_name} 加为信息源（进 Feed · 加权）`)
+      const modeText = {
+        'active-rss': '，RSS 自动追更新内容',
+        'active-query': '，每日主动追更',
+        'passive': '，借道 AI HOT 收录其热门内容',
+        'link-only': '。注意：该站无 RSS 且无法抓取，只登记跳转，不会自动追更',
+      }[json.data.platforms?.[0]?.track_mode] || ''
+      showToast(`已把 ${json.data.display_name} 加为信息源（进 Feed · 加权）${modeText}`)
     } catch (err) { showToast(`加为信息源失败：${err.message}`) }
+    finally { setFollowingIds(prev => { const s = new Set(prev); s.delete(contentId); return s }) }
   }
 
   // ---- 日报 ----
@@ -624,7 +638,7 @@ export default function WorkbenchPage() {
 
   const pageProps = {
     showToast, contents, report, stories, ghTrending, notes, sources, topics, toggleStar,
-    selectedItems, toggleSelect, followSource, acquire, syncing, syncAllSources,
+    selectedItems, toggleSelect, followSource, followingIds, acquire, syncing, syncAllSources,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea,
     loadNotes, loadSources, loadTopics, loadBrief, setPage, setModal,
     notesTab, setNotesTab, toggleSelectNote,
