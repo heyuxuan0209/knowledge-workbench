@@ -67,3 +67,7 @@ backend/data/
 
 # Claude Code 本地会话配置（含个人权限白名单，永不入库）
 .claude/settings.local.json
+
+# 个人认知资产与工作模板（GitHub 发布原则：只推代码/prompt/skills）
+reference/opinions.md
+templates/
