@@ -160,6 +160,21 @@ export async function fetchYoutubeDetail(videoId) {
   }
 }
 
+// 视频链接 → 所属频道（2026-07-17 反馈：Feed 流里复制的就是 watch 链接，identify 必须认）。
+// yt-dlp dump-json 里 uploader_id 即 @handle（queryYoutube 两种 handle 形态都支持）。
+// 失败返回 null，调用方自行降级/报错
+export async function fetchYoutubeVideoChannel(videoId) {
+  try {
+    const args = ['--dump-json', '--no-download', '--skip-download', `https://www.youtube.com/watch?v=${videoId}`];
+    if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
+    const d = await runJson('yt-dlp', args, 60000);
+    const handle = (d.uploader_id?.startsWith('@') ? d.uploader_id : null) || d.channel_id || null;
+    return handle ? { handle, name: d.channel || d.uploader || handle } : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- 小宇宙播客（2026-07-16 反馈：播客节目要能追更） ----
 // 小宇宙不提供公开 RSS，但节目页是 Next.js 应用，__NEXT_DATA__ 里嵌着完整节目列表
 // （标题/描述/发布时间/播放量），免登录直接抓页面即可。中文内容零翻译成本。
@@ -222,6 +237,21 @@ export async function queryXiaoyuzhou({ handle, displayName }, limit = 5) {
     },
     sourceInfo: { platform: 'Podcast', handle, displayName: podcast.title || displayName },
   }));
+}
+
+// 视频链接 → UP 主（2026-07-17 反馈，同 YouTube：Feed 流里是 /video/BV… 链接）。
+// 视频页嵌入的初始状态 JSON 里有 "owner":{"mid":…,"name":"…"}，免登录直接抓页面提取。
+// 失败返回 null，调用方自行降级
+export async function fetchBiliVideoOwner(videoUrl) {
+  try {
+    const res = await fetch(videoUrl, { headers: XYZ_UA, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const m = html.match(/"owner"\s*:\s*\{\s*"mid"\s*:\s*(\d+)\s*,\s*"name"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    return m ? { uid: m[1], name: JSON.parse(`"${m[2]}"`) } : null;
+  } catch {
+    return null;
+  }
 }
 
 // UP 主资料（登记时取真实昵称用；失败返回 null，调用方自行兜底）
