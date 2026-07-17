@@ -20,9 +20,16 @@ const parser = new Parser({
 });
 
 // 解析单个 RSS feed
+// 用 fetch 拉取 + parseString，而不是 parser.parseURL：parseURL 底层是 http 模块，
+// 不经过全局代理 dispatcher（server.js），被墙 feed（Google 系等）会一直超时
 export async function parseFeed(feedUrl) {
   try {
-    const feed = await parser.parseURL(feedUrl);
+    const res = await fetch(feedUrl, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const feed = await parser.parseString(await res.text());
 
     return {
       success: true,

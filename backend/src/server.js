@@ -1,8 +1,17 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { setGlobalDispatcher, EnvHttpProxyAgent } from 'undici';
 
 dotenv.config();
+
+// 出网代理根治（2026-07-17）：Node fetch（undici）默认忽略 HTTP(S)_PROXY，且 launchd
+// 常驻进程没有 shell 环境——代理只能来自 .env。不配则行为不变（直连）。
+// 覆盖进程内所有 fetch：信源识别/feed 探测/RSS 轮询/正文抓取。NO_PROXY 保证本机调用不绕行
+if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy) {
+  setGlobalDispatcher(new EnvHttpProxyAgent());
+  console.log(`🌐 出网代理已启用：${process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy}`);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
