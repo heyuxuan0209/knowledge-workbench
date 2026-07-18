@@ -382,13 +382,13 @@ app.post('/api/studio/rank-materials', async (req, res) => {
 app.get('/api/studio/platforms', async (req, res) => {
   try {
     const { listPlatforms } = await import('./services/creation-prompts.js');
-    res.json({ success: true, data: listPlatforms().map(({ key, label, icon, note }) => ({ key, label, icon, note })) });
+    res.json({ success: true, data: listPlatforms().map(({ key, label, icon, note, when }) => ({ key, label, icon, note, when })) });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 长文标题候选（标题决定打开率，单独生成 5 个供挑选；prompt 见 creation/titles.md）
+// 长文标题候选（标题决定打开率，按平台分组生成、每个带【平台·策略】标注供挑选；prompt 见 creation/titles.md）
 app.post('/api/studio/titles', async (req, res) => {
   try {
     const { draft } = req.body;
@@ -400,7 +400,7 @@ app.post('/api/studio/titles', async (req, res) => {
       content: render(loadPrompt('titles.md'), { draft: draft.slice(0, 3000) }),
     }]);
     if (!result.success) throw new Error(result.error);
-    const titles = result.content.trim().split('\n').map(s => s.trim().replace(/^\d+[.、)]\s*/, '')).filter(Boolean).slice(0, 5);
+    const titles = result.content.trim().split('\n').map(s => s.trim().replace(/^\d+[.、)]\s*/, '')).filter(Boolean).slice(0, 10);
     res.json({ success: true, data: titles });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
