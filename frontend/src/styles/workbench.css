@@ -484,3 +484,35 @@ input, textarea { font-family: inherit; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(33, 31, 26, 0.15); border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- 渲染后的 markdown（精读稿/素材卡，UI 改造：不露原始符号） ---- */
+.wb-md{ font-size:14px; color:var(--body2, #3a372f); }
+.wb-md h1{ font-family:var(--serif); font-size:18px; line-height:1.4; margin:2px 0 12px; color:var(--ink,#26241f); }
+.wb-md h2{ font-family:var(--serif); font-size:16px; margin:20px 0 8px; padding-top:12px; border-top:1px solid var(--line08); color:var(--ink,#26241f); }
+.wb-md h3{ font-size:14.5px; font-weight:600; margin:14px 0 6px; color:var(--ink,#26241f); }
+.wb-md p{ line-height:1.85; margin:9px 0; }
+.wb-md strong{ color:var(--ink,#26241f); font-weight:600; }
+.wb-md code{ font-family:ui-monospace,Menlo,monospace; font-size:12.5px; background:rgba(33,31,26,.05); padding:1px 5px; border-radius:4px; }
+.wb-md blockquote{ margin:10px 0; padding:8px 14px; background:rgba(33,31,26,.035); border-left:3px solid var(--line10,rgba(33,31,26,.1)); border-radius:4px; color:var(--sub,#726d61); font-size:13px; line-height:1.7; }
+.wb-md ul{ margin:8px 0; padding-left:20px; }
+.wb-md li{ line-height:1.8; margin:4px 0; }
+.wb-md > *:first-child{ margin-top:0; }
+.wb-md h2:first-child{ border-top:none; padding-top:0; }
+
+/* ---- 资讯页平铺网格（UI 改造：B 方案） ---- */
+.wb-feed-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px; }
+.wb-gcard{ background:var(--surface); border:1px solid var(--line10, rgba(33,31,26,.1)); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
+.wb-gcard.selected{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(61,90,128,.15); }
+.wb-gcard-title{ font-family:var(--serif); font-weight:600; font-size:14.5px; line-height:1.4; color:var(--ink,#26241f); }
+.wb-gcard-sum{ font-size:12.5px; color:var(--sub,#726d61); line-height:1.55; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.wb-gcard-foot{ display:flex; align-items:center; gap:10px; margin-top:auto; padding-top:4px; }
+
+/* ---- 资讯页 hero 即时分析 + 今日概览（UI 改造 2a） ---- */
+.wb-hero{ background:linear-gradient(180deg, var(--surface,#fffdf8), #fbf8f1); border:1px solid var(--line10, rgba(33,31,26,.1)); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+.wb-hero-t{ font-family:var(--serif); font-size:15.5px; font-weight:600; margin-bottom:3px; color:var(--body2,#26241f); }
+.wb-hero-d{ font-size:12.5px; color:var(--sub,#726d61); margin-bottom:11px; }
+.wb-hero-row{ display:flex; gap:10px; }
+.wb-hero-row input{ flex:1; padding:11px 14px; border:1px solid var(--line10, rgba(33,31,26,.1)); border-radius:9px; font-size:13.5px; background:#fff; color:var(--body2,#26241f); }
+.wb-lead{ font-size:14px; line-height:1.7; color:var(--body2,#3a372f); background:rgba(61,90,128,.05); border-left:3px solid var(--accent); border-radius:6px; padding:9px 13px; margin:0 0 14px; }
+.wb-lead b{ color:var(--body2,#26241f); font-weight:600; }
+.wb-ov-foot{ margin-top:14px; padding-top:12px; border-top:1px solid var(--line10, rgba(33,31,26,.1)); display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:12.5px; }

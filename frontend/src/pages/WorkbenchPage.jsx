@@ -350,6 +350,12 @@ export default function WorkbenchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItems, analysisMode])
 
+  // 资讯页右栏：没选中内容时默认收起（UI 改造：空面板别白占 20% 屏），选中即自动展开。
+  // 只作用于 feed（素材/主题页右栏有「问素材库/知识体系」入口，仍默认展开）。
+  useEffect(() => {
+    if (page === 'feed') setRightCollapsed(selectedItems.length === 0)
+  }, [page, selectedItems.length])
+
   // ---- 信源 ----
   // 全量同步（反馈 #7：旧"刷新"只走 AI HOT，登记的 RSS/主动查询源永远不出新内容）
   const [syncing, setSyncing] = useState(false)

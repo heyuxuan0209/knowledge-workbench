@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { timeAgo, TYPE_LABEL, api } from './util'
-import { IconTag, IconExternal } from './Icons'
+import { IconExternal } from './Icons'
+import { renderMarkdown } from './markdown'
 
 // 站内阅读器（2026-07-16 用户反馈改版）：默认「精读稿」——与即时分析同模板的
 // 结构化中文解读（讲述脉络/关键案例/表述/idea 钩子），不是逐字译文；
@@ -72,7 +73,8 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
             {interp.error && <div className="wb-warnbar">生成失败：{interp.error}</div>}
             {interp.data && <>
               {interp.data.note && <div className="wb-warnbar" style={{ marginBottom: 10 }}>{interp.data.note}</div>}
-              <div style={{ fontSize: 14, lineHeight: 1.85, color: 'var(--body2)', whiteSpace: 'pre-wrap' }}>{interp.data.text}</div>
+              {/* 渲染成干净排版，不露 markdown 符号（用户 2026-07-18 确认） */}
+              <div className="wb-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(interp.data.text) }} />
             </>}
           </>}
           {tab === 'raw' && <>
@@ -110,9 +112,12 @@ export default function FeedView({
 }) {
   const [acquireVal, setAcquireVal] = useState('')
   const [ingesting, setIngesting] = useState(false)
-  const [expandedFocus, setExpandedFocus] = useState(0)
+  const [expandedFocus, setExpandedFocus] = useState(null) // 默认全收起（UI 改造：第 1 条摊开挤掉后两条）
   const [readerContent, setReaderContent] = useState(null) // 站内全文阅读器
   const [ghStar, setGhStar] = useState({}) // GitHub 区块星标的本地覆盖（数据源在 ghTrending，父级不重载）
+  const [mainTab, setMainTab] = useState('articles') // 'articles' | 'projects'（UI 改造：文章/AI项目分开）
+  const [airHint, setAirHint] = useState(() => !localStorage.getItem('wb-seen-airead-hint')) // 「AI 精读」首次说明气泡
+  const dismissAirHint = () => { localStorage.setItem('wb-seen-airead-hint', '1'); setAirHint(false) }
 
   // Feed 搜索 + 星标过滤（2026-07-16 反馈 #2：被新内容推下去的条目要找得回来）。
   // 与素材库同款：有筛选时走后端 SQL（不是只筛已加载的 30 条），无筛选回全局列表
@@ -160,22 +165,27 @@ export default function FeedView({
 
   return (
     <>
-      <div className="wb-acquire">
-        <input
-          value={acquireVal}
-          onChange={(e) => setAcquireVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') doAcquire() }}
-          placeholder="粘贴链接 / 公众号文章 / YouTube… 开始分析"
-        />
-        <button className="wb-btn-primary" disabled={!acquireVal.trim() || ingesting} onClick={doAcquire}>
-          {ingesting ? '抓取中…' : '分析'}
-        </button>
+      {/* Hero 即时分析（UI 改造 2a）：黄金路径第①步入口，做成显眼 hero，点明用途 */}
+      <div className="wb-hero">
+        <div className="wb-hero-t">把任何链接 / 公众号 / YouTube / 音频丢进来，AI 帮你读懂并存成素材</div>
+        <div className="wb-hero-d">从「信息」到「你的认知」的入口——粘进来 → 出精读稿 → 一键存为素材</div>
+        <div className="wb-hero-row">
+          <input
+            value={acquireVal}
+            onChange={(e) => setAcquireVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') doAcquire() }}
+            placeholder="粘贴链接 / 公众号文章 / YouTube / 上传音频…"
+          />
+          <button className="wb-btn-primary" disabled={!acquireVal.trim() || ingesting} onClick={doAcquire}>
+            {ingesting ? '抓取中…' : '读懂它 →'}
+          </button>
+        </div>
       </div>
 
       <div className="wb-brief">
         <div className="wb-brief-head">
           <div className="wb-brief-title">
-            今日简报 · {report ? formatDate(report.period_key) : dateLabel}
+            今日概览 · {report ? formatDate(report.period_key) : dateLabel}
             {staleReport && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--amber)', fontWeight: 500 }}>· 显示的是 {formatDate(report.period_key)} 的，点刷新出今天的</span>}
           </div>
           <div className="wb-brief-links">
@@ -189,6 +199,9 @@ export default function FeedView({
             <button className="wb-brief-link" onClick={() => setPage('reports')}>查看月报</button>
           </div>
         </div>
+
+        {/* 一句话总结（露出日报导语，此前藏着；UI 改造 2a） */}
+        {report?.summary && <div className="wb-lead">一句话总结：<b>{report.summary}</b></div>}
 
         <div className="wb-brief-label">今日焦点 · 基于你的信息流聚类</div>
         <div className="wb-focus">
@@ -232,145 +245,139 @@ export default function FeedView({
         </div>
 
         {report ? (
-          // 选题建议已迁入素材库（2026-07-16 反馈：折叠在简报里被遮挡没意义），这里只留入口
-          <button className="wb-ideas-toggle" onClick={() => { setNotesTab?.('ideas'); setPage('notes') }}>
-            📌 选题建议 {ideas.length} 条 → 去素材库查看（含支撑素材聚合）
-          </button>
+          // 选题入口 + 行业动态跳转（行业动态不再在此重复列 item，只留一句+跳 AI HOT，去重）
+          <div className="wb-ov-foot">
+            <button className="wb-brief-link" onClick={() => { setNotesTab?.('ideas'); setPage('notes') }}>
+              选题建议 {ideas.length} 条 → 去素材库
+            </button>
+            <a className="wb-brief-link" style={{ marginLeft: 'auto' }} href="https://aihot.virxact.com/daily" target="_blank" rel="noreferrer"
+              title="AI HOT 已做好的完整日报（本期主线+分类），不重复造轮子">
+              行业动态 · 看 AI HOT 完整日报 ↗
+            </a>
+          </div>
         ) : (
           <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
             <button className="wb-btn-primary" disabled={generating} onClick={generateReport}>
-              {generating ? '生成中…' : '生成今日简报'}
+              {generating ? '生成中…' : '生成今日概览'}
             </button>
             <span style={{ fontSize: 12, color: 'var(--sub2)' }}>基于聚类与你关注的信息源提炼焦点与选题（Deepseek，约 ¥0.002）</span>
           </div>
         )}
       </div>
 
-      {ghTrending.repos.length > 0 && (
-        <div className="wb-brief" style={{ background: 'var(--surface)', borderColor: 'var(--line10)' }}>
-          <div className="wb-brief-head" style={{ marginBottom: 8 }}>
-            <div className="wb-brief-title" style={{ fontSize: 15 }}>热门 AI 项目</div>
-            {/* 星标的项目掉出当日榜单后仍在「★ 星标」里找得到（2026-07-18：用户以为被覆盖丢失） */}
-            <button className="wb-brief-link" style={{ marginLeft: 'auto', fontSize: 11 }}
-              title="只显示当天 Top 榜；你星标过的项目即使掉榜也在这里找得回"
-              onClick={() => { setFeedTab('starred'); document.querySelector('.wb-feedbar')?.scrollIntoView({ behavior: 'smooth' }) }}>
-              ★ 我的收藏
-            </button>
-            <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--faint)' }}>GitHub Trending · 每日 · 高星+热门双筛</span>
-          </div>
-          {ghTrending.trend?.trend && (
-            <div className="wb-brief-label" style={{ marginBottom: 10 }}>📈 {ghTrending.trend.trend}</div>
-          )}
-          <div className="wb-focus">
-            {ghTrending.repos.map(r => (
-              <div key={r.id} className="wb-focus-item">
-                <div className="wb-focus-row" style={{ cursor: 'default', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.4 }}>
-                      <a href={r.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{r.zh_title}</a>
-                    </div>
-                    {r.zh_summary && <div style={{ fontSize: 12.5, color: 'var(--sub)', lineHeight: 1.5, marginTop: 3 }}>{r.zh_summary}</div>}
-                  </div>
-                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                    <div style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      ⭐ 今日 +{Math.round(r.external_score)}
-                      <button className={`wb-star${(ghStar[r.id] ?? r.starred) ? ' on' : ''}`} style={{ marginLeft: 4 }}
-                        title="星标收藏（星标列表里也能看到 GitHub 项目）"
-                        onClick={async () => { const s = await toggleStar(r.id); if (s !== null) setGhStar(prev => ({ ...prev, [r.id]: s })) }}>
-                        {(ghStar[r.id] ?? r.starred) ? '★' : '☆'}
-                      </button>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-                      <button className="wb-brief-link" style={{ fontSize: 11 }}
-                        title="产品视角速览：解决什么问题 / 对我产品的启发 / 值不值得写（首次约 1 分钟）"
-                        onClick={() => setReaderContent(r)}>中文速览</button>
-                      <a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
-                        查看 <IconExternal size={9} style={{ verticalAlign: '-1px' }} />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="wb-feedbar">
+      {/* 文章 / AI 项目 分开（UI 改造：不用滑完项目才看到文章） */}
+      <div className="wb-feedbar" style={{ borderBottom: '1px solid var(--line10)', paddingBottom: 0, marginBottom: 12 }}>
         <div className="wb-seg-toggle" style={{ flexShrink: 0 }}>
-          <button className={feedTab === 'all' ? 'active' : ''} onClick={() => setFeedTab('all')}>全部</button>
-          <button className={feedTab === 'starred' ? 'active' : ''} onClick={() => setFeedTab('starred')}>★ 星标</button>
+          <button className={mainTab === 'articles' ? 'active' : ''} onClick={() => setMainTab('articles')}>文章</button>
+          <button className={mainTab === 'projects' ? 'active' : ''} onClick={() => setMainTab('projects')}>
+            AI 项目{ghTrending.repos.length ? `（${ghTrending.repos.length}）` : ''}
+          </button>
         </div>
-        <input className="wb-feed-search" placeholder="搜索资讯（空格分隔多关键词）…"
-          value={feedQuery} onChange={(e) => setFeedQuery(e.target.value)} />
-        <button className="wb-brief-link" disabled={syncing} onClick={syncAllSources}
-          title="同步全部信源：AI HOT + RSS 抓取 + B站/YouTube/GitHub 主动查询">
-          {syncing ? '同步中…' : '↻ 同步信源'}
-        </button>
-        <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
       </div>
 
-      {hasFilter && filtered?.length === 0 && (
-        <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有星标内容。在卡片右上角点 ☆ 一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
-      )}
-
-      {(filtered ?? contents).map(c => {
-        const checked = selIds.has(c.id)
-        const followed = c.source_registered === 1 || c.source_registered === true
-        const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
-        // 作者：识别到的 Source 优先；GitHub 仓库显示 owner；否则显示渠道名
-        const repoOwner = c.source_app === 'github_trending' ? (c.en_title || '').split('/')[0] : null
-        const author = c.source_display_name || repoOwner || channel
-        const platform = c.source_display_name
-          ? `${c.source_platform}${c.source_handle && !c.source_handle.startsWith('http') ? ' · @' + c.source_handle : ''}`
-          : (c.source_display_name === author ? '' : channel)
-        return (
-          <div key={c.id} className={`wb-fcard${checked ? ' selected' : ''}`}>
-            <div className="wb-fcard-head">
-              {followed
-                ? <span className="wb-pill" style={{ color: '#3f7350', background: 'rgba(63,115,80,.12)' }}>已关注</span>
-                : <span className="wb-pill" style={{ color: '#8a8478', background: 'rgba(33,31,26,.06)' }}>未标注</span>}
-              <span className="wb-fcard-author">{author}</span>
-              <span className="wb-fcard-platform">{platform}</span>
-              {c.heat != null && <span className="wb-fcard-score">热度 <b>{c.heat}</b></span>}
-              <button className={`wb-star${c.starred ? ' on' : ''}`} title={c.starred ? '取消星标' : '星标：一键钉住，事后找得回（不用进素材库）'}
-                onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
-            </div>
-            <div className="wb-fcard-title">{c.zh_title || c.en_title || '（无标题）'}</div>
-            {c.zh_summary && <div className="wb-fcard-summary">{c.zh_summary}</div>}
-            <div className="wb-fcard-chips">
-              {(c.tags || []).map(t => <span key={t} className="wb-chip"><IconTag />{t}</span>)}
-              <span className="wb-fcard-time">{TYPE_LABEL[c.content_type] || c.content_type} · {timeAgo(c.published_at)}</span>
-            </div>
-            <div className="wb-fcard-foot">
-              <button className={`wb-btn-outline${checked ? ' checked' : ''}`} onClick={() => toggleSelect(c)}>
-                {checked ? '✓ 已选中' : '选中分析'}
-              </button>
-              {c.permalink && (
-                <a className="wb-btn-ghost" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                  href={c.permalink} target="_blank" rel="noreferrer">
-                  全文解读 <IconExternal style={{ verticalAlign: '-1px' }} />
-                </a>
-              )}
-              {!c.permalink && c.url && c.content_type !== 'tweet' && (
-                <button className="wb-btn-ghost" title="结构化精读稿（与即时分析同款）+ 原文译文，首次生成约 1 分钟"
-                  onClick={() => setReaderContent(c)}>精读</button>
-              )}
-              {c.url && (
-                <a className="wb-btn-ghost" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                  href={c.url} target="_blank" rel="noreferrer">
-                  跳转原文 <IconExternal style={{ verticalAlign: '-1px' }} />
-                </a>
-              )}
-              {!followed && c.source_id !== undefined && (
-                <button className="wb-btn-ghost" disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)}>
-                  {followingIds?.has(c.id) ? '识别中…' : '＋ 加为信息源'}
-                </button>
-              )}
-            </div>
+      {mainTab === 'articles' && (<>
+        <div className="wb-feedbar">
+          <div className="wb-seg-toggle" style={{ flexShrink: 0 }}>
+            <button className={feedTab === 'all' ? 'active' : ''} onClick={() => setFeedTab('all')}>全部</button>
+            <button className={feedTab === 'starred' ? 'active' : ''} onClick={() => setFeedTab('starred')}>★ 收藏</button>
           </div>
-        )
-      })}
+          <input className="wb-feed-search" placeholder="搜索资讯（空格分隔多关键词）…"
+            value={feedQuery} onChange={(e) => setFeedQuery(e.target.value)} />
+          <button className="wb-brief-link" disabled={syncing} onClick={syncAllSources}
+            title="同步全部信源：AI HOT + RSS 抓取 + B站/YouTube/GitHub 主动查询">
+            {syncing ? '同步中…' : '↻ 同步信源'}
+          </button>
+          <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
+        </div>
+
+        {/* 「AI 精读」首次说明气泡 */}
+        {airHint && (filtered ?? contents).length > 0 && (
+          <div style={{ margin: '0 2px 12px', padding: '9px 13px', background: 'rgba(61,90,128,.07)', border: '1px solid rgba(61,90,128,.18)', borderRadius: 8, fontSize: 12.5, color: 'var(--body2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>卡片上的「AI 精读」= 让 AI 帮你读懂这篇（出精读稿），不用啃原文。</span>
+            <button className="wb-brief-link" style={{ marginLeft: 'auto', flexShrink: 0 }} onClick={dismissAirHint}>知道了</button>
+          </div>
+        )}
+
+        {hasFilter && filtered?.length === 0 && (
+          <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有收藏。在卡片右上角点 ☆ 一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
+        )}
+
+        <div className="wb-feed-grid">
+          {(filtered ?? contents).map(c => {
+            const checked = selIds.has(c.id)
+            const followed = c.source_registered === 1 || c.source_registered === true
+            const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
+            const repoOwner = c.source_app === 'github_trending' ? (c.en_title || '').split('/')[0] : null
+            const author = c.source_display_name || repoOwner || channel
+            const canRead = Boolean(c.permalink) || (c.url && c.content_type !== 'tweet')
+            const openRead = () => { dismissAirHint(); if (c.permalink) window.open(c.permalink, '_blank', 'noopener'); else setReaderContent(c) }
+            return (
+              <div key={c.id} className={`wb-gcard${checked ? ' selected' : ''}`}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
+                  {followed
+                    ? <span className="wb-pill" style={{ color: '#3f7350', background: 'rgba(63,115,80,.12)' }}>已关注</span>
+                    : <span className="wb-pill" style={{ color: '#8a8478', background: 'rgba(33,31,26,.06)' }}>未标注</span>}
+                  <span style={{ color: 'var(--sub)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{author}</span>
+                  <span style={{ color: 'var(--faint)', flexShrink: 0 }}>· {timeAgo(c.published_at)}</span>
+                  <button className={`wb-star${c.starred ? ' on' : ''}`} style={{ marginLeft: 'auto' }}
+                    title={c.starred ? '取消收藏' : '收藏：一键钉住，事后找得回'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
+                </div>
+                <div className="wb-gcard-title">{c.zh_title || c.en_title || '（无标题）'}</div>
+                {c.zh_summary && <div className="wb-gcard-sum">{c.zh_summary}</div>}
+                <div className="wb-gcard-foot">
+                  {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
+                    title="AI 帮你读懂这篇，出精读稿，不用啃原文" onClick={openRead}>AI 精读</button>}
+                  <button className="wb-btn-ghost" style={{ padding: 0 }} title="送入右侧一起解读/对话"
+                    onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中'}</button>
+                  {c.url && <a className="wb-btn-ghost" style={{ padding: 0, display: 'inline-flex', alignItems: 'center' }}
+                    href={c.url} target="_blank" rel="noreferrer" title="跳转原文"><IconExternal /></a>}
+                  {!followed && c.source_id !== undefined && (
+                    <button className="wb-btn-ghost" style={{ padding: 0, marginLeft: 'auto', fontSize: 11.5 }}
+                      disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)} title="把这个作者/来源加为你的信息源，以后自动追更">
+                      {followingIds?.has(c.id) ? '识别中…' : '＋ 关注'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </>)}
+
+      {mainTab === 'projects' && (
+        ghTrending.repos.length === 0
+          ? <div className="wb-empty">暂无热门项目 · 同步后自动出现</div>
+          : <>
+            <div style={{ display: 'flex', alignItems: 'center', margin: '2px 2px 12px', fontSize: 11.5, color: 'var(--faint)' }}>
+              {ghTrending.trend?.trend ? <span style={{ color: 'var(--sub)' }}>{ghTrending.trend.trend}</span> : <span>GitHub Trending · 每日 · 高星+热门双筛</span>}
+              <span style={{ marginLeft: 'auto' }}>只显示当天榜；你收藏过的项目在「文章 › ★ 收藏」里</span>
+            </div>
+            <div className="wb-feed-grid">
+              {ghTrending.repos.map(r => (
+                <div key={r.id} className="wb-gcard">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
+                    <span style={{ color: 'var(--amber)', fontWeight: 600 }}>今日 +{Math.round(r.external_score)} 星</span>
+                    <button className={`wb-star${(ghStar[r.id] ?? r.starred) ? ' on' : ''}`} style={{ marginLeft: 'auto' }}
+                      title="收藏（收藏后进「文章 › ★ 收藏」）"
+                      onClick={async () => { const s = await toggleStar(r.id); if (s !== null) setGhStar(prev => ({ ...prev, [r.id]: s })) }}>
+                      {(ghStar[r.id] ?? r.starred) ? '★' : '☆'}
+                    </button>
+                  </div>
+                  <div className="wb-gcard-title">
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{r.zh_title}</a>
+                  </div>
+                  {r.zh_summary && <div className="wb-gcard-sum">{r.zh_summary}</div>}
+                  <div className="wb-gcard-foot">
+                    <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
+                      title="产品视角速览：解决什么问题 / 对我产品的启发 / 值不值得写" onClick={() => setReaderContent(r)}>AI 精读</button>
+                    <a className="wb-btn-ghost" style={{ padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      href={r.url} target="_blank" rel="noreferrer">查看 <IconExternal /></a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+      )}
 
       {readerContent && <ReaderModal content={readerContent} onClose={() => setReaderContent(null)} showToast={showToast} loadNotes={loadNotes} />}
     </>
