@@ -3,6 +3,7 @@ label: thread
 icon: 𝕏
 order: 1
 note: X thread（分条、短句）
+when: 一个观点拆成几条短推——适合抛判断、带争议点、英文/技术圈
 ---
 写一条 X thread（5-8 条推文）：
 - 1/ 钩子：制造好奇缺口，60 字内

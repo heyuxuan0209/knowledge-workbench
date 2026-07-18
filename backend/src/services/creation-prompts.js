@@ -46,6 +46,7 @@ function parsePlatformFile(file) {
     label: meta.label,
     icon: meta.icon || '',
     note: meta.note || meta.label,
+    when: meta.when || '',
     order: Number(meta.order) || 99,
     spec: m[2].trim(),
   };

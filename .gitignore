@@ -70,4 +70,6 @@ backend/data/
 
 # 个人认知资产与工作模板（GitHub 发布原则：只推代码/prompt/skills）
 reference/opinions.md
+reference/platform-playbooks/
 templates/
+published/

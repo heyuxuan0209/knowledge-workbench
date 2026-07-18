@@ -6,13 +6,14 @@
 
 | 文件 | 作用 | 占位符 |
 |---|---|---|
-| `platforms/*.md` | 平台模板，**一个文件一个平台**——新增平台 = 加一个文件，创作台自动出现 | 无（纯规格） |
-| `draft-frame.md` | 起稿总框架（综述+素材+要求的组装模板） | `{{topicName}} {{platformSpec}} {{stanceBlock}} {{current}} {{views}} {{consensus}} {{notes}}` |
+| `platforms/*.md` | 平台模板，**一个文件一个平台**——新增平台 = 加一个文件，创作台自动出现。公众号长文分两种文体：`long.md` 报道体（编译/解读，判断随文走）、`long-personal.md` 叙事体（第一人称亲历，以作者定稿为文风锚），按内容选 | 无（纯规格） |
+| `draft-frame.md` | 起稿总框架（综述+素材+要求的组装模板）；含「作者声音」+ 动笔前隐式构思层 + 全局禁词硬约束（2026-07-17 起） | `{{topicName}} {{platformSpec}} {{stanceBlock}} {{current}} {{views}} {{consensus}} {{notes}}` |
 | `stance-with.md` / `stance-without.md` | 有/无作者立场时的立场块（诚实原则：无立场时 AI 判断必须自我标注） | `{{viewpoint}}` |
-| `humanize.md` | 去 AI 味三遍审校 | `{{platformNote}} {{draft}}` |
+| `humanize.md` | 去 AI 味四遍审校（词汇/句式/反修辞/人味） | `{{platformNote}} {{draft}}` |
 | `rewrite.md` | 创作助手指令改写 | `{{platformNote}} {{instruction}} {{draft}}` |
 | `titles.md` | 标题候选 | `{{draft}}` |
 | `thread-single.md` | 单篇内容快速出 thread（Feed 侧入口） | `{{material}}` |
+| `voice-profile.md` | 作者声音档案（源头文件）——核心版已注入 `draft-frame.md`，**改动时两处同步**；每次复盘定稿学习后回写 | 无 |
 
 ## platforms/ 文件格式
 
@@ -31,3 +32,7 @@ note: 公众号长文（Markdown） ← 指令改写时给 AI 的平台提示
 - 「不编造数据和引语」「保留 [素材N] 溯源标记」这类诚实约束是全局底线，改模板时**不要删**
 - 占位符名字不要改（代码按名字注入）；删掉某个占位符 = 该信息不再进 prompt，属合法操作
 - 文件缺失/frontmatter 缺 label 会导致生成接口报错（有意为之：宁可报错也不静默用空模板）
+- 三层原则（2026-07-18 修订，原两层拆得太粗、且被违反）：**① 工艺**（禁词、长短句、不编造、保留素材N）→ draft-frame + humanize 全局；**② 作者声音**（身份、诚实姿态、具体优先、禁营销腔、口头禅）→ draft-frame，但只放「你是谁」，不放文体手法；**③ 文体人格**（极短句/金句的密度和位置、小标题风格、叙事骨架、判断怎么放）→ 各 platforms 文件，因文体而异。**极短句和金句属第③层，别放全局**——放全局会同时污染报道体（用不上却被塞）和双重下发给叙事体（味太浓），这是 2026-07-17 实测两个症状的根因
+- 文风锚只当审校 checklist，不进生成层：**不要把示范金句写进 draft-frame/platform 当模板**——模型会把它背下来、改几个字套到任何题材（2026-07-18 实测：AI安全 主题里原样搬了「收藏夹」那篇的金句）。例句留在 voice-profile 当「像不像我」的对照
+- humanize 只做减法：审校负责删 AI-tell，不负责加人味/加表态（硬加的表态又突兀又假）。人味在生成层（platform 文件的作者声音）解决
+- 风格量化要克制：写成配额（「至少 N 处」）会产出仿写腔，宁可写成封顶（「最多 N 处」）
