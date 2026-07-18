@@ -153,6 +153,8 @@ export default function FeedView({
 
   const today = new Date()
   const dateLabel = `${today.getMonth() + 1} 月 ${today.getDate()} 日`
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const staleReport = report && report.period_key !== todayKey // 显示的是往日报告（补跑未及时）
   const ideas = (report?.ideas || []).filter(i => i.status === 'suggested' || i.status === 'adopted')
   const selIds = new Set(selectedItems.map(x => x.id))
 
@@ -172,8 +174,17 @@ export default function FeedView({
 
       <div className="wb-brief">
         <div className="wb-brief-head">
-          <div className="wb-brief-title">今日简报 · {report ? formatDate(report.period_key) : dateLabel}</div>
+          <div className="wb-brief-title">
+            今日简报 · {report ? formatDate(report.period_key) : dateLabel}
+            {staleReport && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--amber)', fontWeight: 500 }}>· 显示的是 {formatDate(report.period_key)} 的，点刷新出今天的</span>}
+          </div>
           <div className="wb-brief-links">
+            {report && (
+              <button className="wb-brief-link" disabled={generating} onClick={generateReport}
+                title="用最新同步的数据重新生成当天日报（Deepseek，约 ¥0.002）">
+                {generating ? '刷新中…' : '↻ 刷新'}
+              </button>
+            )}
             <button className="wb-brief-link" onClick={() => setPage('reports')}>查看周报</button>
             <button className="wb-brief-link" onClick={() => setPage('reports')}>查看月报</button>
           </div>
@@ -239,7 +250,13 @@ export default function FeedView({
         <div className="wb-brief" style={{ background: 'var(--surface)', borderColor: 'var(--line10)' }}>
           <div className="wb-brief-head" style={{ marginBottom: 8 }}>
             <div className="wb-brief-title" style={{ fontSize: 15 }}>热门 AI 项目</div>
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--faint)' }}>GitHub Trending · 每日 · 高星+热门双筛</span>
+            {/* 星标的项目掉出当日榜单后仍在「★ 星标」里找得到（2026-07-18：用户以为被覆盖丢失） */}
+            <button className="wb-brief-link" style={{ marginLeft: 'auto', fontSize: 11 }}
+              title="只显示当天 Top 榜；你星标过的项目即使掉榜也在这里找得回"
+              onClick={() => { setFeedTab('starred'); document.querySelector('.wb-feedbar')?.scrollIntoView({ behavior: 'smooth' }) }}>
+              ★ 我的收藏
+            </button>
+            <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--faint)' }}>GitHub Trending · 每日 · 高星+热门双筛</span>
           </div>
           {ghTrending.trend?.trend && (
             <div className="wb-brief-label" style={{ marginBottom: 10 }}>📈 {ghTrending.trend.trend}</div>

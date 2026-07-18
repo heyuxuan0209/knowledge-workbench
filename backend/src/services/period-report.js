@@ -10,7 +10,8 @@ import { tokenize } from './story-clustering.js';
 // 节奏化：UNIQUE(period_type, period_key) 重跑覆盖，不实时刷新。
 
 export function periodKeyOf(periodType, date = new Date()) {
-  if (periodType === 'monthly') return date.toISOString().slice(0, 7); // '2026-07'
+  // 本地年月（不用 toISOString UTC——月初凌晨会算成上个月）；周键下方 ISO 计算已基于本地日历分量
+  if (periodType === 'monthly') return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // '2026-07'
   // ISO 周：'2026-W29'
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;

@@ -10,8 +10,13 @@ import { chat } from './llm.js';
 // 选题（Idea）= 切入角度 + 为什么是现在 + 共识/非共识 + 支撑素材引用，
 // 是"洞察 → 创作"的桥，不是资讯罗列。
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10); // '2026-07-14'
+// 本地日期键（不用 toISOString——那是 UTC，巴黎 UTC+2 时凌晨 0-2 点会算成前一天，
+// 2026-07-18 日报错标 07-17 的潜伏根因）。按系统本地时区取年月日。
+export function todayKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`; // '2026-07-18'（本地日期）
 }
 
 // 组装给 LLM 的素材：焦点簇（多源事件）+ 已登记源的近 48h 内容（用户明确关注的人）
@@ -241,6 +246,20 @@ export function getLatestReport(periodType = 'daily') {
   const report = row ? getReportWithIdeas(db, row.id) : null;
   db.close();
   return report;
+}
+
+// 补跑守卫（2026-07-18 修 Bug1：launchd 凌晨 2:30 跑，笔记本睡着没补上 → 当天无新日报 →
+// 页面退回显示昨天的报告）。由 backend 常驻进程（TCC 已授权、比睡眠的 launchd 可靠）在
+// 启动时与每日定时里调用：今天已有报告就跳过（省 LLM 成本），缺了才生成。force 供手动刷新。
+export async function ensureDailyReport({ force = false } = {}) {
+  const key = todayKey();
+  if (!force) {
+    const latest = getLatestReport('daily');
+    if (latest && latest.period_key === key) {
+      return { success: true, skipped: true, reason: 'already-fresh', data: latest };
+    }
+  }
+  return generateDailyReport();
 }
 
 // 从选题移除一条支撑素材（2026-07-16 反馈：AI 聚合的选题，用户可移走不合适的文章）

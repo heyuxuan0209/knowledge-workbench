@@ -1468,11 +1468,24 @@ app.listen(PORT, () => {
   console.log(`🚀 AI Insight Hub backend running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`✨ v0.2.0 - Workspace Chat APIs enabled`);
+
+  // 启动自检补跑（2026-07-18 修 Bug1）：凌晨 launchd 睡眠错过时，一开机 backend 就把
+  // 当天缺的日报补上。延迟 20s 让首次可能的同步先落地；已有当天报告则跳过（不烧 LLM）。
+  setTimeout(async () => {
+    try {
+      const { ensureDailyReport } = await import('./services/report-generation.js');
+      const r = await ensureDailyReport();
+      console.log(r.skipped ? '[startup] 今日日报已存在，跳过补跑' : `[startup] 已补跑今日日报（${r.data?.period_key}）`);
+    } catch (err) {
+      console.error('[startup] 日报补跑失败:', err.message);
+    }
+  }, 20000);
 });
 
-// 定时全渠道同步：每天 08:10 / 20:10（2026-07-16 反馈 #2/#5 的共同根因：
+// 定时全渠道同步 + 日报生成：每天 08:10 / 20:10（2026-07-16 反馈 #2/#5 的共同根因：
 // 此前同步只在手动刷新时发生，AI HOT 翻页窗口有限，不刷新的日子内容永久错过——
-// DB 实证 7 天里只有 4 天有数据）。node-cron 随 server 常驻，失败只记日志不中断服务。
+// DB 实证 7 天里只有 4 天有数据）。node-cron 随 backend 常驻（TCC 已授权、比睡眠的
+// launchd 可靠），同步完顺手生成当天日报，失败只记日志不中断服务。
 import('node-cron').then(({ default: cron }) => {
   cron.schedule('10 8,20 * * *', async () => {
     console.log('[cron] scheduled sync-all start');
@@ -1484,6 +1497,14 @@ import('node-cron').then(({ default: cron }) => {
     } catch (err) {
       console.error('[cron] sync-all failed:', err.message);
     }
+    // 同步后生成/刷新当天日报（force：拿到最新同步的数据重出一份）
+    try {
+      const { ensureDailyReport } = await import('./services/report-generation.js');
+      const r = await ensureDailyReport({ force: true });
+      console.log(`[cron] 日报已刷新（${r.data?.period_key}）`);
+    } catch (err) {
+      console.error('[cron] 日报生成失败:', err.message);
+    }
   });
-  console.log('⏰ 定时同步已注册：每天 08:10 / 20:10');
+  console.log('⏰ 定时同步+日报已注册：每天 08:10 / 20:10');
 }).catch(err => console.error('node-cron 加载失败（定时同步不可用）:', err.message));

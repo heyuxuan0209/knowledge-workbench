@@ -10,6 +10,8 @@ import { resolve } from 'path';
 // 1. HN/RSS 里与 AI/软件工程/科技产品无关的内容 → 物理删除（feed 数据可重新同步，非用户资产）
 // 2. 保留下来但没有中文摘要的 → 抓原文首段补一句话摘要
 // 素材卡片引用的 content 不删（notes.content_id 外键 ON DELETE SET NULL，但保守起见排除）。
+// 星标内容也不删（2026-07-18 修 Bug2：migrate-m7 承诺"星标不被任何清理逻辑删除"，
+// 但此处此前漏了 starred 排除——用户星标的 HN/RSS 文章会被相关性判定误删）。
 
 export async function cleanupFeed() {
   const db = getDatabase();
@@ -18,6 +20,7 @@ export async function cleanupFeed() {
     SELECT c.id, COALESCE(c.zh_title, c.en_title) AS title, c.url, c.zh_summary
     FROM contents c
     WHERE c.source_app IN ('hackernews', 'rss')
+      AND c.starred = 0
       AND c.id NOT IN (SELECT content_id FROM notes WHERE content_id IS NOT NULL)
   `).all();
   console.log(`📋 ${rows.length} HN/RSS contents to review`);
