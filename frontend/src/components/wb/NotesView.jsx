@@ -99,6 +99,44 @@ export default function NotesView({
     } catch (err) { showToast(`归类失败：${err.message}`) }
   }
 
+  // ---- 1b 知识关联：某条素材的相关素材（按需拉取，复用向量） ----
+  const [relatedOpen, setRelatedOpen] = useState(null)  // 展开了哪条的相关列表
+  const [relatedMap, setRelatedMap] = useState({})      // noteId -> related[]（缓存）
+  const toggleRelated = async (noteId) => {
+    if (relatedOpen === noteId) { setRelatedOpen(null); return }
+    setRelatedOpen(noteId)
+    if (!relatedMap[noteId]) {
+      try { const j = await api(`/api/notes/${noteId}/related`); setRelatedMap(m => ({ ...m, [noteId]: j.data || [] })) }
+      catch { setRelatedMap(m => ({ ...m, [noteId]: [] })) }
+    }
+  }
+  const jumpToNote = (id) => setHighlightNoteId?.(id) // 高亮并滚动（highlight effect 负责）
+
+  // ---- 1b 查重：疑似重复素材分组（语义），用户保留想要的、删掉多余 ----
+  const DUP_KEY = 'wb-dismissed-dups'
+  const [dupGroups, setDupGroups] = useState([])
+  const [dupOpen, setDupOpen] = useState(false)
+  const dupKey = (g) => g.notes.map(n => n.id).sort().join('|')
+  const dupDismissed = () => { try { return JSON.parse(localStorage.getItem(DUP_KEY) || '[]') } catch { return [] } }
+  useEffect(() => {
+    if (notesTab !== 'mine') return
+    api('/api/notes/duplicates').then(j => setDupGroups((j.data || []).filter(g => !dupDismissed().includes(dupKey(g))))).catch(() => {})
+  }, [notes, notesTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  const dismissDup = (g) => {
+    localStorage.setItem(DUP_KEY, JSON.stringify([...dupDismissed(), dupKey(g)].slice(-50)))
+    setDupGroups(prev => prev.filter(x => dupKey(x) !== dupKey(g)))
+  }
+  const delDupNote = async (noteId, g) => {
+    if (!confirm('删除这张素材卡片？（组里其它的保留）')) return
+    try {
+      await api(`/api/notes/${noteId}`, { method: 'DELETE' })
+      showToast('已删除重复素材')
+      loadNotes(); fetchFiltered()
+      // 组内移除这条；只剩 1 条即视为已解决，整组消失
+      setDupGroups(prev => prev.map(x => dupKey(x) === dupKey(g) ? { ...x, notes: x.notes.filter(n => n.id !== noteId) } : x).filter(x => x.notes.length >= 2))
+    } catch (err) { showToast(`删除失败：${err.message}`) }
+  }
+
   // ---- 聚合建议（2026-07-16 反馈 #4：AI 提议哪些放一起、为什么；用户勾选裁决） ----
   const [clusters, setClusters] = useState([])
   const [clusterEdit, setClusterEdit] = useState({}) // key → { name, excluded:Set }
@@ -305,8 +343,34 @@ export default function NotesView({
               {searchMode === 'semantic' && keyword.trim()
                 ? (results.length && results[0].score < 0.47
                     ? '库里暂时没有很贴合的，下面是最接近的几条——换个说法或再攒点素材试试'
-                    : `按相关度排序 · ${results.length} 条`)
+                    : `按语义相关度排序（AI 比对意思，不是关键词）· ${results.length} 条`)
                 : `筛选出 ${results.length} 条`}
+            </div>
+          )}
+
+          {/* 查重条（1b）：语义判定的疑似重复素材，用户保留想要的、删掉多余 */}
+          {!hasFilter && dupGroups.length > 0 && (
+            <div style={{ margin: '10px 2px', border: '1px solid var(--line10)', borderRadius: 10, padding: '10px 12px', background: 'var(--surface)' }}>
+              <div onClick={() => setDupOpen(o => !o)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+                🔁 发现 {dupGroups.length} 组疑似重复素材
+                <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 400, color: 'var(--sub2)' }}>{dupOpen ? '收起 ▴' : '展开处理 ▾'}</span>
+              </div>
+              {dupOpen && dupGroups.map(g => (
+                <div key={dupKey(g)} style={{ marginTop: 10, padding: 10, border: '1px solid var(--line08)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 6 }}>相似度 {Math.round(g.score * 100)}% · 保留你要的、删掉多余的（删除不影响另一条）</div>
+                  {g.notes.map(n => (
+                    <div key={n.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0', borderTop: '1px dashed var(--line08)' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{n.title || '（无标题）'}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--sub)', lineHeight: 1.5, maxHeight: 42, overflow: 'hidden' }}>{n.excerpt}</div>
+                        <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>来源：{n.source_title || '未知'}</div>
+                      </div>
+                      <button className="wb-btn-ghost" style={{ flexShrink: 0 }} onClick={() => delDupNote(n.id, g)}>删除</button>
+                    </div>
+                  ))}
+                  <button className="wb-btn-ghost" style={{ marginTop: 6 }} onClick={() => dismissDup(g)}>不是重复 · 忽略</button>
+                </div>
+              ))}
             </div>
           )}
 
@@ -437,9 +501,29 @@ export default function NotesView({
             ))}
             <option value="__new__">＋ 新建主题…</option>
           </select>
+          <button className="wb-note-jump" title="语义上相关的其它素材（把死知识连成网）"
+            onClick={() => toggleRelated(note.id)}>🔗 相关{relatedOpen === note.id ? ' ▴' : ''}</button>
           <span className="wb-note-time">{timeAgo(note.created_at)}</span>
           <button className="wb-note-del" onClick={() => del(note)} title="删除"><IconTrash /></button>
         </div>
+        {relatedOpen === note.id && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--line08)' }}>
+            {!relatedMap[note.id] && <div style={{ fontSize: 12, color: 'var(--sub2)' }}>找相关素材中…</div>}
+            {relatedMap[note.id]?.length === 0 && <div style={{ fontSize: 12, color: 'var(--sub2)' }}>没有明显相关的素材</div>}
+            {relatedMap[note.id]?.length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 6, lineHeight: 1.5 }}>
+                按<b style={{ color: 'var(--sub2)' }}>意思的接近度</b>找的——AI 读过每条素材的含义、逐一比对相似度（不是靠共同关键词），越靠上越接近。
+              </div>
+            )}
+            {relatedMap[note.id]?.map(r => { const rl = relevanceLabel(r.score); return (
+              <div key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0' }}>
+                <span className="wb-pill" style={{ fontSize: 10, color: rl.fg, background: rl.bg, flexShrink: 0 }}>{rl.text}</span>
+                <button className="wb-note-jump" style={{ textAlign: 'left', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title="跳到这条素材" onClick={() => jumpToNote(r.id)}>{r.title || r.source_title || '（无标题）'}</button>
+              </div>
+            ) })}
+          </div>
+        )}
       </div>
     )
   }

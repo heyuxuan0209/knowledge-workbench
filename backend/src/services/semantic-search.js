@@ -85,6 +85,73 @@ export async function searchNotes(query, { limit = 20, minScore = 0 } = {}) {
   return scored.slice(0, limit);
 }
 
+// 载入所有带向量的素材（含解析后的向量），供关联/查重复用
+function loadEmbeddedNotes() {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT id, title, excerpt, source_title, source_url, content_id, created_at, embedding
+    FROM notes WHERE embedding IS NOT NULL AND embedding_model = ?
+  `).all(MODEL_NAME);
+  db.close();
+  return rows.map(r => ({ ...r, vec: parseVec(r.embedding) })).filter(r => r.vec);
+}
+
+// 关联图核心（VISION-V4 阶段1b）：某条素材语义上最近的其他素材（"死知识变活网"）。
+export function relatedNotes(noteId, { limit = 6, minScore = 0.4 } = {}) {
+  const all = loadEmbeddedNotes();
+  const self = all.find(n => n.id === noteId);
+  if (!self) return [];
+  const scored = [];
+  for (const n of all) {
+    if (n.id === noteId) continue;
+    const score = cosine(self.vec, n.vec);
+    if (score < minScore) continue;
+    scored.push({ id: n.id, title: n.title, source_title: n.source_title, source_url: n.source_url, content_id: n.content_id, score: Math.round(score * 1000) / 1000 });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit);
+}
+
+// 查重（VISION-V4 阶段1b）：全库两两余弦，超阈值的判为疑似重复，用并查集聚成组。
+// 阈值默认 0.85（bge-m3 上"讲同一件事"的素材通常 0.85+，相关但不同约 0.6-0.8）。
+export function findDuplicates({ threshold = 0.85 } = {}) {
+  const all = loadEmbeddedNotes();
+  const n = all.length;
+  const parent = all.map((_, i) => i);
+  const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a, b) => { parent[find(a)] = find(b); };
+  const pairScore = new Map(); // "i-j" -> score，用于展示两两相似度
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const s = cosine(all[i].vec, all[j].vec);
+      if (s >= threshold) { union(i, j); pairScore.set(`${i}-${j}`, Math.round(s * 1000) / 1000); }
+    }
+  }
+  // 收集每个根下的成员
+  const groups = new Map();
+  for (let i = 0; i < n; i++) { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(i); }
+
+  const result = [];
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    // 组内最高相似度作为该组"重复程度"
+    let maxS = 0;
+    for (let a = 0; a < members.length; a++) for (let b = a + 1; b < members.length; b++) {
+      const s = pairScore.get(`${members[a]}-${members[b]}`) || 0; if (s > maxS) maxS = s;
+    }
+    result.push({
+      score: maxS,
+      notes: members.map(i => ({
+        id: all[i].id, title: all[i].title, excerpt: (all[i].excerpt || '').slice(0, 160),
+        source_title: all[i].source_title, created_at: all[i].created_at,
+      })),
+    });
+  }
+  result.sort((a, b) => b.score - a.score);
+  return result;
+}
+
 // 索引状态（给前端提示"还有 N 条未建语义索引"）
 export function indexStatus() {
   const db = getDatabase();

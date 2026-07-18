@@ -838,6 +838,27 @@ app.get('/api/notes/search-semantic', async (req, res) => {
   }
 });
 
+// 某条素材的相关素材（VISION-V4 阶段1b，知识关联图/死知识变活网）
+app.get('/api/notes/:id/related', async (req, res) => {
+  try {
+    const { relatedNotes } = await import('./services/semantic-search.js');
+    res.json({ success: true, data: relatedNotes(req.params.id, { limit: parseInt(req.query.limit) || 6 }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 疑似重复素材分组（VISION-V4 阶段1b，查重）
+app.get('/api/notes/duplicates', async (req, res) => {
+  try {
+    const { findDuplicates } = await import('./services/semantic-search.js');
+    const threshold = req.query.threshold ? parseFloat(req.query.threshold) : 0.85;
+    res.json({ success: true, data: findDuplicates({ threshold }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 语义索引状态（前端提示"还有 N 条未建索引"）
 app.get('/api/notes/index-status', async (req, res) => {
   try {
