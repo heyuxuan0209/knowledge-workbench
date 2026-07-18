@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小红书卡片工作台</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--scale:.32;--cardh:1440px}
+  body{background:#2b2a27;color:#eee;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;padding:24px;line-height:1.5}
+  .app{max-width:1280px;margin:0 auto}
+  h1{font-size:18px;font-weight:600;margin-bottom:4px}
+  .hint{font-size:12.5px;color:#a4a4a4;margin-bottom:16px;line-height:1.7}
+  .hint b{color:#ddd}
+  .panel{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+  textarea{flex:1;min-width:340px;min-height:170px;padding:12px;border-radius:8px;border:1px solid #555;background:#26251f;color:#eee;font-family:inherit;font-size:13px;line-height:1.7;resize:vertical}
+  .controls{display:flex;flex-direction:column;gap:10px;min-width:190px}
+  button{padding:9px 14px;border-radius:8px;border:1px solid #666;background:#3d3b34;color:#eee;font-size:13px;cursor:pointer;font-family:inherit}
+  button:hover{background:#4a473e}
+  button.primary{background:#8a6d3b;border-color:#8a6d3b;color:#fff}
+  .styles{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .styles button{font-size:12.5px;padding:7px 13px}
+  .styles button.on{background:#fff;color:#111;border-color:#fff;font-weight:600}
+  .row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#bbb}
+  .row .asp{padding:5px 12px;font-size:12.5px}
+  .row .asp.on{background:#fff;color:#111;border-color:#fff}
+  .caption-box{background:#26251f;border:1px solid #555;border-radius:8px;padding:12px;margin-bottom:18px;color:#ddd;display:none}
+  .cap-label{font-size:12px;color:#fff;font-weight:600;margin-bottom:6px;letter-spacing:.02em}
+  .cap-text{background:#1f1e19;border:1px solid #4a473e;border-radius:6px;padding:9px 11px;font-size:13px;line-height:1.7;color:#e8e4da;white-space:pre-wrap;outline:none}
+  .cap-text:hover{border-color:#6a6455}
+  .cap-text:focus{border-color:#8a6d3b}
+  .cap-copy{margin-top:10px;font-size:12px;padding:6px 12px}
+  .gallery{display:flex;flex-wrap:wrap;gap:20px}
+  .slot{display:flex;flex-direction:column;gap:8px}
+  .stage{overflow:hidden;border-radius:5px;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+  .slot .dl{font-size:12px;padding:6px 10px}
+  .empty{color:#888;font-size:14px;padding:40px 0}
+  [contenteditable]{outline:none}
+  [contenteditable]:hover{box-shadow:0 0 0 3px rgba(200,154,91,.3) inset}
+  [contenteditable]:focus{box-shadow:0 0 0 3px rgba(200,154,91,.6) inset}
+
+  /* ===== 卡片骨架（4 风格共用） ===== */
+  .card{width:1080px;height:var(--cardh,1440px);transform:scale(var(--scale,.32));transform-origin:top left;
+        position:relative;display:flex;flex-direction:column;padding:120px 100px;background:var(--bg);color:var(--ink)}
+  .card .top{position:absolute;left:100px;top:88px;font-size:23px;letter-spacing:.32em;text-transform:uppercase;color:var(--sub);font-weight:500}
+  .card .foot{position:absolute;right:100px;bottom:86px;font-size:22px;letter-spacing:.14em;color:var(--sub)}
+  .card .mid{margin:auto 0;display:flex;flex-direction:column;justify-content:center;flex:1}
+  .card .mark{display:none}
+  .card.cover .mark{display:block;width:56px;height:56px;background:var(--accent);margin-bottom:44px}
+  .card.cover .num,.card.cover .rule{display:none}
+  /* 精修默认（Aesop / 画廊 走这套） */
+  .card.cover .big{font-size:118px;font-weight:600;line-height:1.2;color:var(--ink)}
+  .card.cover .small{font-size:32px;line-height:1.6;color:var(--sub);margin-top:40px;max-width:84%}
+  .card.content .num{font-size:40px;font-weight:600;letter-spacing:.1em;color:var(--accent)}
+  .card.content .title{font-size:66px;font-weight:600;line-height:1.34;color:var(--ink);margin-top:22px}
+  .card.content .rule{height:1px;background:var(--line);margin:40px 0}
+  .card.content .body{font-size:40px;line-height:1.66;color:var(--sub2)}
+
+  /* ① Aesop 药房 */
+  .aesop{--bg:#E7E2D8;--ink:#1B1A17;--sub:#6B6459;--sub2:#3d3a33;--accent:#5A6247;--line:#CDC5B6}
+
+  /* ② 画廊深色 */
+  .gallery{--bg:#1E1C19;--ink:#ECE4D6;--sub:#9A9184;--sub2:#c9c0b1;--accent:#C79A5B;--line:#3A362F}
+
+  /* ③ 深色科技（在骨架上覆写字体/字号/点色） */
+  .dark{--bg:#111318;--ink:#EAECEF;--sub:#9aa4b2;--sub2:#aeb6c2;--accent:#3B82F6;--line:#2a2f3a}
+  .dark .top{color:#6EE7B7;font-family:ui-monospace,Menlo,monospace;letter-spacing:.24em}
+  .dark .foot{font-family:ui-monospace,Menlo,monospace}
+  .dark.cover .big{color:#fff;font-size:120px;font-weight:700;line-height:1.16}
+  .dark.content .num{font-size:120px;font-weight:700;letter-spacing:0;line-height:1}
+  .dark.content .title{color:#fff;font-weight:700;font-size:66px}
+  .dark.content .rule{height:2px}
+
+  /* ④ 新粗野 */
+  .brut{--bg:#FFFDF5;--ink:#0A0A0A;--sub:#0A0A0A;--sub2:#0A0A0A;--accent:#0A0A0A;--line:#0A0A0A}
+  .brut .top{background:#0A0A0A;color:#C7F000;padding:8px 18px;font-weight:800;letter-spacing:.08em}
+  .brut .foot{opacity:.5}
+  .brut.cover .mark{display:none}
+  .brut.cover .big{font-size:112px;font-weight:900;line-height:1.14;background:#C7F000;display:inline;padding:6px 2px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  .brut.cover .small{font-size:34px;font-weight:600;margin-top:44px;border:6px solid #0A0A0A;padding:20px 24px;box-shadow:12px 12px 0 #0A0A0A;max-width:100%}
+  .brut.content .num{font-size:100px;font-weight:900;letter-spacing:0;border:8px solid #0A0A0A;width:170px;height:170px;display:flex;align-items:center;justify-content:center;box-shadow:12px 12px 0 #C7F000}
+  .brut.content .title{font-size:64px;font-weight:900;margin-top:48px}
+  .brut.content .rule{display:none}
+  .brut.content .body{font-weight:500;line-height:1.55;margin-top:40px;border-left:10px solid #C7F000;padding-left:28px}
+
+  /* 9:16 抖音：放大字号+间距，填满竖版、去掉上下大留白（覆写所有风格，放最后靠源序生效） */
+  .card.tall{padding:160px 100px}
+  .card.tall.cover .mark{width:76px;height:76px;margin-bottom:64px}
+  .card.tall.cover .big{font-size:158px;line-height:1.2}
+  .card.tall.cover .small{font-size:42px;margin-top:60px}
+  .card.tall .title{font-size:94px;margin-top:38px;line-height:1.34}
+  .card.tall .rule{margin:64px 0}
+  .card.tall .body{font-size:54px;line-height:1.74}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>小红书 / 抖音卡片工作台</h1>
+  <div class="hint">
+    ① 把创作台「小红书」生成的卡片文字粘进下框 → 点<b>渲染卡片</b>　② 上排切<b>风格</b>（切换保留你的改动）　③ 卡片上的<b>标题/正文点着就能改</b>（悬停有金框提示；重新点「渲染卡片」按文本框重置）　④ 选<b>比例</b>后点<b>下载 PNG</b>。
+  </div>
+  <div class="panel">
+    <textarea id="input" spellcheck="false"></textarea>
+    <div class="controls">
+      <button class="primary" onclick="render()">渲染卡片</button>
+      <button onclick="downloadAll()">下载全部 PNG</button>
+      <div class="row">比例
+        <button class="asp on" onclick="setAspect(1440,this)">3:4 小红书</button>
+        <button class="asp" onclick="setAspect(1920,this)">9:16 抖音</button>
+      </div>
+      <div class="row">预览 <input type="range" min="22" max="52" value="32" oninput="setScale(this.value)"></div>
+      <div class="hint" style="margin:0">卡片 ≤9 张（含封面）· 导出 1080×{高}</div>
+    </div>
+  </div>
+  <div class="styles" id="styles"></div>
+  <div class="caption-box" id="caption"></div>
+  <div class="gallery" id="gallery"><div class="empty">粘贴卡片文字后点「渲染卡片」</div></div>
+</div>
+
+<script>
+const STYLES=[
+  {key:'gallery',name:'画廊深色'},
+  {key:'aesop',name:'Aesop 药房'},
+  {key:'dark',name:'深色科技'},
+  {key:'brut',name:'新粗野'},
+];
+let curStyle='gallery';
+
+const DEMO=`【封面卡】大字：AI安全的「开关」来了／小字：不用重新训练，一次训练切出多个安全等级｜写给 AI 产品经理与开发者
+
+【卡1】标题：别只堵输出，源头控制更稳／正文：主流做法只阻止危险输出，底层知识还在，越狱一样能恢复。更稳的思路：从源头隔离知识。
+
+【卡2】标题：一次训练，多套安全配置／正文：GRAM 物理隔离知识模块，只训一个模型就能独立开关不同能力。关掉病毒学知识，保留通用对话。按需部署，不用重复烧钱。
+
+【卡3】标题：移除能力后，攻击者很难恢复／正文：传统"反学习"事后擦除，微调就能复原。GRAM 直接删模块，想恢复几乎不可能——等于拆掉一块电路板。
+
+【卡4】标题：一个模型，两种玩法／正文：同一个基础模型，对普通用户隐藏高危模块，对科研机构开放。安全与功能不再二选一。
+
+【卡5】标题：AI 编程也在变：从盯代码到定方向／正文：Anthropic 实践里，AI Agent 让工程师从盯每一步，转向判断"什么值得做"。团队 65% 的 PR 由 AI 提交，质量门槛反而更高。
+
+【卡6】标题：开发者的新护城河：品味+判断／正文：AI 让执行变快，但"什么该做"还是人说了算。作品质量的期望被抬高，你需要更精准的品味。
+
+【卡7】标题：安全、效率、品味，其实是同一课题／正文：从知识隔离到角色升级，AI 时代真正稀缺的不是技术对抗，而是判断力——知道什么值得做、什么该守住。
+
+【正文文案】AI安全不该只是给输出加滤镜。一个更底层的解法：物理隔离知识，一次训练切出多个安全版本。另一条线是，AI 编程正倒逼开发者从执行者变成决策者。安全、效率、品味，在 AI 时代其实是同一个课题。
+
+【标签】#AI安全 #AI产品经理 #AI编程 #开发者 #知识管理`;
+
+document.getElementById('input').value=DEMO;
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function parse(text){
+  const cards=[]; let caption='',tags='';
+  const blocks=text.split(/(?=【)/).map(b=>b.trim()).filter(Boolean);
+  for(const b of blocks){
+    const head=(b.match(/【([^】]+)】/)||[])[1]||'';
+    const rest=b.replace(/【[^】]+】/,'').trim();
+    if(/封面/.test(head)){
+      const big=(rest.match(/大字[:：]\s*([^／\/\n]*)/)||[])[1]||'';
+      const small=(rest.match(/小字[:：]\s*([^\n]*)/)||[])[1]||'';
+      cards.unshift({type:'cover',big:big.trim(),small:small.trim()});
+    }else if(/^卡/.test(head)){
+      const title=(rest.match(/标题[:：]\s*([^／\/\n]*)/)||[])[1]||'';
+      const body=(rest.match(/正文[:：]\s*([^\n]*)/)||[])[1]||'';
+      cards.push({type:'content',title:title.trim(),body:body.trim()});
+    }else if(/正文文案|配文/.test(head)) caption=rest.trim();
+    else if(/标签/.test(head)) tags=rest.trim();
+  }
+  return {cards,caption,tags};
+}
+
+function cardHTML(c,i,total){
+  const foot=`<div class="foot">${String(i+1).padStart(2,'0')} / ${String(total).padStart(2,'0')}</div>`;
+  if(c.type==='cover'){
+    return `<div class="card ${curStyle} cover"><div class="top">AI SAFETY · 2026</div>
+      <div class="mid">
+        <div class="mark"></div>
+        <div class="big" contenteditable spellcheck="false">${esc(c.big)}</div>
+        <div class="small" contenteditable spellcheck="false">${esc(c.small)}</div>
+      </div>${foot}</div>`;
+  }
+  return `<div class="card ${curStyle} content"><div class="top">POINT ${String(i).padStart(2,'0')}</div>
+    <div class="mid">
+      <div class="num">${String(i).padStart(2,'0')}</div>
+      <div class="title" contenteditable spellcheck="false">${esc(c.title)}</div>
+      <div class="rule"></div>
+      <div class="body" contenteditable spellcheck="false">${esc(c.body)}</div>
+    </div>${foot}</div>`;
+}
+
+function render(){
+  const {cards,caption,tags}=parse(document.getElementById('input').value);
+  const total=cards.length; const g=document.getElementById('gallery');
+  if(!total){g.innerHTML='<div class="empty">没解析到卡片，检查格式（【封面卡】/【卡N】）</div>';return;}
+  g.innerHTML=cards.map((c,i)=>
+    `<div class="slot"><div class="stage">${cardHTML(c,i,total)}</div>
+     <button class="dl" onclick="downloadOne(${i})">下载第 ${i+1} 张</button></div>`
+  ).join('');
+  sizeStages(); applyTall();
+  const cap=document.getElementById('caption');
+  if(caption||tags){cap.style.display='block';
+    cap.innerHTML=`<div class="cap-label">正文文案（发布贴图下方 · 可改）</div>
+      <div class="cap-text" contenteditable spellcheck="false">${esc(caption)}</div>
+      <div class="cap-label" style="margin-top:12px">标签（可改）</div>
+      <div class="cap-text" contenteditable spellcheck="false">${esc(tags)}</div>
+      <button class="cap-copy" onclick="copyCaption()">复制正文 + 标签</button>`;}
+  else cap.style.display='none';
+}
+function copyCaption(){
+  const t=document.querySelectorAll('#caption .cap-text');
+  const txt=((t[0]&&t[0].innerText)||'')+'\n\n'+((t[1]&&t[1].innerText)||'');
+  if(navigator.clipboard)navigator.clipboard.writeText(txt.trim()).then(()=>{
+    const b=document.querySelector('.cap-copy'); if(b){const o=b.textContent;b.textContent='已复制 ✓';setTimeout(()=>b.textContent=o,1200);}
+  });
+}
+
+function setStyle(k){
+  curStyle=k;
+  document.querySelectorAll('#styles button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  document.querySelectorAll('.gallery .card').forEach(card=>{
+    STYLES.forEach(s=>card.classList.remove(s.key));
+    card.classList.add(k);
+  });
+}
+function setScale(v){document.documentElement.style.setProperty('--scale',(v/100).toFixed(2));sizeStages();}
+function setAspect(h,btn){document.documentElement.style.setProperty('--cardh',h+'px');document.querySelectorAll('.row .asp').forEach(b=>b.classList.toggle('on',b===btn));applyTall();sizeStages();}
+function applyTall(){const tall=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cardh'))>=1900;document.querySelectorAll('.gallery .card').forEach(c=>c.classList.toggle('tall',tall));}
+function sizeStages(){
+  const sc=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale'))||.32;
+  const ch=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cardh'))||1440;
+  document.querySelectorAll('.gallery .stage').forEach(st=>{st.style.width=(1080*sc)+'px';st.style.height=(ch*sc)+'px';});
+}
+
+async function shot(i){
+  const el=document.querySelectorAll('.gallery .card')[i];
+  const prev=el.style.transform; el.style.transform='none';
+  const ch=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cardh'))||1440;
+  const canvas=await html2canvas(el,{width:1080,height:ch,scale:2,backgroundColor:null,useCORS:true});
+  el.style.transform=prev; return canvas;
+}
+async function downloadOne(i){
+  if(typeof html2canvas==='undefined'){alert('html2canvas 没加载（没联网）。可直接手动截图卡片。');return;}
+  const canvas=await shot(i);
+  const a=document.createElement('a'); a.download=`card-${String(i+1).padStart(2,'0')}.png`;
+  a.href=canvas.toDataURL('image/png'); a.click();
+}
+async function downloadAll(){
+  if(typeof html2canvas==='undefined'){alert('html2canvas 没加载（没联网）。可直接手动截图卡片。');return;}
+  const n=document.querySelectorAll('.gallery .card').length;
+  for(let i=0;i<n;i++){await downloadOne(i);await new Promise(r=>setTimeout(r,300));}
+}
+
+document.getElementById('styles').innerHTML=STYLES.map(s=>
+  `<button data-k="${s.key}" class="${s.key===curStyle?'on':''}" onclick="setStyle('${s.key}')">${s.name}</button>`
+).join('');
+
+// 嵌入产品时：接收父页面（创作台）灌入的草稿文字，自动填充并渲染
+window.addEventListener('message',(e)=>{
+  const d=e.data;
+  if(d&&d.type==='kw-fill-cards'&&typeof d.text==='string'){
+    document.getElementById('input').value=d.text;
+    render();
+  }
+});
+// 告诉父页面：工作台已就绪，可以灌数据了
+try{ if(window.parent!==window) window.parent.postMessage({type:'kw-cards-ready'},'*'); }catch(_){}
+
+render();
+</script>
+</body>
+</html>

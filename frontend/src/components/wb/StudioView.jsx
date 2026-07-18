@@ -85,7 +85,16 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setVariants(v => ({ ...v, applied: null })) // 撤销后三个候选恢复可选
     showToast('已撤销替换')
   }
+  // ---- 卡片图 tab（小红书专属）：iframe 嵌入卡片工作台，切过去自动灌入当前草稿 ----
+  const [xhsMode, setXhsMode] = useState('text')  // 'text' 文案 | 'cards' 卡片图
+  const cardFrame = useRef(null)
+  const cardsMode = studio.platform === 'xhs' && xhsMode === 'cards'
+  const postDraftToCards = () => {
+    try { cardFrame.current?.contentWindow?.postMessage({ type: 'kw-fill-cards', text: studio.draft }, '*') } catch { /* 跨窗口受限时忽略 */ }
+  }
+
   const setPlatform = (p) => {
+    setXhsMode('text')
     setStudio(s => ({ ...s, platform: p }))
     setTimeout(() => genDraft(p), 0)
   }
@@ -128,10 +137,31 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       <div className="wb-seg">
         {platforms.map(p => (
           <button key={p.key} className={`wb-seg-btn${studio.platform === p.key ? ' active' : ''}`}
+            title={p.when || p.note}
             onClick={() => setPlatform(p.key)}>{p.icon ? `${p.icon} ` : ''}{p.label}</button>
         ))}
       </div>
 
+      {(() => {
+        const sel = platforms.find(p => p.key === studio.platform)
+        return sel?.when ? (
+          <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '8px 0 0', lineHeight: 1.5 }}>
+            <span style={{ opacity: 0.7 }}>何时用 · </span>{sel.when}
+          </div>
+        ) : null
+      })()}
+
+      {studio.platform === 'xhs' && (
+        <div style={{ display: 'flex', gap: 6, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>
+          {[['text', '✍️ 文案'], ['cards', '🖼 卡片图']].map(([m, label]) => (
+            <button key={m} className={xhsMode === m ? 'wb-btn-primary' : 'wb-btn-outline'}
+              onClick={() => { setXhsMode(m); if (m === 'cards') setTimeout(postDraftToCards, 80) }}>{label}</button>
+          ))}
+          {cardsMode && <span style={{ fontSize: 12, color: 'var(--sub2)' }}>已填入当前文案 · 切风格/比例、点着改字、下载图</span>}
+        </div>
+      )}
+
+      {!cardsMode && (<>
       {studio.sourceTopicId && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 0' }}>
           <span style={{ fontSize: 12, color: 'var(--sub2)', flex: 'none' }}>你的观点</span>
@@ -184,6 +214,13 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         )}
       </div>
       <div className="wb-studio-hint">想让 AI 按你的意思改，用右侧「创作助手」：例如「开头更犀利」「压到 5 条」「加一个反方观点」。</div>
+      </>)}
+
+      {cardsMode && (
+        <iframe ref={cardFrame} src="/xhs-card-studio.html" title="卡片图工作台"
+          onLoad={postDraftToCards}
+          style={{ width: '100%', height: '80vh', border: '1px solid var(--line08)', borderRadius: 10, marginTop: 8, background: '#2b2a27' }} />
+      )}
 
       {critique && (
         <div className="wb-card" style={{ marginTop: 12, padding: '14px 16px' }}>
