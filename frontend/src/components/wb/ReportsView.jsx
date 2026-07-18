@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { IconChart, IconBulb, IconBolt, IconExternal } from './Icons'
 import { api } from './util'
+import IndustryBrief from './IndustryBrief'
 
 // 周报/月报（M3 洞察层收尾）：动向（升温/降温）+ 主题页更新 + 涌现建议 + 深度选题。
 // 数据来自 /api/reports/latest?period=weekly|monthly；生成走 /api/reports/generate-period。
@@ -110,6 +111,9 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
           {generating ? '生成中…' : (report ? '重新生成' : `生成本${unitCn}报`)}
         </button>
       </div>
+
+      {/* 行业全貌（阶段2）：复用 AI HOT，与下方"你的知识库演进"个人总结并存 */}
+      <IndustryBrief period={periodType} />
 
       {!report && (
         <div className="wb-empty">

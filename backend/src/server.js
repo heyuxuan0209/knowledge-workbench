@@ -602,6 +602,16 @@ app.get('/api/reports/latest', async (req, res) => {
   }
 });
 
+// 行业面（VISION-V4 阶段2）：复用 AI HOT 热门内容做行业提要 + 跳转，不重新生成（零 LLM）
+app.get('/api/industry-brief', async (req, res) => {
+  try {
+    const { getIndustryBrief } = await import('./services/industry-brief.js');
+    res.json({ success: true, data: getIndustryBrief(req.query.period || 'daily') });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 选题状态流转：suggested → adopted（采纳）/ dismissed（忽略）/ created（已创作）
 app.patch('/api/ideas/:id', async (req, res) => {
   try {
