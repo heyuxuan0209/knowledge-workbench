@@ -144,7 +144,7 @@ app.post('/api/content/ingest', async (req, res) => {
 // 已经过 /api/content/ingest 摄入+翻译的结果，未入库）。两者可同时存在。
 app.post('/api/chat/ephemeral', async (req, res) => {
   try {
-    const { contentIds = [], adHocContents = [], topicId = null, messages } = req.body;
+    const { contentIds = [], adHocContents = [], topicId = null, messages, librarySearch = false, noteIds = [], knowledgeBase = false } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({
@@ -152,23 +152,40 @@ app.post('/api/chat/ephemeral', async (req, res) => {
         error: 'messages is required and must be a non-empty array'
       });
     }
-    // topicId：主题页探讨模式（P0）——以主题综述+已并入素材为材料，可单独使用
-    if (contentIds.length === 0 && adHocContents.length === 0 && !topicId) {
+    // topicId：主题页探讨；librarySearch：问素材库首轮（语义检索出材料）；knowledgeBase：问知识体系（喂全部主题综述）；
+    // noteIds：显式素材（多轮追问复用首轮检索到的材料，不重新检索——否则"第2条展开"会拿追问去搜错东西）
+    if (contentIds.length === 0 && adHocContents.length === 0 && !topicId && !librarySearch && noteIds.length === 0 && !knowledgeBase) {
       return res.status(400).json({
         success: false,
-        error: 'at least one of contentIds, adHocContents or topicId is required'
+        error: 'at least one of contentIds, adHocContents, topicId, librarySearch, noteIds or knowledgeBase is required'
       });
     }
 
+    // librarySearch 模式：用最新一条用户消息做语义检索，取 top-k 素材作为材料注入；
+    // 否则用显式传入的 noteIds（多轮复用）
+    let retrievedNotes = [];
+    let finalNoteIds = noteIds;
+    if (librarySearch) {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user');
+      if (lastUser?.content?.trim()) {
+        const { searchNotes } = await import('./services/semantic-search.js');
+        retrievedNotes = await searchNotes(lastUser.content, { limit: 8 });
+        finalNoteIds = retrievedNotes.map(n => n.id);
+      }
+    }
+
     const { buildMessagesWithContext } = await import('./services/ephemeral-chat.js');
-    const { messages: contextInjectedMessages, degraded } = await buildMessagesWithContext(contentIds, adHocContents, messages, topicId);
+    const { messages: contextInjectedMessages, degraded, topicNames } = await buildMessagesWithContext(contentIds, adHocContents, messages, topicId, finalNoteIds, knowledgeBase);
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    // 开流前先发降级清单（哪些材料只拿到摘要）——前端据此显示黄色降级条（诚实承诺，决策5）
-    res.write(`data: ${JSON.stringify({ type: 'meta', degraded })}\n\n`);
+    // 开流前先发降级清单；librarySearch 发命中素材；knowledgeBase 发纳入的主题名（前端显示"基于这 N 个主题"）
+    const retrieved = librarySearch
+      ? retrievedNotes.map(n => ({ id: n.id, title: n.title, source_title: n.source_title, score: n.score }))
+      : (knowledgeBase ? (topicNames || []).map(name => ({ title: name })) : []);
+    res.write(`data: ${JSON.stringify({ type: 'meta', degraded, retrieved, kind: knowledgeBase ? 'knowledge' : (librarySearch || noteIds.length ? 'library' : null) })}\n\n`);
 
     const { streamChat } = await import('./services/llm.js');
 
@@ -808,6 +825,40 @@ app.get('/api/notes/sources', async (req, res) => {
   }
 });
 
+// 素材语义检索（VISION-V4 阶段1a）：模糊需求 → 语义找素材（不是关键词 LIKE）
+app.get('/api/notes/search-semantic', async (req, res) => {
+  try {
+    const q = req.query.q || '';
+    if (!q.trim()) return res.json({ success: true, data: [] });
+    const { searchNotes } = await import('./services/semantic-search.js');
+    const data = await searchNotes(q, { limit: parseInt(req.query.limit) || 20 });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 语义索引状态（前端提示"还有 N 条未建索引"）
+app.get('/api/notes/index-status', async (req, res) => {
+  try {
+    const { indexStatus } = await import('./services/semantic-search.js');
+    res.json({ success: true, data: indexStatus() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 重建语义索引（首次上线 / 换模型后；force=1 全量重算）
+app.post('/api/notes/reindex', async (req, res) => {
+  try {
+    const { reindexNotes } = await import('./services/semantic-search.js');
+    const data = await reindexNotes({ force: req.query.force === '1' });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.post('/api/notes', async (req, res) => {
   try {
     const { excerpt, noteType, contentId, sourceTitle, sourceUrl, stance } = req.body;
@@ -829,6 +880,11 @@ app.post('/api/notes', async (req, res) => {
         if (kw) setNoteKeywords(note.id, kw.split(/[,，、]\s*/).filter(Boolean).slice(0, 6));
       })
       .catch(err => console.error('[Notes] keyword extraction failed:', err.message));
+
+    // 后台生成语义向量（VISION-V4 阶段1a）：保存即可被语义搜索/RAG 检索到，不阻塞保存
+    import('./services/semantic-search.js')
+      .then(({ embedNoteById }) => embedNoteById(note.id))
+      .catch(err => console.error('[Notes] embedding failed:', err.message));
 
     // M3 同化（设计文档 §引擎B：保存素材即触发，用户不需要理解"待并入"）：
     // 1. 自动匹配活跃 Topic（本地 TF 余弦，零成本）

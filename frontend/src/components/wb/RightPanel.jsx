@@ -52,13 +52,16 @@ const CAP_STYLE = {
 function QuickAnalysis({
   onToggle, onToggleWide, wide, selectedItems, removeSel, analysisMode, backList,
   chat, degraded, startAnalysis, sendChat, saveMsg, page, topicView, activeTopic,
+  askLibrary, askKnowledge, libraryHits = [], chatKind,
 }) {
   const [input, setInput] = useState('')
   const endRef = useRef(null)
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat])
 
   const onTopicPage = page === 'topics' && topicView === 'page' && activeTopic
-  const sub = onTopicPage ? `上下文：本主题《${activeTopic.name}》` : '选中内容即时分析 · 对话不落库'
+  const onTopicsList = page === 'topics' && !onTopicPage // 主题库列表层 → 问知识体系
+  const sub = onTopicPage ? `上下文：本主题《${activeTopic.name}》`
+    : onTopicsList ? '问你的知识体系 · 跨主题综合' : '选中内容即时分析 · 对话不落库'
   const chatMode = analysisMode === 'chat'
 
   const send = () => {
@@ -104,9 +107,25 @@ function QuickAnalysis({
               <button className="wb-btn-primary" style={{ marginTop: 8 }} onClick={startAnalysis}>开始分析 →</button>
               <div className="wb-panel-hint">分析基于原文；抓取失败会显式标注基于摘要。</div>
             </>
+          ) : (page === 'notes' && askLibrary) ? (
+            // 问整个素材库只在【素材页】出现。分工：中间搜索框=找卡片（出列表）；这里=问问题（出答案+溯源）
+            <>
+              <AskBox label="问整个素材库（出答案，不是列表）" cta="语义检索并回答 →" onAsk={askLibrary}
+                placeholder="用大白话问，如「我攒过哪些关于降低用户操作摩擦的素材？」"
+                hint="回车换行，点按钮或 ⌘/Ctrl+回车发送，可多轮追问。框可拖右下角放大；想更宽就拖面板左边框或点右上 ⇤ 半屏。" />
+              <div className="wb-panel-empty" style={{ marginTop: 0 }}>或在素材卡片点「选中分析」<br />可多选后一起解读</div>
+            </>
+          ) : (onTopicsList && askKnowledge) ? (
+            // 问知识体系只在【主题库列表层】出现；单个主题的探讨在主题详情页右栏
+            <>
+              <AskBox label="问我的知识体系（跨主题综合）" cta="综合我的主题作答 →" onAsk={askKnowledge}
+                placeholder="跨主题地问，如「我在哪些主题里聊过 agent 可靠性？串一下」「哪两个主题其实在讲同一件事？」"
+                hint="基于你全部主题的综述作答，会标注参考了哪几个主题，可多轮追问。想深挖单个主题，点开它的详情页。" />
+              <div className="wb-panel-empty" style={{ marginTop: 0 }}>想深挖某一个主题？<br />点开主题详情页，右栏会带上那个主题的综述+素材做弹药</div>
+            </>
           ) : (
             <div className="wb-panel-empty">
-              在 资讯 卡片点「选中分析」<br />可多选后一起解读<br /><br />对话用完即走，<br />点「保存到笔记」才沉淀
+              在卡片点「选中分析」<br />可多选后一起解读<br /><br />对话用完即走，<br />点「保存到笔记」才沉淀
             </div>
           )}
         </div>
@@ -117,8 +136,18 @@ function QuickAnalysis({
           <div className="wb-panel-body">
             <div className="wb-chat-meta">
               <button className="wb-back" style={{ fontSize: 11.5 }} onClick={backList}>← 返回</button>
-              {onTopicPage ? `探讨主题《${activeTopic.name}》· 综述+素材做弹药` : `基于 ${selectedItems.length || 1} 篇内容 · 结构化解读`}
+              {chatKind === 'knowledge'
+                ? `问知识体系 · 基于 ${libraryHits.length} 个主题综合`
+                : chatKind === 'library' || libraryHits.length > 0
+                ? `问素材库 · 检索到 ${libraryHits.length} 条相关素材`
+                : onTopicPage ? `探讨主题《${activeTopic.name}》· 综述+素材做弹药` : `基于 ${selectedItems.length || 1} 篇内容 · 结构化解读`}
             </div>
+            {libraryHits.length > 0 && (
+              <div className="wb-panel-hint" style={{ marginBottom: 8 }}>
+                {chatKind === 'knowledge' ? '参考主题：' : '引用素材：'}
+                {libraryHits.map(h => `《${(h.title || h.source_title || '素材').slice(0, 14)}》`).join('、')}
+              </div>
+            )}
             {degraded?.length > 0 && (
               <div className="wb-warnbar" style={{ marginBottom: 8, fontSize: 11.5 }}>
                 其中 {degraded.length} 篇未获取到原文，以下基于摘要：{degraded.map(d => `《${d.title.slice(0, 16)}》`).join('')}
@@ -135,7 +164,8 @@ function QuickAnalysis({
             <textarea
               className="wb-chat-input" rows={2} value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+              // 输入法组合中（中文/候选未定）不提交，避免打一半被回车提交
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }}
               placeholder="继续追问…"
             />
             <button className="wb-send" disabled={!input.trim()} onClick={send}><IconSend /></button>
@@ -143,6 +173,23 @@ function QuickAnalysis({
         </>
       )}
     </>
+  )
+}
+
+// 问答输入框（问素材库 / 问知识体系共用）：大框、可拖拽、回车换行、⌘/Ctrl+回车 或按钮发送、输入法安全
+function AskBox({ label, cta, placeholder, hint, onAsk }) {
+  const [q, setQ] = useState('')
+  const submit = () => { const t = q.trim(); if (t) { onAsk(t); setQ('') } }
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="wb-panel-label">{label}</div>
+      <textarea className="wb-chat-input" style={{ minHeight: 120, height: 120, resize: 'both', width: '100%', lineHeight: 1.6 }} value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } }}
+        placeholder={placeholder} />
+      <button className="wb-btn-primary" style={{ marginTop: 6, width: '100%' }} disabled={!q.trim()} onClick={submit}>{cta}</button>
+      <div className="wb-panel-hint">{hint}</div>
+    </div>
   )
 }
 

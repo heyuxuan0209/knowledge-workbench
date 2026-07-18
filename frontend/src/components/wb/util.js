@@ -66,11 +66,11 @@ export function sourceCapability(c) {
 }
 
 // SSE 流式对话（/api/chat/ephemeral），onDelta 增量回调、onMeta 降级清单回调，返回完整文本
-export async function streamEphemeralChat({ contentIds, adHocContents, topicId, messages }, onDelta, onMeta) {
+export async function streamEphemeralChat({ contentIds, adHocContents, topicId, messages, librarySearch, noteIds, knowledgeBase }, onDelta, onMeta) {
   const res = await fetch('/api/chat/ephemeral', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contentIds, adHocContents, topicId, messages }),
+    body: JSON.stringify({ contentIds, adHocContents, topicId, messages, librarySearch, noteIds, knowledgeBase }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -90,7 +90,7 @@ export async function streamEphemeralChat({ contentIds, adHocContents, topicId, 
       if (!line.startsWith('data: ')) continue
       const event = JSON.parse(line.slice(6))
       if (event.type === 'content') { full += event.content; onDelta(full) }
-      else if (event.type === 'meta') { onMeta?.(event.degraded || []) }
+      else if (event.type === 'meta') { onMeta?.(event.degraded || [], event.retrieved || [], event.kind || null) }
       else if (event.type === 'error') throw new Error(event.error)
     }
   }

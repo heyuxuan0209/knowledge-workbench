@@ -20,6 +20,8 @@ export default function NotesView({
   notesTab = 'mine', setNotesTab, toggleSelectNote, selectedItems = [],
 }) {
   const [keyword, setKeyword] = useState('')
+  const [searchMode, setSearchMode] = useState('semantic') // 'keyword' | 'semantic'（默认语义：模糊需求也能找到）
+  const [relFilter, setRelFilter] = useState('all') // 语义结果按相关度档筛选：all|high|mid|low（免得弱相关一大堆往下滑）
   const [sourceFilter, setSourceFilter] = useState('')
   const [topicFilter, setTopicFilter] = useState('')
   const [ctypeFilter, setCtypeFilter] = useState('')
@@ -36,6 +38,12 @@ export default function NotesView({
   const fetchFiltered = useCallback(async () => {
     if (!hasFilter) { setResults(null); return }
     try {
+      // 语义模式：只按关键框做语义检索（模糊需求→意思相近的素材），其余筛选器不参与
+      if (searchMode === 'semantic' && keyword.trim()) {
+        const params = new URLSearchParams({ q: keyword.trim(), limit: '30' })
+        setResults((await api(`/api/notes/search-semantic?${params}`)).data || [])
+        return
+      }
       const params = new URLSearchParams({ limit: '200' })
       if (keyword.trim()) params.set('q', keyword.trim())
       if (sourceFilter) params.set('source', sourceFilter)
@@ -43,13 +51,16 @@ export default function NotesView({
       if (ctypeFilter) params.set('ctype', ctypeFilter)
       setResults((await api(`/api/notes?${params}`)).data || [])
     } catch (err) { console.error(err) }
-  }, [hasFilter, keyword, sourceFilter, topicFilter, ctypeFilter])
+  }, [hasFilter, searchMode, keyword, sourceFilter, topicFilter, ctypeFilter])
 
   // 输入防抖 250ms 后查询后端
   useEffect(() => {
     const t = setTimeout(fetchFiltered, 250)
     return () => clearTimeout(t)
   }, [fetchFiltered])
+
+  // 换查询/换模式时相关度档回到"全部"，避免停在空档
+  useEffect(() => { setRelFilter('all') }, [keyword, searchMode])
 
   useEffect(() => {
     if (highlightNoteId && highlightRef.current) {
@@ -158,6 +169,13 @@ export default function NotesView({
 
   const shown = results ?? notes
 
+  // 语义搜索激活时：按相关度档筛选（默认全部），避免弱相关一大堆往下滑
+  const semanticActive = searchMode === 'semantic' && Boolean(keyword.trim()) && results !== null && results.some(r => r.score != null)
+  const relCounts = semanticActive
+    ? shown.reduce((a, n) => { a[relBand(n.score)]++; a.all++; return a }, { all: 0, high: 0, mid: 0, low: 0 })
+    : null
+  const shownFiltered = (semanticActive && relFilter !== 'all') ? shown.filter(n => relBand(n.score) === relFilter) : shown
+
   // 主题 chips 的计数（基于已加载素材，近似值够用）
   const topicCount = {}
   notes.forEach(n => (n.topic_ids || '').split(',').filter(Boolean).forEach(id => { topicCount[id] = (topicCount[id] || 0) + 1 }))
@@ -229,38 +247,67 @@ export default function NotesView({
       {notesTab === 'mine' && (
         <>
           <div className="wb-filterbar">
-            <input placeholder="搜索素材（空格分隔多个关键词）…" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
-            <select className="wb-filter-chip" value={ctypeFilter} onChange={(e) => setCtypeFilter(e.target.value)}>
-              <option value="">类型（全部）</option>
-              <option value="article">📄 文章</option>
-              <option value="video">🎬 视频</option>
-              <option value="repo">⭐ GitHub 项目</option>
-            </select>
-            <select className="wb-filter-chip" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
-              style={{ maxWidth: 160 }}>
-              <option value="">按来源（全部）</option>
-              {sourceOptions.map(s => <option key={s.source} value={s.source}>{s.source.slice(0, 24)}（{s.count}）</option>)}
-            </select>
+            <div className="wb-seg-toggle" style={{ flexShrink: 0 }} title="语义：按意思找（模糊需求也能命中）；关键词：按字面匹配">
+              <button className={searchMode === 'semantic' ? 'active' : ''}
+                onClick={() => { setSearchMode('semantic'); setCtypeFilter(''); setSourceFilter('') }}>语义</button>
+              <button className={searchMode === 'keyword' ? 'active' : ''} onClick={() => setSearchMode('keyword')}>关键词</button>
+            </div>
+            <input placeholder={searchMode === 'semantic' ? '描述你想找的（如「怎么降低用户操作摩擦」）…' : '搜索素材（空格分隔多个关键词）…'}
+              value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+            {/* 类型/来源筛选只在关键词模式下有效，语义模式直接隐藏（不做灰按钮） */}
+            {searchMode === 'keyword' && (
+              <select className="wb-filter-chip" value={ctypeFilter} onChange={(e) => setCtypeFilter(e.target.value)}>
+                <option value="">类型（全部）</option>
+                <option value="article">📄 文章</option>
+                <option value="video">🎬 视频</option>
+                <option value="repo">⭐ GitHub 项目</option>
+              </select>
+            )}
+            {searchMode === 'keyword' && (
+              <select className="wb-filter-chip" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+                style={{ maxWidth: 160 }}>
+                <option value="">按来源（全部）</option>
+                {sourceOptions.map(s => <option key={s.source} value={s.source}>{s.source.slice(0, 24)}（{s.count}）</option>)}
+              </select>
+            )}
             {hasFilter && (
               <button className="wb-filter-chip" onClick={() => { setKeyword(''); setSourceFilter(''); setTopicFilter(''); setCtypeFilter('') }}>清除筛选</button>
             )}
           </div>
 
-          {/* 主题 tab（2026-07-16 反馈：内容多时下拉切换太钝，chips 一点即切） */}
-          <div className="wb-topic-chips">
-            <button className={`wb-topic-chip${!topicFilter ? ' active' : ''}`} onClick={() => setTopicFilter('')}>全部</button>
-            <button className={`wb-topic-chip${topicFilter === '__none__' ? ' active' : ''}`} onClick={() => setTopicFilter('__none__')}>
-              未归类{inboxCount ? `（${inboxCount}）` : ''}
-            </button>
-            {topics.map(t => (
-              <button key={t.id} className={`wb-topic-chip${topicFilter === t.id ? ' active' : ''}`}
-                onClick={() => setTopicFilter(topicFilter === t.id ? '' : t.id)} title={t.name}>
-                {t.name.slice(0, 12)}{topicCount[t.id] ? `（${topicCount[t.id]}）` : ''}
+          {/* 语义搜索时用相关度档 chips（主题 chips 对语义结果无意义，换掉不并列）；
+              否则用主题 tab（2026-07-16 反馈：内容多时下拉切换太钝，chips 一点即切） */}
+          {semanticActive ? (
+            <div className="wb-topic-chips">
+              <button className={`wb-topic-chip${relFilter === 'all' ? ' active' : ''}`} onClick={() => setRelFilter('all')}>全部（{relCounts.all}）</button>
+              <button className={`wb-topic-chip${relFilter === 'high' ? ' active' : ''}`} onClick={() => setRelFilter('high')}
+                style={relFilter === 'high' ? undefined : { color: '#3f7350' }}>高度相关（{relCounts.high}）</button>
+              <button className={`wb-topic-chip${relFilter === 'mid' ? ' active' : ''}`} onClick={() => setRelFilter('mid')}
+                style={relFilter === 'mid' ? undefined : { color: '#8a6a1a' }}>相关（{relCounts.mid}）</button>
+              <button className={`wb-topic-chip${relFilter === 'low' ? ' active' : ''}`} onClick={() => setRelFilter('low')}>弱相关（{relCounts.low}）</button>
+            </div>
+          ) : (
+            <div className="wb-topic-chips">
+              <button className={`wb-topic-chip${!topicFilter ? ' active' : ''}`} onClick={() => setTopicFilter('')}>全部</button>
+              <button className={`wb-topic-chip${topicFilter === '__none__' ? ' active' : ''}`} onClick={() => setTopicFilter('__none__')}>
+                未归类{inboxCount ? `（${inboxCount}）` : ''}
               </button>
-            ))}
-          </div>
+              {topics.map(t => (
+                <button key={t.id} className={`wb-topic-chip${topicFilter === t.id ? ' active' : ''}`}
+                  onClick={() => setTopicFilter(topicFilter === t.id ? '' : t.id)} title={t.name}>
+                  {t.name.slice(0, 12)}{topicCount[t.id] ? `（${topicCount[t.id]}）` : ''}
+                </button>
+              ))}
+            </div>
+          )}
           {hasFilter && results !== null && (
-            <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '6px 2px 0' }}>筛选出 {results.length} 条</div>
+            <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '6px 2px 0' }}>
+              {searchMode === 'semantic' && keyword.trim()
+                ? (results.length && results[0].score < 0.47
+                    ? '库里暂时没有很贴合的，下面是最接近的几条——换个说法或再攒点素材试试'
+                    : `按相关度排序 · ${results.length} 条`)
+                : `筛选出 ${results.length} 条`}
+            </div>
           )}
 
           {/* 聚合建议条：AI 提议哪些未归类素材放一起 + 为什么（共享关键词），用户勾选裁决 */}
@@ -295,14 +342,14 @@ export default function NotesView({
             )
           })}
 
-          {shown.length === 0 && (
+          {(hasFilter ? shownFiltered : shown).length === 0 && (
             <div className="wb-empty">
-              {hasFilter ? '没有匹配的素材' : <>还没有素材。<br />去资讯页选中内容分析，把有价值的回答「保存到笔记」。</>}
+              {semanticActive && relFilter !== 'all' ? '这个相关度档没有素材，换个档看看' : hasFilter ? '没有匹配的素材' : <>还没有素材。<br />去资讯页选中内容分析，把有价值的回答「保存到笔记」。</>}
             </div>
           )}
 
           {hasFilter
-            ? shown.map(note => renderNote(note))
+            ? shownFiltered.map(note => renderNote(note))
             : groups.map(g => (
               <div key={g.id}>
                 <div className="wb-note-group-head">
@@ -337,6 +384,9 @@ export default function NotesView({
         {note.title && (
           <div style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
             {note.title}
+            {note.score != null && (() => { const r = relevanceLabel(note.score); return (
+              <span className="wb-pill" style={{ marginLeft: 6, fontSize: 10, color: r.fg, background: r.bg }}>{r.text}</span>
+            ) })()}
             <button className="wb-note-del" style={{ marginLeft: 6, fontSize: 11 }} title="修改标题" onClick={() => renameNote(note)}>✎</button>
           </div>
         )}
@@ -398,3 +448,12 @@ export default function NotesView({
 function safeParseKeywords(s) {
   try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : [] } catch { return [] }
 }
+
+// 语义相关度 → 人话标签（用户看不懂 0.66 这种分数，产品要一眼就懂）。
+// 阈值按 bge-m3 实测：贴合的匹配约 0.5+，无关约 0.3。
+function relevanceLabel(score) {
+  if (score >= 0.55) return { text: '高度相关', fg: '#3f7350', bg: 'rgba(63,115,80,.14)' }
+  if (score >= 0.47) return { text: '相关', fg: '#8a6a1a', bg: 'rgba(169,121,31,.14)' }
+  return { text: '弱相关', fg: '#8a8478', bg: 'rgba(33,31,26,.07)' }
+}
+function relBand(score) { return score >= 0.55 ? 'high' : score >= 0.47 ? 'mid' : 'low' }

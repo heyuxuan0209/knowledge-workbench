@@ -75,6 +75,8 @@ export default function WorkbenchPage() {
   const [analysisMode, setAnalysisMode] = useState('list')
   const [chat, setChat] = useState([]) // {role:'user'|'ai', text, pending?, saved?, noteId?}
   const [degraded, setDegraded] = useState([]) // 本轮对话中降级为摘要的材料清单（SSE meta）
+  const [libraryHits, setLibraryHits] = useState([]) // 问素材库/知识体系时纳入的素材或主题（SSE meta.retrieved）
+  const [chatKind, setChatKind] = useState(null) // 'library' | 'knowledge' | null——右栏对话头部据此显示不同标签
   const chatHistory = useRef([]) // 发给后端的纯净历史
 
   // 弹窗
@@ -200,15 +202,20 @@ export default function WorkbenchPage() {
   // （换主题 / 主题↔选中切换）就自动重开对话，避免材料串台
   const chatContextRef = useRef(null)
 
-  const runChat = async (userText, { fresh = false } = {}) => {
+  const libraryNoteIdsRef = useRef([]) // 当前"问素材库"会话首轮检索到的素材 id，供多轮追问复用
+
+  const runChat = async (userText, { fresh = false, library = false, knowledge = false } = {}) => {
     const items = selectedItems
     // 主题详情页 = 探讨模式（P0，V3「沉淀=探讨」入口）：材料为主题综述+已并入素材。
-    // 主题页优先于选中列表——右栏此时显示的就是"上下文：本主题"
     const onTopicPage = page === 'topics' && topicView === 'page' && activeTopic
-    if (!items.length && !onTopicPage) return
+    // library = 问素材库（原始弹药）；knowledge = 问知识体系（全部主题综述）。追问（sendChat）不带标志，
+    // 但若当前会话就是该模式（chatContextRef）且没选中别的材料，则延续为多轮
+    const knowledgeTurn = knowledge || (chatContextRef.current === 'knowledge' && !onTopicPage && !items.length)
+    const libraryTurn = !knowledgeTurn && (library || (chatContextRef.current === 'library' && !onTopicPage && !items.length))
+    if (!items.length && !onTopicPage && !libraryTurn && !knowledgeTurn) return
     const topicId = onTopicPage ? activeTopic.id : null
 
-    const contextKey = topicId ? `topic:${topicId}` : `items:${items.map(x => x.id).join(',')}`
+    const contextKey = knowledgeTurn ? 'knowledge' : libraryTurn ? 'library' : topicId ? `topic:${topicId}` : `items:${items.map(x => x.id).join(',')}`
     if (chatContextRef.current !== contextKey) { fresh = true; chatContextRef.current = contextKey }
 
     const history = fresh ? [] : chatHistory.current
@@ -217,12 +224,27 @@ export default function WorkbenchPage() {
     setAnalysisMode('chat')
     setChat(prev => [...(fresh ? [] : prev), { role: 'user', text: userText }, { role: 'ai', text: '', pending: true }])
     try {
-      const contentIds = topicId ? [] : items.filter(x => !x.adHoc).map(x => x.id)
-      const adHocContents = topicId ? [] : items.filter(x => x.adHoc).map(x => x.adHoc)
+      // 首轮问素材库（library 显式且 fresh）走语义检索；追问复用首轮 noteIds（不重搜）。知识体系每轮喂全部主题综述
+      const doSearch = library && fresh
+      const special = libraryTurn || knowledgeTurn || topicId
+      const contentIds = special ? [] : items.filter(x => !x.adHoc).map(x => x.id)
+      const adHocContents = special ? [] : items.filter(x => x.adHoc).map(x => x.adHoc)
       const full = await streamEphemeralChat(
-        { contentIds, adHocContents, topicId, messages: chatHistory.current },
+        {
+          contentIds, adHocContents, topicId, messages: chatHistory.current,
+          librarySearch: doSearch,
+          noteIds: (libraryTurn && !doSearch) ? libraryNoteIdsRef.current : undefined,
+          knowledgeBase: knowledgeTurn,
+        },
         (text) => setChat(prev => patchLast(prev, { text, pending: true })),
-        (deg) => setDegraded(deg)
+        (deg, retrieved, kind) => {
+          setDegraded(deg)
+          if (kind) setChatKind(kind)
+          if ((doSearch || knowledgeTurn) && retrieved?.length) {
+            setLibraryHits(retrieved)
+            if (doSearch) libraryNoteIdsRef.current = retrieved.map(n => n.id)
+          }
+        }
       )
       chatHistory.current.push({ role: 'assistant', content: full })
       setChat(prev => patchLast(prev, { text: full, pending: false }))
@@ -231,6 +253,9 @@ export default function WorkbenchPage() {
       setChat(prev => patchLast(prev, { text: `请求失败：${err.message}`, pending: false, error: true }))
     }
   }
+  // 问素材库 / 问知识体系入口（右栏空态调用）——每次都是新会话
+  const askLibrary = (q) => { if (q?.trim()) { chatContextRef.current = null; setChatKind(null); runChat(q.trim(), { library: true, fresh: true }) } }
+  const askKnowledge = (q) => { if (q?.trim()) { chatContextRef.current = null; setChatKind(null); runChat(q.trim(), { knowledge: true, fresh: true }) } }
 
   // 即时分析模板（HANDOFF-2026-07-15）：prompt 维护在 reference/prompts/instant-analysis.md，
   // 经 /api/prompts/instant-analysis 拉取（首次拉取后缓存），改文件即改行为。
@@ -685,8 +710,9 @@ export default function WorkbenchPage() {
           width={rightWide ? '55vw' : rightW} wide={rightWide} onToggleWide={() => setRightWide(v => !v)}
           page={page} collapsed={rightCollapsed} onToggle={() => setRightCollapsed(v => !v)}
           selectedItems={selectedItems} removeSel={removeSel}
-          analysisMode={analysisMode} backList={() => setAnalysisMode('list')}
+          analysisMode={analysisMode} backList={() => { setAnalysisMode('list'); setLibraryHits([]); setChatKind(null) }}
           chat={chat} degraded={degraded} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg}
+          askLibrary={askLibrary} askKnowledge={askKnowledge} libraryHits={libraryHits} chatKind={chatKind}
           topicView={topicView} activeTopic={activeTopic}
           studio={studio} notes={notes} rankedNotes={rankedNotes} insertMaterial={insertMaterial} removeRef={removeRef} gotoNote={gotoNote} rewriteDraft={rewriteDraft}
           showToast={showToast}

@@ -107,6 +107,53 @@ ${body.consensus || '（暂无）'}
 ${notesBlock}`;
 }
 
+// 素材库语义检索命中的素材卡作为材料（VISION-V4 阶段1a「把右侧AI当搜索引擎问全库」）。
+// 与主题探讨的素材块同构：来源可溯，正文截断到 800 字够 LLM 引用。noteIds 由端侧语义检索给出。
+function formatNotesAsMaterial(noteIds) {
+  if (!noteIds?.length) return null;
+  const db = getDatabase();
+  const ph = noteIds.map(() => '?').join(',');
+  const rows = db.prepare(`
+    SELECT id, title, source_title, source_url, excerpt FROM notes WHERE id IN (${ph})
+  `).all(...noteIds);
+  db.close();
+  if (!rows.length) return null;
+  // 保持传入顺序（= 语义相关度降序）
+  const byId = new Map(rows.map(r => [r.id, r]));
+  const ordered = noteIds.map(id => byId.get(id)).filter(Boolean);
+  const block = ordered.map((n, i) =>
+    `[素材${i + 1}]${n.title ? ` 《${n.title}》` : ''}（来源：${n.source_title || '未知'}${n.source_url ? ` ${n.source_url}` : ''}）\n${(n.excerpt || '').slice(0, 800)}`
+  ).join('\n\n');
+  return `## 材料：从你的素材库中语义检索到的相关素材
+用户把 AI 助手当作"问整个素材库"的搜索引擎。请只依据下面这些素材回答用户的问题：引用具体素材（标注[素材N]）、指出素材间的关联与矛盾；素材里没有的就明说"素材库里没有相关内容"，不要编造，也不要用你自己的通用知识替代素材内容。
+${block}`;
+}
+
+// 跨主题问答（VISION-V4 阶段1a，主题库 AI 助手）：把用户全部主题的综述作为材料，
+// 让 AI 横跨所有主题综合、串联、找关联/矛盾/盲点。主题少（十几个）直接全喂，够用且最准；
+// 多了（>30）再改语义预筛 top-k。只喂综述不喂原始素材（太长），每主题当前认知截到 700 字。
+function formatAllTopicsAsMaterial() {
+  const db = getDatabase();
+  const topics = db.prepare('SELECT id, name, description, body FROM topics ORDER BY updated_at DESC').all();
+  db.close();
+  if (!topics.length) return { material: null, topicNames: [] };
+
+  const blocks = topics.map((t, i) => {
+    let body; try { body = JSON.parse(t.body || '{}'); } catch { body = {}; }
+    const views = (body.views || []).length
+      ? '\n【各方观点】\n' + body.views.map(v => `  - ${v.who}：${v.what}${v.conflict ? '（⚡与他方冲突）' : ''}`).join('\n')
+      : '';
+    const consensus = body.consensus ? `\n【共识/非共识】${body.consensus}` : '';
+    return `### 主题${i + 1}《${t.name}》\n【当前认知】${(body.current || t.description || '（空）').slice(0, 700)}${views}${consensus}`;
+  });
+
+  const material = `## 材料：用户长期沉淀的全部知识主题（他消化后的观点与理解）
+用户想跨主题地问、串联思考。请只依据下面这些主题综述回答：引用具体主题（标注《主题名》）、指出主题之间的关联与矛盾、必要时点出他还没想清楚的盲点；综述里没有的就明说，不要用你的通用知识替代他的观点。
+
+${blocks.join('\n\n')}`;
+  return { material, topicNames: topics.map(t => t.name) };
+}
+
 // 构建注入材料前缀后的完整消息数组。异步：多篇 content 的原文抓取用 Promise.all 并行，
 // 避免串行等待导致响应变慢（每篇最多 15 秒超时，见 FETCH_TIMEOUT_MS）。
 // 沿用 server.js 里 /api/llm/chat 已有的既定模式：材料前缀注入到「当前这一轮」的最新用户
@@ -115,8 +162,10 @@ ${notesBlock}`;
 // 服务端持久化对话+材料只注入一次。
 // contentIds: string[]，adHocContents: 已翻译的 ingest+translate 结果数组，userMessages: 对话历史，
 // topicId: 主题页探讨模式（可与前两者并存，主题材料排在最前）
-export async function buildMessagesWithContext(contentIds, adHocContents, userMessages, topicId = null) {
+export async function buildMessagesWithContext(contentIds, adHocContents, userMessages, topicId = null, noteIds = [], knowledgeBase = false) {
   const topicMaterial = topicId ? formatTopicAsMaterial(topicId) : null;
+  const notesMaterial = formatNotesAsMaterial(noteIds);
+  const kb = knowledgeBase ? formatAllTopicsAsMaterial() : { material: null, topicNames: [] };
 
   const resolvedContents = (contentIds || [])
     .map(id => getContentById(id))
@@ -135,13 +184,15 @@ export async function buildMessagesWithContext(contentIds, adHocContents, userMe
 
   const materials = [
     ...(topicMaterial ? [topicMaterial] : []),
+    ...(kb.material ? [kb.material] : []),
+    ...(notesMaterial ? [notesMaterial] : []),
     ...contentMaterials,
     ...adHocMaterials,
   ];
 
   if (materials.length === 0 || userMessages.length === 0) {
     // 没有材料（理论上不应发生，前端应保证至少有一项）或没有对话历史，直接透传，不强行拼接
-    return { messages: userMessages, degraded };
+    return { messages: userMessages, degraded, topicNames: kb.topicNames };
   }
 
   const materialsBlock = `# 参考材料\n\n${materials.join('\n\n---\n\n')}\n\n---\n\n请基于以上材料回答我的问题。如果某条材料标注了"无法获取原文"，请在回答时告知用户这一点，不要假装已经读过原文。如果材料中没有相关信息，请明确说明，不要编造。\n\n`;
@@ -155,5 +206,6 @@ export async function buildMessagesWithContext(contentIds, adHocContents, userMe
       { role: 'user', content: materialsBlock + `问题：${currentMessage.content}` }
     ],
     degraded,
+    topicNames: kb.topicNames,
   };
 }
