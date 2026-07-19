@@ -930,6 +930,16 @@ app.get('/api/notes/topic-suggestions', async (req, res) => {
   }
 });
 
+// 新主题启发：把不属于任何现有主题、彼此语义相关的素材聚成堆，建议建新主题（语义版，替代关键词聚类）
+app.get('/api/notes/new-topic-suggestions', async (req, res) => {
+  try {
+    const { suggestNewTopics } = await import('./services/topic-suggest.js');
+    res.json({ success: true, data: await suggestNewTopics() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 疑似重复素材分组（VISION-V4 阶段1b，查重）
 app.get('/api/notes/duplicates', async (req, res) => {
   try {

@@ -172,7 +172,7 @@ export default function NotesView({
   const clusterKey = (sug) => [...sug.noteIds].sort().join('|')
   const dismissed = () => { try { return JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]') } catch { return [] } }
   useEffect(() => {
-    api('/api/notes/cluster-suggestions')
+    api('/api/notes/new-topic-suggestions')
       .then(j => setClusters((j.data || []).filter(s => !dismissed().includes(clusterKey(s)))))
       .catch(() => {})
   }, [notes]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -486,8 +486,8 @@ export default function NotesView({
             return (
               <div key={key} className="wb-cluster-card">
                 <div className="wb-cluster-head">
-                  🤖 这 {sug.noteIds.length} 条可以放一起
-                  <span className="wb-cluster-why">为什么：共享关键词 {sug.sharedKeywords.join('、')}</span>
+                  这 {sug.noteIds.length} 条不属于现有主题、但聊的是同一类事 → 可建新主题
+                  <span className="wb-cluster-why">{sug.sharedKeywords?.[0] === '语义相关' ? '语义相关' : `共享：${sug.sharedKeywords.join('、')}`}</span>
                 </div>
                 {sug.notes.map(n => (
                   <label key={n.id} className="wb-cluster-item">
