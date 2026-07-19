@@ -33,7 +33,7 @@ export default function NotesView({
   const [showAllTopics, setShowAllTopics] = useState(false) // 主题 chips 瘦身：默认藏零散的单条主题
   const [ovOpen, setOvOpen] = useState(() => localStorage.getItem('wb-notes-ov-collapsed') !== '1') // 素材概览默认展开
   const [topicSug, setTopicSug] = useState({}) // 语义补归类：noteId -> [{topicId,name,score}]（贴合但没标的主题）
-  const [newOnly, setNewOnly] = useState(false)
+  const [pendingOnly, setPendingOnly] = useState(false)
   const highlightRef = useRef(null)
   const toggleExpand = (id) => setExpandedNotes(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   const toggleOv = () => setOvOpen(o => { localStorage.setItem('wb-notes-ov-collapsed', o ? '1' : '0'); return !o })
@@ -46,12 +46,15 @@ export default function NotesView({
     api('/api/notes/sources').then(j => setSourceOptions(j.data || [])).catch(() => {})
   }, [])
 
-  // 「新增」= 近 3 天内新存的素材（created_at 是 UTC，按 timeAgo 同款解析算小时差）。
-  // 时间窗固定、可预期：3 天后自动不再算新、并从置顶区归入各主题。
-  const NEW_WINDOW_H = 72
+  // 新/老按「处理状态」定义，不按时间（第一性：让素材"变老"的是你处理了它，不是它等够久）。
+  // 已归位 = 已归入 ≥1 主题 或 已被引用进创作草稿；其余都是「待处理」。
+  // 待处理里放久了的（≥3 天）叫「搁置」——它不是老，是被忽略的待办，要催而不是沉底。
   const hoursSince = (iso) => { if (!iso) return Infinity; const t = new Date(/[zZ+]/.test(iso) ? iso : `${iso}Z`).getTime(); return (Date.now() - t) / 3600000 }
-  const isNew = (n) => hoursSince(n.created_at) < NEW_WINDOW_H
-  const newNotes = notes.filter(isNew).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  const staleDays = (n) => Math.floor(hoursSince(n.created_at) / 24)
+  const isSettled = (n) => Boolean((n.topic_ids || '').trim()) || Boolean(n.used_in_draft)
+  const isPending = (n) => !isSettled(n)
+  // 待处理列表：最老（最该催办）排在最前
+  const pendingNotes = notes.filter(isPending).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
 
   const hasFilter = Boolean(keyword.trim() || sourceFilter || topicFilter || ctypeFilter)
 
@@ -259,7 +262,8 @@ export default function NotesView({
   // 主题 chips 的计数（基于已加载素材，近似值够用）
   const topicCount = {}
   notes.forEach(n => (n.topic_ids || '').split(',').filter(Boolean).forEach(id => { topicCount[id] = (topicCount[id] || 0) + 1 }))
-  const inboxCount = notes.filter(n => !(n.topic_ids || '').trim()).length
+  const pendingCount = pendingNotes.length
+  const overdueCount = pendingNotes.filter(n => staleDays(n) >= 3).length
 
   // ---- 素材概览（进页面就看全景，降搜索/注意力成本）----
   const topicsByCount = [...topics].sort((a, b) => (b.note_count || 0) - (a.note_count || 0))
@@ -270,32 +274,32 @@ export default function NotesView({
   const readyTopic = topicsByCount.find(t => topicState(t).ready)
   const nextStep = readyTopic
     ? { text: <>从《<b>{readyTopic.name}</b>》开始创作——素材最足、综述已成型</>, cta: '开始创作', act: () => startCreation(readyTopic) }
-    : topPending
+    : overdueCount > 0
+      ? { text: <>有 <b>{overdueCount}</b> 条搁置 3 天以上还没处理，别让它烂在这</>, cta: '看待处理', act: () => { setNotesTab?.('mine'); setPendingOnly(true); setTopicFilter('') } }
+      : topPending
       ? { text: <>《<b>{topPending.name}</b>》有 {topPending.pending_count} 条待收进，去把综述更新一版</>, cta: '去主题', act: () => gotoTopic?.(topPending.id) }
-      : inboxCount > 3
-        ? { text: <>先把 <b>{inboxCount}</b> 条未归类整理好，主题才成型</>, cta: '看未归类', act: () => { setNotesTab?.('mine'); setTopicFilter('__none__') } }
+      : pendingCount > 3
+        ? { text: <>先把 <b>{pendingCount}</b> 条待处理归好类，主题才成型</>, cta: '看待处理', act: () => { setNotesTab?.('mine'); setPendingOnly(true); setTopicFilter('') } }
         : clusters.length
           ? { text: <>有 {clusters.length} 组零散素材可以聚成新主题</>, cta: null, act: null }
           : { text: <>继续攒——某主题攒到 5 条且综述成型，就能开写了</>, cta: null, act: null }
 
-  // 无筛选时按主题分组：素材可属多主题——按第一主题归组避免重复卡片；未归类置顶当收件箱。
-  // 最近新增再置于最顶（近 3 天），且从下面各组剔除避免同卡重复，3 天后自动落回各主题。
+  // 无筛选时：待处理（未归类且未用过）置顶——最老的排最前，别让它烂在这；
+  // 已归位的按主题分组沉在下面（真正的"老"=处理完了）。
   const groups = []
   if (!hasFilter) {
     const firstTopic = n => (n.topic_ids || '').split(',')[0] || null
-    const recentIds = new Set(shown.filter(isNew).map(n => n.id))
-    const recent = shown.filter(n => recentIds.has(n.id)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    if (recent.length) groups.push({ id: '__new__', name: '最近新增', notes: recent })
-    const older = shown.filter(n => !recentIds.has(n.id))
-    const unassigned = older.filter(n => !firstTopic(n))
-    if (unassigned.length) groups.push({ id: '__inbox__', name: '未归类', notes: unassigned })
+    const pendingIds = new Set(shown.filter(isPending).map(n => n.id))
+    const pending = shown.filter(n => pendingIds.has(n.id)).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
+    if (pending.length) groups.push({ id: '__pending__', name: '待处理', notes: pending })
+    const settled = shown.filter(n => !pendingIds.has(n.id))
     for (const t of topics) {
-      const tn = older.filter(n => firstTopic(n) === t.id)
+      const tn = settled.filter(n => firstTopic(n) === t.id)
       if (tn.length) groups.push({ id: t.id, name: t.name, notes: tn })
     }
     const placed = new Set(groups.flatMap(g => g.notes.map(n => n.id)))
     const rest = shown.filter(n => !placed.has(n.id))
-    if (rest.length) groups.push({ id: '__rest__', name: '其他（原主题已删除）', notes: rest })
+    if (rest.length) groups.push({ id: '__rest__', name: '其他', notes: rest })
   }
 
   return (
@@ -368,10 +372,10 @@ export default function NotesView({
                       </button>
                     ) })}
                   </div>
-                  {(inboxCount > 0 || pendingTotal > 0 || clusters.length > 0 || Object.keys(topicSug).length > 0) && (
+                  {(pendingCount > 0 || pendingTotal > 0 || clusters.length > 0 || Object.keys(topicSug).length > 0) && (
                     <div className="wb-ov-todo">
-                      待处理：
-                      {inboxCount > 0 && <button className="wb-brief-link" onClick={() => setTopicFilter('__none__')}>{inboxCount} 条未归类</button>}
+                      待办：
+                      {pendingCount > 0 && <button className="wb-brief-link" onClick={() => { setPendingOnly(true); setTopicFilter('') }}>{pendingCount} 条待处理{overdueCount > 0 ? <b style={{ color: '#a9791f' }}>（{overdueCount} 条已搁置）</b> : ''}</button>}
                       {pendingTotal > 0 && <span> · {pendingTotal} 条待收进</span>}
                       {Object.keys(topicSug).length > 0 && <span> · <b style={{ color: 'var(--accent)' }}>{Object.keys(topicSug).length} 条可能漏归了主题</b>（卡片上一键补）</span>}
                       {clusters.length > 0 && <span> · {clusters.length} 组可聚成新主题</span>}
@@ -429,14 +433,11 @@ export default function NotesView({
             </div>
           ) : (
             <div className="wb-topic-chips">
-              <button className={`wb-topic-chip${!topicFilter && !newOnly ? ' active' : ''}`} onClick={() => { setTopicFilter(''); setNewOnly(false) }}>全部</button>
-              {newNotes.length > 0 && (
-                <button className={`wb-topic-chip${newOnly ? ' active' : ''}`} style={newOnly ? undefined : { color: 'var(--accent)', fontWeight: 600 }}
-                  onClick={() => { setNewOnly(v => !v); setTopicFilter('') }}>最近新增（{newNotes.length}）</button>
+              <button className={`wb-topic-chip${!topicFilter && !pendingOnly ? ' active' : ''}`} onClick={() => { setTopicFilter(''); setPendingOnly(false) }}>全部</button>
+              {pendingCount > 0 && (
+                <button className={`wb-topic-chip${pendingOnly ? ' active' : ''}`} style={pendingOnly ? undefined : { color: 'var(--accent)', fontWeight: 600 }}
+                  onClick={() => { setPendingOnly(v => !v); setTopicFilter('') }}>待处理（{pendingCount}）</button>
               )}
-              <button className={`wb-topic-chip${topicFilter === '__none__' ? ' active' : ''}`} onClick={() => { setTopicFilter('__none__'); setNewOnly(false) }}>
-                未归类{inboxCount ? `（${inboxCount}）` : ''}
-              </button>
               {(() => {
                 // 瘦身：按素材数降序，默认只显示有量的（≥2）主题，零散单条藏进「更多」
                 const sorted = [...topics].sort((a, b) => (topicCount[b.id] || 0) - (topicCount[a.id] || 0))
@@ -445,7 +446,7 @@ export default function NotesView({
                 return (<>
                   {primary.map(t => (
                     <button key={t.id} className={`wb-topic-chip${topicFilter === t.id ? ' active' : ''}`}
-                      onClick={() => { setTopicFilter(topicFilter === t.id ? '' : t.id); setNewOnly(false) }} title={t.name}>
+                      onClick={() => { setTopicFilter(topicFilter === t.id ? '' : t.id); setPendingOnly(false) }} title={t.name}>
                       {t.name.slice(0, 12)}{topicCount[t.id] ? `（${topicCount[t.id]}）` : ''}
                     </button>
                   ))}
@@ -533,23 +534,20 @@ export default function NotesView({
             </div>
           )}
 
-          {newOnly && !hasFilter && newNotes.length === 0 && (
-            <div className="wb-empty">没有新增素材（你都看过了）。</div>
+          {pendingOnly && !hasFilter && pendingNotes.length === 0 && (
+            <div className="wb-empty">没有待处理的素材——都归好类或用过了 👍</div>
           )}
           {hasFilter
             ? shownFiltered.map(note => renderNote(note))
-            : newOnly
-            ? newNotes.map(note => renderNote(note))
+            : pendingOnly
+            ? shown.filter(isPending).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')).map(note => renderNote(note))
             : groups.map(g => (
               <div key={g.id}>
                 <div className="wb-note-group-head">
                   <span className="wb-note-group-name">{g.name}</span>
                   <span className="wb-note-group-count">{g.notes.length}</span>
-                  {g.id === '__inbox__' && (
-                    <span className="wb-note-group-hint">收件箱 · 周清 2 分钟：归入主题或删除</span>
-                  )}
-                  {g.id === '__new__' && (
-                    <span className="wb-note-group-hint">近 3 天新存 · 之后自动归入下面各主题</span>
+                  {g.id === '__pending__' && (
+                    <span className="wb-note-group-hint">还没归类或用过 · 越老越靠前，趁早处理别搁置</span>
                   )}
                 </div>
                 {g.notes.map(note => renderNote(note))}
@@ -574,7 +572,9 @@ export default function NotesView({
     return (
       <div key={note.id} className={`wb-card${selected ? ' selected' : ''}`} ref={highlighted ? highlightRef : null}
         style={{ position: 'relative', ...(highlighted ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px rgba(61,90,128,.18)', transition: 'box-shadow .3s' } : {}) }}>
-        {isNew(note) && <span className="wb-new-badge" title="近 3 天新增">新</span>}
+        {isPending(note) && (staleDays(note) >= 3
+          ? <span className="wb-new-badge overdue" title="待处理，且已搁置——趁早归类或用掉">搁置 {staleDays(note)} 天</span>
+          : <span className="wb-new-badge pending" title="还没归类/用过，待处理">待处理</span>)}
         {note.title && (
           <div style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
             {note.title}

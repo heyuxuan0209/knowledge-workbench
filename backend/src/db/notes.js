@@ -102,7 +102,8 @@ export function getNotes({ limit = 50, offset = 0, q = null, topicId = null, sou
       (SELECT group_concat(nt.topic_id) FROM note_topics nt WHERE nt.note_id = n.id) AS topic_ids,
       (SELECT group_concat(t.name, ' / ') FROM note_topics nt2 JOIN topics t ON t.id = nt2.topic_id WHERE nt2.note_id = n.id) AS topic_names,
       (SELECT json_group_array(json_object('id', nt3.topic_id, 'name', t3.name, 'status', nt3.status, 'addedBy', nt3.added_by))
-         FROM note_topics nt3 JOIN topics t3 ON t3.id = nt3.topic_id WHERE nt3.note_id = n.id) AS topics_json
+         FROM note_topics nt3 JOIN topics t3 ON t3.id = nt3.topic_id WHERE nt3.note_id = n.id) AS topics_json,
+      EXISTS (SELECT 1 FROM drafts d WHERE d.paragraph_refs LIKE '%"noteId":"' || n.id || '"%') AS used_in_draft
     FROM notes n
     LEFT JOIN contents c ON n.content_id = c.id
     LEFT JOIN sources s ON c.source_id = s.id
