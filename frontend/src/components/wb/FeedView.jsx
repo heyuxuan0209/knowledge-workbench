@@ -256,9 +256,12 @@ export default function FeedView({
         {/* 一句话总结（露出日报导语，此前藏着；UI 改造 2a） */}
         {report?.summary && <div className="wb-lead">一句话总结：<b>{report.summary}</b></div>}
 
+        {recs.length > 0 && (
+          <div className="wb-ov-lead">左边是<b>今天多个信息源都在说的热点</b>，右边是<b>按你关注的主题挑给你的</b>——一个看大盘、一个看你自己。</div>
+        )}
         <div className={recs.length ? 'wb-ov-cols' : ''}>
         <div>
-        <div className="wb-brief-label">今日焦点 · 基于你的信息流聚类</div>
+        <div className="wb-brief-label">今日热点 · 多个信息源都在说</div>
         <div className="wb-focus">
           {stories.length === 0 && (
             <div style={{ padding: '14px 13px', fontSize: 12.5, color: 'var(--faint)' }}>
@@ -301,11 +304,11 @@ export default function FeedView({
         </div>
         {recs.length > 0 && (
           <div>
-            <div className="wb-brief-label">为你推荐 · 带理由</div>
+            <div className="wb-brief-label">为你精选 · 命中你关注的主题</div>
             {recs.map(r => (
               <div key={r.id} className="wb-rec">
                 <div className="wb-rec-t"><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></div>
-                <div className="wb-rec-why">{r.reason}{r.category ? ` · ${r.category}` : ''}</div>
+                <div className="wb-rec-why">{r.reason}</div>
               </div>
             ))}
           </div>
@@ -333,31 +336,31 @@ export default function FeedView({
         )}
       </div>
 
-      {/* 文章 / AI 项目 分开（UI 改造：不用滑完项目才看到文章） */}
-      <div className="wb-feedbar" style={{ borderBottom: '1px solid var(--line10)', paddingBottom: 0, marginBottom: 12 }}>
+      {/* 列表工具条：文章/AI项目 + （文章时）全部/收藏/搜索/计数/同步 合并成一条，贴住网格 */}
+      <div className="wb-feedbar wb-list-toolbar">
         <div className="wb-seg-toggle" style={{ flexShrink: 0 }}>
           <button className={mainTab === 'articles' ? 'active' : ''} onClick={() => setMainTab('articles')}>文章</button>
           <button className={mainTab === 'projects' ? 'active' : ''} onClick={() => setMainTab('projects')}>
             AI 项目{ghTrending.repos.length ? `（${ghTrending.repos.length}）` : ''}
           </button>
         </div>
-      </div>
-
-      {mainTab === 'articles' && (<>
-        <div className="wb-feedbar">
+        {mainTab === 'articles' && (<>
+          <span className="wb-tb-sep" />
           <div className="wb-seg-toggle" style={{ flexShrink: 0 }}>
             <button className={feedTab === 'all' ? 'active' : ''} onClick={() => setFeedTab('all')}>全部</button>
             <button className={feedTab === 'starred' ? 'active' : ''} onClick={() => setFeedTab('starred')}>★ 收藏</button>
           </div>
           <input className="wb-feed-search" placeholder="搜索资讯（空格分隔多关键词）…"
             value={feedQuery} onChange={(e) => setFeedQuery(e.target.value)} />
+          <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
           <button className="wb-brief-link" disabled={syncing} onClick={syncAllSources}
             title="同步全部信源：AI HOT + RSS 抓取 + B站/YouTube/GitHub 主动查询">
-            {syncing ? '同步中…' : '↻ 同步信源'}
+            {syncing ? '同步中…' : '↻ 同步'}
           </button>
-          <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
-        </div>
+        </>)}
+      </div>
 
+      {mainTab === 'articles' && (<>
         {/* 分类 chips（2b）：只在无搜索/收藏筛选时出现，避免叠加混乱 */}
         {feedTab !== 'starred' && !feedQuery.trim() && (
           <CatChips cats={ART_CATS} counts={artCatCounts} active={artCat} onPick={setArtCat} defs={ART_DEFS} />

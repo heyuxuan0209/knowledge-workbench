@@ -516,7 +516,7 @@ input, textarea { font-family: inherit; }
 .wb-md h2:first-child{ border-top:none; padding-top:0; }
 
 /* ---- 资讯页平铺网格（UI 改造：B 方案） ---- */
-.wb-feed-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px; }
+.wb-feed-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:14px; }
 .wb-gcard{ background:var(--surface); border:1px solid var(--line10, rgba(33,31,26,.1)); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
 .wb-gcard.selected{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(61,90,128,.15); }
 .wb-gcard-title{ font-family:var(--serif); font-weight:600; font-size:14.5px; line-height:1.4; color:var(--ink,#26241f); }
@@ -612,3 +612,10 @@ input, textarea { font-family: inherit; }
 .wb-new-badge{ position:absolute; top:10px; right:12px; z-index:1; font-size:10px; font-weight:700; color:#fff; border-radius:5px; padding:2px 7px; letter-spacing:.5px; }
 .wb-new-badge.pending{ background:#6b7f96; }
 .wb-new-badge.overdue{ background:var(--amber); }
+
+/* 资讯今日概览：两栏领起句（点破 热度 vs 相关） */
+.wb-ov-lead{ font-size:12.5px; background:var(--surface); border-left:3px solid var(--accent); padding:7px 12px; border-radius:0 6px 6px 0; margin:2px 0 14px; color:var(--body2); line-height:1.6; }
+.wb-ov-lead b{ color:var(--body); }
+/* 资讯列表工具条：文章/项目 + 筛选/搜索/计数/同步 合并一条，贴住网格 */
+.wb-list-toolbar{ flex-wrap:wrap; gap:12px; }
+.wb-tb-sep{ width:1px; height:20px; background:var(--line14); flex:none; }
