@@ -65,3 +65,47 @@ export function getPlatform(key) {
   }
   return platform;
 }
+
+// ── ADR-026 并行新路径：文体(genres/) × 平台形态(platform-forms/) 拼装层 ──
+// 与老 platforms/ 完全并存，扫两个新目录；README.md 不算模板。第二步接线用，不影响老路由。
+function parseSpecFileIn(subdir, file) {
+  const raw = loadPrompt(join(subdir, file));
+  const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!m) throw new Error(`${subdir}/${file} 缺少 frontmatter（--- label: … --- 头部）`);
+  const meta = {};
+  for (const line of m[1].split('\n')) {
+    const kv = line.match(/^(\w+):\s*(.*)$/);
+    if (kv) meta[kv[1]] = kv[2].trim();
+  }
+  if (!meta.label) throw new Error(`${subdir}/${file} 的 frontmatter 缺少 label`);
+  return {
+    key: basename(file, '.md'),
+    label: meta.label,
+    icon: meta.icon || '',
+    note: meta.note || meta.label,
+    when: meta.when || '',
+    order: Number(meta.order) || 99,
+    spec: m[2].trim(),
+  };
+}
+
+function listSpecsIn(subdir) {
+  const files = readdirSync(join(ROOT, subdir)).filter(f => f.endsWith('.md') && f !== 'README.md');
+  if (!files.length) throw new Error(`reference/prompts/creation/${subdir}/ 下没有任何模板`);
+  return files.map(f => parseSpecFileIn(subdir, f)).sort((a, b) => a.order - b.order);
+}
+
+export function listGenres() { return listSpecsIn('genres'); }
+export function listPlatformForms() { return listSpecsIn('platform-forms'); }
+
+export function getGenre(key) {
+  const g = listGenres().find(x => x.key === key);
+  if (!g) throw new Error(`未知文体「${key}」（可用：${listGenres().map(x => x.key).join('/')}）`);
+  return g;
+}
+
+export function getPlatformForm(key) {
+  const p = listPlatformForms().find(x => x.key === key);
+  if (!p) throw new Error(`未知平台形态「${key}」（可用：${listPlatformForms().map(x => x.key).join('/')}）`);
+  return p;
+}

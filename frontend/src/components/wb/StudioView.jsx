@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { IconWarn } from './Icons'
+import { useState, useRef, useEffect } from 'react'
+import { IconWarn, IconBolt } from './Icons'
 import { api } from './util'
 
 // 创作台（视觉对齐原型 06-studio）：平台模板分段 + 衬线草稿区 + 溯源警示 + 复制/导出。
@@ -11,6 +11,55 @@ import { api } from './util'
 
 export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, suggestTitles, gotoTopic }) {
   const platformIcon = (key) => platforms.find(p => p.key === key)?.icon || '📝'
+
+  // ── ADR-026 试新版：文体(genre) × 平台形态(platform-form)，与老平台行完全并存 ──
+  const [v2Mode, setV2Mode] = useState(false)
+  const [genres, setGenres] = useState([])
+  const [pforms, setPforms] = useState([])
+  const [v2Genre, setV2Genre] = useState('')
+  const [v2Pform, setV2Pform] = useState('')
+  useEffect(() => {
+    if (!v2Mode || genres.length) return
+    ;(async () => {
+      try {
+        const [g, p] = await Promise.all([api('/api/studio/genres'), api('/api/studio/platform-forms')])
+        setGenres(g.data || []); setPforms(p.data || [])
+      } catch (err) { showToast('文体/平台形态加载失败：' + err.message) }
+    })()
+  }, [v2Mode])
+  // 阶段1·B：从整个素材库挑（不必先有主题），默认不选，可搜；生成只用勾中的
+  const [mats, setMats] = useState([])
+  const [selMat, setSelMat] = useState(new Set())
+  const [matQ, setMatQ] = useState('')
+  useEffect(() => {
+    if (!v2Mode) return
+    ;(async () => {
+      try { const j = await api('/api/materials'); setMats(j.data || []) } catch { /* 静默 */ }
+    })()
+  }, [v2Mode])
+  const toggleMat = id => setSelMat(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const matsShown = matQ.trim()
+    ? mats.filter(m => (`${m.sourceTitle} ${m.excerpt}`).toLowerCase().includes(matQ.trim().toLowerCase()))
+    : mats
+  const genDraftV2 = async () => {
+    if (!v2Genre || !v2Pform) { showToast('先选文体和平台形态'); return }
+    if (selMat.size === 0) { showToast('先从素材库勾选至少 1 条素材'); return }
+    setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在按 文体×平台 起稿（约 30 秒）…' }))
+    try {
+      const json = await api('/api/materials/draft-v2', { method: 'POST', body: { genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null, selectedNoteIds: [...selMat] } })
+      const d = json.data
+      setStudio(s => ({
+        ...s, busy: false, draft: d.body, title: d.title, draftId: d.id, platform: d.platform,
+        paragraphRefs: d.paragraph_refs,
+        refs: (d.paragraph_refs || []).map(r => ({ note: r.sourceTitle || '素材', para: r.marker })),
+      }))
+      const gl = genres.find(g => g.key === v2Genre)?.label, pl = pforms.find(p => p.key === v2Pform)?.label
+      showToast(`已按「${gl}×${pl}」起稿（引用 ${d.paragraph_refs?.length || 0} 条，¥${d.cost_yuan?.toFixed(3)}）`)
+    } catch (err) {
+      setStudio(s => ({ ...s, busy: false }))
+      showToast(`起稿失败：${err.message}`)
+    }
+  }
 
   // ---- P2：批评人格审稿 ----
   const [critique, setCritique] = useState(null) // {verdict, points:[{persona,quote,problem,suggestion}]}
@@ -131,7 +180,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             <option value="">草稿箱（{drafts.length}）…</option>
             {drafts.map(d => (
               <option key={d.id} value={d.id}>
-                {platformIcon(d.platform)} {(d.title || d.body.slice(0, 24)).slice(0, 26)} · {(d.updated_at || '').slice(5, 10)}
+                {(d.title || d.body.slice(0, 24)).slice(0, 26)} · {(d.updated_at || '').slice(5, 10)}
               </option>
             ))}
           </select>
@@ -139,22 +188,67 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       </div>
       <div className="wb-page-sub">同一素材集，按平台分化模板 · 每段可溯源到素材卡片</div>
 
-      <div className="wb-seg">
-        {platforms.map(p => (
-          <button key={p.key} className={`wb-seg-btn${studio.platform === p.key ? ' active' : ''}`}
-            title={p.when || p.note}
-            onClick={() => setPlatform(p.key)}>{p.icon ? `${p.icon} ` : ''}{p.label}</button>
-        ))}
+      {/* ADR-026 试新版：文体 × 平台形态（并行，不影响下面的老平台行；关掉即恢复原样） */}
+      <div style={{ margin: '10px 0 0' }}>
+        <button className={v2Mode ? 'wb-btn-primary' : 'wb-btn-outline'}
+          style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+          onClick={() => setV2Mode(v => !v)}>
+          <IconBolt />试新版（文体 × 平台形态）
+        </button>
       </div>
-
-      {(() => {
-        const sel = platforms.find(p => p.key === studio.platform)
-        return sel?.when ? (
-          <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '8px 0 0', lineHeight: 1.5 }}>
-            <span style={{ opacity: 0.7 }}>何时用 · </span>{sel.when}
+      {v2Mode && (
+        <div style={{ border: '1px dashed var(--line10)', borderRadius: 8, padding: 12, margin: '10px 0' }}>
+          <div style={{ fontSize: 12, color: 'var(--sub2)', marginBottom: 6 }}>① 从素材库挑要用的（已选 {selMat.size}）· 生成只用勾中的，不必先进主题</div>
+          <input value={matQ} onChange={e => setMatQ(e.target.value)} placeholder="搜索素材（标题 / 内容）…"
+            style={{ width: '100%', marginBottom: 8, padding: '6px 10px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)' }} />
+          <div style={{ maxHeight: 150, overflowY: 'auto', marginBottom: 12, border: '1px solid var(--line10)', borderRadius: 6, padding: '4px 8px' }}>
+            {matsShown.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '8px 2px' }}>{mats.length ? '没有匹配的素材' : '素材库为空 / 加载中…'}</div>}
+            {matsShown.map(m => (
+              <label key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0', fontSize: 12.5, cursor: 'pointer' }}>
+                <input type="checkbox" checked={selMat.has(m.id)} onChange={() => toggleMat(m.id)} style={{ marginTop: 3 }} />
+                <span><b style={{ color: 'var(--body)' }}>{m.sourceTitle}</b>{m.excerpt ? <span style={{ color: 'var(--faint)' }}> · {m.excerpt}</span> : null}</span>
+              </label>
+            ))}
           </div>
-        ) : null
-      })()}
+          <div style={{ fontSize: 12, color: 'var(--sub2)', marginBottom: 6 }}>② 选文体</div>
+          <div className="wb-seg">
+            {genres.map(g => (
+              <button key={g.key} className={`wb-seg-btn${v2Genre === g.key ? ' active' : ''}`} title={g.when || g.note}
+                onClick={() => setV2Genre(g.key)}>{g.label}</button>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '12px 0 6px' }}>③ 选平台形态</div>
+          <div className="wb-seg">
+            {pforms.map(p => (
+              <button key={p.key} className={`wb-seg-btn${v2Pform === p.key ? ' active' : ''}`} title={p.when || p.note}
+                onClick={() => setV2Pform(p.key)}>{p.label}</button>
+            ))}
+          </div>
+          <button className="wb-btn-primary" style={{ marginTop: 12 }} disabled={studio.busy || !v2Genre || !v2Pform}
+            onClick={genDraftV2}>
+            按「{genres.find(g => g.key === v2Genre)?.label || '文体'} × {pforms.find(p => p.key === v2Pform)?.label || '平台'}」生成
+          </button>
+        </div>
+      )}
+
+      {!v2Mode && (<>
+        <div className="wb-seg">
+          {platforms.map(p => (
+            <button key={p.key} className={`wb-seg-btn${studio.platform === p.key ? ' active' : ''}`}
+              title={p.when || p.note}
+              onClick={() => setPlatform(p.key)}>{p.label}</button>
+          ))}
+        </div>
+
+        {(() => {
+          const sel = platforms.find(p => p.key === studio.platform)
+          return sel?.when ? (
+            <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '8px 0 0', lineHeight: 1.5 }}>
+              <span style={{ opacity: 0.7 }}>何时用 · </span>{sel.when}
+            </div>
+          ) : null
+        })()}
+      </>)}
 
       {studio.platform === 'xhs' && (
         <div style={{ display: 'flex', gap: 6, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>

@@ -440,6 +440,76 @@ app.get('/api/studio/platforms', async (req, res) => {
   }
 });
 
+// ── ADR-026 并行新路径（试新版：文体 × 平台形态）。三条 v2 接口，与老接口完全并存 ──
+app.get('/api/studio/genres', async (req, res) => {
+  try {
+    const { listGenres } = await import('./services/creation-prompts.js');
+    res.json({ success: true, data: listGenres().map(({ key, label, icon, note, when }) => ({ key, label, icon, note, when })) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/studio/platform-forms', async (req, res) => {
+  try {
+    const { listPlatformForms } = await import('./services/creation-prompts.js');
+    res.json({ success: true, data: listPlatformForms().map(({ key, label, icon, note, when }) => ({ key, label, icon, note, when })) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 某主题的已并入素材列表（供创作台勾选用）
+app.get('/api/topics/:id/materials', async (req, res) => {
+  try {
+    const { listTopicMaterials } = await import('./services/draft-generation.js');
+    res.json({ success: true, data: listTopicMaterials(req.params.id) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// v2 起稿：文体(genre) × 平台形态(platform-form) 拼装（老 /api/topics/:id/draft 不变）
+// selectedNoteIds 非空 → 只用勾选的素材（ADR-028 阶段1）
+app.post('/api/topics/:id/draft-v2', async (req, res) => {
+  try {
+    const { genre, platformForm, viewpoint, selectedNoteIds } = req.body || {};
+    if (!genre || !platformForm) return res.status(400).json({ success: false, error: 'genre 和 platformForm 必填' });
+    const ids = Array.isArray(selectedNoteIds) && selectedNoteIds.length ? selectedNoteIds : null;
+    const { generateFromTopicV2 } = await import('./services/draft-generation.js');
+    const draft = await generateFromTopicV2(req.params.id, genre, platformForm, viewpoint || null, ids);
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    const status = error.message === 'Topic not found' ? 404 : 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// 全库素材列表（ADR-028 阶段1·B：创作台可不进主题，从整库挑；?q= 搜索）
+app.get('/api/materials', async (req, res) => {
+  try {
+    const { getNotes } = await import('./db/notes.js');
+    const rows = getNotes({ limit: 200, q: req.query.q || null });
+    res.json({ success: true, data: rows.map(n => ({ id: n.id, excerpt: (n.excerpt || '').slice(0, 90), sourceTitle: n.title || n.content_zh_title || n.source_title || '未命名素材', sourceUrl: n.source_url || n.content_url || null })) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 按选中素材生成（无需主题）
+app.post('/api/materials/draft-v2', async (req, res) => {
+  try {
+    const { genre, platformForm, viewpoint, selectedNoteIds } = req.body || {};
+    if (!genre || !platformForm) return res.status(400).json({ success: false, error: 'genre 和 platformForm 必填' });
+    if (!Array.isArray(selectedNoteIds) || !selectedNoteIds.length) return res.status(400).json({ success: false, error: '至少选 1 条素材' });
+    const { generateFromMaterials } = await import('./services/draft-generation.js');
+    const draft = await generateFromMaterials(selectedNoteIds, genre, platformForm, viewpoint || null);
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 长文标题候选（标题决定打开率，按平台分组生成、每个带【平台·策略】标注供挑选；prompt 见 creation/titles.md）
 app.post('/api/studio/titles', async (req, res) => {
   try {
