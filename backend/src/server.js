@@ -624,6 +624,16 @@ app.get('/api/reports/latest', async (req, res) => {
   }
 });
 
+// 为你推荐（VISION-V4 UI 改造 2b）：读缓存（cron/启动刷新），秒回
+app.get('/api/recommendations', async (req, res) => {
+  try {
+    const { getCachedRecommendations } = await import('./services/recommend.js');
+    res.json({ success: true, data: getCachedRecommendations() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 行业面（VISION-V4 阶段2）：复用 AI HOT 热门内容做行业提要 + 跳转，不重新生成（零 LLM）
 app.get('/api/industry-brief', async (req, res) => {
   try {
@@ -1588,6 +1598,13 @@ app.listen(PORT, () => {
     } catch (err) {
       console.error('[startup] 日报补跑失败:', err.message);
     }
+    // 为你推荐缓存为空则算一次（首次上线/重启后）
+    try {
+      const { getCachedRecommendations, refreshRecommendations } = await import('./services/recommend.js');
+      if (getCachedRecommendations().length === 0) await refreshRecommendations();
+    } catch (err) {
+      console.error('[startup] 为你推荐刷新失败:', err.message);
+    }
   }, 20000);
 });
 
@@ -1613,6 +1630,13 @@ import('node-cron').then(({ default: cron }) => {
       console.log(`[cron] 内容分类：+${c.classified} 条`);
     } catch (err) {
       console.error('[cron] 内容分类失败:', err.message);
+    }
+    // 刷新"为你推荐"缓存（向量匹配主题，约 10s，故缓存）
+    try {
+      const { refreshRecommendations } = await import('./services/recommend.js');
+      await refreshRecommendations();
+    } catch (err) {
+      console.error('[cron] 为你推荐刷新失败:', err.message);
     }
     // 同步后生成/刷新当天日报（force：拿到最新同步的数据重出一份）
     try {

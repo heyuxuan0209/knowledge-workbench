@@ -127,9 +127,11 @@ export default function FeedView({
   const [artCat, setArtCat] = useState(null)   // 文章分类 chip（2b）
   const [projCat, setProjCat] = useState(null)  // 项目分类 chip（2b）
   const [artCatCounts, setArtCatCounts] = useState({}) // 文章各类目计数（后端，全量）
+  const [recs, setRecs] = useState([]) // 为你推荐（后端向量匹配主题，读缓存）
   const hasFilter = feedTab === 'starred' || Boolean(feedQuery.trim()) || Boolean(artCat)
   useEffect(() => {
     api('/api/contents/categories').then(j => setArtCatCounts(j.data || {})).catch(() => {})
+    api('/api/recommendations').then(j => setRecs(j.data || [])).catch(() => {})
   }, [])
   useEffect(() => {
     if (!hasFilter) { setFiltered(null); return }
@@ -213,6 +215,8 @@ export default function FeedView({
         {/* 一句话总结（露出日报导语，此前藏着；UI 改造 2a） */}
         {report?.summary && <div className="wb-lead">一句话总结：<b>{report.summary}</b></div>}
 
+        <div className={recs.length ? 'wb-ov-cols' : ''}>
+        <div>
         <div className="wb-brief-label">今日焦点 · 基于你的信息流聚类</div>
         <div className="wb-focus">
           {stories.length === 0 && (
@@ -252,6 +256,19 @@ export default function FeedView({
               </div>
             )
           })}
+        </div>
+        </div>
+        {recs.length > 0 && (
+          <div>
+            <div className="wb-brief-label">为你推荐 · 带理由</div>
+            {recs.map(r => (
+              <div key={r.id} className="wb-rec">
+                <div className="wb-rec-t"><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></div>
+                <div className="wb-rec-why">{r.reason}{r.category ? ` · ${r.category}` : ''}</div>
+              </div>
+            ))}
+          </div>
+        )}
         </div>
 
         {report ? (

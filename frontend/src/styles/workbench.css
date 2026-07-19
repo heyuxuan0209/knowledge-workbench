@@ -519,3 +519,13 @@ input, textarea { font-family: inherit; }
 
 /* ---- 资讯页分类标签（UI 改造 2b） ---- */
 .wb-cat{ font-size:10.5px; padding:1px 7px; border-radius:4px; background:rgba(61,90,128,.10); color:var(--accent); flex-shrink:0; }
+
+/* ---- 今日概览 焦点/推荐 双列 + 推荐条（UI 改造 2b） ---- */
+.wb-ov-cols{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width: 920px){ .wb-ov-cols{ grid-template-columns:1fr; } }
+.wb-rec{ padding:8px 0; border-bottom:1px solid var(--line08); }
+.wb-rec:last-child{ border-bottom:none; }
+.wb-rec-t{ font-size:13px; font-weight:600; line-height:1.45; color:var(--body2,#26241f); }
+.wb-rec-t a{ color:inherit; text-decoration:none; }
+.wb-rec-t a:hover{ text-decoration:underline; }
+.wb-rec-why{ font-size:11.5px; color:var(--green,#3f7350); margin-top:3px; line-height:1.5; }
