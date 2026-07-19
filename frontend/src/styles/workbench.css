@@ -539,3 +539,13 @@ input, textarea { font-family: inherit; }
   background: #2b2924; color: #fdfbf6; font-size: 11.5px; font-weight: 400; line-height: 1.55;
   padding: 7px 11px; border-radius: 7px; box-shadow: 0 6px 18px rgba(0,0,0,.2); pointer-events: none;
 }
+
+/* ---- 即时分析 hero：上传按钮 + 拖拽 + 转写进度（UI 改造） ---- */
+.wb-hero{ transition: border-color .15s, background .15s; }
+.wb-hero.dragover{ border-color: var(--accent); background: rgba(61,90,128,.08); }
+.wb-hero-clip{ width:40px; height:40px; flex-shrink:0; border:1px solid var(--line10, rgba(33,31,26,.1)); border-radius:9px; background:#fff; color:var(--sub,#726d61); font-size:20px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+.wb-hero-clip:hover{ border-color: var(--accent); color: var(--accent); }
+.wb-uploading{ background:#fff; border:1px solid var(--line10, rgba(33,31,26,.1)); border-radius:9px; padding:12px 14px; }
+.wb-progress{ height:8px; border-radius:6px; background:rgba(33,31,26,.08); overflow:hidden; margin:10px 0 6px; position:relative; }
+.wb-progress > i{ display:block; height:100%; width:34%; background:var(--accent); border-radius:6px; position:absolute; animation: wbprog 1.5s ease-in-out infinite; }
+@keyframes wbprog{ 0%{ left:-34%; } 100%{ left:100%; } }

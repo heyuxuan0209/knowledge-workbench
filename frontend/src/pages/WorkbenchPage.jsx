@@ -310,34 +310,60 @@ export default function WorkbenchPage() {
     } catch (err) { showToast(`保存失败：${err.message}`) }
   }
 
-  // ---- 万能收口：粘贴链接 → 摄入 → 直接进入解读对话 ----
+  // 摄入结果 → 送入右栏解读（粘链接/文字 和 上传文件 共用）。
+  // 只保留解读需要的字段：完整结果里的 transcript（几千段带时间戳）会把后续每轮对话请求
+  // 撑到数 MB（曾触发 PayloadTooLarge）。metadata 必须随行——即时分析管道要求带元数据块。
+  const beginAnalysisWith = (d, label, sourceUrl = null) => {
+    const title = d.zhTitle || d.zh_title || d.enTitle || d.en_title || d.title || label
+    const adHoc = {
+      zhTitle: title,
+      enTitle: d.enTitle || d.en_title || d.title || null,
+      zhBody: d.zhBody || d.zh_body || null,
+      body: (d.zhBody || d.zh_body) ? null : (d.body || null),
+      url: sourceUrl,
+      metadata: d.metadata || null,
+    }
+    setSelectedItems(prev => [...prev.filter(x => x.id !== 'paste'), { id: 'paste', title: `[${label}] ${title}`, adHoc }])
+    setRightCollapsed(false)
+    setTimeout(() => setAnalysisMode('chat'), 0)
+  }
+
+  // ---- 万能收口：粘贴链接/文字 → 摄入 → 进入解读 ----
   const acquire = async (input) => {
     showToast('正在识别并抓取内容…')
     try {
       const json = await api('/api/content/ingest', { method: 'POST', body: { input } })
       if (!json.success) throw new Error(json.data?.fetchError || json.error || '摄入失败')
-      const d = json.data
-      const title = d.zhTitle || d.zh_title || d.enTitle || d.en_title || d.title || input.slice(0, 28)
-      // 只保留解读需要的字段：完整摄入结果里的 transcript（几千段带时间戳）会把
-      // 后续每轮对话请求撑到数 MB（曾触发 PayloadTooLarge）。
-      // metadata（原题/作者/平台/日期）必须随行——即时分析管道要求带元数据块
-      const adHoc = {
-        zhTitle: title,
-        enTitle: d.enTitle || d.en_title || d.title || null,
-        zhBody: d.zhBody || d.zh_body || null,
-        body: (d.zhBody || d.zh_body) ? null : (d.body || null),
-        url: input.startsWith('http') ? input : null,
-        metadata: d.metadata || null,
-      }
-      setSelectedItems(prev => [...prev.filter(x => x.id !== 'paste'), { id: 'paste', title: `[粘贴] ${title}`, adHoc }])
-      setRightCollapsed(false)
-      setTimeout(() => {
-        setAnalysisMode('chat')
-        // 单独走一次全新解读（selectedItems 状态更新后由用户消息触发）
-      }, 0)
+      beginAnalysisWith(json.data, '粘贴', input.startsWith('http') ? input : null)
       return true
     } catch (err) {
       showToast(`摄入失败：${err.message}`)
+      return false
+    }
+  }
+
+  // ---- 上传文件（音频→转写全程 / PDF→抽文字）：异步任务，轮询进度，完成后进解读 ----
+  const uploadFile = async (file, onStatus) => {
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/content/upload', { method: 'POST', body: fd })
+      const j = await res.json()
+      if (!j.success) throw new Error(j.error || '上传失败')
+      const { jobId, kind } = j.data
+      onStatus?.({ status: 'processing', kind, filename: file.name, elapsedSec: 0 })
+      // 轮询：音频转写可能几分钟，PDF 秒级
+      for (;;) {
+        await new Promise(r => setTimeout(r, kind === 'pdf' ? 1200 : 3000))
+        const pj = await api(`/api/content/upload/${jobId}`)
+        const job = pj.data
+        onStatus?.(job)
+        if (job.status === 'done') { beginAnalysisWith(job.result, kind === 'pdf' ? 'PDF' : '音频'); return true }
+        if (job.status === 'error') throw new Error(job.error || '处理失败')
+      }
+    } catch (err) {
+      showToast(`处理失败：${err.message}`)
+      onStatus?.({ status: 'error', error: err.message })
       return false
     }
   }
@@ -669,7 +695,7 @@ export default function WorkbenchPage() {
 
   const pageProps = {
     showToast, contents, report, stories, ghTrending, notes, sources, topics, toggleStar,
-    selectedItems, toggleSelect, followSource, followingIds, acquire, syncing, syncAllSources,
+    selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile, syncing, syncAllSources,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea,
     loadNotes, loadSources, loadTopics, loadBrief, setPage, setModal,
     notesTab, setNotesTab, toggleSelectNote,

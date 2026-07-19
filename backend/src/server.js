@@ -16,6 +16,12 @@ if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 文件上传（即时分析支持音频/PDF，UI 改造）：存临时目录，处理完由 upload-ingest 删除。上限 300MB（会议音频）
+import multer from 'multer';
+import { tmpdir } from 'os';
+import { join as pathJoin } from 'path';
+const upload = multer({ dest: pathJoin(tmpdir(), 'kw-uploads'), limits: { fileSize: 300 * 1024 * 1024 } });
+
 app.use(cors());
 // 5mb：adHoc 对话材料含长视频译文（默认 100kb 会对长内容直接 PayloadTooLarge）
 app.use(express.json({ limit: '5mb' }));
@@ -158,6 +164,30 @@ app.post('/api/content/ingest', async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// 上传文件即时分析（UI 改造）：音频→本地转写全程 / PDF→抽文字。异步：返回 jobId，前端轮询。
+app.post('/api/content/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: '没收到文件' });
+    const { startUploadJob } = await import('./services/upload-ingest.js');
+    const { id, kind } = startUploadJob({ path: req.file.path, originalname: req.file.originalname, mimetype: req.file.mimetype });
+    res.json({ success: true, data: { jobId: id, kind, filename: req.file.originalname } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 轮询上传处理进度/结果（result 与 /api/content/ingest 的 data 同 shape）
+app.get('/api/content/upload/:jobId', async (req, res) => {
+  try {
+    const { getJob } = await import('./services/upload-ingest.js');
+    const job = getJob(req.params.jobId);
+    if (!job) return res.status(404).json({ success: false, error: '任务不存在或已过期' });
+    res.json({ success: true, data: job });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

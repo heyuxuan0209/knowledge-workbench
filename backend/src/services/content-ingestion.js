@@ -42,8 +42,32 @@ export function detectInputType(input) {
   }
 
   if (url.hostname.includes('xiaoyuzhoufm.com') && url.pathname.includes('/episode/')) return 'xiaoyuzhou';
+  if (/bilibili\.com|b23\.tv/.test(url.hostname)) return 'bilibili'; // B站视频→转写（复用已有 ASR 下载管道）
   const isYoutube = YOUTUBE_HOSTS.some(host => url.hostname.includes(host));
   return isYoutube ? 'youtube' : 'url';
+}
+
+// B站视频（UI 改造：此前 B站链接当普通网页抓，拿不到视频内容）：
+// 复用 asr.transcribeVideo（bili-cli 免登录下载音频 + 本地转写）。默认 15 分钟上限（视频口播够用）。
+async function ingestBilibili(input) {
+  const url = input.trim();
+  try {
+    const { transcribeVideo } = await import('./asr.js');
+    const asr = await transcribeVideo(url);
+    let body = asr.text;
+    if (!asr.diarized) {
+      try { const { formatTranscript } = await import('./translation.js'); body = await formatTranscript(body); }
+      catch { /* 保留原文 */ }
+    }
+    return {
+      title: null, body, type: 'video', fetchStatus: 'success', fetchError: null,
+      transcript: asr.segments || null,
+      metadata: { originalTitle: null, author: null, platform: 'B站视频', publishedAt: null },
+      note: asr.truncated ? '视频较长，已转写前 15 分钟' : null,
+    };
+  } catch (err) {
+    return { title: null, body: null, type: 'video', fetchStatus: 'failed', fetchError: `B站视频转写失败：${err.message}` };
+  }
 }
 
 // 小宇宙单集（M5，RESEARCH-PIPELINE-EXTENSIONS §M5"小宇宙音频直链"）：
@@ -348,6 +372,10 @@ export async function ingest(input) {
 
     case 'youtube':
       result = await ingestYoutube(input);
+      return { ...result, inputMethod: 'url_auto' };
+
+    case 'bilibili':
+      result = await ingestBilibili(input);
       return { ...result, inputMethod: 'url_auto' };
 
     case 'url':
