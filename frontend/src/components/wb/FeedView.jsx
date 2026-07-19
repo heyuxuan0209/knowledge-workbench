@@ -135,6 +135,14 @@ export default function FeedView({
   // 与素材库同款：有筛选时走后端 SQL（不是只筛已加载的 30 条），无筛选回全局列表
   const [feedTab, setFeedTab] = useState('all') // 'all' | 'starred'
   const [feedQuery, setFeedQuery] = useState('')
+  const [sortMode, setSortMode] = useState('latest') // 'latest' 最新 | 'hot' 最热 | 'followed' 关注优先
+  const timeOf = (c) => new Date(`${(c.published_at || c.created_at || '').replace(' ', 'T')}Z`).getTime() || 0
+  const sortContents = (list) => {
+    const arr = [...(list || [])]
+    if (sortMode === 'hot') return arr.sort((a, b) => (b.heat ?? b.external_score ?? 0) - (a.heat ?? a.external_score ?? 0) || timeOf(b) - timeOf(a))
+    if (sortMode === 'followed') return arr.sort((a, b) => (Number(!!b.source_registered) - Number(!!a.source_registered)) || timeOf(b) - timeOf(a))
+    return arr.sort((a, b) => timeOf(b) - timeOf(a)) // 最新：纯发布时间倒序（明确、可预期）
+  }
   const [filtered, setFiltered] = useState(null)
   const [artCat, setArtCat] = useState(null)   // 文章分类 chip（2b）
   const [projCat, setProjCat] = useState(null)  // 项目分类 chip（2b）
@@ -359,6 +367,12 @@ export default function FeedView({
           </div>
           <input className="wb-feed-search" placeholder="搜索资讯（空格分隔多关键词）…"
             value={feedQuery} onChange={(e) => setFeedQuery(e.target.value)} />
+          <select className="wb-filter-chip" style={{ flexShrink: 0 }} value={sortMode} onChange={(e) => setSortMode(e.target.value)}
+            title="最新=按发布时间；最热=按热度分；关注优先=你关注的源排前面">
+            <option value="latest">排序：最新</option>
+            <option value="hot">排序：最热</option>
+            <option value="followed">排序：关注优先</option>
+          </select>
           <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
           <button className="wb-brief-link" disabled={syncing} onClick={syncAllSources}
             title="同步全部信源：AI HOT + RSS 抓取 + B站/YouTube/GitHub 主动查询">
@@ -386,7 +400,7 @@ export default function FeedView({
         )}
 
         <div className="wb-feed-grid">
-          {(filtered ?? contents).map(c => {
+          {sortContents(filtered ?? contents).map(c => {
             const checked = selIds.has(c.id)
             const followed = c.source_registered === 1 || c.source_registered === true
             const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
