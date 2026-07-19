@@ -1,17 +1,10 @@
 import { getDatabase } from './init.js';
 import { randomUUID } from 'crypto';
+import { stripPreamble } from '../util/strip-preamble.js';
 
 // 素材卡片（ADR-010 NotebookLM 模式）：只有用户主动"保存到笔记"的片段才落库。
 // content_id 引用可空：adHoc 粘贴的内容未入库，此时靠 source_title/source_url 冗余字段溯源。
-
-// AI 回复常见开场白（"好的，以下是…的结构化解读。"）对素材是噪音，保存时剥掉首行
-function stripPreamble(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length > 1 && /^(好的|当然|以下是|这是)/.test(lines[0]) && /解读|材料|总结|分析/.test(lines[0])) {
-    return lines.slice(1).join('\n').trim();
-  }
-  return text.trim();
-}
+// 存前剥掉 AI 客套开场白（见 util/strip-preamble）——对素材是纯噪音。
 
 export function createNote({ excerpt, noteType = 'chat', contentId = null, sourceTitle = null, sourceUrl = null, stance = null, title = null }) {
   if (!excerpt || !excerpt.trim()) {

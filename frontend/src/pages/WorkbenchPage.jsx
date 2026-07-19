@@ -726,7 +726,7 @@ export default function WorkbenchPage() {
         {!leftCollapsed && <div className="wb-resizer" onMouseDown={startDrag('left')} title="拖拽调整宽度" />}
 
         <main className="wb-main">
-          <div className="wb-main-inner" key={page + topicView}>
+          <div className={`wb-main-inner${(page === 'studio' || page === 'reports' || (page === 'topics' && topicView === 'page')) ? ' narrow' : ''}`} key={page + topicView}>
             {page === 'feed' && <FeedView {...pageProps} />}
             {page === 'notes' && <NotesView {...pageProps} />}
             {page === 'sources' && <SourcesView {...pageProps} />}

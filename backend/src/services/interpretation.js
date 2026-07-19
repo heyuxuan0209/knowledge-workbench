@@ -5,6 +5,7 @@ import { getDatabase } from '../db/init.js';
 import { getContentById } from '../db/contents.js';
 import { resolveContentBody } from './content-body-resolver.js';
 import { chat } from './llm.js';
+import { stripPreamble } from '../util/strip-preamble.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -57,7 +58,7 @@ export async function getOrGenerateInterpretation(contentId, { force = false } =
   const result = await chat([{ role: 'user', content: prompt }]);
   if (!result.success) throw new Error(`LLM 调用失败: ${result.error}`);
 
-  const text = result.content.trim();
+  const text = stripPreamble(result.content);
   const db = getDatabase();
   db.prepare("UPDATE contents SET interpretation = ?, updated_at = datetime('now') WHERE id = ?").run(text, contentId);
   db.close();

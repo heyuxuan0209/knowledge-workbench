@@ -89,22 +89,25 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
   const tabs = [{ key: 'all', label: '全部', count: sources.length }, ...grouped.filter(g => g.items.length).map(g => ({ key: g.key, label: g.label, count: g.items.length }))]
   const shown = activeTab === 'all' ? sources : (grouped.find(g => g.key === activeTab)?.items || [])
 
-  const sourceRow = (s) => {
+  const sourceCard = (s) => {
     const note = (s.platforms || []).map(sourceModeNote).find(Boolean)
+    const p0 = s.platforms?.[0]
     return (
-      <div key={s.id} className="wb-card" style={{ marginTop: 0, marginBottom: 9, padding: '12px 15px', borderRadius: 10 }}>
-        <div className="wb-src-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="wb-src-name">{s.display_name}</span>
+      <div key={s.id} className="wb-scard">
+        <div className="wb-scard-name">{s.display_name}</div>
+        <div className="wb-scard-badges">
           {(s.platforms || []).map(p => (
             <span key={p.id} className="wb-pill" title={p.handle}
               style={{ color: modeOf(p.track_mode).fg, background: modeOf(p.track_mode).bg, borderRadius: 6 }}>
               {p.platform} · {modeOf(p.track_mode).cn}
             </span>
           ))}
-          <span className="wb-src-count">{s.content_count} 条</span>
+        </div>
+        <div className="wb-scard-foot">
+          <span className="wb-src-count">{s.content_count} 条进 Feed</span>
           <button className="wb-src-unfollow" style={{ color: '#a24b3f' }} onClick={() => unfollow(s)}>取消关注</button>
         </div>
-        {note && <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 5, lineHeight: 1.5 }}>ⓘ {note}</div>}
+        {note && <div className="wb-scard-note">ⓘ {note}</div>}
       </div>
     )
   }
@@ -196,7 +199,7 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
         </div>
       )}
 
-      {shown.map(sourceRow)}
+      <div className="wb-src-grid">{shown.map(sourceCard)}</div>
     </>
   )
 }
