@@ -33,6 +33,9 @@ export default function NotesView({
   const [showAllTopics, setShowAllTopics] = useState(false) // 主题 chips 瘦身：默认藏零散的单条主题
   const [ovOpen, setOvOpen] = useState(() => localStorage.getItem('wb-notes-ov-collapsed') !== '1') // 素材概览默认展开
   const [topicSug, setTopicSug] = useState({}) // 语义补归类：noteId -> [{topicId,name,score}]（贴合但没标的主题）
+  // "新增"识别：记住上次进素材页时见过的最新素材时间，比它新的标「新」；看过即不再算新
+  const lastSeenRef = useRef(localStorage.getItem('wb-notes-lastseen') || '')
+  const [newOnly, setNewOnly] = useState(false)
   const highlightRef = useRef(null)
   const toggleExpand = (id) => setExpandedNotes(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   const toggleOv = () => setOvOpen(o => { localStorage.setItem('wb-notes-ov-collapsed', o ? '1' : '0'); return !o })
@@ -44,6 +47,15 @@ export default function NotesView({
   useEffect(() => {
     api('/api/notes/sources').then(j => setSourceOptions(j.data || [])).catch(() => {})
   }, [])
+
+  // 看过这批素材后，把"上次见过的最新时间"推进到当前最新——下次进来只有更新的才算「新」
+  useEffect(() => {
+    const maxCreated = notes.reduce((m, n) => ((n.created_at || '') > m ? n.created_at : m), '')
+    if (maxCreated) localStorage.setItem('wb-notes-lastseen', maxCreated)
+  }, [notes])
+
+  const isNew = (n) => Boolean(lastSeenRef.current) && (n.created_at || '') > lastSeenRef.current
+  const newNotes = notes.filter(isNew).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 
   const hasFilter = Boolean(keyword.trim() || sourceFilter || topicFilter || ctypeFilter)
 
@@ -416,8 +428,12 @@ export default function NotesView({
             </div>
           ) : (
             <div className="wb-topic-chips">
-              <button className={`wb-topic-chip${!topicFilter ? ' active' : ''}`} onClick={() => setTopicFilter('')}>全部</button>
-              <button className={`wb-topic-chip${topicFilter === '__none__' ? ' active' : ''}`} onClick={() => setTopicFilter('__none__')}>
+              <button className={`wb-topic-chip${!topicFilter && !newOnly ? ' active' : ''}`} onClick={() => { setTopicFilter(''); setNewOnly(false) }}>全部</button>
+              {newNotes.length > 0 && (
+                <button className={`wb-topic-chip${newOnly ? ' active' : ''}`} style={newOnly ? undefined : { color: 'var(--accent)', fontWeight: 600 }}
+                  onClick={() => { setNewOnly(v => !v); setTopicFilter('') }}>最近新增（{newNotes.length}）</button>
+              )}
+              <button className={`wb-topic-chip${topicFilter === '__none__' ? ' active' : ''}`} onClick={() => { setTopicFilter('__none__'); setNewOnly(false) }}>
                 未归类{inboxCount ? `（${inboxCount}）` : ''}
               </button>
               {(() => {
@@ -428,7 +444,7 @@ export default function NotesView({
                 return (<>
                   {primary.map(t => (
                     <button key={t.id} className={`wb-topic-chip${topicFilter === t.id ? ' active' : ''}`}
-                      onClick={() => setTopicFilter(topicFilter === t.id ? '' : t.id)} title={t.name}>
+                      onClick={() => { setTopicFilter(topicFilter === t.id ? '' : t.id); setNewOnly(false) }} title={t.name}>
                       {t.name.slice(0, 12)}{topicCount[t.id] ? `（${topicCount[t.id]}）` : ''}
                     </button>
                   ))}
@@ -466,7 +482,7 @@ export default function NotesView({
                     <div key={n.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0', borderTop: '1px dashed var(--line08)' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{n.title || '（无标题）'}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--sub)', lineHeight: 1.5, maxHeight: 42, overflow: 'hidden' }}>{n.excerpt}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--sub)', lineHeight: 1.5, maxHeight: 42, overflow: 'hidden' }}>{plainPreview(n.excerpt, 90)}</div>
                         <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>来源：{n.source_title || '未知'}</div>
                       </div>
                       <button className="wb-btn-ghost" style={{ flexShrink: 0 }} onClick={() => delDupNote(n.id, g)}>删除</button>
@@ -516,8 +532,13 @@ export default function NotesView({
             </div>
           )}
 
+          {newOnly && !hasFilter && newNotes.length === 0 && (
+            <div className="wb-empty">没有新增素材（你都看过了）。</div>
+          )}
           {hasFilter
             ? shownFiltered.map(note => renderNote(note))
+            : newOnly
+            ? newNotes.map(note => renderNote(note))
             : groups.map(g => (
               <div key={g.id}>
                 <div className="wb-note-group-head">
@@ -548,7 +569,8 @@ export default function NotesView({
     const selected = selectedItems.some(x => x.id === note.content_id || x.id === `note-${note.id}`)
     return (
       <div key={note.id} className={`wb-card${selected ? ' selected' : ''}`} ref={highlighted ? highlightRef : null}
-        style={highlighted ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px rgba(61,90,128,.18)', transition: 'box-shadow .3s' } : undefined}>
+        style={{ position: 'relative', ...(highlighted ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px rgba(61,90,128,.18)', transition: 'box-shadow .3s' } : {}) }}>
+        {isNew(note) && <span className="wb-new-badge" title="上次来之后新增的">新</span>}
         {note.title && (
           <div style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
             {note.title}
@@ -675,7 +697,7 @@ function topicState(t) {
 // 折叠预览：剥掉 markdown 符号，取首段纯文本（素材页急救：卡片不再倒整篇原文）
 function plainPreview(md, n) {
   return String(md || '')
-    .replace(/^#{1,6}\s+/gm, '').replace(/^>\s?/gm, '').replace(/^[-*]\s+/gm, '')
+    .replace(/^#{1,6}\s*/gm, '').replace(/^>\s?/gm, '').replace(/^[-*]\s+/gm, '')
     .replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1')
     .replace(/\s+/g, ' ').trim().slice(0, n)
 }

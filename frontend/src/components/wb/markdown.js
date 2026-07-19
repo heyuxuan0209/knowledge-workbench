@@ -25,9 +25,9 @@ export function renderMarkdown(md) {
   for (const ln of lines) {
     if (/^>\s?/.test(ln)) { flushList(); inQuote = true; quoteBuf.push(ln.replace(/^>\s?/, '')); continue }
     flushQuote()
-    if (/^###\s+/.test(ln)) { flushList(); html += '<h3>' + inline(ln.replace(/^###\s+/, '')) + '</h3>'; continue }
-    if (/^##\s+/.test(ln)) { flushList(); html += '<h2>' + inline(ln.replace(/^##\s+/, '')) + '</h2>'; continue }
-    if (/^#\s+/.test(ln)) { flushList(); html += '<h1>' + inline(ln.replace(/^#\s+/, '')) + '</h1>'; continue }
+    // 标题：容忍 # 后没有空格（AI 常写「###标题」）、以及 #### 及以上（并到 h3）
+    const hm = ln.match(/^(#{1,6})\s*(\S.*)$/)
+    if (hm) { flushList(); const lvl = Math.min(hm[1].length, 3); html += `<h${lvl}>` + inline(hm[2].trim()) + `</h${lvl}>`; continue }
     if (/^[-*]\s+/.test(ln)) { if (!inList) { html += '<ul>'; inList = true } html += '<li>' + inline(ln.replace(/^[-*]\s+/, '')) + '</li>'; continue }
     flushList()
     if (ln.trim() === '---' || ln.trim() === '') continue
