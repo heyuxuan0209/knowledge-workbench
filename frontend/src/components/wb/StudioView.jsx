@@ -16,8 +16,12 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [v2Mode, setV2Mode] = useState(false)
   const [genres, setGenres] = useState([])
   const [pforms, setPforms] = useState([])
-  const [v2Genre, setV2Genre] = useState('')
-  const [v2Pform, setV2Pform] = useState('')
+  const [v2Genre, setV2Genre] = useState('读书精读体')   // 默认=推荐
+  const [v2Pform, setV2Pform] = useState('gzh-long')
+  const [openDD, setOpenDD] = useState(null)            // 'genre' | 'platform' | null
+  const [combosOpen, setCombosOpen] = useState(false)
+  const gLabel = k => genres.find(g => g.key === k)?.label || k
+  const pLabel = k => pforms.find(p => p.key === k)?.label || k
   useEffect(() => {
     if (!v2Mode || genres.length) return
     ;(async () => {
@@ -197,37 +201,102 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </button>
       </div>
       {v2Mode && (
-        <div style={{ border: '1px dashed var(--line10)', borderRadius: 8, padding: 12, margin: '10px 0' }}>
-          <div style={{ fontSize: 12, color: 'var(--sub2)', marginBottom: 6 }}>① 从素材库挑要用的（已选 {selMat.size}）· 生成只用勾中的，不必先进主题</div>
-          <input value={matQ} onChange={e => setMatQ(e.target.value)} placeholder="搜索素材（标题 / 内容）…"
-            style={{ width: '100%', marginBottom: 8, padding: '6px 10px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)' }} />
-          <div style={{ maxHeight: 150, overflowY: 'auto', marginBottom: 12, border: '1px solid var(--line10)', borderRadius: 6, padding: '4px 8px' }}>
-            {matsShown.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '8px 2px' }}>{mats.length ? '没有匹配的素材' : '素材库为空 / 加载中…'}</div>}
-            {matsShown.map(m => (
-              <label key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0', fontSize: 12.5, cursor: 'pointer' }}>
-                <input type="checkbox" checked={selMat.has(m.id)} onChange={() => toggleMat(m.id)} style={{ marginTop: 3 }} />
-                <span><b style={{ color: 'var(--body)' }}>{m.sourceTitle}</b>{m.excerpt ? <span style={{ color: 'var(--faint)' }}> · {m.excerpt}</span> : null}</span>
-              </label>
-            ))}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--sub2)', marginBottom: 6 }}>② 选文体</div>
-          <div className="wb-seg">
-            {genres.map(g => (
-              <button key={g.key} className={`wb-seg-btn${v2Genre === g.key ? ' active' : ''}`} title={g.when || g.note}
-                onClick={() => setV2Genre(g.key)}>{g.label}</button>
-            ))}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '12px 0 6px' }}>③ 选平台形态</div>
-          <div className="wb-seg">
-            {pforms.map(p => (
-              <button key={p.key} className={`wb-seg-btn${v2Pform === p.key ? ' active' : ''}`} title={p.when || p.note}
-                onClick={() => setV2Pform(p.key)}>{p.label}</button>
-            ))}
-          </div>
-          <button className="wb-btn-primary" style={{ marginTop: 12 }} disabled={studio.busy || !v2Genre || !v2Pform}
-            onClick={genDraftV2}>
-            按「{genres.find(g => g.key === v2Genre)?.label || '文体'} × {pforms.find(p => p.key === v2Pform)?.label || '平台'}」生成
-          </button>
+        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '236px 1fr', border: '1px solid var(--line10)', borderRadius: 12, margin: '10px 0', background: 'var(--surface)', minHeight: 300 }}>
+          {/* 左：素材台（贯穿到底 + 改稿说明） */}
+          <aside style={{ borderRight: '1px solid var(--line08)', padding: 14, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 12, color: 'var(--sub2)', fontWeight: 600, marginBottom: 3 }}>素材（已选 {selMat.size}）</div>
+            <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 8 }}>从素材库挑，生成只用勾中的</div>
+            <input value={matQ} onChange={e => setMatQ(e.target.value)} placeholder="搜索素材…"
+              style={{ width: '100%', marginBottom: 8, padding: '6px 10px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)' }} />
+            <div style={{ flex: 1, minHeight: 120, maxHeight: 360, overflowY: 'auto', border: '1px solid var(--line10)', borderRadius: 6, padding: '4px 8px' }}>
+              {matsShown.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '8px 2px' }}>{mats.length ? '没有匹配的素材' : '素材库为空 / 加载中…'}</div>}
+              {matsShown.map(m => (
+                <label key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', fontSize: 12.5, cursor: 'pointer', borderBottom: '1px solid var(--line08)' }}>
+                  <input type="checkbox" checked={selMat.has(m.id)} onChange={() => toggleMat(m.id)} style={{ marginTop: 3 }} />
+                  <span><b style={{ color: 'var(--body)' }}>{m.sourceTitle}</b>{m.excerpt ? <span style={{ color: 'var(--faint)' }}> · {m.excerpt}</span> : null}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line08)', fontSize: 11, color: 'var(--sub2)', lineHeight: 1.55 }}>
+              <b style={{ color: 'var(--sub)' }}>右侧「创作助手」= 改稿</b><br />起稿在中间；某段不满意，选中它用底部「审稿 / 改一段」调。
+            </div>
+          </aside>
+
+          {/* 右：推荐卡 + 换文体/换平台/更多组合 */}
+          <section style={{ padding: 14 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 9 }}>
+              {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议：` : '勾选左侧素材后，按下面的组合生成：'}
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1.9, border: '1px solid rgba(61,90,128,.35)', borderRadius: 11, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <span style={{ fontSize: 10.5, color: 'var(--accent)', background: 'rgba(61,90,128,.09)', borderRadius: 5, padding: '2px 7px' }}>推荐</span>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 15.5, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{gLabel(v2Genre)} · {pLabel(v2Pform)}</h3>
+                </div>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>用「{gLabel(v2Genre)}」的骨架 +「{pLabel(v2Pform)}」的形态起稿；想换见下面「换文体 / 换平台」。</p>
+                <button className="wb-btn-primary" disabled={studio.busy || selMat.size === 0} onClick={genDraftV2}>用这个生成</button>
+              </div>
+              <div style={{ flex: 1, border: '1px solid var(--line10)', borderRadius: 11, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <span style={{ fontSize: 10.5, color: 'var(--sub2)', background: 'var(--line07)', borderRadius: 5, padding: '2px 7px' }}>备选</span>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>读书精读体 · 小红书卡片</h3>
+                </div>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>拆成收藏卡，接图卡工具。</p>
+                <button className="wb-btn-ghost" onClick={() => { setV2Genre('读书精读体'); setV2Pform('xhs-card') }}>选它</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 12.5, color: 'var(--sub)' }}>
+              <div style={{ position: 'relative' }}>
+                <span style={{ cursor: 'pointer' }} onClick={() => { setCombosOpen(false); setOpenDD(openDD === 'genre' ? null : 'genre') }}>换文体 ▾</span>
+                {openDD === 'genre' && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 10, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 5, minWidth: 180 }}>
+                    {genres.map(g => (
+                      <div key={g.key} onClick={() => { setV2Genre(g.key); setOpenDD(null) }}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: v2Genre === g.key ? 'var(--accent)' : 'var(--body)', background: v2Genre === g.key ? 'rgba(61,90,128,.07)' : 'transparent' }}>
+                        {g.label}{g.key === '读书精读体' && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(61,90,128,.11)', borderRadius: 4, padding: '1px 6px' }}>推荐</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ position: 'relative' }}>
+                <span style={{ cursor: 'pointer' }} onClick={() => { setCombosOpen(false); setOpenDD(openDD === 'platform' ? null : 'platform') }}>换平台 ▾</span>
+                {openDD === 'platform' && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 10, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 5, minWidth: 170, maxHeight: 260, overflowY: 'auto' }}>
+                    {pforms.map(p => (
+                      <div key={p.key} onClick={() => { setV2Pform(p.key); setOpenDD(null) }}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: v2Pform === p.key ? 'var(--accent)' : 'var(--body)', background: v2Pform === p.key ? 'rgba(61,90,128,.07)' : 'transparent' }}>
+                        {p.label}{p.key === 'gzh-long' && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(61,90,128,.11)', borderRadius: 4, padding: '1px 6px' }}>推荐</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span style={{ cursor: 'pointer' }} onClick={() => { setOpenDD(null); setCombosOpen(o => !o) }}>更多组合 ▾</span>
+            </div>
+
+            {combosOpen && (
+              <div style={{ marginTop: 12, border: '1px solid var(--line10)', borderRadius: 11, padding: 13, background: 'var(--brief-bg)' }}>
+                <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 7 }}>文体</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+                  {genres.map(g => (
+                    <span key={g.key} onClick={() => setV2Genre(g.key)}
+                      style={{ border: '1px solid var(--line10)', background: v2Genre === g.key ? 'var(--accent)' : 'var(--surface)', color: v2Genre === g.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{g.label}</span>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 7 }}>平台形态</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                  {pforms.map(p => (
+                    <span key={p.key} onClick={() => setV2Pform(p.key)}
+                      style={{ border: '1px solid var(--line10)', background: v2Pform === p.key ? 'var(--accent)' : 'var(--surface)', color: v2Pform === p.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{p.label}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {openDD && <div onClick={() => setOpenDD(null)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />}
         </div>
       )}
 
@@ -252,7 +321,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 
       {studio.platform === 'xhs' && (
         <div style={{ display: 'flex', gap: 6, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>
-          {[['text', '✍️ 文案'], ['cards', '🖼 卡片图']].map(([m, label]) => (
+          {[['text', '文案'], ['cards', '卡片图']].map(([m, label]) => (
             <button key={m} className={xhsMode === m ? 'wb-btn-primary' : 'wb-btn-outline'}
               onClick={() => { setXhsMode(m); if (m === 'cards') setTimeout(postDraftToCards, 80) }}>{label}</button>
           ))}
@@ -274,7 +343,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </div>
       )}
 
-      {isEmpty && (
+      {isEmpty && !v2Mode && (
         <div className="wb-guide">
           <div className="wb-guide-steps">
             <span className="wb-guide-step on"><span className="n">1</span>起稿<span className="cap">你在这</span></span>
@@ -286,7 +355,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <button className="wb-btn-primary" disabled={studio.busy} onClick={() => genDraft()}
               style={{ fontSize: 15, padding: '12px 26px' }}>
-              {studio.busy ? '生成中…' : `✍️ 生成${selPlatform?.label || ''}初稿`}
+              {studio.busy ? '生成中…' : `生成${selPlatform?.label || ''}初稿`}
             </button>
             <span style={{ fontSize: 12.5, color: 'var(--sub2)' }}>或直接在下面空白处自己写</span>
           </div>
@@ -309,41 +378,47 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </div>
       )}
 
-      {!isEmpty && (<>
+      {(!isEmpty || v2Mode) && (<>
+      {/* 方案2b：左侧次级（改/存）+ 右侧 context-aware 主行动（文字→复制全文 / 卡片→生成图文卡片）；无 emoji。试新版下常驻，空稿时打磨/产出键置灰 */}
       <div className="wb-studio-actions">
-        <button className="wb-btn-primary" onClick={saveDraft}>{studio.draftId ? '保存修改' : '保存草稿'}</button>
-        <span className="wb-studio-sep" />
-        <button className="wb-btn-outline" disabled={studio.busy} title="整篇改得更顺更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断"
+        <button className="wb-btn-outline" disabled={studio.busy} title="用同样的素材·文体·平台再出一版"
+          onClick={() => v2Mode ? genDraftV2() : genDraft()}>{isEmpty ? '生成' : '重新生成'}</button>
+        <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title="整篇改得更顺更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断"
           onClick={humanizeDraft}>润色</button>
-        <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy}
-          title="三个批评视角（挑剔读者/结构编辑/事实核查）通读全稿，给出具体批注——只批注不改稿"
+        <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy || isEmpty}
+          title="三个批评视角通读全稿，给出批注——只批注不改稿"
           onClick={critiqueDraft}>{critiqueBusy ? '审稿中…' : '审稿'}</button>
-        <button className="wb-btn-outline" disabled={variantsBusy || studio.busy}
-          title="选中草稿里的一段，给 3 个策略不同的改法（更锋利/更具体/更简洁）供挑选"
+        <button className="wb-btn-outline" disabled={variantsBusy || studio.busy || isEmpty}
+          title="选中一段，给 3 个策略不同的改法"
           onClick={makeVariants}>{variantsBusy ? '生成中…' : '改一段'}</button>
         {studio.prevDraft && (
           <button className="wb-btn-ghost" title="改写前后两版互换" onClick={undoRewrite}>撤销改写</button>
         )}
         <span className="wb-studio-sep" />
+        <button className="wb-btn-ghost" disabled={isEmpty} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
         <div className="wb-more-wrap">
-          <button className="wb-btn-ghost" onClick={() => setMoreOpen(o => !o)}>⋯ 更多</button>
+          <button className="wb-btn-ghost" onClick={() => setMoreOpen(o => !o)}>更多</button>
           {moreOpen && (<>
             <div className="wb-more-backdrop" onClick={() => setMoreOpen(false)} />
             <div className="wb-more-menu">
-              <button className="wb-more-item" disabled={studio.busy}
-                onClick={() => { setMoreOpen(false); genDraft() }}>↻ 重新生成</button>
-              {studio.platform === 'long' && (
-                <button className="wb-more-item" onClick={() => { setMoreOpen(false); suggestTitles() }}>✎ 标题候选</button>
-              )}
-              <button className="wb-more-item" onClick={() => { setMoreOpen(false); copyAll() }}>⧉ 复制全文</button>
               <button className="wb-more-item" title="导出发布版：溯源标记转文末来源列表"
-                onClick={() => { setMoreOpen(false); exportMd() }}>↧ 导出 Markdown</button>
+                onClick={() => { setMoreOpen(false); exportMd() }}>导出 Markdown</button>
+              {(v2Mode ? (v2Pform === 'gzh-long' || v2Pform === 'xhs-long') : studio.platform === 'long') && (
+                <button className="wb-more-item" onClick={() => { setMoreOpen(false); suggestTitles() }}>标题候选</button>
+              )}
               {studio.draftId && (
-                <button className="wb-more-item danger" onClick={() => { setMoreOpen(false); deleteCurrentDraft() }}>🗑 删除草稿</button>
+                <button className="wb-more-item danger" onClick={() => { setMoreOpen(false); deleteCurrentDraft() }}>删除草稿</button>
               )}
             </div>
           </>)}
         </div>
+        <span style={{ marginLeft: 'auto' }} />
+        {(v2Mode ? (v2Pform || '').includes('card') : studio.platform === 'xhs') ? (
+          <button className="wb-btn-primary" disabled={isEmpty} title="把卡片文字渲染成图（复用图卡工具）"
+            onClick={() => { if (studio.platform === 'xhs') { setXhsMode('cards'); setTimeout(postDraftToCards, 80) } else { showToast('图卡工具接入中（阶段4）') } }}>生成图文卡片</button>
+        ) : (
+          <button className="wb-btn-primary" disabled={isEmpty} onClick={copyAll}>复制全文</button>
+        )}
       </div>
       <div className="wb-studio-hint">想让 AI 按你的意思改，用右侧「创作助手」：例如「开头更犀利」「压到 5 条」「加一个反方观点」。</div>
       </>)}
@@ -358,7 +433,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       {critique && (
         <div className="wb-card" style={{ marginTop: 12, padding: '14px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="wb-card-label" style={{ flex: 'none' }}>🧐 审稿批注（{critique.points.length}）</span>
+            <span className="wb-card-label" style={{ flex: 'none' }}>审稿批注（{critique.points.length}）</span>
             <span style={{ fontSize: 12.5, color: 'var(--sub2)', flex: 1 }}>{critique.verdict}</span>
             <button className="wb-note-del" style={{ flex: 'none' }} title="关闭批注" onClick={() => setCritique(null)}>✕</button>
           </div>
