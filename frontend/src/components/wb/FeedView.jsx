@@ -108,7 +108,7 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
 export default function FeedView({
   contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile,
   generateReport, generating, setPage, setNotesTab, syncing, syncAllSources,
-  toggleStar, showToast, loadNotes,
+  toggleStar, showToast, loadNotes, setReturnPage,
 }) {
   const [acquireVal, setAcquireVal] = useState('')
   const [ingesting, setIngesting] = useState(false)
@@ -128,6 +128,8 @@ export default function FeedView({
   const [mainTab, setMainTab] = useState('articles') // 'articles' | 'projects'（UI 改造：文章/AI项目分开）
   const [airHint, setAirHint] = useState(() => !localStorage.getItem('wb-seen-airead-hint')) // 「AI 精读」首次说明气泡
   const dismissAirHint = () => { localStorage.setItem('wb-seen-airead-hint', '1'); setAirHint(false) }
+  const [leadOpen, setLeadOpen] = useState(() => localStorage.getItem('wb-ov-lead-collapsed') !== '1') // 概览两栏领起句可折叠
+  const toggleLead = () => setLeadOpen(o => { localStorage.setItem('wb-ov-lead-collapsed', o ? '1' : '0'); return !o })
 
   // Feed 搜索 + 星标过滤（2026-07-16 反馈 #2：被新内容推下去的条目要找得回来）。
   // 与素材库同款：有筛选时走后端 SQL（不是只筛已加载的 30 条），无筛选回全局列表
@@ -256,9 +258,14 @@ export default function FeedView({
         {/* 一句话总结（露出日报导语，此前藏着；UI 改造 2a） */}
         {report?.summary && <div className="wb-lead">一句话总结：<b>{report.summary}</b></div>}
 
-        {recs.length > 0 && (
-          <div className="wb-ov-lead">左边是<b>今天多个信息源都在说的热点</b>，右边是<b>按你关注的主题挑给你的</b>——一个看大盘、一个看你自己。</div>
-        )}
+        {recs.length > 0 && (leadOpen ? (
+          <div className="wb-ov-lead">
+            左边是<b>今天多个信息源都在说的热点</b>，右边是<b>按你关注的主题挑给你的</b>——一个看大盘、一个看你自己。
+            <button className="wb-ov-lead-x" title="收起说明" onClick={toggleLead}>收起 ▴</button>
+          </div>
+        ) : (
+          <button className="wb-ov-lead-toggle" onClick={toggleLead}>两栏有啥区别？▾</button>
+        ))}
         <div className={recs.length ? 'wb-ov-cols' : ''}>
         <div>
         <div className="wb-brief-label">今日热点 · 多个信息源都在说</div>
@@ -318,7 +325,7 @@ export default function FeedView({
         {report ? (
           // 选题入口 + 行业动态跳转（行业动态不再在此重复列 item，只留一句+跳 AI HOT，去重）
           <div className="wb-ov-foot">
-            <button className="wb-brief-link" onClick={() => { setNotesTab?.('ideas'); setPage('notes') }}>
+            <button className="wb-brief-link" onClick={() => { setReturnPage?.('feed'); setNotesTab?.('ideas'); setPage('notes') }}>
               选题建议 {ideas.length} 条 → 去素材库
             </button>
             <a className="wb-brief-link" style={{ marginLeft: 'auto' }} href="https://aihot.virxact.com/daily" target="_blank" rel="noreferrer"

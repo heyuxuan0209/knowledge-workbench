@@ -709,7 +709,7 @@ export default function WorkbenchPage() {
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, platforms, genDraft: (...a) => genDraftRef.current(...a), exportMd,
     drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, suggestTitles,
-    highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack,
+    highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack, setReturnPage,
   }
 
   return (

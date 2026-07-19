@@ -616,6 +616,10 @@ input, textarea { font-family: inherit; }
 /* 资讯今日概览：两栏领起句（点破 热度 vs 相关） */
 .wb-ov-lead{ font-size:12.5px; background:var(--surface); border-left:3px solid var(--accent); padding:7px 12px; border-radius:0 6px 6px 0; margin:2px 0 14px; color:var(--body2); line-height:1.6; }
 .wb-ov-lead b{ color:var(--body); }
+.wb-ov-lead-x{ margin-left:8px; background:none; border:none; color:var(--sub2); font-size:11.5px; cursor:pointer; white-space:nowrap; }
+.wb-ov-lead-x:hover{ color:var(--accent); }
+.wb-ov-lead-toggle{ background:none; border:none; color:var(--sub); font-size:12px; cursor:pointer; padding:0 0 10px; }
+.wb-ov-lead-toggle:hover{ color:var(--accent); }
 /* 资讯列表工具条：文章/项目 + 筛选/搜索/计数/同步 合并一条，贴住网格 */
 .wb-list-toolbar{ flex-wrap:wrap; gap:12px; }
 .wb-tb-sep{ width:1px; height:20px; background:var(--line14); flex:none; }
