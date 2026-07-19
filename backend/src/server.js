@@ -920,6 +920,16 @@ app.get('/api/notes/:id/related', async (req, res) => {
   }
 });
 
+// 语义补归类建议：每条素材语义贴合、但还没标的主题（漏归/多主题提示）
+app.get('/api/notes/topic-suggestions', async (req, res) => {
+  try {
+    const { suggestTopicsForAllNotes } = await import('./services/topic-suggest.js');
+    res.json({ success: true, data: await suggestTopicsForAllNotes() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 疑似重复素材分组（VISION-V4 阶段1b，查重）
 app.get('/api/notes/duplicates', async (req, res) => {
   try {

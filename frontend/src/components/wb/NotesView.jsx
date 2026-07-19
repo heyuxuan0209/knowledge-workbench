@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { timeAgo, STANCE_COLORS, STANCE_CN, api } from './util'
 import { IconClip, IconExternal, IconTrash } from './Icons'
+import { renderMarkdown } from './markdown'
 
 // 素材库（2026-07-16 反馈改版）：双 Tab——
 // 「我的素材」：聚合建议条（AI 提议哪些放一起+为什么）→ 未归类收件箱 → 按主题分组；
@@ -18,6 +19,7 @@ export default function NotesView({
   notes, loadNotes, loadTopics, loadBrief, showToast, highlightNoteId, setHighlightNoteId,
   returnPage, goBack, topics = [], report, upgradeIdea, createFromIdea,
   notesTab = 'mine', setNotesTab, toggleSelectNote, selectedItems = [],
+  setPage, setStudio, gotoTopic,
 }) {
   const [keyword, setKeyword] = useState('')
   const [searchMode, setSearchMode] = useState('semantic') // 'keyword' | 'semantic'（默认语义：模糊需求也能找到）
@@ -27,7 +29,17 @@ export default function NotesView({
   const [ctypeFilter, setCtypeFilter] = useState('')
   const [sourceOptions, setSourceOptions] = useState([])
   const [results, setResults] = useState(null) // null = 无筛选，展示全局列表
+  const [expandedNotes, setExpandedNotes] = useState(() => new Set()) // 展开看全文的素材（默认折叠成摘要）
+  const [showAllTopics, setShowAllTopics] = useState(false) // 主题 chips 瘦身：默认藏零散的单条主题
+  const [ovOpen, setOvOpen] = useState(() => localStorage.getItem('wb-notes-ov-collapsed') !== '1') // 素材概览默认展开
+  const [topicSug, setTopicSug] = useState({}) // 语义补归类：noteId -> [{topicId,name,score}]（贴合但没标的主题）
   const highlightRef = useRef(null)
+  const toggleExpand = (id) => setExpandedNotes(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  const toggleOv = () => setOvOpen(o => { localStorage.setItem('wb-notes-ov-collapsed', o ? '1' : '0'); return !o })
+  const startCreation = (t) => {
+    setStudio?.(s => ({ ...s, source: `Topic：${t.name}`, sourceTopicId: t.id, platform: 'long', draft: '', draftId: null, title: null, refs: [], paragraphRefs: [] }))
+    setPage?.('studio')
+  }
 
   useEffect(() => {
     api('/api/notes/sources').then(j => setSourceOptions(j.data || [])).catch(() => {})
@@ -99,6 +111,23 @@ export default function NotesView({
     } catch (err) { showToast(`归类失败：${err.message}`) }
   }
 
+  // 接受一条语义补归类建议：归入 + 从建议里移除
+  const acceptSug = async (note, s) => {
+    await assignTopic(note, s.topicId)
+    setTopicSug(prev => {
+      const c = { ...prev }
+      c[note.id] = (c[note.id] || []).filter(x => x.topicId !== s.topicId)
+      if (!c[note.id].length) delete c[note.id]
+      return c
+    })
+  }
+  const dismissSug = (note, s) => setTopicSug(prev => {
+    const c = { ...prev }
+    c[note.id] = (c[note.id] || []).filter(x => x.topicId !== s.topicId)
+    if (!c[note.id].length) delete c[note.id]
+    return c
+  })
+
   // ---- 1b 知识关联：某条素材的相关素材（按需拉取，复用向量） ----
   const [relatedOpen, setRelatedOpen] = useState(null)  // 展开了哪条的相关列表
   const [relatedMap, setRelatedMap] = useState({})      // noteId -> related[]（缓存）
@@ -147,6 +176,11 @@ export default function NotesView({
       .then(j => setClusters((j.data || []).filter(s => !dismissed().includes(clusterKey(s)))))
       .catch(() => {})
   }, [notes]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 语义补归类建议（贴合但没标的主题）：约 3-4s，异步拉，不阻塞页面
+  useEffect(() => {
+    api('/api/notes/topic-suggestions').then(j => setTopicSug(j.data?.suggestions || {})).catch(() => {})
+  }, [notes.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dismissCluster = (sug) => {
     localStorage.setItem(DISMISS_KEY, JSON.stringify([...dismissed(), clusterKey(sug)].slice(-50)))
@@ -219,6 +253,23 @@ export default function NotesView({
   notes.forEach(n => (n.topic_ids || '').split(',').filter(Boolean).forEach(id => { topicCount[id] = (topicCount[id] || 0) + 1 }))
   const inboxCount = notes.filter(n => !(n.topic_ids || '').trim()).length
 
+  // ---- 素材概览（进页面就看全景，降搜索/注意力成本）----
+  const topicsByCount = [...topics].sort((a, b) => (b.note_count || 0) - (a.note_count || 0))
+  const mainTopics = topicsByCount.filter(t => (t.note_count || 0) >= 2)
+  const scatterCount = topicsByCount.length - mainTopics.length
+  const pendingTotal = topics.reduce((a, t) => a + (t.pending_count || 0), 0)
+  const topPending = [...topics].filter(t => (t.pending_count || 0) > 0).sort((a, b) => b.pending_count - a.pending_count)[0]
+  const readyTopic = topicsByCount.find(t => topicState(t).ready)
+  const nextStep = readyTopic
+    ? { text: <>从《<b>{readyTopic.name}</b>》开始创作——素材最足、综述已成型</>, cta: '开始创作', act: () => startCreation(readyTopic) }
+    : topPending
+      ? { text: <>《<b>{topPending.name}</b>》有 {topPending.pending_count} 条待并入，去把综述更新一版</>, cta: '去主题', act: () => gotoTopic?.(topPending.id) }
+      : inboxCount > 3
+        ? { text: <>先把 <b>{inboxCount}</b> 条未归类整理好，主题才成型</>, cta: '看未归类', act: () => { setNotesTab?.('mine'); setTopicFilter('__none__') } }
+        : clusters.length
+          ? { text: <>有 {clusters.length} 组零散素材可以聚成新主题</>, cta: null, act: null }
+          : { text: <>继续攒——某主题攒到 5 条且综述成型，就能开写了</>, cta: null, act: null }
+
   // 无筛选时按主题分组：素材可属多主题——按第一主题归组避免重复卡片；未归类置顶当收件箱
   const groups = []
   if (!hasFilter) {
@@ -240,7 +291,7 @@ export default function NotesView({
         <button className="wb-back" onClick={goBack}>← 返回{PAGE_LABEL[returnPage] || '上一页'}</button>
       )}
       <div className="wb-page-title">素材库</div>
-      <div className="wb-page-sub">{notes.length} 张素材卡片 · AI 对话「保存到笔记」/ 精读弹窗「存为素材」沉淀 · 创作台按段引用</div>
+      <div className="wb-page-sub">你从资讯/精读里存下来的 {notes.length} 条有价值内容——可搜索、按主题归类，右侧问整个素材库，创作时引用。</div>
 
       <div className="wb-seg-toggle" style={{ margin: '10px 0 4px', display: 'inline-flex' }}>
         <button className={notesTab === 'mine' ? 'active' : ''} onClick={() => setNotesTab?.('mine')}>我的素材</button>
@@ -284,6 +335,45 @@ export default function NotesView({
 
       {notesTab === 'mine' && (
         <>
+          {/* 素材概览：一进页面就看全景——围绕哪几个主题、到什么地步、下一步从哪开始 */}
+          {topics.length > 0 && (
+            <div className="wb-ov-card">
+              <div className="wb-ov-head" onClick={toggleOv}>
+                <span className="wb-ov-title">素材概览</span>
+                <span className="wb-ov-metaline">{notes.length} 条素材 · 聚在 {mainTopics.length} 个主要主题{scatterCount > 0 ? ` (+${scatterCount} 个零散)` : ''}</span>
+                <span className="wb-ov-toggle">{ovOpen ? '收起 ▴' : '展开 ▾'}</span>
+              </div>
+              {ovOpen && (
+                <div className="wb-ov-inner">
+                  <div className="wb-ov-topics">
+                    {mainTopics.slice(0, 6).map(t => { const st = topicState(t); return (
+                      <button key={t.id} className="wb-ov-topic" onClick={() => setTopicFilter(topicFilter === t.id ? '' : t.id)} title="只看这个主题的素材">
+                        <span className="wb-ov-tn">{t.name.slice(0, 14)}</span>
+                        <span className="wb-ov-tc">{t.note_count}</span>
+                        <span className="wb-pill" style={{ fontSize: 10, color: st.fg, background: st.bg }}>{st.label}</span>
+                        {t.pending_count > 0 && <span className="wb-pill" style={{ fontSize: 10, color: '#8a6a1a', background: 'rgba(169,121,31,.12)' }}>{t.pending_count} 待并入</span>}
+                      </button>
+                    ) })}
+                  </div>
+                  {(inboxCount > 0 || pendingTotal > 0 || clusters.length > 0 || Object.keys(topicSug).length > 0) && (
+                    <div className="wb-ov-todo">
+                      待处理：
+                      {inboxCount > 0 && <button className="wb-brief-link" onClick={() => setTopicFilter('__none__')}>{inboxCount} 条未归类</button>}
+                      {pendingTotal > 0 && <span> · {pendingTotal} 条待并入</span>}
+                      {Object.keys(topicSug).length > 0 && <span> · <b style={{ color: 'var(--accent)' }}>{Object.keys(topicSug).length} 条可能漏归了主题</b>（卡片上一键补）</span>}
+                      {clusters.length > 0 && <span> · {clusters.length} 组可聚成新主题</span>}
+                    </div>
+                  )}
+                  <div className="wb-ov-next">
+                    <span className="wb-ov-next-lbl">下一步</span>
+                    <span className="wb-ov-next-text">{nextStep.text}</span>
+                    {nextStep.cta && <button className="wb-btn-primary" style={{ padding: '5px 14px', fontSize: 12, marginLeft: 'auto', flexShrink: 0 }} onClick={nextStep.act}>{nextStep.cta} →</button>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="wb-filterbar">
             <div className="wb-seg-toggle" style={{ flexShrink: 0 }} title="语义：按意思找（模糊需求也能命中）；关键词：按字面匹配">
               <button className={searchMode === 'semantic' ? 'active' : ''}
@@ -330,12 +420,26 @@ export default function NotesView({
               <button className={`wb-topic-chip${topicFilter === '__none__' ? ' active' : ''}`} onClick={() => setTopicFilter('__none__')}>
                 未归类{inboxCount ? `（${inboxCount}）` : ''}
               </button>
-              {topics.map(t => (
-                <button key={t.id} className={`wb-topic-chip${topicFilter === t.id ? ' active' : ''}`}
-                  onClick={() => setTopicFilter(topicFilter === t.id ? '' : t.id)} title={t.name}>
-                  {t.name.slice(0, 12)}{topicCount[t.id] ? `（${topicCount[t.id]}）` : ''}
-                </button>
-              ))}
+              {(() => {
+                // 瘦身：按素材数降序，默认只显示有量的（≥2）主题，零散单条藏进「更多」
+                const sorted = [...topics].sort((a, b) => (topicCount[b.id] || 0) - (topicCount[a.id] || 0))
+                const primary = showAllTopics ? sorted : sorted.filter(t => (topicCount[t.id] || 0) >= 2 || t.id === topicFilter)
+                const hidden = sorted.length - primary.length
+                return (<>
+                  {primary.map(t => (
+                    <button key={t.id} className={`wb-topic-chip${topicFilter === t.id ? ' active' : ''}`}
+                      onClick={() => setTopicFilter(topicFilter === t.id ? '' : t.id)} title={t.name}>
+                      {t.name.slice(0, 12)}{topicCount[t.id] ? `（${topicCount[t.id]}）` : ''}
+                    </button>
+                  ))}
+                  {!showAllTopics && hidden > 0 && (
+                    <button className="wb-topic-chip" onClick={() => setShowAllTopics(true)}>更多 {hidden} 个 ▾</button>
+                  )}
+                  {showAllTopics && (
+                    <button className="wb-topic-chip" onClick={() => setShowAllTopics(false)}>收起 ▴</button>
+                  )}
+                </>)
+              })()}
             </div>
           )}
           {hasFilter && results !== null && (
@@ -454,11 +558,38 @@ export default function NotesView({
             <button className="wb-note-del" style={{ marginLeft: 6, fontSize: 11 }} title="修改标题" onClick={() => renameNote(note)}>✎</button>
           </div>
         )}
-        <div className="wb-note-excerpt">{note.excerpt}</div>
+        {(() => {
+          const long = (note.excerpt || '').length > 200
+          const open = expandedNotes.has(note.id)
+          if (!long) return <div className="wb-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(note.excerpt) }} />
+          return (
+            <div>
+              {open
+                ? <div className="wb-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(note.excerpt) }} />
+                : <div className="wb-note-excerpt">{plainPreview(note.excerpt, 180)}…</div>}
+              <button className="wb-note-jump" style={{ padding: 0, marginTop: 6 }} onClick={() => toggleExpand(note.id)}>
+                {open ? '收起 ▴' : '展开全文 ▾'}
+              </button>
+            </div>
+          )
+        })()}
         {keywords.length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
             {keywords.map(k => (
               <button key={k} className="wb-chip" title="点击搜索该关键词" onClick={() => setKeyword(k)}>{k}</button>
+            ))}
+          </div>
+        )}
+        {/* 语义补归类建议：AI 觉得它还贴合、但你没标的主题（治凭感性漏归） */}
+        {topicSug[note.id]?.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
+            <span style={{ color: 'var(--accent)' }}>AI 觉得还贴合：</span>
+            {topicSug[note.id].map(s => (
+              <span key={s.topicId} className="wb-pill" style={{ color: '#3d5a80', background: 'rgba(61,90,128,.08)', border: '1px dashed rgba(61,90,128,.4)', gap: 4 }}>
+                <button className="wb-topic-pill-x" style={{ color: '#3d5a80' }} title={`归入《${s.name}》`} onClick={() => acceptSug(note, s)}>＋</button>
+                {s.name.slice(0, 14)}
+                <button className="wb-topic-pill-x" title="不对，忽略" onClick={() => dismissSug(note, s)}>×</button>
+              </span>
             ))}
           </div>
         )}
@@ -527,6 +658,26 @@ export default function NotesView({
       </div>
     )
   }
+}
+
+// 主题成熟度（素材概览：告诉用户每个主题到什么地步了）
+function topicState(t) {
+  let cur = ''
+  try { const b = typeof t.body === 'string' ? JSON.parse(t.body || '{}') : (t.body || {}); cur = (b.current || '').trim() } catch { /* noop */ }
+  const hasSyn = cur.length > 60 // 真综述才算，10 字的占位 stub 不算"成型"
+  const n = t.note_count || 0
+  if (n >= 5 && hasSyn) return { label: '够写一篇', fg: '#3f7350', bg: 'rgba(63,115,80,.14)', ready: true }
+  if (n >= 3 && hasSyn) return { label: '综述成型', fg: '#3d5a80', bg: 'rgba(61,90,128,.12)' }
+  if (n >= 1) return { label: '攒素材中', fg: '#8a6a1a', bg: 'rgba(169,121,31,.12)' }
+  return { label: '刚起步', fg: '#8a8478', bg: 'rgba(33,31,26,.06)' }
+}
+
+// 折叠预览：剥掉 markdown 符号，取首段纯文本（素材页急救：卡片不再倒整篇原文）
+function plainPreview(md, n) {
+  return String(md || '')
+    .replace(/^#{1,6}\s+/gm, '').replace(/^>\s?/gm, '').replace(/^[-*]\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1')
+    .replace(/\s+/g, ' ').trim().slice(0, n)
 }
 
 function safeParseKeywords(s) {
