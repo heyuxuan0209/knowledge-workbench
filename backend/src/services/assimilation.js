@@ -27,7 +27,7 @@ function buildPrompt(topic, body, notes) {
 
 # 主题页现状
 ## 当前认知
-${body.current || '（空白——这是第一次并入素材，请从零写出综述）'}
+${body.current || '（空白——这是第一次收进素材，请从零写出综述）'}
 
 ## 各方观点
 ${viewsBlock}
@@ -35,7 +35,7 @@ ${viewsBlock}
 ## 共识 / 非共识
 ${body.consensus || '（暂无）'}
 
-# 新并入的素材
+# 新收进的素材
 ${notesBlock}
 
 请把新素材同化进主题页：补充新证据、修正过时论断、标记观点冲突。输出 JSON（不要 markdown 代码块）：
@@ -45,13 +45,13 @@ ${notesBlock}
     { "who": "观点方（人名/机构，来自素材或原有观点）", "what": "观点一句话", "ref": "来源短标（素材来源名）", "conflict": false }
   ],
   "consensus": "更新后的共识/非共识描述（150字内，用'共识：…'和'非共识：…'两段）",
-  "changelog": "本次修订的一句话说明（40字内，说清并入了什么、改了什么）",
+  "changelog": "本次修订的一句话说明（40字内，说清收进了什么、改了什么）",
   "hasConflict": false
 }
 
 要求：
 - views 合并新旧观点，同一方的观点更新为最新表述，上限 8 条；互相矛盾的观点把 conflict 设为 true
-- hasConflict：本次并入是否引入了与已有认知矛盾的论断
+- hasConflict：本次收进是否引入了与已有认知矛盾的论断
 - 不得编造素材里没有的信息；全部用中文`;
 }
 
@@ -138,10 +138,10 @@ export async function assimilate(topicId, noteIds = null, minRelevance = 0) {
     sql += ` AND n.id IN (${noteIds.map(() => '?').join(',')})`;
     params.push(...noteIds);
   }
-  // 单次并入上限 10 条：控制 prompt 长度与单次成本，剩余的下次再并
+  // 单次收进上限 10 条：控制 prompt 长度与单次成本，剩余的下次再收
   const notes = db.prepare(sql + ' ORDER BY nt.created_at LIMIT 10').all(...params);
 
-  if (notes.length === 0) { db.close(); return { success: false, error: '没有待并入的素材' }; }
+  if (notes.length === 0) { db.close(); return { success: false, error: '没有待收进的素材' }; }
 
   let body;
   try { body = { ...EMPTY_BODY, ...JSON.parse(topic.body || '{}') }; } catch { body = { ...EMPTY_BODY }; }
@@ -174,7 +174,7 @@ export async function assimilate(topicId, noteIds = null, minRelevance = 0) {
       : body.views,
     consensus: typeof parsed.consensus === 'string' ? parsed.consensus : body.consensus,
   };
-  const summary = (parsed.changelog || `并入 ${notes.length} 条素材，更新综述`).slice(0, 120);
+  const summary = (parsed.changelog || `收进 ${notes.length} 条素材，更新综述`).slice(0, 120);
   const changeType = parsed.hasConflict ? 'conflict' : 'assimilated';
 
   db.exec('BEGIN');

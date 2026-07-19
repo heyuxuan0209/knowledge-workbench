@@ -7,7 +7,7 @@ import { renderMarkdown } from './markdown'
 // 「我的素材」：聚合建议条（AI 提议哪些放一起+为什么）→ 未归类收件箱 → 按主题分组；
 // 「选题建议 · AI」：从 Feed 简报迁来（折叠在简报里被遮挡没意义），
 //   含支撑素材聚合，逐条可移除（用户裁决 AI 的聚合结果）。
-// 素材卡：类型徽章（GitHub 项目/文章/视频）+ 关键词标签 + 归入主题 + 选中分析。
+// 素材卡：类型徽章（GitHub 项目/文章/视频）+ 关键词标签 + 归入主题 + 选中解读。
 
 const PAGE_LABEL = { studio: '创作台', topics: '主题库', feed: '资讯', reports: '周报' }
 const CTYPE_BADGE = {
@@ -105,7 +105,7 @@ export default function NotesView({
         loadTopics?.()
       }
       await api(`/api/notes/${note.id}/topics`, { method: 'POST', body: { topicId } })
-      showToast('已归入主题（AI 会把它并入主题综述）')
+      showToast('已归入主题（AI 会把它收进主题综述）')
       loadNotes()
       fetchFiltered()
     } catch (err) { showToast(`归类失败：${err.message}`) }
@@ -263,7 +263,7 @@ export default function NotesView({
   const nextStep = readyTopic
     ? { text: <>从《<b>{readyTopic.name}</b>》开始创作——素材最足、综述已成型</>, cta: '开始创作', act: () => startCreation(readyTopic) }
     : topPending
-      ? { text: <>《<b>{topPending.name}</b>》有 {topPending.pending_count} 条待并入，去把综述更新一版</>, cta: '去主题', act: () => gotoTopic?.(topPending.id) }
+      ? { text: <>《<b>{topPending.name}</b>》有 {topPending.pending_count} 条待收进，去把综述更新一版</>, cta: '去主题', act: () => gotoTopic?.(topPending.id) }
       : inboxCount > 3
         ? { text: <>先把 <b>{inboxCount}</b> 条未归类整理好，主题才成型</>, cta: '看未归类', act: () => { setNotesTab?.('mine'); setTopicFilter('__none__') } }
         : clusters.length
@@ -351,7 +351,7 @@ export default function NotesView({
                         <span className="wb-ov-tn">{t.name.slice(0, 14)}</span>
                         <span className="wb-ov-tc">{t.note_count}</span>
                         <span className="wb-pill" style={{ fontSize: 10, color: st.fg, background: st.bg }}>{st.label}</span>
-                        {t.pending_count > 0 && <span className="wb-pill" style={{ fontSize: 10, color: '#8a6a1a', background: 'rgba(169,121,31,.12)' }}>{t.pending_count} 待并入</span>}
+                        {t.pending_count > 0 && <span className="wb-pill" style={{ fontSize: 10, color: '#8a6a1a', background: 'rgba(169,121,31,.12)' }}>{t.pending_count} 待收进</span>}
                       </button>
                     ) })}
                   </div>
@@ -359,7 +359,7 @@ export default function NotesView({
                     <div className="wb-ov-todo">
                       待处理：
                       {inboxCount > 0 && <button className="wb-brief-link" onClick={() => setTopicFilter('__none__')}>{inboxCount} 条未归类</button>}
-                      {pendingTotal > 0 && <span> · {pendingTotal} 条待并入</span>}
+                      {pendingTotal > 0 && <span> · {pendingTotal} 条待收进</span>}
                       {Object.keys(topicSug).length > 0 && <span> · <b style={{ color: 'var(--accent)' }}>{Object.keys(topicSug).length} 条可能漏归了主题</b>（卡片上一键补）</span>}
                       {clusters.length > 0 && <span> · {clusters.length} 组可聚成新主题</span>}
                     </div>
@@ -607,13 +607,13 @@ export default function NotesView({
             <span className="wb-pill" style={{ color: sc.fg, background: sc.bg }}>{stanceCn}</span>
           )}
           {noteTopics.map(t => {
-            // 你手动归的 = 实心；AI 自动匹配的 = 虚线 + 「疑似」（pending 未并入时）。都可 ✕ 摘除
+            // 你手动归的 = 实心；AI 自动匹配的 = 虚线 + 「疑似」（pending 未收进时）。都可 ✕ 摘除
             const isAuto = t.addedBy !== 'user'
             const suspect = isAuto && t.status === 'pending'
             return (
               <span key={t.id} className="wb-pill wb-topic-pill"
                 style={{ color: '#3d5a80', background: 'rgba(61,90,128,.1)', border: isAuto ? '1px dashed rgba(61,90,128,.45)' : '1px solid transparent' }}
-                title={isAuto ? `AI 自动匹配${suspect ? '（疑似相关，未并入）' : '（已并入综述）'}，不对可 ✕ 摘除` : '你归入的主题'}>
+                title={isAuto ? `AI 自动匹配${suspect ? '（疑似相关，未收进）' : '（已收进综述）'}，不对可 ✕ 摘除` : '你归入的主题'}>
                 {t.name.slice(0, 14)}{suspect ? ' ·疑似' : ''}
                 <button className="wb-topic-pill-x" title={`从「${t.name}」摘除`}
                   onClick={() => unlinkTopic(note, t)}>×</button>
@@ -622,7 +622,7 @@ export default function NotesView({
           })}
           <button className={`wb-note-jump${selected ? '' : ''}`} style={selected ? { color: 'var(--accent)', fontWeight: 600 } : undefined}
             title="送入右侧快速分析（可多选素材一起解读）" onClick={() => toggleSelectNote?.(note)}>
-            {selected ? '✓ 已选中' : '选中分析'}
+            {selected ? '✓ 已选中' : '选中解读'}
           </button>
           <select className="wb-note-assign" value="" title="归入主题（可当场新建，名字以后随时改）"
             onChange={(e) => assignTopic(note, e.target.value)}>

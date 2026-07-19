@@ -3,8 +3,8 @@ import { IconBolt, IconDoc, IconTrash } from './Icons'
 import { api, timeAgo } from './util'
 
 // 主题库 + 活页详情（M3 知识层，ADR-009）。
-// 列表数据来自 /api/topics；详情打开时拉 /api/topics/:id（含 changelog + 待并入素材）。
-// "全部并入"触发同化：一次 Deepseek 调用更新综述并写修订记录。
+// 列表数据来自 /api/topics；详情打开时拉 /api/topics/:id（含 changelog + 待收进素材）。
+// "立即收进"触发同化：一次 Deepseek 调用更新综述并写修订记录。
 
 const PHASE = {
   emerging: { label: '新建期', fg: '#3d5a80', bg: 'rgba(61,90,128,.12)' },
@@ -68,7 +68,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       setQuery('')
       showToast(json.data.backfilled
         ? `已建立主题页「${name}」，找到 ${json.data.backfilled} 条相关素材，AI 正在生成综述（约半分钟后刷新可见）`
-        : `已建立主题页「${name}」，之后保存的相关素材会自动并入综述`)
+        : `已建立主题页「${name}」，之后保存的相关素材会自动收进综述`)
       setActiveTopic(json.data); setTopicView('page')
     } catch (err) { showToast(`建页失败：${err.message}`) } finally { setCreating(false) }
   }
@@ -89,7 +89,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       <div className="wb-feedbar" style={{ margin: '12px 0 0' }}>
         <span>排序 <b>最近活跃</b></span>
         <span className="wb-feedbar-sep">|</span>
-        <span>保存素材后自动匹配主题 · 并入时 AI 更新综述</span>
+        <span>保存素材后自动匹配主题 · 收进时 AI 更新综述</span>
       </div>
 
       {suggestions.length > 0 && (
@@ -110,7 +110,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       {topics.length === 0 && (
         <div className="wb-empty">
           还没有主题页。<br />
-          在上方输入主题名建页——之后每次保存素材，AI 会自动把相关内容并入综述、记下修订；<br />
+          在上方输入主题名建页——之后每次保存素材，AI 会自动把相关内容收进综述、记下修订；<br />
           简报里的选题也可以「升级为主题」在这里建页。
         </div>
       )}
@@ -123,10 +123,10 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
               <span style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 600 }}>{tp.name}</span>
               <span className="wb-pill" style={{ color: ph.fg, background: ph.bg }}>{ph.label}</span>
               {tp.pending_count > 0 && (
-                <span className="wb-pill" style={{ color: '#a9791f', background: 'rgba(169,121,31,.12)' }}>{tp.pending_count} 条待并入</span>
+                <span className="wb-pill" style={{ color: '#a9791f', background: 'rgba(169,121,31,.12)' }}>{tp.pending_count} 条待收进</span>
               )}
             </div>
-            <div className="wb-topic-meta">已并入素材 {tp.note_count} · 修订 {Math.max(0, tp.changelog_count - 1)} 次 · 最近活跃 {timeAgo(tp.last_active_at)}</div>
+            <div className="wb-topic-meta">已收进素材 {tp.note_count} · 修订 {Math.max(0, tp.changelog_count - 1)} 次 · 最近活跃 {timeAgo(tp.last_active_at)}</div>
             {tp.latest_change && <div className="wb-topic-evo">最新演进：{tp.latest_change.summary}</div>}
             {tp.conflict && <div className="wb-topic-conflict"><IconBolt />{tp.conflict}</div>}
             <div className="wb-topic-actions">
@@ -155,13 +155,13 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast, r
 
   const assimilate = async () => {
     setBusy(true)
-    showToast('AI 正在把素材并入综述（约 20 秒，调用 Deepseek）…')
+    showToast('AI 正在把素材收进综述（约 20 秒，调用 Deepseek）…')
     try {
       const json = await api(`/api/topics/${topicId}/assimilate`, { method: 'POST', body: {} })
       if (!json.success) throw new Error(json.error)
       await load()
-      showToast(`已并入 ${json.data.assimilated} 条素材：${json.data.changelog}${json.data.hasConflict ? ' ⚡发现观点冲突' : ''}`)
-    } catch (err) { showToast(`并入失败：${err.message}`) } finally { setBusy(false) }
+      showToast(`已收进 ${json.data.assimilated} 条素材：${json.data.changelog}${json.data.hasConflict ? ' ⚡发现观点冲突' : ''}`)
+    } catch (err) { showToast(`收进失败：${err.message}`) } finally { setBusy(false) }
   }
 
   if (!topic) return <><button className="wb-back" onClick={back}>← 主题库</button><div className="wb-empty">加载中…</div></>
@@ -200,12 +200,12 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast, r
       </div>
 
       <div className="wb-card">
-        <div className="wb-card-label"><IconDoc />主题综述 · AI 维护，并入新素材自动更新</div>
+        <div className="wb-card-label"><IconDoc />主题综述 · AI 维护，收进新素材自动更新</div>
         <div className="wb-review">
           <h4>当前认知</h4>
           {body.current
             ? body.current.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)
-            : <p style={{ color: 'var(--sub2)' }}>（暂无综述——并入素材后由 AI 生成）</p>}
+            : <p style={{ color: 'var(--sub2)' }}>（暂无综述——收进素材后由 AI 生成）</p>}
           {body.views.length > 0 && <>
             <h4>各方观点</h4>
             {body.views.map((v, i) => (
@@ -221,12 +221,12 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast, r
 
       <div className="wb-card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 13, color: 'var(--body2)' }}>
-          待并入素材（{topic.pending_notes.length}）
-          {topic.pending_notes.length > 0 && <span style={{ color: 'var(--sub2)' }}> · 保存时通常已自动并入，这里是失败兜底</span>}
+          待收进素材（{topic.pending_notes.length}）
+          {topic.pending_notes.length > 0 && <span style={{ color: 'var(--sub2)' }}> · 保存时通常已自动收进，这里是失败兜底</span>}
         </span>
         {topic.pending_notes.length > 0 && (
           <button className="wb-btn-outline" style={{ marginLeft: 'auto' }} disabled={busy} onClick={assimilate}>
-            {busy ? '并入中…' : '立即并入'}
+            {busy ? '收进中…' : '立即收进'}
           </button>
         )}
       </div>
@@ -251,9 +251,9 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast, r
       ))}
 
       <div className="wb-card">
-        <div className="wb-card-label">已并入素材（{topic.assimilated_notes?.length || 0}）· 综述由它们长成</div>
+        <div className="wb-card-label">已收进素材（{topic.assimilated_notes?.length || 0}）· 综述由它们长成</div>
         <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 8 }}>
-          自动并入的判定：保存素材时与主题名/综述做本地相似度匹配（不调 AI）。误并点 ✕ 移出——AI 会同时修订综述，剔除只有它支撑的论点。
+          自动收进的判定：保存素材时与主题名/综述做本地相似度匹配（不调 AI）。误收点 ✕ 移出——AI 会同时修订综述，剔除只有它支撑的论点。
         </div>
         {(topic.assimilated_notes || []).map(n => {
           const url = n.content_url || n.source_url
@@ -281,7 +281,7 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast, r
             </div>
           )
         })}
-        {!(topic.assimilated_notes || []).length && <div style={{ fontSize: 12, color: 'var(--faint)' }}>还没有素材并入过这个主题</div>}
+        {!(topic.assimilated_notes || []).length && <div style={{ fontSize: 12, color: 'var(--faint)' }}>还没有素材收进过这个主题</div>}
       </div>
 
       <div className="wb-card">

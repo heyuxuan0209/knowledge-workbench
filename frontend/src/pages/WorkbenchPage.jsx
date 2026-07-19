@@ -165,7 +165,7 @@ export default function WorkbenchPage() {
   // 素材库 tab（2026-07-16 反馈：选题建议迁入素材库，Feed 一行入口跳过来）
   const [notesTab, setNotesTab] = useState('mine') // 'mine' | 'ideas'
 
-  // 素材卡选中分析（2026-07-16 反馈：素材要能用右侧 AI 助手）：
+  // 素材卡选中解读（2026-07-16 反馈：素材要能用右侧 AI 助手）：
   // 有原文回链的走 Feed 同款管道（全文获取）；多篇聚合产物把摘录本身作 adHoc 材料
   const toggleSelectNote = (note) => {
     if (note.content_id) {
@@ -206,7 +206,7 @@ export default function WorkbenchPage() {
 
   const runChat = async (userText, { fresh = false, library = false, knowledge = false } = {}) => {
     const items = selectedItems
-    // 主题详情页 = 探讨模式（P0，V3「沉淀=探讨」入口）：材料为主题综述+已并入素材。
+    // 主题详情页 = 探讨模式（P0，V3「沉淀=探讨」入口）：材料为主题综述+已收进素材。
     const onTopicPage = page === 'topics' && topicView === 'page' && activeTopic
     // library = 问素材库（原始弹药）；knowledge = 问知识体系（全部主题综述）。追问（sendChat）不带标志，
     // 但若当前会话就是该模式（chatContextRef）且没选中别的材料，则延续为多轮
@@ -294,16 +294,16 @@ export default function WorkbenchPage() {
       })
       setChat(prev => prev.map((m, i) => i === index ? { ...m, noteId: json.data.id } : m))
       loadNotes()
-      // 保存即同化：高置信匹配（≥0.15）自动并入；弱匹配挂待并入等用户在主题页确认
+      // 保存即同化：高置信匹配（≥0.15）自动收进；弱匹配挂待收进等用户在主题页确认
       const matched = json.matchedTopics || []
       const strong = matched.filter(m => m.relevance >= 0.15)
       const weak = matched.filter(m => m.relevance < 0.15)
       if (strong.length) {
-        showToast(`已存为素材，AI 正在并入主题「${strong.map(m => m.name).join('」「')}」${weak.length ? `；「${weak[0].name}」疑似相关，去主题页确认` : ''}`)
+        showToast(`已存为素材，AI 正在收进主题「${strong.map(m => m.name).join('」「')}」${weak.length ? `；「${weak[0].name}」疑似相关，去主题页确认` : ''}`)
         setTimeout(loadTopics, 35000) // 同化完成后刷新主题统计
       } else if (weak.length) {
         loadTopics()
-        showToast(`已存为素材，疑似与主题「${weak.map(m => m.name).join('」「')}」相关——去主题页确认是否并入`)
+        showToast(`已存为素材，疑似与主题「${weak.map(m => m.name).join('」「')}」相关——去主题页确认是否收进`)
       } else {
         showToast('已存为素材卡片。想让它进入某个主题综述？在主题页建立相关主题即可自动归入')
       }
@@ -417,8 +417,8 @@ export default function WorkbenchPage() {
         'passive': '，借道 AI HOT 收录其热门内容',
         'link-only': '。注意：该站无 RSS 且无法抓取，只登记跳转，不会自动追更',
       }[json.data.platforms?.[0]?.track_mode] || ''
-      showToast(`已把 ${json.data.display_name} 加为信息源（进 Feed · 加权）${modeText}`)
-    } catch (err) { showToast(`加为信息源失败：${err.message}`) }
+      showToast(`已关注 ${json.data.display_name}（进 Feed · 加权）${modeText}`)
+    } catch (err) { showToast(`关注失败：${err.message}`) }
     finally { setFollowingIds(prev => { const s = new Set(prev); s.delete(contentId); return s }) }
   }
 
@@ -444,7 +444,7 @@ export default function WorkbenchPage() {
       const json = await api('/api/topics/from-idea', { method: 'POST', body: { ideaId: idea.id } })
       await loadTopics()
       setActiveTopic(json.data); setTopicView('page'); setPage('topics')
-      showToast(`已升级为主题页「${json.data.name}」，AI 将随素材并入持续维护综述`)
+      showToast(`已升级为主题页「${json.data.name}」，AI 将随素材收进持续维护综述`)
     } catch (err) {
       setPage('topics'); setTopicView('list')
       showToast(`建页失败：${err.message}`)
@@ -465,7 +465,7 @@ export default function WorkbenchPage() {
   // ---- 创作台 ----
   const genDraftRef = useRef(() => {})
   genDraftRef.current = async (platform = studio.platform, sourceContentId = studio.sourceContentId) => {
-    // 活页起稿（M4）：活页综述做骨架 + 已并入素材可溯源引用，生成即落库
+    // 活页起稿（M4）：活页综述做骨架 + 已收进素材可溯源引用，生成即落库
     if (studio.sourceTopicId) {
       setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在基于主题页起稿（约 30 秒）…' }))
       try {
@@ -550,16 +550,16 @@ export default function WorkbenchPage() {
     }))
   }
 
-  // 去 AI 味（三遍审校一道工序），改写后替换草稿区，由用户决定是否保存。
+  // 润色（三遍改写一道工序，让它更好读），改写后替换草稿区，由用户决定是否保存。
   // 覆盖前把上一版存进 prevDraft —— 改坏了可一步撤销
   const humanizeDraft = async () => {
     if (!studio.draft.trim()) { showToast('草稿为空'); return }
     setStudio(s => ({ ...s, busy: true }))
-    showToast('正在去 AI 味审校（约 30 秒）…')
+    showToast('正在润色（约 30 秒）…')
     try {
       const json = await api('/api/studio/humanize', { method: 'POST', body: { draft: studio.draft, platform: studio.platform } })
       setStudio(s => ({ ...s, busy: false, prevDraft: s.draft, draft: json.data.text }))
-      showToast(`已完成去 AI 味改写（¥${json.data.cost?.toFixed(3)}），不满意可点「撤销改写」`)
+      showToast(`已完成润色（¥${json.data.cost?.toFixed(3)}），不满意可点「撤销改写」`)
     } catch (err) {
       setStudio(s => ({ ...s, busy: false }))
       showToast(`审校失败：${err.message}`)

@@ -477,7 +477,7 @@ export function unregisterSource(sourceId) {
   return result.changes > 0;
 }
 
-// "把作者加为信息源"闭环（飞轮：内容 → Source）：
+// "关注作者/来源"闭环（飞轮：内容 → Source）：
 // - 内容已识别到作者 → 直接标记登记
 // - 未识别到作者但有 URL → 走 identifyInput 识别站点并登记，同时回填 content.source_id
 export async function followSourceOfContent(contentId) {
@@ -499,7 +499,7 @@ export async function followSourceOfContent(contentId) {
   db.close();
 
   if (!content.url) {
-    throw new Error('该内容没有识别到作者，也没有可用链接，无法加为信息源');
+    throw new Error('该内容没有识别到作者，也没有可用链接，无法关注');
   }
 
   const identified = await identifyInput(content.url);

@@ -104,8 +104,8 @@ export function getTopicDetail(topicId) {
     ORDER BY nt.created_at DESC
   `).all(topicId));
 
-  // 已并入素材清单（可移出，见 assimilation.removeNoteFromTopic）：
-  // 用户必须能看到"这页综述由哪些素材长成"，误并才有察觉与撤销的机会
+  // 已收进素材清单（可移出，见 assimilation.removeNoteFromTopic）：
+  // 用户必须能看到"这页综述由哪些素材长成"，误收才有察觉与撤销的机会
   topic.assimilated_notes = parseTerms(db.prepare(`
     SELECT n.id, n.title, n.excerpt, n.source_title, n.source_url, c.url AS content_url,
            nt.relevance, nt.matched_terms, nt.added_by, nt.assimilated_at

@@ -93,17 +93,17 @@ function formatTopicAsMaterial(topicId) {
     : '（暂无）';
   const notesBlock = notes.length
     ? notes.map((n, i) => `[素材${i + 1}]（来源：${n.source_title || '未知'}）\n${(n.excerpt || '').slice(0, 600)}`).join('\n\n')
-    : '（暂无已并入素材）';
+    : '（暂无已收进素材）';
 
   return `## 材料：主题页《${topic.name}》
-这是用户长期维护的知识主题，包含 AI 综述与已并入素材。用户是带着问题来探讨的：请引用材料里的证据回答、指出观点间的矛盾、必要时提出反例；材料之外的推测要明确标注。
+这是用户长期维护的知识主题，包含 AI 综述与已收进素材。用户是带着问题来探讨的：请引用材料里的证据回答、指出观点间的矛盾、必要时提出反例；材料之外的推测要明确标注。
 【当前认知】
 ${body.current || topic.description || '（空）'}
 【各方观点】
 ${views}
 【共识 / 非共识】
 ${body.consensus || '（暂无）'}
-【已并入素材】
+【已收进素材】
 ${notesBlock}`;
 }
 

@@ -402,12 +402,12 @@ export default function FeedView({
                   {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
                     title="AI 帮你读懂这篇，出精读稿，不用啃原文" onClick={openRead}>AI 精读</button>}
                   <button className="wb-btn-ghost" style={{ padding: 0 }} title="送入右侧一起解读/对话"
-                    onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中'}</button>
+                    onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中解读'}</button>
                   {c.url && <a className="wb-btn-ghost" style={{ padding: 0, display: 'inline-flex', alignItems: 'center' }}
                     href={c.url} target="_blank" rel="noreferrer" title="跳转原文"><IconExternal /></a>}
                   {!followed && c.source_id !== undefined && (
                     <button className="wb-btn-ghost" style={{ padding: 0, marginLeft: 'auto', fontSize: 11.5 }}
-                      disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)} title="把这个作者/来源加为你的信息源，以后自动追更">
+                      disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)} title="关注这个作者/来源，以后自动追更">
                       {followingIds?.has(c.id) ? '识别中…' : '＋ 关注'}
                     </button>
                   )}

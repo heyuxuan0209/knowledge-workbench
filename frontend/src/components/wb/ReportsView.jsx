@@ -162,7 +162,7 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
         <div className="wb-card" style={{ padding: '16px 18px' }}>
           <div className="wb-report-section-title">主题更新</div>
           <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 6 }}>
-            来自本{unitCn}各主题页的修订记录（素材并入时自动生成）。点主题名可查看该页综述、已并入素材与完整修订时间线。
+            来自本{unitCn}各主题页的修订记录（素材收进时自动生成）。点主题名可查看该页综述、已收进素材与完整修订时间线。
           </div>
           {report.page_changes?.length
             ? report.page_changes.map((p, i) => (
@@ -171,7 +171,7 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
                 {p.summary}{p.conflict && <span style={{ color: 'var(--amber)' }}> ⚡含矛盾点</span>}
               </div>
             ))
-            : <div className="wb-report-line">本{unitCn}没有主题页修订。保存素材并在主题页「并入」后，这里会汇总每次演进。</div>}
+            : <div className="wb-report-line">本{unitCn}没有主题页修订。保存素材并在主题页「收进」后，这里会汇总每次演进。</div>}
         </div>
 
         <div className="wb-card" style={{ padding: '16px 18px', background: 'var(--brief-bg)', borderColor: 'rgba(61,90,128,.22)' }}>

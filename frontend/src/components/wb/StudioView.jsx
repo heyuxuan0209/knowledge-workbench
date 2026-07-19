@@ -193,8 +193,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           {studio.busy ? '生成中…' : '重新生成'}
         </button>
         <button className="wb-btn-primary" onClick={saveDraft}>{studio.draftId ? '保存修改' : '保存草稿'}</button>
-        <button className="wb-btn-outline" disabled={studio.busy} title="三遍审校：去 AI 高频词 / 拆套路句式 / 加入第一人称判断"
-          onClick={humanizeDraft}>去 AI 味</button>
+        <button className="wb-btn-outline" disabled={studio.busy} title="三遍改写让它更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断"
+          onClick={humanizeDraft}>润色</button>
         <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy}
           title="三个批评视角（挑剔读者/结构编辑/事实核查）通读全稿，给出具体批注——只批注不改稿"
           onClick={critiqueDraft}>{critiqueBusy ? '审稿中…' : '审稿'}</button>

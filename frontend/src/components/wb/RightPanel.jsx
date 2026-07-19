@@ -113,7 +113,7 @@ function QuickAnalysis({
               <AskBox label="问整个素材库（出答案，不是列表）" cta="语义检索并回答 →" onAsk={askLibrary}
                 placeholder="用大白话问，如「我攒过哪些关于降低用户操作摩擦的素材？」"
                 hint="回车换行，点按钮或 ⌘/Ctrl+回车发送，可多轮追问。框可拖右下角放大；想更宽就拖面板左边框或点右上 ⇤ 半屏。" />
-              <div className="wb-panel-empty" style={{ marginTop: 0 }}>或在素材卡片点「选中分析」<br />可多选后一起解读</div>
+              <div className="wb-panel-empty" style={{ marginTop: 0 }}>或在素材卡片点「选中解读」<br />可多选后一起解读</div>
             </>
           ) : (onTopicsList && askKnowledge) ? (
             // 问知识体系只在【主题库列表层】出现；单个主题的探讨在主题详情页右栏
@@ -125,7 +125,7 @@ function QuickAnalysis({
             </>
           ) : (
             <div className="wb-panel-empty">
-              在卡片点「选中分析」<br />可多选后一起解读<br /><br />对话用完即走，<br />点「保存到笔记」才沉淀
+              在卡片点「选中解读」<br />可多选后一起解读<br /><br />对话用完即走，<br />点「保存到笔记」才沉淀
             </div>
           )}
         </div>

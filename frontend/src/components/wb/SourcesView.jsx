@@ -181,7 +181,7 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
       </div>
 
       {sources.length === 0 && (
-        <div className="wb-empty">还没有登记信息源。<br />也可以在资讯卡片上点「＋加为信息源」从内容里发现好作者。</div>
+        <div className="wb-empty">还没有登记信息源。<br />也可以在资讯卡片上点「＋关注」从内容里发现好作者。</div>
       )}
 
       {sources.length > 0 && (
