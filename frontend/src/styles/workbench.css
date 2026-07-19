@@ -516,3 +516,6 @@ input, textarea { font-family: inherit; }
 .wb-lead{ font-size:14px; line-height:1.7; color:var(--body2,#3a372f); background:rgba(61,90,128,.05); border-left:3px solid var(--accent); border-radius:6px; padding:9px 13px; margin:0 0 14px; }
 .wb-lead b{ color:var(--body2,#26241f); font-weight:600; }
 .wb-ov-foot{ margin-top:14px; padding-top:12px; border-top:1px solid var(--line10, rgba(33,31,26,.1)); display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:12.5px; }
+
+/* ---- 资讯页分类标签（UI 改造 2b） ---- */
+.wb-cat{ font-size:10.5px; padding:1px 7px; border-radius:4px; background:rgba(61,90,128,.10); color:var(--accent); flex-shrink:0; }

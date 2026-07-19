@@ -124,7 +124,13 @@ export default function FeedView({
   const [feedTab, setFeedTab] = useState('all') // 'all' | 'starred'
   const [feedQuery, setFeedQuery] = useState('')
   const [filtered, setFiltered] = useState(null)
-  const hasFilter = feedTab === 'starred' || Boolean(feedQuery.trim())
+  const [artCat, setArtCat] = useState(null)   // 文章分类 chip（2b）
+  const [projCat, setProjCat] = useState(null)  // 项目分类 chip（2b）
+  const [artCatCounts, setArtCatCounts] = useState({}) // 文章各类目计数（后端，全量）
+  const hasFilter = feedTab === 'starred' || Boolean(feedQuery.trim()) || Boolean(artCat)
+  useEffect(() => {
+    api('/api/contents/categories').then(j => setArtCatCounts(j.data || {})).catch(() => {})
+  }, [])
   useEffect(() => {
     if (!hasFilter) { setFiltered(null); return }
     const t = setTimeout(async () => {
@@ -132,12 +138,13 @@ export default function FeedView({
         const params = new URLSearchParams({ limit: '200' })
         if (feedQuery.trim()) params.set('q', feedQuery.trim())
         if (feedTab === 'starred') params.set('starred', '1')
+        if (artCat) params.set('category', artCat)
         const json = await api(`/api/contents?${params}`)
         setFiltered((json.data || []).map(c => ({ ...c, tags: safeParseTags(c.tags) })))
       } catch (err) { console.error('feed filter:', err) }
     }, 250)
     return () => clearTimeout(t)
-  }, [hasFilter, feedTab, feedQuery])
+  }, [hasFilter, feedTab, feedQuery, artCat])
 
   const onStar = async (c) => {
     const starred = await toggleStar(c.id)
@@ -162,6 +169,9 @@ export default function FeedView({
   const staleReport = report && report.period_key !== todayKey // 显示的是往日报告（补跑未及时）
   const ideas = (report?.ideas || []).filter(i => i.status === 'suggested' || i.status === 'adopted')
   const selIds = new Set(selectedItems.map(x => x.id))
+  // 项目分类（客户端，只 10 条）：计数 + 按 chip 筛选
+  const projCounts = (ghTrending.repos || []).reduce((a, r) => { const k = r.category || '其他'; a[k] = (a[k] || 0) + 1; return a }, {})
+  const shownRepos = projCat ? (ghTrending.repos || []).filter(r => (r.category || '其他') === projCat) : (ghTrending.repos || [])
 
   return (
     <>
@@ -290,6 +300,11 @@ export default function FeedView({
           <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
         </div>
 
+        {/* 分类 chips（2b）：只在无搜索/收藏筛选时出现，避免叠加混乱 */}
+        {feedTab !== 'starred' && !feedQuery.trim() && (
+          <CatChips cats={ART_CATS} counts={artCatCounts} active={artCat} onPick={setArtCat} />
+        )}
+
         {/* 「AI 精读」首次说明气泡 */}
         {airHint && (filtered ?? contents).length > 0 && (
           <div style={{ margin: '0 2px 12px', padding: '9px 13px', background: 'rgba(61,90,128,.07)', border: '1px solid rgba(61,90,128,.18)', borderRadius: 8, fontSize: 12.5, color: 'var(--body2)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -319,6 +334,7 @@ export default function FeedView({
                     : <span className="wb-pill" style={{ color: '#8a8478', background: 'rgba(33,31,26,.06)' }}>未标注</span>}
                   <span style={{ color: 'var(--sub)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{author}</span>
                   <span style={{ color: 'var(--faint)', flexShrink: 0 }}>· {timeAgo(c.published_at)}</span>
+                  {c.category && <span className="wb-cat">{c.category}</span>}
                   <button className={`wb-star${c.starred ? ' on' : ''}`} style={{ marginLeft: 'auto' }}
                     title={c.starred ? '取消收藏' : '收藏：一键钉住，事后找得回'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
                 </div>
@@ -352,11 +368,13 @@ export default function FeedView({
               {ghTrending.trend?.trend ? <span style={{ color: 'var(--sub)' }}>{ghTrending.trend.trend}</span> : <span>GitHub Trending · 每日 · 高星+热门双筛</span>}
               <span style={{ marginLeft: 'auto' }}>只显示当天榜；你收藏过的项目在「文章 › ★ 收藏」里</span>
             </div>
+            <CatChips cats={REPO_CATS} counts={projCounts} active={projCat} onPick={setProjCat} />
             <div className="wb-feed-grid">
-              {ghTrending.repos.map(r => (
+              {shownRepos.map(r => (
                 <div key={r.id} className="wb-gcard">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
                     <span style={{ color: 'var(--amber)', fontWeight: 600 }}>今日 +{Math.round(r.external_score)} 星</span>
+                    {r.category && <span className="wb-cat">{r.category}</span>}
                     <button className={`wb-star${(ghStar[r.id] ?? r.starred) ? ' on' : ''}`} style={{ marginLeft: 'auto' }}
                       title="收藏（收藏后进「文章 › ★ 收藏」）"
                       onClick={async () => { const s = await toggleStar(r.id); if (s !== null) setGhStar(prev => ({ ...prev, [r.id]: s })) }}>
@@ -381,6 +399,24 @@ export default function FeedView({
 
       {readerContent && <ReaderModal content={readerContent} onClose={() => setReaderContent(null)} showToast={showToast} loadNotes={loadNotes} />}
     </>
+  )
+}
+
+// 分类 chips（UI 改造 2b）——文章/项目各一套类目，只显示有内容的类目
+const ART_CATS = ['模型', '产品', '行业', '观点方法', '其他']
+const REPO_CATS = ['工具Agent', '模型', '应用', '基建', '其他']
+
+function CatChips({ cats, counts, active, onPick }) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+  if (!total) return null
+  return (
+    <div className="wb-topic-chips" style={{ marginBottom: 12 }}>
+      <button className={`wb-topic-chip${!active ? ' active' : ''}`} onClick={() => onPick(null)}>全部（{total}）</button>
+      {cats.map(c => counts[c]
+        ? <button key={c} className={`wb-topic-chip${active === c ? ' active' : ''}`}
+            onClick={() => onPick(active === c ? null : c)}>{c}（{counts[c]}）</button>
+        : null)}
+    </div>
   )
 }
 

@@ -36,6 +36,7 @@ app.get('/api/contents', async (req, res) => {
     const contents = getContents(limit, offset, {
       q: req.query.q || null,
       starred: req.query.starred === '1',
+      category: req.query.category || null,
     });
 
     res.json({
@@ -48,6 +49,27 @@ app.get('/api/contents', async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// 内容分类计数（资讯页 chips，UI 改造 2b）。repo=1 统计 AI 项目，否则文章
+app.get('/api/contents/categories', async (req, res) => {
+  try {
+    const { categoryCounts } = await import('./services/content-classify.js');
+    res.json({ success: true, data: categoryCounts({ repo: req.query.repo === '1' }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 触发补分类（存量回填 / 手动；force=1 全量重分类）
+app.post('/api/contents/classify', async (req, res) => {
+  try {
+    const { classifyUnclassified } = await import('./services/content-classify.js');
+    const data = await classifyUnclassified({ force: req.query.force === '1' });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -304,7 +326,7 @@ app.get('/api/github-trending', async (req, res) => {
     const { getDatabase } = await import('./db/init.js');
     const db = getDatabase();
     const repos = db.prepare(`
-      SELECT id, zh_title, zh_summary, en_title, url, external_score, tags, published_at
+      SELECT id, zh_title, zh_summary, en_title, url, external_score, tags, published_at, category, starred
       FROM contents WHERE source_app = 'github_trending'
       ORDER BY external_score DESC LIMIT 10
     `).all();
@@ -1583,6 +1605,14 @@ import('node-cron').then(({ default: cron }) => {
       ));
     } catch (err) {
       console.error('[cron] sync-all failed:', err.message);
+    }
+    // 同步后给新内容补分类（UI 改造 2b：资讯页 chips），只分未分类的、缓存不重算
+    try {
+      const { classifyUnclassified } = await import('./services/content-classify.js');
+      const c = await classifyUnclassified();
+      console.log(`[cron] 内容分类：+${c.classified} 条`);
+    } catch (err) {
+      console.error('[cron] 内容分类失败:', err.message);
     }
     // 同步后生成/刷新当天日报（force：拿到最新同步的数据重出一份）
     try {
