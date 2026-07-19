@@ -85,6 +85,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setVariants(v => ({ ...v, applied: null })) // 撤销后三个候选恢复可选
     showToast('已撤销替换')
   }
+  // ---- 「⋯ 更多」下拉（按钮墙降级：主操作+3打磨键留在外面，低频项收进来）----
+  const [moreOpen, setMoreOpen] = useState(false)
   // ---- 卡片图 tab（小红书专属）：iframe 嵌入卡片工作台，切过去自动灌入当前草稿 ----
   const [xhsMode, setXhsMode] = useState('text')  // 'text' 文案 | 'cards' 卡片图
   const cardFrame = useRef(null)
@@ -106,6 +108,9 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 
   // 溯源检查：草稿有内容但没有任何 [素材N]/引用标记时提示
   const noRefs = studio.draft.trim() && !/\[素材|—— 引自/.test(studio.draft)
+  // 冷启动态：还没有草稿 → 出三步向导 + 一个明确的「生成初稿」，而不是空框+按钮墙
+  const isEmpty = !studio.draft.trim()
+  const selPlatform = platforms.find(p => p.key === studio.platform)
 
   return (
     <>
@@ -170,8 +175,30 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             onChange={(e) => setStudio(s => ({ ...s, viewpoint: e.target.value }))}
             placeholder="这篇你想说什么？一句话立场（如「同化式采纳被高估了」）· 留空则 AI 提议判断并明确标注"
             style={{ flex: 1, fontSize: 12.5, padding: '7px 10px', border: '1px solid var(--line08)', borderRadius: 8, background: 'var(--surface)' }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && studio.viewpoint.trim()) { showToast('立场已记下，点「重新生成」按它起稿'); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && studio.viewpoint.trim()) { showToast('立场已记下，生成时按它起稿'); } }}
           />
+        </div>
+      )}
+
+      {isEmpty && (
+        <div className="wb-guide">
+          <div className="wb-guide-steps">
+            <span className="wb-guide-step on"><span className="n">1</span>起稿<span className="cap">你在这</span></span>
+            <span className="wb-guide-arrow">→</span>
+            <span className="wb-guide-step"><span className="n">2</span>打磨<span className="cap">润色·审稿·改一段</span></span>
+            <span className="wb-guide-arrow">→</span>
+            <span className="wb-guide-step"><span className="n">3</span>产出<span className="cap">复制·导出</span></span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <button className="wb-btn-primary" disabled={studio.busy} onClick={() => genDraft()}
+              style={{ fontSize: 15, padding: '12px 26px' }}>
+              {studio.busy ? '生成中…' : `✍️ 生成${selPlatform?.label || ''}初稿`}
+            </button>
+            <span style={{ fontSize: 12.5, color: 'var(--sub2)' }}>或直接在下面空白处自己写</span>
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 10 }}>
+            素材已就位（{studio.source || '手选素材'}）· 生成后第 2、3 步自动亮起
+          </div>
         </div>
       )}
 
@@ -179,7 +206,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         ref={draftRef}
         className="wb-draft" value={studio.draft}
         onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
-        placeholder="点「重新生成」按当前平台模板产出草稿，或从右侧插入素材开始写…"
+        placeholder="点上方「生成初稿」，或直接在这里手写；从右侧可插入素材…"
       />
 
       {noRefs && (
@@ -188,32 +215,44 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </div>
       )}
 
+      {!isEmpty && (<>
       <div className="wb-studio-actions">
-        <button className="wb-btn-outline" disabled={studio.busy} onClick={() => genDraft()}>
-          {studio.busy ? '生成中…' : '重新生成'}
-        </button>
         <button className="wb-btn-primary" onClick={saveDraft}>{studio.draftId ? '保存修改' : '保存草稿'}</button>
-        <button className="wb-btn-outline" disabled={studio.busy} title="三遍改写让它更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断"
+        <span className="wb-studio-sep" />
+        <button className="wb-btn-outline" disabled={studio.busy} title="整篇改得更顺更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断"
           onClick={humanizeDraft}>润色</button>
         <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy}
           title="三个批评视角（挑剔读者/结构编辑/事实核查）通读全稿，给出具体批注——只批注不改稿"
           onClick={critiqueDraft}>{critiqueBusy ? '审稿中…' : '审稿'}</button>
         <button className="wb-btn-outline" disabled={variantsBusy || studio.busy}
-          title="选中草稿里的一段，给 3 个策略不同的改法（锋利/具体/简洁）供挑选"
-          onClick={makeVariants}>{variantsBusy ? '生成中…' : '3 个改法'}</button>
+          title="选中草稿里的一段，给 3 个策略不同的改法（更锋利/更具体/更简洁）供挑选"
+          onClick={makeVariants}>{variantsBusy ? '生成中…' : '改一段'}</button>
         {studio.prevDraft && (
           <button className="wb-btn-ghost" title="改写前后两版互换" onClick={undoRewrite}>撤销改写</button>
         )}
-        {studio.platform === 'long' && (
-          <button className="wb-btn-ghost" title="AI 拟 5 个风格错开的标题供挑选" onClick={suggestTitles}>标题候选</button>
-        )}
-        <button className="wb-btn-ghost" onClick={copyAll}>复制全文</button>
-        <button className="wb-btn-ghost" title="导出发布版：溯源标记转文末来源列表" onClick={exportMd}>导出 Markdown</button>
-        {studio.draftId && (
-          <button className="wb-note-del" style={{ marginLeft: 'auto' }} title="删除这份草稿" onClick={deleteCurrentDraft}>🗑</button>
-        )}
+        <span className="wb-studio-sep" />
+        <div className="wb-more-wrap">
+          <button className="wb-btn-ghost" onClick={() => setMoreOpen(o => !o)}>⋯ 更多</button>
+          {moreOpen && (<>
+            <div className="wb-more-backdrop" onClick={() => setMoreOpen(false)} />
+            <div className="wb-more-menu">
+              <button className="wb-more-item" disabled={studio.busy}
+                onClick={() => { setMoreOpen(false); genDraft() }}>↻ 重新生成</button>
+              {studio.platform === 'long' && (
+                <button className="wb-more-item" onClick={() => { setMoreOpen(false); suggestTitles() }}>✎ 标题候选</button>
+              )}
+              <button className="wb-more-item" onClick={() => { setMoreOpen(false); copyAll() }}>⧉ 复制全文</button>
+              <button className="wb-more-item" title="导出发布版：溯源标记转文末来源列表"
+                onClick={() => { setMoreOpen(false); exportMd() }}>↧ 导出 Markdown</button>
+              {studio.draftId && (
+                <button className="wb-more-item danger" onClick={() => { setMoreOpen(false); deleteCurrentDraft() }}>🗑 删除草稿</button>
+              )}
+            </div>
+          </>)}
+        </div>
       </div>
       <div className="wb-studio-hint">想让 AI 按你的意思改，用右侧「创作助手」：例如「开头更犀利」「压到 5 条」「加一个反方观点」。</div>
+      </>)}
       </>)}
 
       {cardsMode && (
