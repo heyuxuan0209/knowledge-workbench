@@ -319,7 +319,7 @@ export default function FeedView({
 
         {/* 分类 chips（2b）：只在无搜索/收藏筛选时出现，避免叠加混乱 */}
         {feedTab !== 'starred' && !feedQuery.trim() && (
-          <CatChips cats={ART_CATS} counts={artCatCounts} active={artCat} onPick={setArtCat} />
+          <CatChips cats={ART_CATS} counts={artCatCounts} active={artCat} onPick={setArtCat} defs={ART_DEFS} />
         )}
 
         {/* 「AI 精读」首次说明气泡 */}
@@ -385,7 +385,7 @@ export default function FeedView({
               {ghTrending.trend?.trend ? <span style={{ color: 'var(--sub)' }}>{ghTrending.trend.trend}</span> : <span>GitHub Trending · 每日 · 高星+热门双筛</span>}
               <span style={{ marginLeft: 'auto' }}>只显示当天榜；你收藏过的项目在「文章 › ★ 收藏」里</span>
             </div>
-            <CatChips cats={REPO_CATS} counts={projCounts} active={projCat} onPick={setProjCat} />
+            <CatChips cats={REPO_CATS} counts={projCounts} active={projCat} onPick={setProjCat} defs={REPO_DEFS} />
             <div className="wb-feed-grid">
               {shownRepos.map(r => (
                 <div key={r.id} className="wb-gcard">
@@ -419,18 +419,34 @@ export default function FeedView({
   )
 }
 
-// 分类 chips（UI 改造 2b）——文章/项目各一套类目，只显示有内容的类目
+// 分类 chips（UI 改造 2b）——文章/项目各一套类目，只显示有内容的类目。
+// defs：hover 说明每类是什么（与后端分类 prompt 同口径，2026-07-19）
 const ART_CATS = ['模型', '产品', '行业', '观点方法', '其他']
 const REPO_CATS = ['工具Agent', '模型', '应用', '基建', '其他']
+const ART_DEFS = {
+  模型: '模型本身：发布/更新、技术路线、训练方法、benchmark、研究',
+  产品: '能用的工具/应用/SDK/Agent 工具、产品功能更新',
+  行业: '生意与格局：融资/IPO/政策/法律/数据中心/公司动向/地缘',
+  观点方法: '人的思考与做法：观点、经验、方法论、辩论、教程、评论',
+  其他: '不属于以上四类',
+}
+const REPO_DEFS = {
+  工具Agent: 'Agent 框架/CLI/开发者工具/自动化',
+  模型: '模型权重/训练/推理相关的开源项目',
+  应用: '面向具体场景的完整应用、示例合集、产品',
+  基建: '底层设施：数据/向量库/部署/可观测/协议',
+  其他: '不属于以上四类',
+}
 
-function CatChips({ cats, counts, active, onPick }) {
+function CatChips({ cats, counts, active, onPick, defs = {} }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
   if (!total) return null
   return (
     <div className="wb-topic-chips" style={{ marginBottom: 12 }}>
-      <button className={`wb-topic-chip${!active ? ' active' : ''}`} onClick={() => onPick(null)}>全部（{total}）</button>
+      <button className={`wb-topic-chip wb-chip-tip${!active ? ' active' : ''}`} data-tip="不筛，看全部"
+        onClick={() => onPick(null)}>全部（{total}）</button>
       {cats.map(c => counts[c]
-        ? <button key={c} className={`wb-topic-chip${active === c ? ' active' : ''}`}
+        ? <button key={c} className={`wb-topic-chip wb-chip-tip${active === c ? ' active' : ''}`} data-tip={defs[c] || c}
             onClick={() => onPick(active === c ? null : c)}>{c}（{counts[c]}）</button>
         : null)}
     </div>
