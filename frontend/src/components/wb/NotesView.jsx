@@ -33,8 +33,6 @@ export default function NotesView({
   const [showAllTopics, setShowAllTopics] = useState(false) // 主题 chips 瘦身：默认藏零散的单条主题
   const [ovOpen, setOvOpen] = useState(() => localStorage.getItem('wb-notes-ov-collapsed') !== '1') // 素材概览默认展开
   const [topicSug, setTopicSug] = useState({}) // 语义补归类：noteId -> [{topicId,name,score}]（贴合但没标的主题）
-  // "新增"识别：记住上次进素材页时见过的最新素材时间，比它新的标「新」；看过即不再算新
-  const lastSeenRef = useRef(localStorage.getItem('wb-notes-lastseen') || '')
   const [newOnly, setNewOnly] = useState(false)
   const highlightRef = useRef(null)
   const toggleExpand = (id) => setExpandedNotes(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
@@ -48,13 +46,11 @@ export default function NotesView({
     api('/api/notes/sources').then(j => setSourceOptions(j.data || [])).catch(() => {})
   }, [])
 
-  // 看过这批素材后，把"上次见过的最新时间"推进到当前最新——下次进来只有更新的才算「新」
-  useEffect(() => {
-    const maxCreated = notes.reduce((m, n) => ((n.created_at || '') > m ? n.created_at : m), '')
-    if (maxCreated) localStorage.setItem('wb-notes-lastseen', maxCreated)
-  }, [notes])
-
-  const isNew = (n) => Boolean(lastSeenRef.current) && (n.created_at || '') > lastSeenRef.current
+  // 「新增」= 近 3 天内新存的素材（created_at 是 UTC，按 timeAgo 同款解析算小时差）。
+  // 时间窗固定、可预期：3 天后自动不再算新、并从置顶区归入各主题。
+  const NEW_WINDOW_H = 72
+  const hoursSince = (iso) => { if (!iso) return Infinity; const t = new Date(/[zZ+]/.test(iso) ? iso : `${iso}Z`).getTime(); return (Date.now() - t) / 3600000 }
+  const isNew = (n) => hoursSince(n.created_at) < NEW_WINDOW_H
   const newNotes = notes.filter(isNew).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 
   const hasFilter = Boolean(keyword.trim() || sourceFilter || topicFilter || ctypeFilter)
@@ -282,14 +278,19 @@ export default function NotesView({
           ? { text: <>有 {clusters.length} 组零散素材可以聚成新主题</>, cta: null, act: null }
           : { text: <>继续攒——某主题攒到 5 条且综述成型，就能开写了</>, cta: null, act: null }
 
-  // 无筛选时按主题分组：素材可属多主题——按第一主题归组避免重复卡片；未归类置顶当收件箱
+  // 无筛选时按主题分组：素材可属多主题——按第一主题归组避免重复卡片；未归类置顶当收件箱。
+  // 最近新增再置于最顶（近 3 天），且从下面各组剔除避免同卡重复，3 天后自动落回各主题。
   const groups = []
   if (!hasFilter) {
     const firstTopic = n => (n.topic_ids || '').split(',')[0] || null
-    const unassigned = shown.filter(n => !firstTopic(n))
+    const recentIds = new Set(shown.filter(isNew).map(n => n.id))
+    const recent = shown.filter(n => recentIds.has(n.id)).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    if (recent.length) groups.push({ id: '__new__', name: '最近新增', notes: recent })
+    const older = shown.filter(n => !recentIds.has(n.id))
+    const unassigned = older.filter(n => !firstTopic(n))
     if (unassigned.length) groups.push({ id: '__inbox__', name: '未归类', notes: unassigned })
     for (const t of topics) {
-      const tn = shown.filter(n => firstTopic(n) === t.id)
+      const tn = older.filter(n => firstTopic(n) === t.id)
       if (tn.length) groups.push({ id: t.id, name: t.name, notes: tn })
     }
     const placed = new Set(groups.flatMap(g => g.notes.map(n => n.id)))
@@ -547,6 +548,9 @@ export default function NotesView({
                   {g.id === '__inbox__' && (
                     <span className="wb-note-group-hint">收件箱 · 周清 2 分钟：归入主题或删除</span>
                   )}
+                  {g.id === '__new__' && (
+                    <span className="wb-note-group-hint">近 3 天新存 · 之后自动归入下面各主题</span>
+                  )}
                 </div>
                 {g.notes.map(note => renderNote(note))}
               </div>
@@ -570,7 +574,7 @@ export default function NotesView({
     return (
       <div key={note.id} className={`wb-card${selected ? ' selected' : ''}`} ref={highlighted ? highlightRef : null}
         style={{ position: 'relative', ...(highlighted ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px rgba(61,90,128,.18)', transition: 'box-shadow .3s' } : {}) }}>
-        {isNew(note) && <span className="wb-new-badge" title="上次来之后新增的">新</span>}
+        {isNew(note) && <span className="wb-new-badge" title="近 3 天新增">新</span>}
         {note.title && (
           <div style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
             {note.title}

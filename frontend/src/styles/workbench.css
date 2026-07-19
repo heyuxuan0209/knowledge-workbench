@@ -158,6 +158,11 @@ input, textarea { font-family: inherit; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   z-index: 100; animation: rwUp 0.25s; max-width: 80vw;
 }
+.wb-toast-action {
+  margin-left: 12px; padding: 4px 12px; border-radius: 7px; cursor: pointer;
+  background: #5b7da8; color: #fff; border: none; font-size: 12.5px; font-weight: 600; white-space: nowrap;
+}
+.wb-toast-action:hover { background: #6f8eb5; }
 .wb-modal-mask {
   position: fixed; inset: 0; background: rgba(33, 31, 26, 0.35);
   display: flex; align-items: center; justify-content: center; z-index: 90;

@@ -35,6 +35,7 @@ export default function WorkbenchPage() {
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [toast, setToast] = useState('')
+  const [toastAction, setToastAction] = useState(null) // {label,onClick} 可选，toast 里的按钮
   const toastTimer = useRef(null)
 
   // 可拖拽三栏（2026-07-16 反馈 #3，修订 ADR-004 固定宽）：宽度记 localStorage；
@@ -119,11 +120,14 @@ export default function WorkbenchPage() {
     } catch (err) { console.error('platforms:', err) }
   }, [])
 
-  const showToast = useCallback((msg) => {
+  // action 可选：{ label, onClick } —— 在 toast 里带一个可点按钮（如「去素材页看看 →」）
+  const showToast = useCallback((msg, action = null) => {
     setToast(msg)
+    setToastAction(action)
     clearTimeout(toastTimer.current)
-    // 长文案（如 link-only 的解释）2.6 秒读不完，按长度自适应，上限 7 秒
-    toastTimer.current = setTimeout(() => setToast(''), Math.min(7000, Math.max(2600, msg.length * 90)))
+    // 长文案（如 link-only 的解释）2.6 秒读不完，按长度自适应；带按钮的多给点时间
+    const ms = Math.min(action ? 9000 : 7000, Math.max(action ? 5000 : 2600, msg.length * 90))
+    toastTimer.current = setTimeout(() => { setToast(''); setToastAction(null) }, ms)
   }, [])
 
   // ---- 数据加载 ----
@@ -294,18 +298,21 @@ export default function WorkbenchPage() {
       })
       setChat(prev => prev.map((m, i) => i === index ? { ...m, noteId: json.data.id } : m))
       loadNotes()
+      // 存好后给个「去素材页看看 →」入口（gotoNote 会记住当前页，素材页顶部可一键返回）；
+      // 已在素材页时不重复提示
+      const goAction = page !== 'notes' ? { label: '去素材页看看 →', onClick: () => gotoNote(json.data.id) } : null
       // 保存即同化：高置信匹配（≥0.15）自动收进；弱匹配挂待收进等用户在主题页确认
       const matched = json.matchedTopics || []
       const strong = matched.filter(m => m.relevance >= 0.15)
       const weak = matched.filter(m => m.relevance < 0.15)
       if (strong.length) {
-        showToast(`已存为素材，AI 正在收进主题「${strong.map(m => m.name).join('」「')}」${weak.length ? `；「${weak[0].name}」疑似相关，去主题页确认` : ''}`)
+        showToast(`已存为素材，AI 正在收进主题「${strong.map(m => m.name).join('」「')}」${weak.length ? `；「${weak[0].name}」疑似相关，去主题页确认` : ''}`, goAction)
         setTimeout(loadTopics, 35000) // 同化完成后刷新主题统计
       } else if (weak.length) {
         loadTopics()
-        showToast(`已存为素材，疑似与主题「${weak.map(m => m.name).join('」「')}」相关——去主题页确认是否收进`)
+        showToast(`已存为素材，疑似与主题「${weak.map(m => m.name).join('」「')}」相关——去主题页确认是否收进`, goAction)
       } else {
-        showToast('已存为素材卡片。想让它进入某个主题综述？在主题页建立相关主题即可自动归入')
+        showToast('已存为素材卡片。想让它进入某个主题综述？在主题页建立相关主题即可自动归入', goAction)
       }
     } catch (err) { showToast(`保存失败：${err.message}`) }
   }
@@ -760,7 +767,16 @@ export default function WorkbenchPage() {
       {modal === 'pool' && <PoolModal onClose={() => setModal(null)} showToast={showToast} />}
       {modal === 'import' && <ImportModal onClose={() => setModal(null)} showToast={showToast} onDone={loadSources} />}
 
-      {toast && <div className="wb-toast">{toast}</div>}
+      {toast && (
+        <div className="wb-toast">
+          {toast}
+          {toastAction && (
+            <button className="wb-toast-action" onClick={() => { const a = toastAction; setToast(''); setToastAction(null); a.onClick() }}>
+              {toastAction.label}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
