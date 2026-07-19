@@ -97,6 +97,7 @@ input, textarea { font-family: inherit; }
    阅读型页面（主题综述/精读/创作/周报）用 .narrow 收窄，行宽更利于读。 */
 .wb-main-inner { max-width: 1360px; margin: 0 auto; padding: 20px 24px 60px; animation: rwUp 0.25s; }
 .wb-main-inner.narrow { max-width: 820px; }
+.wb-main-inner.studio-wide { max-width: 1180px; }
 
 /* 右栏 */
 .wb-panel {
@@ -631,3 +632,7 @@ input, textarea { font-family: inherit; }
 .wb-report-cnt{ font-size:11px; font-weight:400; color:var(--faint); margin-left:8px; }
 .wb-report-sublab{ font-size:12px; font-weight:700; color:var(--sub); margin:12px 0 1px; }
 .wb-report-explain{ font-size:11.5px; color:var(--sub2); line-height:1.5; margin:0 0 6px; }
+/* 报告分区可折叠：标题整行可点 + 收起/展开 caret */
+.wb-report-sechead{ display:flex; align-items:center; gap:8px; width:100%; background:none; border:none; padding:0; text-align:left; cursor:pointer; }
+.wb-report-caret{ font-size:11.5px; color:var(--sub2); flex:none; white-space:nowrap; }
+.wb-report-sechead:hover .wb-report-caret{ color:var(--accent); }

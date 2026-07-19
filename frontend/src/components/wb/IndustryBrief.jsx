@@ -8,6 +8,7 @@ const PERIOD_CN = { daily: '日', weekly: '周', monthly: '月' }
 
 export default function IndustryBrief({ period = 'daily', compact = false, limit }) {
   const [data, setData] = useState(null)
+  const [open, setOpen] = useState(true)
   useEffect(() => {
     let alive = true
     api(`/api/industry-brief?period=${period}`).then(j => { if (alive) setData(j.data) }).catch(() => {})
@@ -20,15 +21,18 @@ export default function IndustryBrief({ period = 'daily', compact = false, limit
 
   return (
     <div className="wb-brief" style={{ background: 'var(--surface)', borderColor: 'var(--line10)' }}>
-      <div className="wb-brief-head" style={{ marginBottom: 8 }}>
-        <div className="wb-brief-title" style={{ fontSize: 15 }}>🌐 行业大事</div>
-        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--faint)' }}>AI HOT 精选 · 前 {items.length} 条</span>
+      <div className="wb-brief-head" style={{ marginBottom: open ? 8 : 0 }}>
+        <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, flex: 1, textAlign: 'left' }}>
+          <span className="wb-brief-title" style={{ fontSize: 15 }}>🌐 行业大事</span>
+          <span style={{ fontSize: 11, color: 'var(--faint)' }}>AI HOT 精选 · 前 {items.length} 条</span>
+          <span className="wb-report-caret" style={{ marginLeft: 6 }}>{open ? '收起 ▴' : '展开 ▾'}</span>
+        </button>
         <a className="wb-brief-link" style={{ marginLeft: 'auto' }} href={data.jumpUrl} target="_blank" rel="noreferrer"
           title="到 AI HOT 看完整日/周/月报（本期主线+主题聚类的编辑综合，他们已做好，我们不重复造轮子）">
           看 AI HOT 完整{PERIOD_CN[period]}报 <IconExternal size={10} style={{ verticalAlign: '-1px' }} />
         </a>
       </div>
-      {compact ? (
+      {open && (compact ? (
         <div>
           {items.map((it, i) => (
             <div key={it.id} style={{ fontSize: 13, padding: '5px 0', borderTop: i ? '1px solid var(--line08)' : 'none', display: 'flex', gap: 8 }}>
@@ -57,7 +61,7 @@ export default function IndustryBrief({ period = 'daily', compact = false, limit
           </div>
         ))}
       </div>
-      )}
+      ))}
     </div>
   )
 }

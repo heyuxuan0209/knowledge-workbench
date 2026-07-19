@@ -25,6 +25,20 @@ function ArticleLinks({ articles }) {
   )
 }
 
+// 可折叠的报告分区：标题行整条可点，收起后只留标题——周报信息量大，随手折叠少下滑
+function SectionCard({ id, header, brief, collapsedSet, toggle, children }) {
+  const open = !collapsedSet.has(id)
+  return (
+    <div className="wb-card" style={{ padding: '16px 18px', ...(brief ? { background: 'var(--brief-bg)', borderColor: 'rgba(61,90,128,.22)' } : null) }}>
+      <button className="wb-report-sechead" onClick={() => toggle(id)}>
+        <span className="wb-report-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>{header}</span>
+        <span className="wb-report-caret">{open ? '收起 ▴' : '展开 ▾'}</span>
+      </button>
+      {open && children}
+    </div>
+  )
+}
+
 // 素材卡片引用列表（点击跳素材库并高亮，可返回）
 function NoteLinks({ notes, gotoNote }) {
   if (!notes?.length) return null
@@ -56,6 +70,15 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
   const [reports, setReports] = useState({ weekly: null, monthly: null })
   const [generating, setGenerating] = useState(false)
   const [openTrend, setOpenTrend] = useState(null) // 展开的动向索引（看证据文章）
+  // 各分区折叠状态（记本地）：周报信息量大，随手收起少下滑
+  const [collapsedSet, setCollapsed] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('wb-report-collapsed') || '[]')) } catch { return new Set() }
+  })
+  const toggle = (id) => setCollapsed(prev => {
+    const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id)
+    localStorage.setItem('wb-report-collapsed', JSON.stringify([...s]))
+    return s
+  })
 
   const load = async (pt) => {
     try {
@@ -129,10 +152,8 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
         )}
 
         {/* ① 我的主题这周变了啥（纯事实：changelog） */}
-        <div className="wb-card" style={{ padding: '16px 18px' }}>
-          <div className="wb-report-section-title">① 我的主题这{unitCn}变了啥
-            {report.page_changes?.length ? <span className="wb-report-cnt">{report.page_changes.length} 处演进</span> : null}
-          </div>
+        <SectionCard id="mine" collapsedSet={collapsedSet} toggle={toggle}
+          header={<>① 我的主题这{unitCn}变了啥{report.page_changes?.length ? <span className="wb-report-cnt">{report.page_changes.length} 处演进</span> : null}</>}>
           <div className="wb-report-explain">来自你主题页的同化/修订记录（收进素材时自动生成）——纯事实。点主题名看综述与完整时间线。</div>
           {report.page_changes?.length
             ? report.page_changes.map((p, i) => (
@@ -142,13 +163,11 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
               </div>
             ))
             : <div className="wb-report-line" style={{ color: 'var(--sub2)' }}>本{unitCn}没有主题页修订。存素材并在主题页「收进」后，这里会汇总每次演进。</div>}
-        </div>
+        </SectionCard>
 
         {/* ② 涌现的新方向（AI 提议 · 供你判断，每类带算法解释） */}
-        <div className="wb-card" style={{ padding: '16px 18px', background: 'var(--brief-bg)', borderColor: 'rgba(61,90,128,.22)' }}>
-          <div className="wb-report-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <IconBulb />② 涌现的新方向 <span className="wb-ai-tag">AI 提议 · 供你判断</span>
-          </div>
+        <SectionCard id="emergent" brief collapsedSet={collapsedSet} toggle={toggle}
+          header={<><IconBulb />② 涌现的新方向 <span className="wb-ai-tag">AI 提议 · 供你判断</span></>}>
           {em.newTopics?.length > 0 && <>
             <div className="wb-report-sublab">建议新建主题</div>
             <div className="wb-report-explain">怎么来的：AI 看到素材扎堆在某个你还没建的方向、且有热度，提议建页。</div>
@@ -179,14 +198,12 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
           {!hasEmergent && (
             <div className="wb-report-line" style={{ color: 'var(--sub2)' }}>本{unitCn}暂无涌现发现（素材与主题页活动越多，AI 越能发现新方向）。</div>
           )}
-        </div>
+        </SectionCard>
 
         {/* ③ 值得写的选题 */}
         {report.ideas?.length > 0 && (
-          <div className="wb-card" style={{ padding: '16px 18px' }}>
-            <div className="wb-report-section-title">③ 值得写的选题 <span className="wb-ai-tag">AI 提议</span>
-              <span className="wb-report-cnt">{report.ideas.length} 个</span>
-            </div>
+          <SectionCard id="ideas" collapsedSet={collapsedSet} toggle={toggle}
+            header={<>③ 值得写的选题 <span className="wb-ai-tag">AI 提议</span><span className="wb-report-cnt">{report.ideas.length} 个</span></>}>
             <div className="wb-report-explain">怎么来的：结合你可能没注意到的行业热点 + 你素材厚/有立场的主题，出跨越单日热点的深度选题。</div>
             {report.ideas.map(idea => (
               <div key={idea.id} className="wb-report-line" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -194,12 +211,12 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
                 <button className="wb-brief-link" onClick={() => viewIdea(idea)}>查看 →</button>
               </div>
             ))}
-          </div>
+          </SectionCard>
         )}
 
         {/* ④ 大盘动态（信息流关键词升降，本地统计） */}
-        <div className="wb-card" style={{ padding: '16px 18px' }}>
-          <div className="wb-report-section-title">④ 大盘动态 <span className="wb-report-cnt">外部信号</span></div>
+        <SectionCard id="trends" collapsedSet={collapsedSet} toggle={toggle}
+          header={<>④ 大盘动态 <span className="wb-report-cnt">外部信号</span></>}>
           <div className="wb-report-explain">你信息流里关键词本期 vs 上期的词频变化（本地统计）。点每条看命中的文章。</div>
           {report.trends?.length
             ? report.trends.map((t, i) => {
@@ -224,9 +241,9 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
               )
             })
             : <div className="wb-report-line" style={{ color: 'var(--sub2)' }}>本{unitCn}信息流没有显著的升温/降温变化。</div>}
-        </div>
+        </SectionCard>
 
-        {/* 行业大事（AI HOT 收窄成标题级，和资讯页去重） */}
+        {/* 行业大事（AI HOT 收窄成标题级，和资讯页去重，自身可折叠） */}
         <IndustryBrief period={periodType} compact limit={5} />
       </>}
     </>
