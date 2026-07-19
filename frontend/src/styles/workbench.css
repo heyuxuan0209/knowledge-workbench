@@ -623,3 +623,11 @@ input, textarea { font-family: inherit; }
 /* 资讯列表工具条：文章/项目 + 筛选/搜索/计数/同步 合并一条，贴住网格 */
 .wb-list-toolbar{ flex-wrap:wrap; gap:12px; }
 .wb-tb-sep{ width:1px; height:20px; background:var(--line14); flex:none; }
+
+/* 周报/月报重构：导语横幅 + AI 提议标 + 子标签 + 算法解释 + 计数 */
+.wb-report-oneline{ background:var(--brief-bg); border-left:3px solid var(--accent); padding:12px 16px; border-radius:0 8px 8px 0; font-size:14px; line-height:1.6; margin:4px 0 4px; }
+.wb-report-oneline b{ color:var(--body); }
+.wb-ai-tag{ font-size:10.5px; font-weight:600; color:var(--accent); background:rgba(61,90,128,.1); padding:2px 8px; border-radius:5px; }
+.wb-report-cnt{ font-size:11px; font-weight:400; color:var(--faint); margin-left:8px; }
+.wb-report-sublab{ font-size:12px; font-weight:700; color:var(--sub); margin:12px 0 1px; }
+.wb-report-explain{ font-size:11.5px; color:var(--sub2); line-height:1.5; margin:0 0 6px; }

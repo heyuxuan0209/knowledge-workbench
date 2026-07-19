@@ -192,6 +192,7 @@ function getReportWithIdeas(db, reportId) {
       consensus: JSON.parse(i.consensus || '[]'),
       non_consensus: JSON.parse(i.non_consensus || '[]'),
       supporting_content_ids: JSON.parse(i.supporting_content_ids || '[]'),
+      supporting_note_ids: JSON.parse(i.supporting_note_ids || '[]'),
     }));
   resolveReportRefs(db, report);
   return report;
@@ -214,7 +215,10 @@ function resolveReportRefs(db, report) {
     em[key] = (em[key] || []).map(item => (typeof item === 'string' ? { text: item } : item));
     em[key].forEach(collect);
   }
-  for (const idea of report.ideas) (idea.supporting_content_ids || []).forEach(id => contentIds.add(id));
+  for (const idea of report.ideas) {
+    (idea.supporting_content_ids || []).forEach(id => contentIds.add(id));
+    (idea.supporting_note_ids || []).forEach(id => noteIds.add(id));
+  }
 
   const inClause = (ids) => ids.map(() => '?').join(',');
   const contentMap = new Map(contentIds.size
@@ -235,6 +239,7 @@ function resolveReportRefs(db, report) {
   for (const key of ['newTopics', 'links', 'conflicts']) em[key].forEach(attach);
   for (const idea of report.ideas) {
     idea.supporting_contents = (idea.supporting_content_ids || []).map(id => contentMap.get(id)).filter(Boolean);
+    idea.supporting_notes = (idea.supporting_note_ids || []).map(id => noteMap.get(id)).filter(Boolean);
   }
 }
 

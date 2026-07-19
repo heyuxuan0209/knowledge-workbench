@@ -33,7 +33,7 @@ export function IdeaModal({ idea, onClose, onUpgrade, onCreate, onDismiss }) {
       <Body>{idea.consensus.length ? idea.consensus.map((c, i) => <div key={i}>· {c}</div>) : '（无）'}</Body>
       <Label>非共识（{idea.non_consensus.length}）</Label>
       <Body>{idea.non_consensus.length ? idea.non_consensus.map((c, i) => <div key={i}>· {c}</div>) : '（无）'}</Body>
-      <Label>支撑素材（{(idea.supporting_content_ids || []).length}）</Label>
+      <Label>外部支撑 · 行业热点（{(idea.supporting_content_ids || []).length}）</Label>
       <Body>
         {(idea.supporting_contents || []).length
           ? idea.supporting_contents.map(c => (
@@ -45,6 +45,10 @@ export function IdeaModal({ idea, onClose, onUpgrade, onCreate, onDismiss }) {
           ))
           : <span style={{ color: 'var(--sub)' }}>{(idea.supporting_content_ids || []).length ? '（原文已从信息流删除）' : '（本选题没有引用具体文章）'}</span>}
       </Body>
+      {(idea.supporting_notes || []).length > 0 && <>
+        <Label>你的素材支撑（{idea.supporting_notes.length}）</Label>
+        <Body>{idea.supporting_notes.map(n => <div key={n.id}>· 素材：{n.title || '(未命名)'}</div>)}</Body>
+      </>}
       <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
         <button className="wb-btn-primary" onClick={onUpgrade}>升级为常驻主题</button>
         <button className="wb-btn-outline" onClick={() => onCreate('thread')}>创作 thread</button>

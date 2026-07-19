@@ -3,9 +3,9 @@ import { IconChart, IconBulb, IconBolt, IconExternal } from './Icons'
 import { api } from './util'
 import IndustryBrief from './IndustryBrief'
 
-// 周报/月报（M3 洞察层收尾）：动向（升温/降温）+ 主题页更新 + 涌现建议 + 深度选题。
+// 周报/月报（M3 洞察层收尾 · 2026-07-19 重构）：先我后外。
+// 顺序：本期一句话 → ①我的主题演进 → ②涌现的新方向（AI提议·带算法解释）→ ③值得写的选题 → ④大盘动态 → 行业大事（收窄）。
 // 数据来自 /api/reports/latest?period=weekly|monthly；生成走 /api/reports/generate-period。
-// 2026-07-16 可信化改版：每个板块都带真实溯源（文章/素材/主题页链接），跳走可返回。
 
 // 文章引用列表（后端已把 contentIds 解析为 {id,title,url}）
 function ArticleLinks({ articles }) {
@@ -95,6 +95,9 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
     </>
   )
 
+  const em = report?.emergent || {}
+  const hasEmergent = (em.newTopics?.length || 0) + (em.links?.length || 0) + (em.conflicts?.length || 0) > 0
+
   return (
     <>
       <button className="wb-back" onClick={() => setPage('feed')}>← 返回资讯</button>
@@ -106,34 +109,98 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
         </div>
       </div>
       <div className="wb-page-sub">
-        汇总本{unitCn}信息流动向与主题页演进，涌现新方向
+        你这{unitCn}的信息综合：主题演进 + 涌现的新方向
         <button className="wb-brief-link" style={{ marginLeft: 10 }} disabled={generating} onClick={generate}>
           {generating ? '生成中…' : (report ? '重新生成' : `生成本${unitCn}报`)}
         </button>
       </div>
 
-      {/* 行业全貌（阶段2）：复用 AI HOT，与下方"你的知识库演进"个人总结并存 */}
-      <IndustryBrief period={periodType} />
-
       {!report && (
         <div className="wb-empty">
-          还没有{unitCn}报。点上方「生成」：AI 会统计本{unitCn}主题升温/降温、回顾主题页修订，并给出涌现建议与深度选题。
+          还没有{unitCn}报。点上方「生成」：AI 会先看你的主题演进，再给涌现的新方向与深度选题，最后附一眼行业大事。
           <br />也可定时生成：<code>node src/services/sync-period-report.js {periodType}</code>
         </div>
       )}
 
       {report && <>
+        {/* 导语 */}
         {report.summary && (
+          <div className="wb-report-oneline">本{unitCn}一句话：<b>{report.summary}</b></div>
+        )}
+
+        {/* ① 我的主题这周变了啥（纯事实：changelog） */}
+        <div className="wb-card" style={{ padding: '16px 18px' }}>
+          <div className="wb-report-section-title">① 我的主题这{unitCn}变了啥
+            {report.page_changes?.length ? <span className="wb-report-cnt">{report.page_changes.length} 处演进</span> : null}
+          </div>
+          <div className="wb-report-explain">来自你主题页的同化/修订记录（收进素材时自动生成）——纯事实。点主题名看综述与完整时间线。</div>
+          {report.page_changes?.length
+            ? report.page_changes.map((p, i) => (
+              <div key={i} className="wb-report-line">
+                「<button className="wb-brief-link" style={{ padding: 0, fontWeight: 600 }} onClick={() => gotoTopic(p.topicId, { remember: true })}>{p.topicName}</button>」
+                {p.summary}{p.conflict && <span style={{ color: 'var(--amber)' }}> ⚡含矛盾点</span>}
+              </div>
+            ))
+            : <div className="wb-report-line" style={{ color: 'var(--sub2)' }}>本{unitCn}没有主题页修订。存素材并在主题页「收进」后，这里会汇总每次演进。</div>}
+        </div>
+
+        {/* ② 涌现的新方向（AI 提议 · 供你判断，每类带算法解释） */}
+        <div className="wb-card" style={{ padding: '16px 18px', background: 'var(--brief-bg)', borderColor: 'rgba(61,90,128,.22)' }}>
+          <div className="wb-report-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconBulb />② 涌现的新方向 <span className="wb-ai-tag">AI 提议 · 供你判断</span>
+          </div>
+          {em.newTopics?.length > 0 && <>
+            <div className="wb-report-sublab">建议新建主题</div>
+            <div className="wb-report-explain">怎么来的：AI 看到素材扎堆在某个你还没建的方向、且有热度，提议建页。</div>
+            {em.newTopics.map((t, i) => (
+              <div key={`n${i}`} className="wb-report-line">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ flex: 1 }}>🌱 <b>「{t.name}」</b>：{t.why}</span>
+                  <button className="wb-brief-link" style={{ flex: 'none' }} onClick={() => createFromSuggestion(t)}>建为主题 →</button>
+                </div>
+                {emergentRefs(t)}
+              </div>
+            ))}
+          </>}
+          {em.links?.length > 0 && <>
+            <div className="wb-report-sublab">跨主题洞察</div>
+            <div className="wb-report-explain">怎么来的：AI 通读你各主题的综述，找出两个主题之间的关联或因果。</div>
+            {em.links.map((l, i) => (
+              <div key={`l${i}`} className="wb-report-line">🔗 {l.text}{emergentRefs(l)}</div>
+            ))}
+          </>}
+          {em.conflicts?.length > 0 && <>
+            <div className="wb-report-sublab">观点冲突</div>
+            <div className="wb-report-explain">怎么来的：AI 找出素材/主题间互相矛盾、值得你验证的论断。</div>
+            {em.conflicts.map((c, i) => (
+              <div key={`c${i}`} className="wb-report-line" style={{ color: 'var(--amber)' }}><IconBolt /> {c.text}{emergentRefs(c)}</div>
+            ))}
+          </>}
+          {!hasEmergent && (
+            <div className="wb-report-line" style={{ color: 'var(--sub2)' }}>本{unitCn}暂无涌现发现（素材与主题页活动越多，AI 越能发现新方向）。</div>
+          )}
+        </div>
+
+        {/* ③ 值得写的选题 */}
+        {report.ideas?.length > 0 && (
           <div className="wb-card" style={{ padding: '16px 18px' }}>
-            <div className="wb-report-line" style={{ fontSize: 13.5 }}>{report.summary}</div>
+            <div className="wb-report-section-title">③ 值得写的选题 <span className="wb-ai-tag">AI 提议</span>
+              <span className="wb-report-cnt">{report.ideas.length} 个</span>
+            </div>
+            <div className="wb-report-explain">怎么来的：结合你可能没注意到的行业热点 + 你素材厚/有立场的主题，出跨越单日热点的深度选题。</div>
+            {report.ideas.map(idea => (
+              <div key={idea.id} className="wb-report-line" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                💡 <span style={{ flex: 1 }}>{idea.title}</span>
+                <button className="wb-brief-link" onClick={() => viewIdea(idea)}>查看 →</button>
+              </div>
+            ))}
           </div>
         )}
 
+        {/* ④ 大盘动态（信息流关键词升降，本地统计） */}
         <div className="wb-card" style={{ padding: '16px 18px' }}>
-          <div className="wb-report-section-title">本{unitCn}动向</div>
-          <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 6 }}>
-            统计口径：关键词出现在多少篇内容里（本期 vs 上期，本地统计）。点每条可展开命中的文章。
-          </div>
+          <div className="wb-report-section-title">④ 大盘动态 <span className="wb-report-cnt">外部信号</span></div>
+          <div className="wb-report-explain">你信息流里关键词本期 vs 上期的词频变化（本地统计）。点每条看命中的文章。</div>
           {report.trends?.length
             ? report.trends.map((t, i) => {
               const open = openTrend === i
@@ -156,60 +223,11 @@ export default function ReportsView({ setPage, viewIdea, showToast, loadTopics, 
                 </div>
               )
             })
-            : <div className="wb-report-line">本{unitCn}信息流没有显著的升温/降温变化。</div>}
+            : <div className="wb-report-line" style={{ color: 'var(--sub2)' }}>本{unitCn}信息流没有显著的升温/降温变化。</div>}
         </div>
 
-        <div className="wb-card" style={{ padding: '16px 18px' }}>
-          <div className="wb-report-section-title">主题更新</div>
-          <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 6 }}>
-            来自本{unitCn}各主题页的修订记录（素材收进时自动生成）。点主题名可查看该页综述、已收进素材与完整修订时间线。
-          </div>
-          {report.page_changes?.length
-            ? report.page_changes.map((p, i) => (
-              <div key={i} className="wb-report-line">
-                「<button className="wb-brief-link" style={{ padding: 0, fontWeight: 600 }} onClick={() => gotoTopic(p.topicId, { remember: true })}>{p.topicName}</button>」
-                {p.summary}{p.conflict && <span style={{ color: 'var(--amber)' }}> ⚡含矛盾点</span>}
-              </div>
-            ))
-            : <div className="wb-report-line">本{unitCn}没有主题页修订。保存素材并在主题页「收进」后，这里会汇总每次演进。</div>}
-        </div>
-
-        <div className="wb-card" style={{ padding: '16px 18px', background: 'var(--brief-bg)', borderColor: 'rgba(61,90,128,.22)' }}>
-          <div className="wb-report-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><IconBulb />涌现建议</div>
-          <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 6 }}>
-            AI 回顾本{unitCn}素材与主题页修订，找三类信号：值得新建的主题 / 跨主题关联 / 互相矛盾的论断。每条附支撑来源。
-          </div>
-          {(report.emergent?.newTopics || []).map((t, i) => (
-            <div key={`n${i}`} className="wb-report-line">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ flex: 1 }}>🌱 <b>建议新主题「{t.name}」</b>：{t.why}</span>
-                <button className="wb-brief-link" style={{ flex: 'none' }} onClick={() => createFromSuggestion(t)}>建为主题 →</button>
-              </div>
-              {emergentRefs(t)}
-            </div>
-          ))}
-          {(report.emergent?.links || []).map((l, i) => (
-            <div key={`l${i}`} className="wb-report-line">🔗 {l.text}{emergentRefs(l)}</div>
-          ))}
-          {(report.emergent?.conflicts || []).map((c, i) => (
-            <div key={`c${i}`} className="wb-report-line" style={{ color: 'var(--amber)' }}><IconBolt /> {c.text}{emergentRefs(c)}</div>
-          ))}
-          {!(report.emergent?.newTopics?.length || report.emergent?.links?.length || report.emergent?.conflicts?.length) && (
-            <div className="wb-report-line">本{unitCn}暂无涌现发现（素材与主题页活动越多，AI 越能发现新方向）。</div>
-          )}
-        </div>
-
-        {report.ideas?.length > 0 && (
-          <div className="wb-card" style={{ padding: '16px 18px' }}>
-            <div className="wb-report-section-title">深度选题</div>
-            {report.ideas.map(idea => (
-              <div key={idea.id} className="wb-report-line" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                💡 <span style={{ flex: 1 }}>{idea.title}</span>
-                <button className="wb-brief-link" onClick={() => viewIdea(idea)}>查看 →</button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* 行业大事（AI HOT 收窄成标题级，和资讯页去重） */}
+        <IndustryBrief period={periodType} compact limit={5} />
       </>}
     </>
   )

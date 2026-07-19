@@ -172,7 +172,8 @@ ${contentsBlock}
       "whyNow": "为什么是现在",
       "consensus": ["共识点"],
       "nonConsensus": ["争议点"],
-      "contentIds": ["支撑内容id，来自「本期热门内容」方括号里的真实id"]
+      "contentIds": ["外部支撑：来自「本期热门内容」方括号里的真实id（他可能没注意到的行业热点）"],
+      "noteIds": ["个人支撑：来自「本期新增素材卡片」方括号里的真实id（他素材厚/有立场的地方）"]
     }
   ]
 }
@@ -181,7 +182,9 @@ ${contentsBlock}
 - trends 3-6 条，宁缺毋滥，srcKeys 必须来自上面的 T 编号；pageChanges 只写真有修订的主题页
 - emergent.newTopics 只在素材/热度确实支撑时建议（0-3 个），不硬凑；links 和 conflicts 同理
 - emergent 里每条建议都必须给出支撑依据的 contentIds / noteIds（谁支撑它就引谁，没有依据的建议不要写）
-- ideas 出 1-3 个，偏"跨越单日热点的深度选题"（这是${periodLabel}报，不是日报）
+- ideas 出 1-3 个"跨越单日热点的深度选题"（这是${periodLabel}报，不是日报）；取材两头都要兼顾：
+  既有他可能没注意到的行业热点（引 contentIds），也有他素材厚/已有立场的方向（引 noteIds）——
+  最好的选题是"外部热点 × 他的独特积累"的交叉点。每条尽量同时给 contentIds 和 noteIds
 - id 必须来自方括号里的真实 id，不得编造；全部用中文`;
 }
 
@@ -284,15 +287,16 @@ export async function generatePeriodReport(periodType = 'weekly') {
     );
 
     const insertIdea = db.prepare(`
-      INSERT INTO ideas (id, report_id, title, angle, why_now, consensus, non_consensus, supporting_content_ids)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ideas (id, report_id, title, angle, why_now, consensus, non_consensus, supporting_content_ids, supporting_note_ids)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const idea of parsed.ideas || []) {
       if (!idea.title) continue;
       insertIdea.run(
         randomUUID(), reportId, idea.title, idea.angle || '', idea.whyNow || '',
         JSON.stringify(idea.consensus || []), JSON.stringify(idea.nonConsensus || []),
-        JSON.stringify(sanitizeIds(idea.contentIds))
+        JSON.stringify(sanitizeIds(idea.contentIds)),
+        JSON.stringify(sanitizeNoteIds(idea.noteIds))
       );
     }
 
