@@ -10,9 +10,17 @@ export default function RightPanel(props) {
   const isStudio = page === 'studio'
 
   if (collapsed) {
+    // 细条自说明（方案 A）：闲时不占地，但竖排写清用途——选中卡片即自动展开成面板
+    const railHint = isStudio ? '创作助手'
+      : page === 'topics' ? '跨主题 AI 助手'
+      : page === 'notes' ? '选中卡片 → 解读 · 问素材库'
+      : '选中卡片 → 即时解读'
     return (
       <aside className="wb-panel collapsed">
-        <button className="wb-panel-toggle" onClick={onToggle} title="展开面板"><IconChevronLeft /></button>
+        <button className="wb-panel-rail" onClick={onToggle} title="展开面板">
+          <IconChevronLeft />
+          <span className="wb-panel-rail-hint">{railHint}</span>
+        </button>
       </aside>
     )
   }
