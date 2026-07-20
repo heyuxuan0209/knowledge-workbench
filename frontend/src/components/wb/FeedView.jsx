@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { timeAgo, TYPE_LABEL, api } from './util'
+import { timeAgo, TYPE_LABEL, api, platformLabel } from './util'
 import { IconExternal } from './Icons'
 import { renderMarkdown } from './markdown'
 
@@ -378,7 +378,7 @@ export default function FeedView({
             const title = c.zh_title || c.en_title || '（无标题）'
             // 关注状态 → 小圆点（绿=已关注/灰=未关注），不再用满色 pill；分类降成尾巴小灰字
             const dot = <span className={`wb-fdot${followed ? ' f' : ''}`} title={followed ? '来自你关注的源' : '来自你没关注的源'} />
-            const plat = platformOf(c) // 来源类型标（一眼知道是视频/文章/播客/公众号…）
+            const plat = platformLabel({ platform: c.source_platform, contentType: c.content_type, sourceApp: c.source_app }) // 来源类型标
             const meta = `${plat ? plat + ' · ' : ''}${author} · ${timeAgo(c.published_at)}${c.category ? ' · ' + c.category : ''}`
             const actions = (
               <div className="wb-fcard-act">
@@ -455,20 +455,6 @@ export default function FeedView({
       {readerContent && <ReaderModal content={readerContent} onClose={() => setReaderContent(null)} showToast={showToast} loadNotes={loadNotes} />}
     </>
   )
-}
-
-// 来源类型标（用户反馈：卡片要能一眼看出是 YouTube / 公众号 / 播客 还是文章）。
-// 优先用 source_platform（登记源带），没有再看 content_type，最后 source_app 兜底。
-function platformOf(c) {
-  const P = {
-    YouTube: '▶ YouTube', Bilibili: '▶ B站', WeChat: '公众号', Podcast: '🎙 播客',
-    Xiaoyuzhou: '🎙 小宇宙', RSS: '网页', Blog: '网页', Newsletter: '网页', GitHub: 'GitHub', X: 'X',
-  }
-  if (c.source_platform && P[c.source_platform]) return P[c.source_platform]
-  const T = { video: '▶ 视频', podcast: '🎙 播客', tweet: 'X', repo: 'GitHub', article: '文章' }
-  if (c.content_type && T[c.content_type]) return T[c.content_type]
-  const A = { aihot: 'AI HOT', hackernews: 'HN', github_trending: 'GitHub', rss: '网页' }
-  return A[c.source_app] || '文章'
 }
 
 // 分类 chips（UI 改造 2b）——文章/项目各一套类目，只显示有内容的类目。

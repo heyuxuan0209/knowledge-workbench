@@ -53,6 +53,20 @@ export const TYPE_LABEL = {
   article: 'Article', video: 'Video', tweet: 'X', paper: 'Paper', repo: 'Repo', text: 'Text',
 }
 
+// 来源类型标（资讯/素材/信源统一）：一眼知道是 YouTube/公众号/播客还是文章。
+// 优先 platform（登记源精确到平台），没有再看 contentType，最后 sourceApp 兜底。
+const PLAT_LABEL = {
+  YouTube: '▶ YouTube', Bilibili: '▶ B站', WeChat: '公众号', Podcast: '🎙 播客',
+  Xiaoyuzhou: '🎙 小宇宙', RSS: '网页', Blog: '网页', Newsletter: '网页', GitHub: 'GitHub', X: 'X',
+}
+export function platformLabel({ platform, contentType, sourceApp } = {}) {
+  if (platform && PLAT_LABEL[platform]) return PLAT_LABEL[platform]
+  const T = { video: '▶ 视频', podcast: '🎙 播客', tweet: 'X', repo: 'GitHub', article: '文章' }
+  if (contentType && T[contentType]) return T[contentType]
+  const A = { aihot: 'AI HOT', hackernews: 'HN', github_trending: 'GitHub', rss: '网页' }
+  return A[sourceApp] || platform || '文章'
+}
+
 // 来源抓取能力（NotebookLM 式来源区分）：选中时就告知用户该条能拿到什么
 // full=可抓原文 / summary=只有摘要（公众号/无链接）/ video=依赖字幕
 export function sourceCapability(c) {

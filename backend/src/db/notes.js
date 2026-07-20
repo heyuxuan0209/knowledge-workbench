@@ -99,6 +99,7 @@ export function getNotes({ limit = 50, offset = 0, q = null, topicId = null, sou
   const rows = db.prepare(`
     SELECT n.*, c.zh_title AS content_zh_title, c.url AS content_url,
       c.content_type AS content_content_type, c.source_app AS content_source_app,
+      (SELECT sp.platform FROM source_platforms sp WHERE sp.source_id = c.source_id LIMIT 1) AS content_source_platform,
       (SELECT group_concat(nt.topic_id) FROM note_topics nt WHERE nt.note_id = n.id) AS topic_ids,
       (SELECT group_concat(t.name, ' / ') FROM note_topics nt2 JOIN topics t ON t.id = nt2.topic_id WHERE nt2.note_id = n.id) AS topic_names,
       (SELECT json_group_array(json_object('id', nt3.topic_id, 'name', t3.name, 'status', nt3.status, 'addedBy', nt3.added_by))

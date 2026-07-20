@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { timeAgo, STANCE_COLORS, STANCE_CN, api } from './util'
+import { timeAgo, STANCE_COLORS, STANCE_CN, api, platformLabel } from './util'
 import { IconClip, IconExternal, IconTrash } from './Icons'
 import { renderMarkdown } from './markdown'
 
@@ -567,7 +567,10 @@ export default function NotesView({
     const keywords = safeParseKeywords(note.keywords)
     const noteTopics = safeParseKeywords(note.topics_json) // [{id,name,status,addedBy}]
     const noteTopicIds = noteTopics.map(t => t.id)
-    const ctypeBadge = CTYPE_BADGE[note.content_content_type] || (note.content_id ? null : '🤖 AI 解读')
+    // 来源类型标（与资讯页同款）：有来源内容→▶YouTube/公众号/…；纯 AI 解读→🤖
+    const ctypeBadge = note.content_id
+      ? platformLabel({ platform: note.content_source_platform, contentType: note.content_content_type, sourceApp: note.content_source_app })
+      : '🤖 AI 解读'
     const selected = selectedItems.some(x => x.id === note.content_id || x.id === `note-${note.id}`)
     return (
       <div key={note.id} className={`wb-card${selected ? ' selected' : ''}`} ref={highlighted ? highlightRef : null}

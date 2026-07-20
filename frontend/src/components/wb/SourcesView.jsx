@@ -18,6 +18,9 @@ const INPUT_EXAMPLES = [
   { type: '其他任意网址', example: 'https://simonwillison.net/', desc: '不在上面类型里也能加：有 RSS 自动抓取，没有则降级为仅登记跳转' },
 ]
 
+// 平台图标（与资讯/素材同款视觉）：信源保留精确平台名（RSS/Blog 要区分），只加图标前缀
+const PLAT_ICON = { YouTube: '▶ ', Bilibili: '▶ ', Podcast: '🎙 ', Xiaoyuzhou: '🎙 ' }
+
 // 信源分类 tab（按第一个平台归组；catch-all「其他」兜住未来新增平台类型）
 const GROUPS = [
   { key: 'x', label: 'X', match: p => p === 'X' },
@@ -99,7 +102,7 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
           {(s.platforms || []).map(p => (
             <span key={p.id} className="wb-pill" title={p.handle}
               style={{ color: modeOf(p.track_mode).fg, background: modeOf(p.track_mode).bg, borderRadius: 6 }}>
-              {p.platform} · {modeOf(p.track_mode).cn}
+              {PLAT_ICON[p.platform] || ''}{p.platform} · {modeOf(p.track_mode).cn}
             </span>
           ))}
         </div>
@@ -159,7 +162,7 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
             <input className="wb-src-preview-name" value={preview.displayName}
               onChange={(e) => setPreview({ ...preview, displayName: e.target.value })} />
             <span className="wb-pill" style={{ color: modeOf(preview.trackMode).fg, background: modeOf(preview.trackMode).bg, borderRadius: 6 }}>
-              {preview.platform} · {modeOf(preview.trackMode).cn}
+              {PLAT_ICON[preview.platform] || ''}{preview.platform} · {modeOf(preview.trackMode).cn}
             </span>
           </div>
           {preview.note && <div className="wb-src-note">{preview.note}</div>}
