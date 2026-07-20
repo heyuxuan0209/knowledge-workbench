@@ -4,41 +4,42 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小红书卡片工作台</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="/html2canvas.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   :root{--scale:.32;--cardh:1440px}
-  body{background:#2b2a27;color:#eee;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;padding:24px;line-height:1.5}
+  body{background:#efece4;color:#211f1a;font-family:system-ui,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;padding:20px;line-height:1.5}
   .app{max-width:1280px;margin:0 auto}
-  h1{font-size:18px;font-weight:600;margin-bottom:4px}
-  .hint{font-size:12.5px;color:#a4a4a4;margin-bottom:16px;line-height:1.7}
-  .hint b{color:#ddd}
+  h1{font-size:18px;font-weight:600;margin-bottom:4px;color:#211f1a}
+  .hint{font-size:12.5px;color:#706b60;margin-bottom:16px;line-height:1.7}
+  .hint b{color:#332f27}
   .panel{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
-  textarea{flex:1;min-width:340px;min-height:170px;padding:12px;border-radius:8px;border:1px solid #555;background:#26251f;color:#eee;font-family:inherit;font-size:13px;line-height:1.7;resize:vertical}
+  textarea{flex:1;min-width:340px;min-height:170px;padding:12px;border-radius:8px;border:1px solid rgba(33,31,26,.14);background:#faf8f2;color:#211f1a;font-family:inherit;font-size:13px;line-height:1.7;resize:vertical}
   .controls{display:flex;flex-direction:column;gap:10px;min-width:190px}
-  button{padding:9px 14px;border-radius:8px;border:1px solid #666;background:#3d3b34;color:#eee;font-size:13px;cursor:pointer;font-family:inherit}
-  button:hover{background:#4a473e}
-  button.primary{background:#8a6d3b;border-color:#8a6d3b;color:#fff}
+  button{padding:9px 14px;border-radius:8px;border:1px solid rgba(33,31,26,.16);background:#faf8f2;color:#332f27;font-size:13px;cursor:pointer;font-family:inherit}
+  button:hover{border-color:#3d5a80;color:#3d5a80}
+  button.primary{background:#3d5a80;border-color:#3d5a80;color:#fff}
+  button.primary:hover{background:#2c456a;color:#fff}
   .styles{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
   .styles button{font-size:12.5px;padding:7px 13px}
-  .styles button.on{background:#fff;color:#111;border-color:#fff;font-weight:600}
-  .row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#bbb}
+  .styles button.on{background:#3d5a80;color:#fff;border-color:#3d5a80;font-weight:600}
+  .row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#706b60}
   .row .asp{padding:5px 12px;font-size:12.5px}
-  .row .asp.on{background:#fff;color:#111;border-color:#fff}
-  .caption-box{background:#26251f;border:1px solid #555;border-radius:8px;padding:12px;margin-bottom:18px;color:#ddd;display:none}
-  .cap-label{font-size:12px;color:#fff;font-weight:600;margin-bottom:6px;letter-spacing:.02em}
-  .cap-text{background:#1f1e19;border:1px solid #4a473e;border-radius:6px;padding:9px 11px;font-size:13px;line-height:1.7;color:#e8e4da;white-space:pre-wrap;outline:none}
-  .cap-text:hover{border-color:#6a6455}
-  .cap-text:focus{border-color:#8a6d3b}
+  .row .asp.on{background:#3d5a80;color:#fff;border-color:#3d5a80}
+  .caption-box{background:#faf8f2;border:1px solid rgba(33,31,26,.1);border-radius:8px;padding:12px;margin-bottom:18px;color:#332f27;display:none}
+  .cap-label{font-size:12px;color:#211f1a;font-weight:600;margin-bottom:6px;letter-spacing:.02em}
+  .cap-text{background:#fff;border:1px solid rgba(33,31,26,.1);border-radius:6px;padding:9px 11px;font-size:13px;line-height:1.7;color:#332f27;white-space:pre-wrap;outline:none}
+  .cap-text:hover{border-color:rgba(33,31,26,.2)}
+  .cap-text:focus{border-color:#3d5a80}
   .cap-copy{margin-top:10px;font-size:12px;padding:6px 12px}
   .gallery{display:flex;flex-wrap:wrap;gap:20px}
   .slot{display:flex;flex-direction:column;gap:8px}
-  .stage{overflow:hidden;border-radius:5px;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+  .stage{overflow:hidden;border-radius:5px;box-shadow:0 6px 24px rgba(33,31,26,.16)}
   .slot .dl{font-size:12px;padding:6px 10px}
-  .empty{color:#888;font-size:14px;padding:40px 0}
+  .empty{color:#8a8478;font-size:14px;padding:40px 0}
   [contenteditable]{outline:none}
-  [contenteditable]:hover{box-shadow:0 0 0 3px rgba(200,154,91,.3) inset}
-  [contenteditable]:focus{box-shadow:0 0 0 3px rgba(200,154,91,.6) inset}
+  [contenteditable]:hover{box-shadow:0 0 0 3px rgba(61,90,128,.25) inset}
+  [contenteditable]:focus{box-shadow:0 0 0 3px rgba(61,90,128,.5) inset}
 
   /* ===== 卡片骨架（4 风格共用） ===== */
   .card{width:1080px;height:var(--cardh,1440px);transform:scale(var(--scale,.32));transform-origin:top left;
@@ -98,7 +99,7 @@
 <div class="app">
   <h1>小红书 / 抖音卡片工作台</h1>
   <div class="hint">
-    ① 把创作台「小红书」生成的卡片文字粘进下框 → 点<b>渲染卡片</b>　② 上排切<b>风格</b>（切换保留你的改动）　③ 卡片上的<b>标题/正文点着就能改</b>（悬停有金框提示；重新点「渲染卡片」按文本框重置）　④ 选<b>比例</b>后点<b>下载 PNG</b>。
+    ① 把创作台「小红书/抖音」生成的卡片文字粘进下框 → 点<b>渲染卡片</b>　② 上排切<b>风格</b>（切换保留你的改动）　③ 卡片上的<b>标题/正文点着就能改</b>（悬停有提示框；重新点「渲染卡片」按文本框重置）　④ 选<b>比例</b>后点<b>下载全部 PNG</b>（或单张）。
   </div>
   <div class="panel">
     <textarea id="input" spellcheck="false"></textarea>

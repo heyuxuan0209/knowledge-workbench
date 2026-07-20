@@ -144,6 +144,15 @@ const FIRST_PERSON_GENRES = ['实践复盘体', '个人叙事体'];
 
 // 输出干净正文（覆盖平台模板里的 Markdown 说法）——用户要"干净正文，不要 ## 和 **"
 const CLEAN_OUTPUT = `【输出格式·最高优先】直接输出可发布的干净正文，**不要用任何 Markdown 符号**：不要 # / ##（标题）、不要 **加粗**、不要 - 或 * 列表符号、不要 \`代码\`反引号。需要小标题时，单独成一行写一句普通文字（前面不加 #）；需要强调时靠措辞，不靠加粗。段落之间用空行分隔。[素材N] 溯源标记要保留。\n\n`;
+// 卡片平台（小红书卡片/抖音卡片）：必须按【封面卡】/【卡N】/【正文文案】结构输出，图卡工具靠这个解析
+const CARD_OUTPUT = `【输出格式·最高优先】严格按下面这个图卡结构输出，一块一行，字段名一字不差：
+【封面卡】大字：（≤12字钩子）／小字：（≤22字，谁该看/能带走什么）
+【卡1】标题：（一句话要点）／正文：（≤60字）
+【卡2】标题：…／正文：…
+…（按内容条数，最多 8 张）
+【正文文案】（发布时配在图片下方那段）
+注意：封面卡必须用「大字：…／小字：…」，内容卡必须用「标题：…／正文：…」，不要混。不要 Markdown 符号（##、**）。[素材N] 溯源标记要保留（渲染成图前会自动去掉）。\n\n`;
+const isCardForm = k => String(k || '').includes('card');
 
 
 function buildPromptV2(topic, body, notes, composedSpec, viewpoint, skipOverview) {
@@ -179,7 +188,8 @@ export async function generateFromTopicV2(topicId, genreKey, platformFormKey, vi
   let exemption = '';
   if (materialsPicked) exemption += `【只用选中素材·ADR-028】本篇只基于下方勾选的 ${selectedNoteIds.length} 条素材创作；**不要引入主题页综述、也不要引入任何未勾选的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】本篇是第一人称亲历文体：[素材N] 溯源只在"引用外部信息/数据"时标，不对你自己的经历强制标注。底线不变：用到外部信息照样必须标、不许编。\n\n`;
-  const composedSpec = `${CLEAN_OUTPUT}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
 
   const { topic, body, notes } = gatherTopicMaterials(topicId, selectedNoteIds);
   console.log(`  ↳ 生成用素材：${materialsPicked ? `选中 ${notes.length} 条（跳过主题综述）` : `主题全部 ${notes.length} 条`}`);
@@ -220,7 +230,8 @@ export async function generateFromMaterials(noteIds, genreKey, platformFormKey, 
 
   let exemption = `【只用选中素材·ADR-028】本篇只基于下方 ${notes.length} 条素材创作；**不要引入任何未提供的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】第一人称亲历文体：[素材N] 只在引用外部信息时标。底线不变：用到外部信息照样标、不许编。\n\n`;
-  const composedSpec = `${CLEAN_OUTPUT}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
 
   // 无主题：造一个最小 topic + 空 body，skipOverview=true（不塞综述）
   const result = await chat([{ role: 'user', content: buildPromptV2({ name: '自选素材', description: '' }, {}, notes, composedSpec, viewpoint, true) }]);

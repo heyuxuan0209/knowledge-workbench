@@ -9,11 +9,11 @@ import { api } from './util'
 // - 审稿：三个批评人格通读全稿 → 批注列表，每条可「按此修改」
 // - 3 个改法：草稿区选中一段 → 三个策略不同的候选卡，挑一个原位替换
 
-export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, suggestTitles, gotoTopic }) {
+export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, gotoTopic }) {
   const platformIcon = (key) => platforms.find(p => p.key === key)?.icon || '📝'
 
   // ── ADR-026 试新版：文体(genre) × 平台形态(platform-form)，与老平台行完全并存 ──
-  const [v2Mode, setV2Mode] = useState(false)
+  const [v2Mode] = useState(true)   // 老版已删，v2 为唯一创作流
   const [genres, setGenres] = useState([])
   const [pforms, setPforms] = useState([])
   const [v2Genre, setV2Genre] = useState('读书精读体')   // 默认=推荐
@@ -151,10 +151,14 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [moreOpen, setMoreOpen] = useState(false)
   // ---- 卡片图 tab（小红书专属）：iframe 嵌入卡片工作台，切过去自动灌入当前草稿 ----
   const [xhsMode, setXhsMode] = useState('text')  // 'text' 文案 | 'cards' 卡片图
+  const [v2Cards, setV2Cards] = useState(false)   // 阶段4：v2 卡片平台打开图卡工具
+  const [draftsOpen, setDraftsOpen] = useState(false)   // 草稿箱面板
+  const [selDrafts, setSelDrafts] = useState(new Set()) // 勾选待删的草稿
   const cardFrame = useRef(null)
-  const cardsMode = studio.platform === 'xhs' && xhsMode === 'cards'
+  const cardsMode = (studio.platform === 'xhs' && xhsMode === 'cards') || v2Cards
   const postDraftToCards = () => {
-    try { cardFrame.current?.contentWindow?.postMessage({ type: 'kw-fill-cards', text: studio.draft }, '*') } catch { /* 跨窗口受限时忽略 */ }
+    const text = String(studio.draft || '').replace(/\s*\[素材\d+\]/g, '')  // 图卡用去掉溯源标记的干净文案
+    try { cardFrame.current?.contentWindow?.postMessage({ type: 'kw-fill-cards', text }, '*') } catch { /* 跨窗口受限时忽略 */ }
   }
 
   const setPlatform = (p) => {
@@ -187,30 +191,48 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           {studio.source || '手选素材（右侧插入）'}
         </span>
         {drafts?.length > 0 && (
-          <select
-            style={{ marginLeft: 'auto', fontSize: 12, padding: '5px 8px', border: '1px solid var(--line08)', borderRadius: 8, background: 'var(--surface)', color: 'var(--body2)', maxWidth: 220 }}
-            value={studio.draftId || ''}
-            onChange={(e) => { const d = drafts.find(x => x.id === e.target.value); if (d) openDraft(d) }}>
-            <option value="">草稿箱（{drafts.length}）…</option>
-            {drafts.map(d => (
-              <option key={d.id} value={d.id}>
-                {(d.title || d.body.slice(0, 24)).slice(0, 26)} · {(d.updated_at || '').slice(5, 10)}
-              </option>
-            ))}
-          </select>
+          <div style={{ marginLeft: 'auto', position: 'relative' }}>
+            <button className="wb-btn-ghost" onClick={() => setDraftsOpen(o => !o)}>草稿箱（{drafts.length}）</button>
+            {draftsOpen && (<>
+              <div onClick={() => setDraftsOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 30 }} />
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 40, width: 340, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 11, boxShadow: '0 12px 32px rgba(33,31,26,.16)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 13px', borderBottom: '1px solid var(--line08)', fontSize: 12, color: 'var(--sub2)' }}>
+                  <span>草稿箱 · {drafts.length} 篇</span>
+                  <span style={{ cursor: 'pointer', color: 'var(--accent)' }}
+                    onClick={() => setSelDrafts(selDrafts.size === drafts.length ? new Set() : new Set(drafts.map(d => d.id)))}>
+                    {selDrafts.size === drafts.length ? '取消全选' : '全选'}
+                  </span>
+                </div>
+                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                  {drafts.map(d => (
+                    <div key={d.id} style={{ display: 'flex', gap: 9, alignItems: 'center', padding: '9px 13px', borderBottom: '1px solid var(--line08)' }}>
+                      <input type="checkbox" checked={selDrafts.has(d.id)}
+                        onChange={() => setSelDrafts(s => { const n = new Set(s); n.has(d.id) ? n.delete(d.id) : n.add(d.id); return n })} />
+                      <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => { openDraft(d); setDraftsOpen(false) }}>
+                        <div style={{ fontSize: 13, color: 'var(--body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(d.title || d.body.slice(0, 24)).slice(0, 28)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>{(d.updated_at || '').slice(5, 16)}</div>
+                      </div>
+                      <button title="删除这份" onClick={() => deleteDrafts?.([d.id])}
+                        style={{ border: 'none', background: 'none', padding: '4px 7px', borderRadius: 6, color: 'var(--faint)', fontSize: 12 }}>删</button>
+                    </div>
+                  ))}
+                </div>
+                {selDrafts.size > 0 && (
+                  <div style={{ padding: '10px 13px', borderTop: '1px solid var(--line08)' }}>
+                    <button onClick={() => { deleteDrafts?.([...selDrafts]); setSelDrafts(new Set()) }}
+                      style={{ width: '100%', border: 'none', background: 'var(--red)', color: '#fff', fontWeight: 600, fontSize: 13, padding: '8px 0', borderRadius: 8, cursor: 'pointer' }}>
+                      删除选中（{selDrafts.size}）
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>)}
+          </div>
         )}
       </div>
-      <div className="wb-page-sub">同一素材集，按平台分化模板 · 每段可溯源到素材卡片</div>
+      <div className="wb-page-sub">选素材 → 按文体 × 平台生成 · 每段可溯源、发布前一键去标记</div>
 
-      {/* ADR-026 试新版：文体 × 平台形态（并行，不影响下面的老平台行；关掉即恢复原样） */}
-      <div style={{ margin: '10px 0 0' }}>
-        <button className={v2Mode ? 'wb-btn-primary' : 'wb-btn-outline'}
-          style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
-          onClick={() => setV2Mode(v => !v)}>
-          <IconBolt />试新版（文体 × 平台形态）
-        </button>
-      </div>
-      {v2Mode && (
+      {v2Mode && !cardsMode && (
         <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '236px 1fr', border: '1px solid var(--line10)', borderRadius: 12, margin: '10px 0', background: 'var(--surface)', minHeight: 300 }}>
           {/* 左：素材台（贯穿到底 + 改稿说明） */}
           <aside style={{ borderRight: '1px solid var(--line08)', padding: 14, display: 'flex', flexDirection: 'column' }}>
@@ -323,24 +345,6 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </div>
       )}
 
-      {!v2Mode && (<>
-        <div className="wb-seg">
-          {platforms.map(p => (
-            <button key={p.key} className={`wb-seg-btn${studio.platform === p.key ? ' active' : ''}`}
-              title={p.when || p.note}
-              onClick={() => setPlatform(p.key)}>{p.label}</button>
-          ))}
-        </div>
-
-        {(() => {
-          const sel = platforms.find(p => p.key === studio.platform)
-          return sel?.when ? (
-            <div style={{ fontSize: 12, color: 'var(--sub2)', margin: '8px 0 0', lineHeight: 1.5 }}>
-              <span style={{ opacity: 0.7 }}>何时用 · </span>{sel.when}
-            </div>
-          ) : null
-        })()}
-      </>)}
 
       {studio.platform === 'xhs' && (
         <div style={{ display: 'flex', gap: 6, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -349,6 +353,13 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               onClick={() => { setXhsMode(m); if (m === 'cards') setTimeout(postDraftToCards, 80) }}>{label}</button>
           ))}
           {cardsMode && <span style={{ fontSize: 12, color: 'var(--sub2)' }}>已填入当前文案 · 切风格/比例、点着改字、下载图</span>}
+        </div>
+      )}
+
+      {v2Cards && (
+        <div style={{ display: 'flex', gap: 8, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="wb-btn-ghost" onClick={() => setV2Cards(false)}>← 返回文稿</button>
+          <span style={{ fontSize: 12, color: 'var(--sub2)' }}>已填入当前文案（已去 [素材N]）· 切风格/比例、点着改字、下载图</span>
         </div>
       )}
 
@@ -366,27 +377,6 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </div>
       )}
 
-      {isEmpty && !v2Mode && (
-        <div className="wb-guide">
-          <div className="wb-guide-steps">
-            <span className="wb-guide-step on"><span className="n">1</span>起稿<span className="cap">你在这</span></span>
-            <span className="wb-guide-arrow">→</span>
-            <span className="wb-guide-step"><span className="n">2</span>打磨<span className="cap">润色·审稿·改一段</span></span>
-            <span className="wb-guide-arrow">→</span>
-            <span className="wb-guide-step"><span className="n">3</span>产出<span className="cap">复制·导出</span></span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <button className="wb-btn-primary" disabled={studio.busy} onClick={() => genDraft()}
-              style={{ fontSize: 15, padding: '12px 26px' }}>
-              {studio.busy ? '生成中…' : `生成${selPlatform?.label || ''}初稿`}
-            </button>
-            <span style={{ fontSize: 12.5, color: 'var(--sub2)' }}>或直接在下面空白处自己写</span>
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 10 }}>
-            素材已就位（{studio.source || '手选素材'}）· 生成后第 2、3 步自动亮起
-          </div>
-        </div>
-      )}
 
       {v2Mode && !isEmpty && (
         <div style={{ display: 'inline-flex', border: '1px solid var(--line10)', borderRadius: 8, overflow: 'hidden', marginTop: 14, marginBottom: -4 }}>
@@ -450,7 +440,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         <span style={{ marginLeft: 'auto' }} />
         {(v2Mode ? (v2Pform || '').includes('card') : studio.platform === 'xhs') ? (
           <button className="wb-btn-primary" disabled={isEmpty} title="把卡片文字渲染成图（复用图卡工具）"
-            onClick={() => { if (studio.platform === 'xhs') { setXhsMode('cards'); setTimeout(postDraftToCards, 80) } else { showToast('图卡工具接入中（阶段4）') } }}>生成图文卡片</button>
+            onClick={() => { if (v2Mode) { setV2Cards(true) } else { setXhsMode('cards') } setTimeout(postDraftToCards, 150) }}>生成图文卡片</button>
         ) : (
           <button className="wb-btn-primary" disabled={isEmpty} onClick={copyAll}>复制全文</button>
         )}
@@ -462,7 +452,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       {cardsMode && (
         <iframe ref={cardFrame} src="/xhs-card-studio.html" title="卡片图工作台"
           onLoad={postDraftToCards}
-          style={{ width: '100%', height: '80vh', border: '1px solid var(--line08)', borderRadius: 10, marginTop: 8, background: '#2b2a27' }} />
+          style={{ width: '100%', height: '78vh', border: '1px solid var(--line10)', borderRadius: 10, marginTop: 8, background: 'var(--surface)' }} />
       )}
 
       {critique && (
