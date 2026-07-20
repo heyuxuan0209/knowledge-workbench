@@ -3,7 +3,7 @@ import { IconChat, IconChevronRight, IconChevronLeft, IconSend, IconStudio } fro
 
 // 右栏：快速分析（非创作页）/ 创作助手（创作页）。可折叠为 40px 细条。
 // 快速分析 list 态 = 已选中列表 + 开始分析；chat 态 = SSE 流式结构化解读 + 保存到笔记。
-// 创作助手 = 已引用 / 可插入素材 / 指令改写（AI 直接改左侧草稿）。
+// 创作助手 = 指令改写（AI 直接改左侧草稿）；素材/引用统一在左栏（A+ 消重）。
 
 export default function RightPanel(props) {
   const { page, collapsed, onToggle, width } = props
@@ -249,72 +249,9 @@ function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, rankedNo
 
   return (
     <>
-      <PanelHeader icon={<IconStudio />} title="创作助手" sub="素材引用 + 指令改写，直接改左侧草稿" onToggle={onToggle} onToggleWide={onToggleWide} wide={wide} />
+      <PanelHeader icon={<IconStudio />} title="创作助手" sub="指令改写，直接改左侧草稿（素材/引用都在左栏）" onToggle={onToggle} onToggleWide={onToggleWide} wide={wide} />
       <div className="wb-panel-body">
-        <div className="wb-panel-label">已引用（{studio.refs.length}）</div>
-        {studio.refs.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)' }}>尚未引用素材</div>}
-        {studio.refs.map((r, i) => {
-          const src = notes.find(n => n.id === studio.paragraphRefs[i]?.noteId)
-          const label = src?.title || r.note
-          const url = src?.content_url || src?.source_url
-          return (
-            <div key={i} className="wb-ref-item" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                📎 <b style={src ? { cursor: 'pointer' } : undefined} title={src ? '在素材库中查看' : undefined}
-                  onClick={() => src && gotoNote(src.id)}>{label}</b> → {r.para}
-                {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文" style={{ marginLeft: 4, color: 'var(--accent)', textDecoration: 'none' }}>↗</a>}
-              </span>
-              <button className="wb-note-del" style={{ marginLeft: 'auto', flex: 'none' }} title="移除引用（同时清理草稿中的标记/引块）"
-                onClick={() => removeRef(i)}>✕</button>
-            </div>
-          )
-        })}
-
-        {(() => {
-          // 相关度排序（后端 TF 余弦，rankedNotes）；未就绪时回落到时间序 + 本主题优先
-          const tid = studio.sourceTopicId
-          const isMine = n => n.isMine ?? (tid && (n.topic_ids || '').split(',').includes(tid))
-          const ranked = rankedNotes || (tid ? [...notes].sort((a, b) => isMine(b) - isMine(a)) : notes)
-          const hasDraft = studio.draft.trim().length > 0
-          const relLabel = rankedNotes && hasDraft
-            ? ' · 按与当前草稿的相关度排序'
-            : (tid ? ' · 本主题的排在前' : '')
-          return <>
-            <div className="wb-panel-label">可插入素材（{ranked.length}）{relLabel}</div>
-            {ranked.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)' }}>素材库为空 · 在快速分析里「保存到笔记」</div>}
-            {ranked.slice(0, 12).map(n => {
-              const url = n.content_url || n.source_url
-              return (
-                <div key={n.id} className="wb-insert-item" style={{ alignItems: 'flex-start' }}>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
-                      title="在素材库中查看" onClick={() => gotoNote(n.id)}>
-                      {isMine(n) && <span style={{ color: 'var(--accent)' }}>[本主题] </span>}
-                      {(n.title || n.content_zh_title || n.source_title || '未命名素材').slice(0, 22)}
-                      {url && <a href={url} target="_blank" rel="noreferrer" title="新标签打开原文"
-                        style={{ marginLeft: 4, color: 'var(--accent)', textDecoration: 'none' }}>↗</a>}
-                      <span style={{ color: 'var(--faint)', fontWeight: 400 }}> · {(n.created_at || '').slice(5, 10)}</span>
-                    </span>
-                    <span style={{ display: 'block', color: 'var(--sub2)', fontSize: 11.5, marginTop: 2 }}>
-                      {n.excerpt.replace(/[#>*\n-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 42)}…
-                    </span>
-                    {n.topic_names && !isMine(n) && (
-                      <span style={{ display: 'block', color: 'var(--faint)', fontSize: 11, marginTop: 2 }}>主题：{n.topic_names.slice(0, 20)}</span>
-                    )}
-                    {rankedNotes && hasDraft && (
-                      n.related
-                        ? n.relTerms?.length > 0 && <span style={{ display: 'block', color: '#3f7350', fontSize: 11, marginTop: 2 }}>相关：{n.relTerms.slice(0, 4).join('·')}</span>
-                        : <span style={{ display: 'block', color: 'var(--faint)', fontSize: 11, marginTop: 2 }}>与当前草稿关联弱</span>
-                    )}
-                  </span>
-                  <button className="wb-insert-btn" onClick={() => insertMaterial(n)}>插入</button>
-                </div>
-              )
-            })}
-          </>
-        })()}
-
-        <div className="wb-panel-hint" style={{ borderTop: '1px solid var(--line07)', paddingTop: 10 }}>
+        <div className="wb-panel-hint" style={{ paddingTop: 2 }}>
           让 AI 按你的意思改：例如「开头更犀利」「压到 5 条」「加一个反方观点」「改成口语」——它会直接改写左侧草稿。
         </div>
         <div className="wb-chat" style={{ flex: 'none', marginTop: 8 }}>

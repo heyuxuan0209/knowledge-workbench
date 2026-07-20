@@ -766,7 +766,7 @@ export default function WorkbenchPage() {
     notesTab, setNotesTab, toggleSelectNote,
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, platforms, genDraft: (...a) => genDraftRef.current(...a), exportMd,
-    drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles,
+    drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, removeRef,
     highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack, setReturnPage,
   }
 

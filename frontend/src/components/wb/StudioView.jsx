@@ -11,7 +11,7 @@ import { api } from './util'
 
 const RETURN_LABEL = { feed: '资讯', notes: '素材库', topics: '主题库', reports: '周报', inspirations: '灵感库' }
 
-export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, gotoTopic, returnPage, goBack }) {
+export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, gotoTopic, returnPage, goBack, removeRef }) {
   const platformIcon = (key) => platforms.find(p => p.key === key)?.icon || '📝'
 
   // ── ADR-026 试新版：文体(genre) × 平台形态(platform-form)，与老平台行完全并存 ──
@@ -55,6 +55,34 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     })()
   }, [v2Mode])
   const toggleMat = id => setSelMat(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  // A+：缺素材当场「+新增」写进 notes 库；起稿后某条素材可「插入」正文（不重新生成）
+  const [addOpen, setAddOpen] = useState(false)
+  const [addTitle, setAddTitle] = useState('')
+  const [addText, setAddText] = useState('')
+  const [addBusy, setAddBusy] = useState(false)
+  const addNote = async () => {
+    if (!addText.trim()) { showToast('先粘一段素材文字'); return }
+    setAddBusy(true)
+    try {
+      const j = await api('/api/notes', { method: 'POST', body: { excerpt: addText.trim(), sourceTitle: addTitle.trim() || addText.trim().slice(0, 18), noteType: 'chat' } })
+      const id = j.data?.id
+      const mj = await api('/api/materials'); setMats(mj.data || [])
+      if (id) setSelMat(s => new Set([...s, id]))
+      setAddOpen(false); setAddTitle(''); setAddText('')
+      showToast('已新增素材并选中')
+    } catch (err) { showToast('新增失败：' + err.message) }
+    setAddBusy(false)
+  }
+  const insertMat = (m) => {
+    const label = m.sourceTitle || '素材'
+    setStudio(s => ({
+      ...s,
+      draft: (s.draft ? s.draft + '\n\n' : '') + `> ${m.excerpt}\n  —— 引自《${label}》（可溯源）`,
+      refs: [...(s.refs || []), { note: label, para: '引块' }],
+      paragraphRefs: [...(s.paragraphRefs || []), { marker: '引块', noteId: m.id, sourceTitle: label, contentId: null }],
+    }))
+    showToast(`已把《${label}》插入正文`)
+  }
   const matsShown = matQ.trim()
     ? mats.filter(m => (`${m.sourceTitle} ${m.excerpt}`).toLowerCase().includes(matQ.trim().toLowerCase()))
     : mats
@@ -167,7 +195,6 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     showToast('已撤销替换')
   }
   // ---- 「⋯ 更多」下拉（按钮墙降级：主操作+3打磨键留在外面，低频项收进来）----
-  const [moreOpen, setMoreOpen] = useState(false)
   // ---- 卡片图 tab（小红书专属）：iframe 嵌入卡片工作台，切过去自动灌入当前草稿 ----
   const [xhsMode, setXhsMode] = useState('text')  // 'text' 文案 | 'cards' 卡片图
   const [v2Cards, setV2Cards] = useState(false)   // 阶段4：v2 卡片平台打开图卡工具
@@ -257,17 +284,38 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '236px 1fr', border: '1px solid var(--line10)', borderRadius: 12, margin: '10px 0', background: 'var(--surface)', minHeight: 300 }}>
           {/* 左：素材台（贯穿到底 + 改稿说明） */}
           <aside style={{ borderRight: '1px solid var(--line08)', padding: 14, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 12, color: 'var(--sub2)', fontWeight: 600, marginBottom: 3 }}>素材（已选 {selMat.size}）</div>
-            <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 8 }}>从素材库挑，生成只用勾中的</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <span style={{ fontSize: 12, color: 'var(--sub2)', fontWeight: 600 }}>素材（已选 {selMat.size}）</span>
+              <button onClick={() => setAddOpen(o => !o)} title="新增一条素材到素材库" style={{ marginLeft: 'auto', border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--accent)', borderRadius: 6, padding: '2px 8px', fontSize: 11.5, cursor: 'pointer' }}>+ 新增</button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 8 }}>从素材库挑（按收藏时间排），勾中的才用来起稿；缺就点「+新增」</div>
             <input value={matQ} onChange={e => setMatQ(e.target.value)} placeholder="搜索素材…"
               style={{ width: '100%', marginBottom: 8, padding: '6px 10px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)' }} />
+            {addOpen && (
+              <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line10)', borderRadius: 7, background: 'var(--brief-bg)' }}>
+                <input value={addTitle} onChange={e => setAddTitle(e.target.value)} placeholder="标题（可选）"
+                  style={{ width: '100%', marginBottom: 6, padding: '5px 8px', fontSize: 12, border: '1px solid var(--line10)', borderRadius: 5, background: 'var(--surface)', color: 'var(--body)' }} />
+                <textarea value={addText} onChange={e => setAddText(e.target.value)} placeholder="粘一段素材文字…"
+                  style={{ width: '100%', minHeight: 54, padding: '5px 8px', fontSize: 12, border: '1px solid var(--line10)', borderRadius: 5, background: 'var(--surface)', color: 'var(--body)', resize: 'vertical', boxSizing: 'border-box' }} />
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button disabled={addBusy} onClick={addNote} style={{ flex: 1, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 12, padding: '5px 0', borderRadius: 6, cursor: 'pointer' }}>{addBusy ? '保存中…' : '存入并选中'}</button>
+                  <button onClick={() => setAddOpen(false)} style={{ border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--sub)', fontSize: 12, padding: '5px 10px', borderRadius: 6, cursor: 'pointer' }}>取消</button>
+                </div>
+              </div>
+            )}
             <div style={{ flex: 1, minHeight: 120, maxHeight: 360, overflowY: 'auto', border: '1px solid var(--line10)', borderRadius: 6, padding: '4px 8px' }}>
               {matsShown.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '8px 2px' }}>{mats.length ? '没有匹配的素材' : '素材库为空 / 加载中…'}</div>}
               {matsShown.map(m => (
-                <label key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', fontSize: 12.5, cursor: 'pointer', borderBottom: '1px solid var(--line08)' }}>
-                  <input type="checkbox" checked={selMat.has(m.id)} onChange={() => toggleMat(m.id)} style={{ marginTop: 3 }} />
-                  <span><b style={{ color: 'var(--body)' }}>{m.sourceTitle}</b>{m.excerpt ? <span style={{ color: 'var(--faint)' }}> · {m.excerpt}</span> : null}</span>
-                </label>
+                <div key={m.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '6px 0', fontSize: 12.5, borderBottom: '1px solid var(--line08)' }}>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={selMat.has(m.id)} onChange={() => toggleMat(m.id)} style={{ marginTop: 3, flex: 'none' }} />
+                    <span><b style={{ color: 'var(--body)' }}>{m.sourceTitle}</b>{m.excerpt ? <span style={{ color: 'var(--faint)' }}> · {m.excerpt}</span> : null}</span>
+                  </label>
+                  {!isEmpty && (
+                    <button onClick={() => insertMat(m)} title="把这条插入正文（不重新生成）"
+                      style={{ flex: 'none', border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--accent)', borderRadius: 5, padding: '2px 7px', fontSize: 11, cursor: 'pointer' }}>插入</button>
+                  )}
+                </div>
               ))}
             </div>
             {studio.paragraphRefs?.length > 0 && (
@@ -279,12 +327,14 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                     <span style={{ color: 'var(--accent)', fontWeight: 600, flex: 'none' }}>{r.marker}</span>
                     <span style={{ color: 'var(--body)', flex: 1, minWidth: 0 }}>{r.sourceTitle || '素材'}</span>
                     {r.sourceUrl && <a href={r.sourceUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ color: 'var(--accent)', textDecoration: 'none', flex: 'none' }}>原文↗</a>}
+                    <button onClick={e => { e.stopPropagation(); removeRef?.(i) }} title="移除该引用（清理草稿里的标记/引块）"
+                      style={{ flex: 'none', border: 'none', background: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 }}>✕</button>
                   </div>
                 ))}
               </div>
             )}
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line08)', fontSize: 11, color: 'var(--sub2)', lineHeight: 1.55 }}>
-              <b style={{ color: 'var(--sub)' }}>起稿在中间，改稿有两处</b><br />· 底部按钮：润色/审稿是整篇；「改一段」= 选中一段再改。<br />· 右侧「创作助手」：用大白话说怎么改（如“开头更狠”“压到 5 条”）。
+              <b style={{ color: 'var(--sub)' }}>起稿 → 改稿 → 产出，从上到下</b><br />· 改稿（润色/审稿/改一段）就在草稿正下方。<br />· 也可到右侧「创作助手」用大白话改（如“开头更狠”“压到 5 条”）。
             </div>
           </aside>
 
@@ -360,6 +410,61 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 </div>
               </div>
             )}
+
+            {/* 方案C：草稿嵌右栏（素材台贯穿到底）；改稿贴着草稿单独一行，产出另起一行 */}
+            {studio.sourceTopicId && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 0' }}>
+                <span style={{ fontSize: 12, color: 'var(--sub2)', flex: 'none' }}>你的观点</span>
+                <input value={studio.viewpoint} onChange={(e) => setStudio(s => ({ ...s, viewpoint: e.target.value }))}
+                  placeholder="这篇你想说什么？一句话立场 · 留空则 AI 提议判断并标注"
+                  style={{ flex: 1, fontSize: 12.5, padding: '7px 10px', border: '1px solid var(--line08)', borderRadius: 8, background: 'var(--surface)' }} />
+              </div>
+            )}
+            {!isEmpty && (
+              <div style={{ display: 'inline-flex', border: '1px solid var(--line10)', borderRadius: 8, overflow: 'hidden', marginTop: 14, marginBottom: 6 }}>
+                <button className={!srcMode ? 'wb-btn-primary' : 'wb-btn-ghost'} style={{ borderRadius: 0, border: 'none', fontSize: 12, padding: '6px 14px' }} onClick={() => setSrcMode(false)}>编辑</button>
+                <button className={srcMode ? 'wb-btn-primary' : 'wb-btn-ghost'} style={{ borderRadius: 0, border: 'none', fontSize: 12, padding: '6px 14px' }} onClick={() => setSrcMode(true)}>溯源（点 [素材N] 溯源）</button>
+              </div>
+            )}
+            {srcMode && !isEmpty ? (
+              <div className="wb-draft" style={{ whiteSpace: 'pre-wrap', overflowY: 'auto', cursor: 'default', marginTop: 4 }}>{renderTraced()}</div>
+            ) : (
+              <textarea ref={draftRef} className="wb-draft" style={{ marginTop: 4 }} value={studio.draft}
+                onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
+                placeholder="点上方「用这个生成」起稿，或直接在这里手写；改稿见下方或右侧「创作助手」…" />
+            )}
+            {noRefs && (
+              <div className="wb-warnbar" style={{ marginTop: 10 }}><IconWarn />草稿中没有素材引用，创作前请补充引用（每段可溯源）</div>
+            )}
+            {/* 改稿：贴着草稿（「改一段」要读草稿里选中的文字），与产出分开 */}
+            <div className="wb-studio-actions">
+              <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginRight: 2 }}>改稿</span>
+              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title="整篇改得更顺更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断" onClick={humanizeDraft}>润色</button>
+              <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy || isEmpty} title="三个批评视角通读全稿，给出批注——只批注不改稿" onClick={critiqueDraft}>{critiqueBusy ? '审稿中…' : '审稿'}</button>
+              <button className="wb-btn-outline" disabled={variantsBusy || studio.busy || isEmpty} title="选中一段，给 3 个策略不同的改法" onClick={makeVariants}>{variantsBusy ? '生成中…' : '改一段'}</button>
+              <button className="wb-btn-ghost" disabled={!studio.prevDraft} title="改写前后两版互换（润色/改一段后可用）" onClick={undoRewrite}>撤销改写</button>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--faint)' }}>或到右侧「创作助手」用大白话改</span>
+            </div>
+            {/* 产出 */}
+            <div className="wb-studio-actions">
+              <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginRight: 2 }}>产出</span>
+              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title="用同样的素材·文体·平台再出一版（起稿请用上方推荐卡「用这个生成」）" onClick={genDraftV2}>重新生成</button>
+              <button className="wb-btn-ghost" disabled={isEmpty} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
+              <button className="wb-btn-ghost" disabled={isEmpty} title="导出发布版：溯源标记转文末来源列表" onClick={exportMd}>导出 Markdown</button>
+              <button className="wb-btn-ghost" disabled={isEmpty} title="删掉正文里所有 [素材N] 标记（发布前用；先存草稿）" onClick={() => { setStudio(s => ({ ...s, draft: stripRefs(s.draft) })); showToast('已去掉正文里所有 [素材N] 标记') }}>去引用标记</button>
+              {(v2Pform === 'gzh-long' || v2Pform === 'xhs-long') && (
+                <button className="wb-btn-ghost" disabled={isEmpty} title="生成几个标题候选" onClick={suggestTitles}>标题候选</button>
+              )}
+              {studio.draftId && (
+                <button className="wb-btn-ghost" title="删除当前草稿" style={{ color: 'var(--red)' }} onClick={deleteCurrentDraft}>删除草稿</button>
+              )}
+              <span style={{ marginLeft: 'auto' }} />
+              {(v2Pform || '').includes('card') ? (
+                <button className="wb-btn-primary" disabled={isEmpty} title="把卡片文字渲染成图（复用图卡工具）" onClick={() => { setV2Cards(true); setTimeout(postDraftToCards, 150) }}>生成图文卡片</button>
+              ) : (
+                <button className="wb-btn-primary" disabled={isEmpty} onClick={copyAll}>复制全文</button>
+              )}
+            </div>
           </section>
 
           {openDD && <div onClick={() => setOpenDD(null)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />}
@@ -384,91 +489,6 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </div>
       )}
 
-      {!cardsMode && (<>
-      {studio.sourceTopicId && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 0' }}>
-          <span style={{ fontSize: 12, color: 'var(--sub2)', flex: 'none' }}>你的观点</span>
-          <input
-            value={studio.viewpoint}
-            onChange={(e) => setStudio(s => ({ ...s, viewpoint: e.target.value }))}
-            placeholder="这篇你想说什么？一句话立场（如「同化式采纳被高估了」）· 留空则 AI 提议判断并明确标注"
-            style={{ flex: 1, fontSize: 12.5, padding: '7px 10px', border: '1px solid var(--line08)', borderRadius: 8, background: 'var(--surface)' }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && studio.viewpoint.trim()) { showToast('立场已记下，生成时按它起稿'); } }}
-          />
-        </div>
-      )}
-
-
-      {v2Mode && !isEmpty && (
-        <div style={{ display: 'inline-flex', border: '1px solid var(--line10)', borderRadius: 8, overflow: 'hidden', marginTop: 14, marginBottom: -4 }}>
-          <button className={!srcMode ? 'wb-btn-primary' : 'wb-btn-ghost'} style={{ borderRadius: 0, border: 'none', fontSize: 12, padding: '6px 14px' }} onClick={() => setSrcMode(false)}>编辑</button>
-          <button className={srcMode ? 'wb-btn-primary' : 'wb-btn-ghost'} style={{ borderRadius: 0, border: 'none', fontSize: 12, padding: '6px 14px' }} onClick={() => setSrcMode(true)}>溯源（点 [素材N] 溯源）</button>
-        </div>
-      )}
-      {srcMode && v2Mode && !isEmpty ? (
-        <div className="wb-draft" style={{ whiteSpace: 'pre-wrap', overflowY: 'auto', cursor: 'default' }}>{renderTraced()}</div>
-      ) : (
-        <textarea
-          ref={draftRef}
-          className="wb-draft" value={studio.draft}
-          onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
-          placeholder="点上方「用这个生成」起稿，或直接在这里手写；改稿用底部按钮或右侧「创作助手」…"
-        />
-      )}
-
-      {noRefs && (
-        <div className="wb-warnbar" style={{ marginTop: 10 }}>
-          <IconWarn />草稿中没有素材引用，创作前请在右侧补充引用（每段可溯源）
-        </div>
-      )}
-
-      {(!isEmpty || v2Mode) && (<>
-      {/* 方案2b：左侧次级（改/存）+ 右侧 context-aware 主行动（文字→复制全文 / 卡片→生成图文卡片）；无 emoji。试新版下常驻，空稿时打磨/产出键置灰 */}
-      <div className="wb-studio-actions">
-        <button className="wb-btn-outline" disabled={studio.busy} title="用同样的素材·文体·平台再出一版"
-          onClick={() => v2Mode ? genDraftV2() : genDraft()}>{isEmpty ? '生成' : '重新生成'}</button>
-        <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title="整篇改得更顺更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断"
-          onClick={humanizeDraft}>润色</button>
-        <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy || isEmpty}
-          title="三个批评视角通读全稿，给出批注——只批注不改稿"
-          onClick={critiqueDraft}>{critiqueBusy ? '审稿中…' : '审稿'}</button>
-        <button className="wb-btn-outline" disabled={variantsBusy || studio.busy || isEmpty}
-          title="选中一段，给 3 个策略不同的改法"
-          onClick={makeVariants}>{variantsBusy ? '生成中…' : '改一段'}</button>
-        {studio.prevDraft && (
-          <button className="wb-btn-ghost" title="改写前后两版互换" onClick={undoRewrite}>撤销改写</button>
-        )}
-        <span className="wb-studio-sep" />
-        <button className="wb-btn-ghost" disabled={isEmpty} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
-        <div className="wb-more-wrap">
-          <button className="wb-btn-ghost" onClick={() => setMoreOpen(o => !o)}>更多</button>
-          {moreOpen && (<>
-            <div className="wb-more-backdrop" onClick={() => setMoreOpen(false)} />
-            <div className="wb-more-menu">
-              <button className="wb-more-item" title="导出发布版：溯源标记转文末来源列表"
-                onClick={() => { setMoreOpen(false); exportMd() }}>导出 Markdown</button>
-              <button className="wb-more-item" title="一键删掉正文里所有 [素材N] 溯源标记（发布前用；不可撤销请先存草稿）"
-                onClick={() => { setMoreOpen(false); setStudio(s => ({ ...s, draft: stripRefs(s.draft) })); showToast('已去掉正文里所有 [素材N] 标记') }}>去引用标记</button>
-              {(v2Mode ? (v2Pform === 'gzh-long' || v2Pform === 'xhs-long') : studio.platform === 'long') && (
-                <button className="wb-more-item" onClick={() => { setMoreOpen(false); suggestTitles() }}>标题候选</button>
-              )}
-              {studio.draftId && (
-                <button className="wb-more-item danger" onClick={() => { setMoreOpen(false); deleteCurrentDraft() }}>删除草稿</button>
-              )}
-            </div>
-          </>)}
-        </div>
-        <span style={{ marginLeft: 'auto' }} />
-        {(v2Mode ? (v2Pform || '').includes('card') : studio.platform === 'xhs') ? (
-          <button className="wb-btn-primary" disabled={isEmpty} title="把卡片文字渲染成图（复用图卡工具）"
-            onClick={() => { if (v2Mode) { setV2Cards(true) } else { setXhsMode('cards') } setTimeout(postDraftToCards, 150) }}>生成图文卡片</button>
-        ) : (
-          <button className="wb-btn-primary" disabled={isEmpty} onClick={copyAll}>复制全文</button>
-        )}
-      </div>
-      <div className="wb-studio-hint">想让 AI 按你的意思改，用右侧「创作助手」：例如「开头更犀利」「压到 5 条」「加一个反方观点」。</div>
-      </>)}
-      </>)}
 
       {cardsMode && (
         <iframe ref={cardFrame} src="/xhs-card-studio.html" title="卡片图工作台"
