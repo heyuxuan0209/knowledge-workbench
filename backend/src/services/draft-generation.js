@@ -39,6 +39,26 @@ function gatherTopicMaterials(topicId, selectedNoteIds = null) {
   return { topic, body, notes };
 }
 
+// 启发式推荐：看选中的素材是什么，荐一个文体（平台默认公众号长文，用户可改）
+export function recommendForMaterials(noteIds) {
+  if (!Array.isArray(noteIds) || !noteIds.length) return { genre: '读书精读体', platformForm: 'gzh-long', reason: '' };
+  const db = getDatabase();
+  const ph = noteIds.map(() => '?').join(',');
+  const notes = db.prepare(`SELECT note_type, content_id, source_url, title, excerpt, keywords FROM notes WHERE id IN (${ph})`).all(...noteIds);
+  db.close();
+  const n = notes.length;
+  const external = notes.filter(x => x.content_id || x.source_url).length;
+  const blob = notes.map(x => `${x.title || ''} ${x.excerpt || ''} ${x.keywords || ''}`).join(' ').toLowerCase();
+  const has = re => re.test(blob);
+
+  let genre = '读书精读体', reason = `你选的多是外部文章（${external}/${n} 条），适合消化成一篇带你判断的解读`;
+  if (external === 0) { genre = '实践复盘体'; reason = '这些更像你自己的记录/经历，适合第一人称复盘（要有你的亲历）'; }
+  else if (has(/方法|步骤|如何|怎么做|流程|教程|指南|清单|工作流/)) { genre = '方法教程体'; reason = '素材偏方法/步骤，适合做成看完就能上手的教程'; }
+  else if (has(/争议|分歧|对立|两种|误区|其实不是|反直觉|vs|之争/)) { genre = '思辨辨析体'; reason = '素材里有对立/误区，适合辨析立论'; }
+  else if (n === 1) { genre = '一句话提炼体'; reason = '就一条素材，适合提炼成一个能被转述的记忆点'; }
+  return { genre, platformForm: 'gzh-long', reason };
+}
+
 // 供前端勾选用：列出某主题的已并入素材（id + 短摘要 + 来源）
 export function listTopicMaterials(topicId) {
   const db = getDatabase();
