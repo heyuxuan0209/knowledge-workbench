@@ -6,6 +6,8 @@ import { api, timeAgo } from './util'
 // 列表数据来自 /api/topics；详情打开时拉 /api/topics/:id（含 changelog + 待收进素材）。
 // "立即收进"触发同化：一次 Deepseek 调用更新综述并写修订记录。
 
+const RETURN_LABEL = { feed: '资讯', notes: '素材库', reports: '周报', inspirations: '灵感库' }
+
 const PHASE = {
   emerging: { label: '新建期', fg: '#3d5a80', bg: 'rgba(61,90,128,.12)' },
   active: { label: '持续演进', fg: '#a24b3f', bg: 'rgba(162,75,63,.1)' },
@@ -170,8 +172,8 @@ function TopicDetail({ topicId, back, onDelete, setPage, setStudio, showToast, r
   return (
     <>
       <button className="wb-back" onClick={back}>← 主题库</button>
-      {returnPage === 'reports' && (
-        <button className="wb-back" style={{ marginLeft: 10 }} onClick={goBack}>← 返回周报</button>
+      {returnPage && RETURN_LABEL[returnPage] && (
+        <button className="wb-back" style={{ marginLeft: 10 }} onClick={goBack}>← 返回{RETURN_LABEL[returnPage]}</button>
       )}
       <div className="wb-topic-head" style={{ marginTop: 6 }}>
         <span className="wb-topic-name">{topic.name}</span>

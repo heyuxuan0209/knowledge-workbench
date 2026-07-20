@@ -3,10 +3,11 @@ import '../styles/workbench.css'
 import { api, streamEphemeralChat, sourceCapability } from '../components/wb/util'
 import {
   IconFeed, IconNotes, IconTopics, IconStudio, IconSources, IconSettings,
-  IconChevronLeft,
+  IconChevronLeft, IconBulb,
 } from '../components/wb/Icons'
 import FeedView from '../components/wb/FeedView'
 import NotesView from '../components/wb/NotesView'
+import InspirationsView from '../components/wb/InspirationsView'
 import SourcesView from '../components/wb/SourcesView'
 import TopicsView from '../components/wb/TopicsView'
 import StudioView from '../components/wb/StudioView'
@@ -17,12 +18,14 @@ import { IdeaModal, PoolModal, ImportModal } from '../components/wb/Modals'
 
 // 知识工作台主壳（视觉规格：prototype/design_handoff_knowledge_workbench）。
 // 三栏：左导航（可折叠 62px）/ 中栏页面 / 右栏快速分析·创作助手（可折叠 40px）。
-// 六阶段是心智模型不是导航：资讯(①④)/素材(③)/主题(④M3)/创作(⑤⑥M4)/信源(①)/设置。
+// 六阶段是心智模型不是导航：资讯(①④)/素材(③)/主题(④M3)/灵感(选题种子)/创作(⑤⑥M4)/信源(①)/设置。
+// 心智动线：看→存料(素材)→沉淀(主题)→要写什么(灵感)→写(创作)。
 
 const NAV_TOP = [
   { key: 'feed', label: '资讯', Icon: IconFeed },
   { key: 'notes', label: '素材', Icon: IconNotes },
   { key: 'topics', label: '主题', Icon: IconTopics },
+  { key: 'inspirations', label: '灵感', Icon: IconBulb },
   { key: 'studio', label: '创作', Icon: IconStudio },
 ]
 const NAV_BOTTOM = [
@@ -70,6 +73,7 @@ export default function WorkbenchPage() {
   const [notes, setNotes] = useState([])
   const [sources, setSources] = useState([])
   const [topics, setTopics] = useState([]) // M3 主题活页（/api/topics）
+  const [ideas, setIdeas] = useState([]) // 灵感库（ADR-029，/api/ideas）——选题种子收口
 
   // 右栏（快速分析）
   const [selectedItems, setSelectedItems] = useState([]) // {id,title,adHoc?,capability}
@@ -156,6 +160,31 @@ export default function WorkbenchPage() {
   const loadTopics = useCallback(async () => {
     try { setTopics((await api('/api/topics')).data || []) } catch (err) { console.error(err) }
   }, [])
+  const loadIdeas = useCallback(async () => {
+    try { setIdeas((await api('/api/ideas')).data || []) } catch (err) { console.error(err) }
+  }, [])
+
+  // 收录一条灵感（随手记 / 资讯一键收进 / 外部连接器）。payload: {title, sourceKind, sourceRef, supporting*}
+  // 带「撤销」——feed 上点错 💡 能当场反悔（误触保护发生在误触当下，而不是逼你事后去别页删）
+  const saveIdea = useCallback(async (payload) => {
+    try {
+      const json = await api('/api/ideas', { method: 'POST', body: payload })
+      loadIdeas()
+      const newId = json.data?.id
+      const undo = newId ? {
+        label: '撤销',
+        onClick: async () => { try { await api(`/api/ideas/${newId}`, { method: 'DELETE' }); loadIdeas() } catch { /* 忽略 */ } },
+      } : null
+      const where = page === 'inspirations' ? '已收进灵感库' : '已收进灵感库（在左侧「灵感」里）'
+      showToast(where, undo)
+      return true
+    } catch (err) { showToast(`收录失败：${err.message}`); return false }
+  }, [loadIdeas, page, showToast])
+
+  const deleteIdea = useCallback(async (idea) => {
+    try { await api(`/api/ideas/${idea.id}`, { method: 'DELETE' }); loadIdeas() }
+    catch (err) { showToast(`删除失败：${err.message}`) }
+  }, [loadIdeas, showToast])
 
   // 星标切换（M7 轻量收藏）：返回新状态供 FeedView 同步本地筛选列表
   const toggleStar = useCallback(async (id) => {
@@ -192,7 +221,7 @@ export default function WorkbenchPage() {
         }])
   }
 
-  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics(); loadDrafts(); loadPlatforms() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics, loadDrafts, loadPlatforms])
+  useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics(); loadIdeas(); loadDrafts(); loadPlatforms() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics, loadIdeas, loadDrafts, loadPlatforms])
 
   // ---- 快速分析 ----
   const toggleSelect = (c) => {
@@ -315,6 +344,24 @@ export default function WorkbenchPage() {
         showToast('已存为素材卡片。想让它进入某个主题综述？在主题页建立相关主题即可自动归入', goAction)
       }
     } catch (err) { showToast(`保存失败：${err.message}`) }
+  }
+
+  // 把当前解读提为一条灵感（ADR-029：即时分析产物落素材，同时一键提成"要写什么"的种子）。
+  // 标题取被解读内容的标题（去掉 "[类型]" 前缀），关联到当前选中的原始内容作支撑料。
+  const saveMsgAsIdea = async (index) => {
+    const msg = chat[index]
+    if (!msg || msg.role !== 'ai' || msg.pending || msg.error || msg.ideaId) return
+    const rawTitle = selectedItems[0]?.title?.replace(/^\[[^\]]+\]\s*/, '') || msg.text.split('\n')[0]
+    const contentIds = selectedItems.filter(x => !x.adHoc).map(x => x.id)
+    try {
+      const json = await api('/api/ideas', {
+        method: 'POST',
+        body: { title: rawTitle.slice(0, 200), sourceKind: 'user', supportingContentIds: contentIds },
+      })
+      setChat(prev => prev.map((m, i) => i === index ? { ...m, ideaId: json.data.id } : m))
+      loadIdeas()
+      showToast('已提为灵感（在左侧「灵感」里）', { label: '去灵感库 →', onClick: () => setPage('inspirations') })
+    } catch (err) { showToast(`提为灵感失败：${err.message}`) }
   }
 
   // 摄入结果 → 送入右栏解读（粘链接/文字 和 上传文件 共用）。
@@ -446,10 +493,10 @@ export default function WorkbenchPage() {
   // ---- 选题 ----
   const viewIdea = (idea) => { setIdeaDetail(idea); setModal('idea') }
   const upgradeIdea = async (idea) => {
-    setModal(null)
+    setModal(null); setReturnPage(page) // 记住来路（灵感库/素材页），主题页顶部可一键返回
     try {
       const json = await api('/api/topics/from-idea', { method: 'POST', body: { ideaId: idea.id } })
-      await loadTopics()
+      await loadTopics(); loadIdeas()
       setActiveTopic(json.data); setTopicView('page'); setPage('topics')
       showToast(`已升级为主题页「${json.data.name}」，AI 将随素材收进持续维护综述`)
     } catch (err) {
@@ -459,13 +506,13 @@ export default function WorkbenchPage() {
   }
   const dismissIdea = async (idea) => {
     try { await api(`/api/ideas/${idea.id}`, { method: 'PATCH', body: { status: 'dismissed' } }) } catch { /* 忽略 */ }
-    setModal(null); loadBrief()
+    setModal(null); loadBrief(); loadIdeas()
   }
   const createFromIdea = async (idea, platform = 'thread') => {
-    setModal(null); setPage('studio')
+    setModal(null); setReturnPage(page); setPage('studio') // 记住来路（灵感库/素材页），创作台顶部可一键返回
     const supportId = (idea.supporting_content_ids || [])[0]
     setStudio(s => ({ ...s, platform, source: `选题：${idea.title}`, sourceContentId: supportId || null, draft: '', refs: [] }))
-    api(`/api/ideas/${idea.id}`, { method: 'PATCH', body: { status: 'created' } }).catch(() => {})
+    api(`/api/ideas/${idea.id}`, { method: 'PATCH', body: { status: 'created' } }).then(() => loadIdeas()).catch(() => {})
     setTimeout(() => genDraftRef.current(platform, supportId), 0)
   }
 
@@ -590,6 +637,17 @@ export default function WorkbenchPage() {
       showToast('草稿已删除')
     } catch (err) { showToast(`删除失败：${err.message}`) }
   }
+  // 草稿箱批量删除（勾选后一次删多份）
+  const deleteDrafts = async (ids) => {
+    if (!ids?.length) return
+    if (!confirm(`删除选中的 ${ids.length} 份草稿？（不可恢复）`)) return
+    try {
+      for (const id of ids) await api(`/api/drafts/${id}`, { method: 'DELETE' })
+      if (studio.draftId && ids.includes(studio.draftId)) setStudio(s => ({ ...s, draftId: null, draft: '', title: null, refs: [], paragraphRefs: [], prevDraft: null }))
+      loadDrafts()
+      showToast(`已删除 ${ids.length} 份草稿`)
+    } catch (err) { showToast(`删除失败：${err.message}`) }
+  }
 
   // 标题候选（长文）：5 个风格错开的标题供挑选
   const suggestTitles = async () => {
@@ -701,14 +759,14 @@ export default function WorkbenchPage() {
   )
 
   const pageProps = {
-    showToast, contents, report, stories, ghTrending, notes, sources, topics, toggleStar,
+    showToast, contents, report, stories, ghTrending, notes, sources, topics, ideas, toggleStar,
     selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile, syncing, syncAllSources,
-    generateReport, generating, viewIdea, upgradeIdea, createFromIdea,
+    generateReport, generating, viewIdea, upgradeIdea, createFromIdea, dismissIdea, deleteIdea, saveIdea, loadIdeas,
     loadNotes, loadSources, loadTopics, loadBrief, setPage, setModal,
     notesTab, setNotesTab, toggleSelectNote,
     topicView, setTopicView, activeTopic, setActiveTopic,
     studio, setStudio, platforms, genDraft: (...a) => genDraftRef.current(...a), exportMd,
-    drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, suggestTitles,
+    drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles,
     highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack, setReturnPage,
   }
 
@@ -736,6 +794,7 @@ export default function WorkbenchPage() {
           <div className={`wb-main-inner${page === 'studio' ? ' studio-wide' : ((page === 'reports' || (page === 'topics' && topicView === 'page')) ? ' narrow' : '')}`} key={page + topicView}>
             {page === 'feed' && <FeedView {...pageProps} />}
             {page === 'notes' && <NotesView {...pageProps} />}
+            {page === 'inspirations' && <InspirationsView {...pageProps} />}
             {page === 'sources' && <SourcesView {...pageProps} />}
             {page === 'topics' && <TopicsView {...pageProps} />}
             {page === 'studio' && <StudioView {...pageProps} />}
@@ -750,7 +809,7 @@ export default function WorkbenchPage() {
           page={page} collapsed={rightCollapsed} onToggle={() => setRightCollapsed(v => !v)}
           selectedItems={selectedItems} removeSel={removeSel}
           analysisMode={analysisMode} backList={() => { setAnalysisMode('list'); setLibraryHits([]); setChatKind(null) }}
-          chat={chat} degraded={degraded} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg}
+          chat={chat} degraded={degraded} startAnalysis={startAnalysis} sendChat={(t) => runChat(t)} saveMsg={saveMsg} saveMsgAsIdea={saveMsgAsIdea}
           askLibrary={askLibrary} askKnowledge={askKnowledge} libraryHits={libraryHits} chatKind={chatKind}
           topicView={topicView} activeTopic={activeTopic}
           studio={studio} notes={notes} rankedNotes={rankedNotes} insertMaterial={insertMaterial} removeRef={removeRef} gotoNote={gotoNote} rewriteDraft={rewriteDraft}

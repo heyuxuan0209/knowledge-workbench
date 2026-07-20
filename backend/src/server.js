@@ -496,6 +496,17 @@ app.get('/api/materials', async (req, res) => {
   }
 });
 
+// 启发式推荐：看选中素材荐一个文体（平台默认公众号长文，用户可改）
+app.post('/api/materials/recommend', async (req, res) => {
+  try {
+    const { selectedNoteIds } = req.body || {};
+    const { recommendForMaterials } = await import('./services/draft-generation.js');
+    res.json({ success: true, data: recommendForMaterials(Array.isArray(selectedNoteIds) ? selectedNoteIds : []) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 按选中素材生成（无需主题）
 app.post('/api/materials/draft-v2', async (req, res) => {
   try {
@@ -741,6 +752,77 @@ app.get('/api/industry-brief', async (req, res) => {
     res.json({ success: true, data: getIndustryBrief(req.query.period || 'daily') });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 灵感库列表（ADR-029）：跨全部报告 + 用户手记 + 外部连接器一处收口。?status= / ?sourceKind= 过滤。
+app.get('/api/ideas', async (req, res) => {
+  try {
+    const { listIdeas } = await import('./db/ideas.js');
+    const data = listIdeas({
+      status: req.query.status || null,
+      sourceKind: req.query.sourceKind || null,
+      includeDismissed: req.query.includeDismissed === '1',
+    });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 手记一条灵感（随手记：备忘录/群聊/脑内瞬间想法）。source_kind 默认 user。
+app.post('/api/ideas', async (req, res) => {
+  try {
+    const { title } = req.body || {};
+    if (!title?.trim()) return res.status(400).json({ success: false, error: 'title is required' });
+    const { createIdea } = await import('./db/ideas.js');
+    const idea = createIdea({
+      title,
+      angle: req.body.angle || null,
+      whyNow: req.body.whyNow || null,
+      sourceKind: req.body.sourceKind || 'user',
+      sourceRef: req.body.sourceRef || null,
+      supportingContentIds: req.body.supportingContentIds || [],
+      supportingNoteIds: req.body.supportingNoteIds || [],
+    });
+    res.json({ success: true, data: idea });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 外部连接器入口（飞书妙记/会议纪要/群聊/云文档、备忘录、微信、agent 一句话…）：
+// 任何连接器把一条灵感 POST 到这里即可流进灵感库。source_kind 标明来路（如 'feishu'），
+// source_ref 存回链（文档/消息 URL 或 {docUrl,messageId} JSON）。这是灵感库的通用接缝——
+// 具体的飞书拉取/事件订阅由独立连接器完成后调用本接口，核心库不依赖任何外部凭证。
+app.post('/api/ideas/ingest', async (req, res) => {
+  try {
+    const { title } = req.body || {};
+    if (!title?.trim()) return res.status(400).json({ success: false, error: 'title is required' });
+    const { createIdea } = await import('./db/ideas.js');
+    const idea = createIdea({
+      title,
+      angle: req.body.angle || null,
+      whyNow: req.body.whyNow || null,
+      sourceKind: req.body.sourceKind || 'external',
+      sourceRef: req.body.sourceRef || null,
+      supportingContentIds: req.body.supportingContentIds || [],
+      supportingNoteIds: req.body.supportingNoteIds || [],
+    });
+    res.json({ success: true, data: idea });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 硬删一条灵感（区别于 PATCH status='dismissed' 的"忽略但留痕"）
+app.delete('/api/ideas/:id', async (req, res) => {
+  try {
+    const { deleteIdea } = await import('./db/ideas.js');
+    const done = deleteIdea(req.params.id);
+    res.json({ success: done, message: done ? 'Idea deleted' : 'Idea not found' });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 

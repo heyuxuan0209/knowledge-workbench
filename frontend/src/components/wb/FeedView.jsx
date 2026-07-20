@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { timeAgo, TYPE_LABEL, api } from './util'
 import { IconExternal } from './Icons'
 import { renderMarkdown } from './markdown'
@@ -106,22 +106,10 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
 // 视觉对齐原型 01-feed；数据全部来自后端 API。
 
 export default function FeedView({
-  contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile,
+  contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, followingIds,
   generateReport, generating, setPage, setNotesTab, syncing, syncAllSources,
-  toggleStar, showToast, loadNotes, setReturnPage,
+  toggleStar, saveIdea, showToast, loadNotes, setReturnPage,
 }) {
-  const [acquireVal, setAcquireVal] = useState('')
-  const [ingesting, setIngesting] = useState(false)
-  const [uploading, setUploading] = useState(null) // 上传/转写进度 { status, kind, filename, elapsedSec, error }
-  const [dragOver, setDragOver] = useState(false)
-  const fileInputRef = useRef(null)
-  const onFileChosen = async (file) => {
-    if (!file || !uploadFile) return
-    const isAudio = /\.(mp3|m4a|wav|aac|ogg|opus|flac)$/i.test(file.name) || (file.type || '').startsWith('audio')
-    setUploading({ status: 'processing', kind: isAudio ? 'audio' : 'file', filename: file.name, elapsedSec: 0 })
-    const ok = await uploadFile(file, (job) => setUploading(job))
-    if (ok) setUploading(null) // 完成→已进右栏解读，收起进度条
-  }
   const [expandedFocus, setExpandedFocus] = useState(null) // 默认全收起（UI 改造：第 1 条摊开挤掉后两条）
   const [readerContent, setReaderContent] = useState(null) // 站内全文阅读器
   const [ghStar, setGhStar] = useState({}) // GitHub 区块星标的本地覆盖（数据源在 ghTrending，父级不重载）
@@ -176,15 +164,6 @@ export default function FeedView({
       : prev.map(x => x.id === c.id ? { ...x, starred } : x)))
   }
 
-  const doAcquire = async () => {
-    const v = acquireVal.trim()
-    if (!v || ingesting) return
-    setIngesting(true)
-    const ok = await acquire(v)
-    if (ok) setAcquireVal('')
-    setIngesting(false)
-  }
-
   const today = new Date()
   const dateLabel = `${today.getMonth() + 1} 月 ${today.getDate()} 日`
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -197,54 +176,6 @@ export default function FeedView({
 
   return (
     <>
-      {/* Hero 即时分析（方案 A）：粘链接/文字 + 上传音频/PDF + 拖拽，黄金路径第①步入口 */}
-      <div className={`wb-hero${dragOver ? ' dragover' : ''}`}
-        onDragOver={(e) => { if (uploadFile) { e.preventDefault(); setDragOver(true) } }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) onFileChosen(f) }}>
-        <div className="wb-hero-t">把任何链接 / 会议纪要 / 音频 / PDF 丢进来，AI 帮你读懂并存成素材</div>
-        <div className="wb-hero-d">从「信息」到「你的认知」的入口——出精读稿 → 一键存为素材</div>
-        {uploading ? (
-          <div className="wb-uploading">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{uploading.kind === 'audio' ? '音频' : '文档'}：{uploading.filename}</span>
-              <span className="wb-hero-d" style={{ marginLeft: 'auto', marginBottom: 0 }}>{uploading.status === 'error' ? '' : '本地处理 · 不上传云端'}</span>
-            </div>
-            {uploading.status === 'error'
-              ? <div className="wb-warnbar" style={{ marginTop: 8 }}>处理失败：{uploading.error}
-                  <button className="wb-brief-link" style={{ marginLeft: 8 }} onClick={() => setUploading(null)}>关闭</button></div>
-              : <>
-                  <div className="wb-progress"><i /></div>
-                  <div className="wb-hero-d" style={{ marginBottom: 0 }}>
-                    {uploading.kind === 'audio' ? `正在本地转写全程…已 ${uploading.elapsedSec || 0}s · 会议音频需要几分钟，完成后自动进入解读，你可以先去干别的` : '正在抽取文字…'}
-                  </div>
-                </>}
-          </div>
-        ) : (
-          <>
-            <div className="wb-hero-row">
-              <input type="file" ref={fileInputRef} style={{ display: 'none' }}
-                accept="audio/*,.pdf,.md,.markdown,.txt,.docx,.mp3,.m4a,.wav,.aac,.ogg"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileChosen(f); e.target.value = '' }} />
-              <button className="wb-hero-clip" title="上传音频 / PDF（也可把文件拖到这里）"
-                onClick={() => fileInputRef.current?.click()}>＋</button>
-              <input
-                value={acquireVal}
-                onChange={(e) => setAcquireVal(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') doAcquire() }}
-                placeholder="粘贴链接，或直接粘贴大段文字（会议纪要…）"
-              />
-              <button className="wb-btn-primary" disabled={!acquireVal.trim() || ingesting} onClick={doAcquire}>
-                {ingesting ? '抓取中…' : '读懂它 →'}
-              </button>
-            </div>
-            <div className="wb-hero-d" style={{ marginTop: 9, marginBottom: 0 }}>
-              支持：网页 / 公众号 / YouTube / 小宇宙 / B站 链接 · 会议纪要等大段文字 · 上传 音频（转全程）/ PDF / Markdown / Word · 也可把文件拖到这里
-            </div>
-          </>
-        )}
-      </div>
-
       <div className="wb-brief">
         <div className="wb-brief-head">
           <div className="wb-brief-title">
@@ -333,8 +264,8 @@ export default function FeedView({
         {report ? (
           // 选题入口 + 行业动态跳转（行业动态不再在此重复列 item，只留一句+跳 AI HOT，去重）
           <div className="wb-ov-foot">
-            <button className="wb-brief-link" onClick={() => { setReturnPage?.('feed'); setNotesTab?.('ideas'); setPage('notes') }}>
-              选题建议 {ideas.length} 条 → 去素材库
+            <button className="wb-brief-link" onClick={() => { setReturnPage?.('feed'); setPage('inspirations') }}>
+              选题建议 {ideas.length} 条 → 去灵感库
             </button>
             <a className="wb-brief-link" style={{ marginLeft: 'auto' }} href="https://aihot.virxact.com/daily" target="_blank" rel="noreferrer"
               title="AI HOT 已做好的完整日报（本期主线+分类），不重复造轮子">
@@ -417,7 +348,10 @@ export default function FeedView({
                   <span style={{ color: 'var(--sub)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{author}</span>
                   <span style={{ color: 'var(--faint)', flexShrink: 0 }}>· {timeAgo(c.published_at)}</span>
                   {c.category && <span className="wb-cat">{c.category}</span>}
-                  <button className={`wb-star${c.starred ? ' on' : ''}`} style={{ marginLeft: 'auto' }}
+                  <button className="wb-star" style={{ marginLeft: 'auto', fontSize: 13 }}
+                    title="收进灵感：这个以后能写（区别于收藏=以后再看）"
+                    onClick={() => saveIdea?.({ title: c.zh_title || c.en_title || '（无标题）', sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
+                  <button className={`wb-star${c.starred ? ' on' : ''}`}
                     title={c.starred ? '取消收藏' : '收藏：一键钉住，事后找得回'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
                 </div>
                 <div className="wb-gcard-title">{c.zh_title || c.en_title || '（无标题）'}</div>

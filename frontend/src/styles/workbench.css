@@ -228,6 +228,47 @@ input, textarea { font-family: inherit; }
 .wb-idea-meta { font-size: 12px; color: var(--sub); margin-top: 6px; line-height: 1.55; }
 .wb-idea-stats { font-size: 11.5px; color: var(--sub2); margin-top: 6px; }
 .wb-idea-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ===== 灵感库（ADR-029） ===== */
+.wb-page-head { margin-bottom: 14px; }
+.wb-page-title svg { vertical-align: -2px; margin-right: 6px; }
+.wb-quickcap { display: flex; gap: 8px; align-items: stretch; margin: 12px 0; }
+.wb-quickcap input {
+  flex: 1; border: 1px solid var(--line10); background: var(--surface);
+  border-radius: 8px; padding: 9px 13px; font-size: 13.5px; color: var(--text);
+}
+.wb-quickcap input:focus { outline: none; border-color: var(--accent); }
+.wb-insp-list { display: flex; flex-direction: column; gap: 11px; margin-top: 4px; }
+.wb-insp-card {
+  background: var(--surface); border: 1px solid var(--line10);
+  border-radius: 11px; padding: 14px 16px; transition: border-color 0.15s;
+}
+.wb-insp-card:hover { border-color: rgba(33, 31, 26, 0.16); }
+.wb-insp-card.done { opacity: 0.62; }
+.wb-insp-top { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.wb-insp-title {
+  font-family: var(--serif); font-size: 16px; font-weight: 600; line-height: 1.42;
+  cursor: pointer;
+}
+.wb-insp-title:hover { color: var(--accent); }
+.wb-insp-angle, .wb-insp-why { font-size: 12.5px; color: var(--sub); margin-top: 5px; line-height: 1.55; }
+.wb-insp-supports { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.wb-insp-foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.wb-insp-nudge { font-size: 11px; color: var(--amber); margin-top: 9px; }
+
+.wb-connect-note {
+  margin: 22px 0 6px; border: 1px dashed var(--line10);
+  border-radius: 10px; padding: 2px 14px; background: rgba(33, 31, 26, 0.015);
+}
+.wb-connect-note summary { cursor: pointer; font-size: 12.5px; color: var(--sub2); padding: 10px 0; }
+.wb-connect-note summary:hover { color: var(--text); }
+.wb-connect-body { font-size: 12.5px; color: var(--sub); line-height: 1.7; padding: 0 0 12px; }
+.wb-connect-body code {
+  font-size: 11.5px; background: rgba(33, 31, 26, 0.06);
+  padding: 1px 6px; border-radius: 4px; font-family: ui-monospace, monospace;
+}
+.wb-connect-body b { color: var(--text); font-weight: 600; }
+
 .wb-feedbar {
   display: flex; align-items: center; gap: 16px; margin: 22px 0 4px;
   font-size: 12.5px; color: var(--sub2); flex-wrap: wrap;

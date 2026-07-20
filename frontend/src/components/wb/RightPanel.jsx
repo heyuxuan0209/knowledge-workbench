@@ -59,7 +59,7 @@ const CAP_STYLE = {
 
 function QuickAnalysis({
   onToggle, onToggleWide, wide, selectedItems, removeSel, analysisMode, backList,
-  chat, degraded, startAnalysis, sendChat, saveMsg, page, topicView, activeTopic,
+  chat, degraded, startAnalysis, sendChat, saveMsg, saveMsgAsIdea, page, topicView, activeTopic,
   askLibrary, askKnowledge, libraryHits = [], chatKind,
 }) {
   const [input, setInput] = useState('')
@@ -163,7 +163,7 @@ function QuickAnalysis({
             )}
             <div className="wb-chat">
               {chat.map((m, i) => (
-                <MsgBubble key={i} msg={m} onSave={() => saveMsg(i)} />
+                <MsgBubble key={i} msg={m} onSave={() => saveMsg(i)} onSaveIdea={saveMsgAsIdea ? () => saveMsgAsIdea(i) : null} />
               ))}
               <div ref={endRef} />
             </div>
@@ -201,7 +201,7 @@ function AskBox({ label, cta, placeholder, hint, onAsk }) {
   )
 }
 
-function MsgBubble({ msg, onSave, hideSave = false }) {
+function MsgBubble({ msg, onSave, onSaveIdea = null, hideSave = false }) {
   if (msg.role === 'user') return <div className="wb-msg user">{msg.text}</div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignSelf: 'flex-start', maxWidth: '94%' }}>
@@ -210,9 +210,17 @@ function MsgBubble({ msg, onSave, hideSave = false }) {
         {msg.text && msg.pending && <span className="wb-pending" style={{ marginLeft: 4 }}><i /><i /><i /></span>}
       </div>
       {!hideSave && !msg.pending && !msg.error && (
-        <button className={`wb-msg-save${msg.noteId ? ' saved' : ''}`} disabled={Boolean(msg.noteId)} onClick={onSave}>
-          {msg.noteId ? '✓ 已存入素材库' : '保存到笔记'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className={`wb-msg-save${msg.noteId ? ' saved' : ''}`} disabled={Boolean(msg.noteId)} onClick={onSave}>
+            {msg.noteId ? '✓ 已存入素材库' : '保存到笔记'}
+          </button>
+          {onSaveIdea && (
+            <button className={`wb-msg-save${msg.ideaId ? ' saved' : ''}`} disabled={Boolean(msg.ideaId)} onClick={onSaveIdea}
+              title="这篇值得写 → 提为一条灵感（要写什么）">
+              {msg.ideaId ? '✓ 已提为灵感' : '💡 提为灵感'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

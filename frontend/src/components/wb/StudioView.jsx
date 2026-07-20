@@ -9,7 +9,9 @@ import { api } from './util'
 // - 审稿：三个批评人格通读全稿 → 批注列表，每条可「按此修改」
 // - 3 个改法：草稿区选中一段 → 三个策略不同的候选卡，挑一个原位替换
 
-export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, gotoTopic }) {
+const RETURN_LABEL = { feed: '资讯', notes: '素材库', topics: '主题库', reports: '周报', inspirations: '灵感库' }
+
+export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, gotoTopic, returnPage, goBack }) {
   const platformIcon = (key) => platforms.find(p => p.key === key)?.icon || '📝'
 
   // ── ADR-026 试新版：文体(genre) × 平台形态(platform-form)，与老平台行完全并存 ──
@@ -20,6 +22,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [v2Pform, setV2Pform] = useState('gzh-long')
   const [openDD, setOpenDD] = useState(null)            // 'genre' | 'platform' | null
   const [combosOpen, setCombosOpen] = useState(false)
+  const [recReason, setRecReason] = useState('')        // 推荐理由（基于素材）
+  const [recPinned, setRecPinned] = useState(false)     // 用户手动改过 → 不再自动覆盖
   const gLabel = k => genres.find(g => g.key === k)?.label || k
   const pLabel = k => pforms.find(p => p.key === k)?.label || k
   // 阶段3 溯源态：只读渲染草稿，[素材N] 可点 → 高亮左栏对应引用
@@ -54,6 +58,21 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const matsShown = matQ.trim()
     ? mats.filter(m => (`${m.sourceTitle} ${m.excerpt}`).toLowerCase().includes(matQ.trim().toLowerCase()))
     : mats
+  // 素材变了 → 启发式推荐文体（用户手动改过则只更新理由、不覆盖选择）
+  useEffect(() => {
+    if (!v2Mode || selMat.size === 0) { setRecReason(''); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const j = await api('/api/materials/recommend', { method: 'POST', body: { selectedNoteIds: [...selMat] } })
+        if (cancelled) return
+        const r = j.data || {}
+        setRecReason(r.reason || '')
+        if (!recPinned) { if (r.genre) setV2Genre(r.genre); if (r.platformForm) setV2Pform(r.platformForm) }
+      } catch { /* 静默 */ }
+    })()
+    return () => { cancelled = true }
+  }, [selMat, v2Mode])
   const genDraftV2 = async () => {
     if (!v2Genre || !v2Pform) { showToast('先选文体和平台形态'); return }
     if (selMat.size === 0) { showToast('先从素材库勾选至少 1 条素材'); return }
@@ -181,7 +200,9 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 
   return (
     <>
-      <button className="wb-back" onClick={() => setPage('topics')}>← 返回主题库</button>
+      {returnPage
+        ? <button className="wb-back" onClick={goBack}>← 返回{RETURN_LABEL[returnPage] || '上一页'}</button>
+        : <button className="wb-back" onClick={() => setPage('topics')}>← 返回主题库</button>}
       <div className="wb-topic-head" style={{ marginTop: 6 }}>
         <span className="wb-topic-name">创作台</span>
         <span style={{ fontSize: 12, color: 'var(--sub2)' }}>来源</span>
@@ -263,7 +284,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               </div>
             )}
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line08)', fontSize: 11, color: 'var(--sub2)', lineHeight: 1.55 }}>
-              <b style={{ color: 'var(--sub)' }}>右侧「创作助手」= 改稿</b><br />起稿在中间；某段不满意，选中它用底部「审稿 / 改一段」调。
+              <b style={{ color: 'var(--sub)' }}>起稿在中间，改稿有两处</b><br />· 底部按钮：润色/审稿是整篇；「改一段」= 选中一段再改。<br />· 右侧「创作助手」：用大白话说怎么改（如“开头更狠”“压到 5 条”）。
             </div>
           </aside>
 
@@ -278,7 +299,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                   <span style={{ fontSize: 10.5, color: 'var(--accent)', background: 'rgba(61,90,128,.09)', borderRadius: 5, padding: '2px 7px' }}>推荐</span>
                   <h3 style={{ fontFamily: 'var(--serif)', fontSize: 15.5, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{gLabel(v2Genre)} · {pLabel(v2Pform)}</h3>
                 </div>
-                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>用「{gLabel(v2Genre)}」的骨架 +「{pLabel(v2Pform)}」的形态起稿；想换见下面「换文体 / 换平台」。</p>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>{recReason ? recReason + (recPinned ? '（你已手动指定文体）' : '') : `用「${gLabel(v2Genre)}」骨架 +「${pLabel(v2Pform)}」形态起稿；想换见下面「换文体 / 换平台」。`}</p>
                 <button className="wb-btn-primary" disabled={studio.busy || selMat.size === 0} onClick={genDraftV2}>用这个生成</button>
               </div>
               <div style={{ flex: 1, border: '1px solid var(--line10)', borderRadius: 11, padding: '12px 14px' }}>
@@ -287,7 +308,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                   <h3 style={{ fontFamily: 'var(--serif)', fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>读书精读体 · 小红书卡片</h3>
                 </div>
                 <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>拆成收藏卡，接图卡工具。</p>
-                <button className="wb-btn-ghost" onClick={() => { setV2Genre('读书精读体'); setV2Pform('xhs-card') }}>选它</button>
+                <button className="wb-btn-ghost" onClick={() => { setV2Genre('读书精读体'); setV2Pform('xhs-card'); setRecPinned(true) }}>选它</button>
               </div>
             </div>
 
@@ -297,7 +318,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 {openDD === 'genre' && (
                   <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 10, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 5, minWidth: 180 }}>
                     {genres.map(g => (
-                      <div key={g.key} onClick={() => { setV2Genre(g.key); setOpenDD(null) }}
+                      <div key={g.key} onClick={() => { setV2Genre(g.key); setRecPinned(true); setOpenDD(null) }}
                         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: v2Genre === g.key ? 'var(--accent)' : 'var(--body)', background: v2Genre === g.key ? 'rgba(61,90,128,.07)' : 'transparent' }}>
                         {g.label}{g.key === '读书精读体' && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(61,90,128,.11)', borderRadius: 4, padding: '1px 6px' }}>推荐</span>}
                       </div>
@@ -310,7 +331,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 {openDD === 'platform' && (
                   <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 10, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 5, minWidth: 170, maxHeight: 260, overflowY: 'auto' }}>
                     {pforms.map(p => (
-                      <div key={p.key} onClick={() => { setV2Pform(p.key); setOpenDD(null) }}
+                      <div key={p.key} onClick={() => { setV2Pform(p.key); setRecPinned(true); setOpenDD(null) }}
                         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: v2Pform === p.key ? 'var(--accent)' : 'var(--body)', background: v2Pform === p.key ? 'rgba(61,90,128,.07)' : 'transparent' }}>
                         {p.label}{p.key === 'gzh-long' && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(61,90,128,.11)', borderRadius: 4, padding: '1px 6px' }}>推荐</span>}
                       </div>
@@ -326,14 +347,14 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 7 }}>文体</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
                   {genres.map(g => (
-                    <span key={g.key} onClick={() => setV2Genre(g.key)}
+                    <span key={g.key} onClick={() => { setV2Genre(g.key); setRecPinned(true) }}
                       style={{ border: '1px solid var(--line10)', background: v2Genre === g.key ? 'var(--accent)' : 'var(--surface)', color: v2Genre === g.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{g.label}</span>
                   ))}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 7 }}>平台形态</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                   {pforms.map(p => (
-                    <span key={p.key} onClick={() => setV2Pform(p.key)}
+                    <span key={p.key} onClick={() => { setV2Pform(p.key); setRecPinned(true) }}
                       style={{ border: '1px solid var(--line10)', background: v2Pform === p.key ? 'var(--accent)' : 'var(--surface)', color: v2Pform === p.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{p.label}</span>
                   ))}
                 </div>
@@ -391,7 +412,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           ref={draftRef}
           className="wb-draft" value={studio.draft}
           onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
-          placeholder="点上方「生成初稿」，或直接在这里手写；从右侧可插入素材…"
+          placeholder="点上方「用这个生成」起稿，或直接在这里手写；改稿用底部按钮或右侧「创作助手」…"
         />
       )}
 
