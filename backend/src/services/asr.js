@@ -18,10 +18,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PIP_BIN = join(homedir(), 'Library/Python/3.10/bin');
 const CLI_ENV = { ...process.env, PATH: `${PIP_BIN}:${process.env.PATH || ''}` };
-// 只转前 15 分钟：实测 small 模型 CPU int8 约 3.2 倍速实时（240s 音频 75s 转完），
-// 15 分钟 ≈ 等待 5 分钟，是"首次解读可接受等待"的上限；30 分钟档等待近 10 分钟放弃。
-// B站 AI 类视频多为 5-15 分钟，绝大多数能完整覆盖。
-export const MAX_AUDIO_SECONDS = 900;
+// 字幕优先后，ASR 只是"无字幕视频"的兜底，故上限放宽到 40 分钟（覆盖绝大多数演讲/播客）；
+// 「转写全程」按需补全时用 FULL 档（3 小时，实际取视频真实时长）。small int8 约 3.2× 实时。
+export const MAX_AUDIO_SECONDS = 2400;      // 兜底自动转写：40 分钟
+export const FULL_AUDIO_SECONDS = 10800;    // 「转写全程」：3 小时（够长视频用）
 const DOWNLOAD_TIMEOUT = 5 * 60000;
 const TRANSCRIBE_TIMEOUT = 15 * 60000;
 const DIARIZE_TIMEOUT = 25 * 60000; // 分离管道（whisperX+pyannote）CPU 上明显更慢
@@ -127,14 +127,60 @@ export async function transcribeAudioUrl(audioUrl, { diarize = false } = {}) {
   }
 }
 
-// 转写视频音频 → { text, language, truncated, duration }。失败上抛，调用方决定降级话术。
-export async function transcribeVideo(url) {
+// VTT/SRT 字幕 → 纯文本：去时间轴/标签/序号，合并自动字幕的重复滚动行。
+function parseSubtitles(raw) {
+  const out = [];
+  let last = '';
+  for (let line of raw.split(/\r?\n/)) {
+    line = line.replace(/<[^>]+>/g, '').trim();               // 去 <c>/<00:00:00.000> 等内联标签
+    if (!line || line === 'WEBVTT') continue;
+    if (line.includes('-->')) continue;                       // 时间轴行
+    if (/^\d+$/.test(line)) continue;                         // SRT 序号
+    if (/^(Kind|Language|NOTE):/i.test(line)) continue;
+    if (line === last) continue;                              // 自动字幕逐行滚动的重复
+    out.push(line); last = line;
+  }
+  return out.join('\n').trim();
+}
+
+// yt-dlp 拉字幕（含自动字幕），YouTube/B站 通吃。命中返回纯文本，无字幕返回 null。
+async function fetchCaptions(url, workDir) {
+  const args = [
+    '--skip-download', '--write-subs', '--write-auto-subs',
+    '--sub-langs', 'zh-Hans,zh-Hant,zh,en,en-orig,en.*,zh.*',
+    '--sub-format', 'vtt/srt/best', '--no-playlist',
+    '-o', join(workDir, 'sub.%(ext)s'), url,
+  ];
+  if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
+  try {
+    await pexec('yt-dlp', args, { env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 8 * 1024 * 1024 });
+  } catch (err) {
+    console.log(`[asr] 字幕拉取失败（${(err.stderr || err.message || '').toString().slice(0, 120)}）`);
+    return null;
+  }
+  const files = (await readdir(workDir)).filter(f => /\.(vtt|srt)$/i.test(f));
+  if (!files.length) return null;
+  // 优先中文字幕（含自动），其次英文
+  const pick = files.sort((a, b) => (/(zh|Hans|Hant)/i.test(b) ? 1 : 0) - (/(zh|Hans|Hant)/i.test(a) ? 1 : 0))[0];
+  const { readFile } = await import('fs/promises');
+  const text = parseSubtitles(await readFile(join(workDir, pick), 'utf-8'));
+  return text.length >= 40 ? text : null;
+}
+
+// 视频取全文 → { text, source:'captions'|'asr', truncated, language }。
+// 字幕优先（快、准、无时长限制），拿不到才本地 ASR（full=true 时转全程）。失败上抛。
+export async function transcribeVideo(url, { full = false } = {}) {
   const workDir = join(tmpdir(), 'kw-asr', `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   await mkdir(workDir, { recursive: true });
 
   try {
+    const captions = await fetchCaptions(url, workDir).catch(() => null);
+    if (captions) return { text: captions, source: 'captions', truncated: false, language: null };
+
     const audioFile = await downloadAudio(url, workDir);
-    return await runTranscriber(audioFile, { diarize: false }); // 视频多为单人口播，不做分离
+    const maxSeconds = full ? FULL_AUDIO_SECONDS : MAX_AUDIO_SECONDS;
+    const asr = await runTranscriber(audioFile, { diarize: false, maxSeconds }); // 视频多为单人口播，不做分离
+    return { ...asr, source: 'asr' };
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }

@@ -26,15 +26,15 @@ export function loadRepoQuickscanPrompt() {
   return raw.replace(/<运行时注入：([^>]+)>/g, '$1');
 }
 
-export async function getOrGenerateInterpretation(contentId, { force = false } = {}) {
+export async function getOrGenerateInterpretation(contentId, { force = false, full = false } = {}) {
   const content = getContentById(contentId);
   if (!content) throw new Error('Content not found');
   if (!force && content.interpretation) {
-    return { text: content.interpretation, cached: true, note: null };
+    return { text: content.interpretation, cached: true, note: content.interpretation_note || null, truncated: !!content.interpretation_truncated };
   }
 
-  // 全文获取（抓取/字幕/ASR + 翻译 + zh_body 缓存，全套既有策略）
-  const { body, isFullText, note } = await resolveContentBody(content);
+  // 全文获取（字幕优先 / ASR 兜底 + 翻译 + zh_body 缓存）；full=true 时绕过缓存转全程
+  const { body, isFullText, note, truncated } = await resolveContentBody(content, { full });
   if (!body || body.length < 100) {
     throw new Error(`未获取到足够正文（${note || '内容过短'}），无法生成精读稿`);
   }
@@ -60,9 +60,10 @@ export async function getOrGenerateInterpretation(contentId, { force = false } =
 
   const text = stripPreamble(result.content);
   const db = getDatabase();
-  db.prepare("UPDATE contents SET interpretation = ?, updated_at = datetime('now') WHERE id = ?").run(text, contentId);
+  db.prepare("UPDATE contents SET interpretation = ?, interpretation_note = ?, interpretation_truncated = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(text, note || null, truncated ? 1 : 0, contentId);
   db.close();
 
-  console.log(`✅ Interpretation generated for ${contentId} (${text.length} chars, ¥${result.cost?.toFixed(4)}${isFullText ? '' : '，基于降级材料'})`);
-  return { text, cached: false, note };
+  console.log(`✅ Interpretation generated for ${contentId} (${text.length} chars, ¥${result.cost?.toFixed(4)}${isFullText ? '' : '，基于降级材料'}${truncated ? '，⚠️ 仅前段' : ''})`);
+  return { text, cached: false, note, truncated: !!truncated };
 }

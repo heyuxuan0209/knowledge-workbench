@@ -105,11 +105,13 @@ app.get('/api/prompts/instant-analysis', async (req, res) => {
 });
 
 // 结构化精读稿（2026-07-16：读全文 = 精读稿，与即时分析同模板同形式）。
-// 首次：全文获取（含翻译/字幕/ASR）+ 一次 Deepseek 生成，之后缓存秒开；?force=1 重新生成
+// 首次：全文获取（含翻译/字幕/ASR）+ 一次 Deepseek 生成，之后缓存秒开；
+// ?force=1 重新生成；?full=1「转写全程」——绕过缓存、ASR 转全程后重生成（视频没读全时用）
 app.get('/api/contents/:id/interpretation', async (req, res) => {
   try {
+    const full = req.query.full === '1';
     const { getOrGenerateInterpretation } = await import('./services/interpretation.js');
-    const result = await getOrGenerateInterpretation(req.params.id, { force: req.query.force === '1' });
+    const result = await getOrGenerateInterpretation(req.params.id, { force: req.query.force === '1' || full, full });
     res.json({ success: true, data: result });
   } catch (error) {
     const status = error.message === 'Content not found' ? 404 : 500;

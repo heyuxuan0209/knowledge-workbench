@@ -12,6 +12,21 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
   const [interp, setInterp] = useState({ loading: true, data: null, error: null })
   const [raw, setRaw] = useState({ loading: false, data: null, error: null })
   const [savedNote, setSavedNote] = useState(false)
+  const [fullBusy, setFullBusy] = useState(false)
+
+  // 「转写全程」：视频没读全时按需补全——绕过缓存转全程后重生成精读稿（可能几分钟，转完自动缓存）
+  const transcribeFull = async () => {
+    if (fullBusy) return
+    setFullBusy(true)
+    showToast?.('正在转写全程…（长视频要几分钟，可先关掉，转完自动缓存）')
+    try {
+      const j = await api(`/api/contents/${content.id}/interpretation?full=1`)
+      setInterp({ loading: false, data: j.data, error: null })
+      setRaw({ loading: false, data: null, error: null }) // 原文译文缓存也失效，切过去时重取
+      showToast?.('已按全程重新精读')
+    } catch (err) { showToast?.(`转写全程失败：${err.message}`) }
+    setFullBusy(false)
+  }
 
   // 存为素材（2026-07-16 反馈：GitHub 项目/文章都要能进素材库）——
   // 把精读稿/速览存成素材卡，来源回链本内容，走保存即同化的既有管道
@@ -72,9 +87,21 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
             {interp.loading && <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--sub2)', fontSize: 13 }}>{loadingHint}</div>}
             {interp.error && <div className="wb-warnbar">生成失败：{interp.error}</div>}
             {interp.data && <>
-              {interp.data.note && <div className="wb-warnbar" style={{ marginBottom: 10 }}>{interp.data.note}</div>}
+              {fullBusy ? (
+                <div className="wb-warnbar" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="wb-pending"><i /><i /><i /></span>
+                  正在转写全程并重生成精读稿…（长视频约几分钟，可先关掉，转完自动缓存）
+                </div>
+              ) : interp.data.truncated ? (
+                <div className="wb-warnbar" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(169,121,31,.1)', borderColor: 'rgba(169,121,31,.3)' }}>
+                  <span style={{ flex: 1 }}>⚠️ {interp.data.note || '这个视频没读全——精读只覆盖了前段'}</span>
+                  <button className="wb-btn-primary" style={{ padding: '6px 13px', fontSize: 12, flex: 'none' }} onClick={transcribeFull}>转写全程 →</button>
+                </div>
+              ) : interp.data.note ? (
+                <div className="wb-warnbar" style={{ marginBottom: 10 }}>{interp.data.note}</div>
+              ) : null}
               {/* 渲染成干净排版，不露 markdown 符号（用户 2026-07-18 确认） */}
-              <div className="wb-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(interp.data.text) }} />
+              <div className="wb-md" style={fullBusy ? { opacity: 0.5 } : undefined} dangerouslySetInnerHTML={{ __html: renderMarkdown(interp.data.text) }} />
             </>}
           </>}
           {tab === 'raw' && <>
@@ -351,7 +378,8 @@ export default function FeedView({
             const title = c.zh_title || c.en_title || '（无标题）'
             // 关注状态 → 小圆点（绿=已关注/灰=未关注），不再用满色 pill；分类降成尾巴小灰字
             const dot = <span className={`wb-fdot${followed ? ' f' : ''}`} title={followed ? '来自你关注的源' : '来自你没关注的源'} />
-            const meta = `${author} · ${timeAgo(c.published_at)}${c.category ? ' · ' + c.category : ''}`
+            const plat = platformOf(c) // 来源类型标（一眼知道是视频/文章/播客/公众号…）
+            const meta = `${plat ? plat + ' · ' : ''}${author} · ${timeAgo(c.published_at)}${c.category ? ' · ' + c.category : ''}`
             const actions = (
               <div className="wb-fcard-act">
                 {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} title="AI 帮你读懂这篇，出精读稿" onClick={openRead}>AI 精读</button>}
@@ -427,6 +455,20 @@ export default function FeedView({
       {readerContent && <ReaderModal content={readerContent} onClose={() => setReaderContent(null)} showToast={showToast} loadNotes={loadNotes} />}
     </>
   )
+}
+
+// 来源类型标（用户反馈：卡片要能一眼看出是 YouTube / 公众号 / 播客 还是文章）。
+// 优先用 source_platform（登记源带），没有再看 content_type，最后 source_app 兜底。
+function platformOf(c) {
+  const P = {
+    YouTube: '▶ YouTube', Bilibili: '▶ B站', WeChat: '公众号', Podcast: '🎙 播客',
+    Xiaoyuzhou: '🎙 小宇宙', RSS: '网页', Blog: '网页', Newsletter: '网页', GitHub: 'GitHub', X: 'X',
+  }
+  if (c.source_platform && P[c.source_platform]) return P[c.source_platform]
+  const T = { video: '▶ 视频', podcast: '🎙 播客', tweet: 'X', repo: 'GitHub', article: '文章' }
+  if (c.content_type && T[c.content_type]) return T[c.content_type]
+  const A = { aihot: 'AI HOT', hackernews: 'HN', github_trending: 'GitHub', rss: '网页' }
+  return A[c.source_app] || '文章'
 }
 
 // 分类 chips（UI 改造 2b）——文章/项目各一套类目，只显示有内容的类目。

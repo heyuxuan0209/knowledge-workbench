@@ -41,7 +41,9 @@ async function withTimeout(promise, ms) {
 
 // 返回 { body, isFullText, note }
 // isFullText: true 表示这是真实原文，false 表示降级用了摘要（note 说明原因，成功时为 null）
-export async function resolveContentBody(content) {
+// full=true：「转写全程」——绕过 zh_body 缓存、放宽转写时长与正文上限，重新取全量。
+export async function resolveContentBody(content, { full = false } = {}) {
+  const VIDEO_BODY_CAP = 60000; // 视频/字幕正文上限（42 分钟演讲字幕约 3-4 万字，别再半路截断）
   if (content.content_type === 'tweet') {
     return {
       body: content.zh_summary || content.zh_body || '',
@@ -55,7 +57,7 @@ export async function resolveContentBody(content) {
   // ② 无字幕/B站 → 本地 ASR 转写兜底（ADR-015：faster-whisper，首次分钟级，结果缓存）
   // ③ ASR 也失败 → 诚实降级为标题+简介
   if (content.content_type === 'video') {
-    if (content.zh_body) {
+    if (content.zh_body && !full) {
       return { body: content.zh_body, isFullText: true, note: null };
     }
 
@@ -90,8 +92,7 @@ export async function resolveContentBody(content) {
       try {
         const ingested = await withTimeout(ingest(content.url), 30000);
         if (ingested.fetchStatus !== 'success') throw new Error(ingested.fetchError);
-        // 与 Mode 1 同款长视频保护：字幕前 20k 字符已足够支撑解读
-        const raw = ingested.body.length > 20000 ? ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）' : ingested.body;
+        const raw = ingested.body.length > VIDEO_BODY_CAP ? ingested.body.slice(0, VIDEO_BODY_CAP) : ingested.body;
         const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw);
         persistZhBody(content.id, ingested.body, zhBody);
         return { body: zhBody, isFullText: true, note: null };
@@ -103,18 +104,21 @@ export async function resolveContentBody(content) {
     // ② ASR 兜底（B站直达；YouTube 字幕失败后到这）
     if (isYoutube || isBilibili) {
       try {
-        const { transcribeVideo, MAX_AUDIO_SECONDS } = await import('./asr.js');
-        const asr = await transcribeVideo(content.url);
-        const raw = asr.text.length > 20000 ? asr.text.slice(0, 20000) + '\n…（内容过长，已截取前段解读）' : asr.text;
-        // 中文转写走排版（加标点分段，不改字词）；英文走翻译（翻译天然重排）
+        const { transcribeVideo, MAX_AUDIO_SECONDS, FULL_AUDIO_SECONDS } = await import('./asr.js');
+        const asr = await transcribeVideo(content.url, { full });
+        const raw = asr.text.length > VIDEO_BODY_CAP ? asr.text.slice(0, VIDEO_BODY_CAP) : asr.text;
+        // 中文转写走排版（加标点分段，不改字词）；英文走翻译（翻译天然重排）；字幕已是文本，也走同款
         const { formatTranscript } = await import('./translation.js');
         const zhBody = detectLanguage(raw) === 'zh' ? await formatTranscript(raw) : await translateText(raw);
         persistZhBody(content.id, asr.text, zhBody);
-        return {
-          body: zhBody,
-          isFullText: true,
-          note: `正文由音频本地转写（ASR）生成${asr.truncated ? `，长视频只转写了前 ${Math.round(MAX_AUDIO_SECONDS / 60)} 分钟` : ''}，可能存在少量听写误差`
-        };
+        const capMin = Math.round((full ? FULL_AUDIO_SECONDS : MAX_AUDIO_SECONDS) / 60);
+        const truncated = asr.source === 'asr' && asr.truncated;
+        const note = asr.source === 'captions'
+          ? null // 字幕全文，干净路径，不打扰
+          : truncated
+            ? `这个视频没抓到字幕，音频转写只覆盖了前 ${capMin} 分钟——后半段没读到`
+            : '正文由音频本地转写（ASR）生成，可能有少量听写误差';
+        return { body: zhBody, isFullText: true, note, truncated };
       } catch (asrError) {
         return {
           body: content.zh_summary || '',
