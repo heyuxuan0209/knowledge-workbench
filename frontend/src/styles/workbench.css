@@ -669,6 +669,8 @@ input, textarea { font-family: inherit; }
 .wb-fcard-title{ font-family:var(--serif); font-weight:600; font-size:15px; line-height:1.4; color:var(--body); cursor:pointer; }
 .wb-fcard-title:hover{ color:var(--accent); }
 .wb-fcard-gist{ font-size:12.5px; color:var(--sub); line-height:1.55; margin-top:5px; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+/* hover 就地展开全摘要（静息 1 行，悬停这张卡撑高露全文） */
+.wb-fcard:hover .wb-fcard-gist{ -webkit-line-clamp:unset; display:block; color:var(--body2); }
 .wb-fcard-meta{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--faint); margin-top:8px; }
 .wb-fcard-act{ display:none; gap:11px; align-items:center; margin-top:10px; padding-top:9px; border-top:1px dashed var(--line08); flex-wrap:wrap; }
 .wb-fcard:hover .wb-fcard-act{ display:flex; }

@@ -5,14 +5,16 @@ const S = ({ size = 16, sw = 1.5, style, children }) => (
     strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={style}>{children}</svg>
 )
 
+// 资讯=广播波纹（信息流不断进来）；素材=书签（你挑出来收藏留存的）——两者形状差异最大，不再撞脸
 export const IconFeed = () => (
-  <S><rect x="2" y="3" width="12" height="10" rx="1.5" /><line x1="4.5" y1="6" x2="11.5" y2="6" /><line x1="4.5" y1="8.5" x2="11.5" y2="8.5" /><line x1="4.5" y1="11" x2="8.5" y2="11" /></S>
+  <S><circle cx="4" cy="12" r="1" /><path d="M4 8.5a3.5 3.5 0 0 1 3.5 3.5" /><path d="M4 5a7 7 0 0 1 7 7" /></S>
 )
 export const IconNotes = () => (
-  <S><rect x="2.5" y="2.5" width="10" height="11" rx="1.5" /><line x1="5" y1="5.5" x2="10" y2="5.5" /><line x1="5" y1="8" x2="10" y2="8" /><line x1="5" y1="10.5" x2="8" y2="10.5" /></S>
+  <S><path d="M4 2.5h8v11l-4-3-4 3z" /></S>
 )
+// 主题=AI 帮你持续维护的一篇综述 → 开卷（书），区别于素材书签/文件夹
 export const IconTopics = () => (
-  <S><path d="M2 5a1 1 0 0 1 1-1h3l1.3 1.6H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" /></S>
+  <S><path d="M8 4C6.5 3 4.5 3 2.5 3.5V13c2-.5 4-.5 5.5.5 1.5-1 3.5-1 5.5-.5V3.5C11.5 3 9.5 3 8 4z" /><path d="M8 4v9.5" /></S>
 )
 export const IconStudio = () => (
   <S><path d="M11.4 2.4 13.6 4.6 5.4 12.8 2.8 13.4 3.4 10.8z" /><line x1="10" y1="4" x2="12" y2="6" /></S>
