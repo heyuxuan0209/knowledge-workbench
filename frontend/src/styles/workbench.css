@@ -820,3 +820,78 @@ input, textarea { font-family: inherit; }
 .wb-report-sechead{ display:flex; align-items:center; gap:8px; width:100%; background:none; border:none; padding:0; text-align:left; cursor:pointer; }
 .wb-report-caret{ font-size:11.5px; color:var(--sub2); flex:none; white-space:nowrap; }
 .wb-report-sechead:hover .wb-report-caret{ color:var(--accent); }
+
+/* ============================================================
+   四季皮肤（心情皮肤）· ADR-037
+   默认(:root) = 现状暖纸靛蓝；四季 = 覆盖 body[data-season] 上的变量，
+   组件零改动（全站走 var()）。设计原则：Apple 干净结构 + 莫兰迪低饱和季节色，
+   表面回暖半档保留纸感；冬为唯一暗色。切换器见 SkinPicker（顶栏可折叠）。
+   ============================================================ */
+/* 画布底色：index.css 的 @layer base 把 body 背景钉成 #fafaf9，浅色主题看不出，
+   暗色下画布会发亮、标题（浅字）沉进去看不见——用属性选择器提权强制回到 var(--bg) */
+body[data-season]{ background-color: var(--bg) !important; transition: background .35s, color .35s; }
+/* 侧栏/右栏比内容白略沉一档，做出「分组」层次（仅换肤时） */
+body[data-season] .wb-nav,
+body[data-season] .wb-panel{ background: var(--brief-bg); }
+
+/* —— 春 · 冷杉沙（muted sage） —— */
+body[data-season="spring"]{
+  --bg:#eff2ea; --surface:#fbfbf5; --brief-bg:#f3f5ec;
+  --text:#22261f; --body:#33382d; --body2:#454b3d; --sub:#6e7468; --sub2:#8b9082; --faint:#aab0a2;
+  --line07:rgba(34,40,28,.05); --line08:rgba(34,40,28,.07); --line10:rgba(34,40,28,.09); --line14:rgba(34,40,28,.13); --line16:rgba(34,40,28,.16);
+  --accent:#6f8a5b; --accent-hover:#5c7549; --amber:#ae8a44; --green:#6f8a5b; --red:#b4756b;
+}
+/* —— 夏 · 湖石青（muted blue-teal） —— */
+body[data-season="summer"]{
+  --bg:#edf2f3; --surface:#fafcfb; --brief-bg:#f0f5f5;
+  --text:#1b252a; --body:#2c383e; --body2:#3d4a51; --sub:#647077; --sub2:#86929a; --faint:#a2aeb4;
+  --line07:rgba(22,36,44,.05); --line08:rgba(22,36,44,.07); --line10:rgba(22,36,44,.09); --line14:rgba(22,36,44,.13); --line16:rgba(22,36,44,.16);
+  --accent:#5b8496; --accent-hover:#4a6f80; --amber:#b0894a; --green:#5f8f79; --red:#c07a6e;
+}
+/* —— 秋 · 陶土棕（muted clay，最贴近原版暖纸） —— */
+body[data-season="autumn"]{
+  --bg:#f3efe7; --surface:#fdfbf5; --brief-bg:#f6f2e9;
+  --text:#2a241c; --body:#3b342a; --body2:#4e463a; --sub:#736a5c; --sub2:#948a79; --faint:#b4a992;
+  --line07:rgba(42,36,25,.05); --line08:rgba(42,36,25,.07); --line10:rgba(42,36,25,.09); --line14:rgba(42,36,25,.13); --line16:rgba(42,36,25,.16);
+  --accent:#a6764e; --accent-hover:#8c6140; --amber:#ad8636; --green:#7c8560; --red:#a9685c;
+}
+/* —— 冬·夜 · 深柔暗色 + 雾蓝（唯一暗色；压深画布、软化文字，避免刺眼） —— */
+body[data-season="winter"]{
+  --bg:#191a1d; --surface:#232428; --brief-bg:#1e1f22;
+  /* 次级/浅色文字整体抬亮，压缩明暗跨度——暗底上别让来源·时间·标签掉进背景 */
+  --text:#e7e8ee; --body:#cdd0d8; --body2:#c2c5cd; --sub:#a4a7b1; --sub2:#9599a3; --faint:#7e818b;
+  --ink:#e7e8ee; /* .wb-md 标题等用 var(--ink,#26241f)，暗色下必须点亮，否则深色标题隐形 */
+  --line07:rgba(255,255,255,.04); --line08:rgba(255,255,255,.06); --line10:rgba(255,255,255,.09); --line14:rgba(255,255,255,.13); --line16:rgba(255,255,255,.17);
+  --accent:#8fa9c4; --accent-hover:#a3bad2; --amber:#c9a15e; --green:#7fa98c; --red:#c98679;
+}
+/* 冬·夜的硬编码浅色兜底：滚动条 + hero 渐变里的 #fbf8f1 亮块（会刺眼）+ 白底输入 */
+body[data-season="winter"] ::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.16); }
+body[data-season="winter"] .wb-hero{ background:var(--surface); }
+body[data-season="winter"] .wb-hero-row input,
+body[data-season="winter"] .wb-hero-clip,
+body[data-season="winter"] .wb-uploading{ background:var(--surface); color:var(--body); }
+
+/* ===== 皮肤切换器（顶栏可折叠小控件，不占正文） ===== */
+.wb-skin{ position:relative; }
+.wb-skin-btn{
+  display:flex; align-items:center; gap:6px; height:30px; padding:0 11px;
+  border:1px solid var(--line14); border-radius:15px; background:var(--surface);
+  color:var(--sub); font-size:12.5px; font-weight:500;
+}
+.wb-skin-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.wb-skin-btn .sw{ width:11px; height:11px; border-radius:3px; flex:none; }
+.wb-skin-backdrop{ position:fixed; inset:0; z-index:60; }
+.wb-skin-pop{
+  position:absolute; top:calc(100% + 8px); right:0; z-index:61;
+  background:var(--surface); border:1px solid var(--line14); border-radius:12px;
+  padding:6px; box-shadow:0 14px 34px rgba(0,0,0,.16); display:flex; flex-direction:column; gap:2px; min-width:168px;
+}
+.wb-skin-poptitle{ font-size:10.5px; letter-spacing:.5px; color:var(--sub2); font-weight:600; padding:4px 8px 6px; }
+.wb-skin-item{
+  display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px;
+  border:none; background:none; color:var(--body2); font-size:13px; text-align:left; width:100%; cursor:pointer;
+}
+.wb-skin-item:hover{ background:var(--brief-bg); }
+.wb-skin-item.on{ color:var(--accent); font-weight:600; }
+.wb-skin-item .sw{ width:14px; height:14px; border-radius:4px; flex:none; border:1px solid var(--line10); }
+.wb-skin-item .nm{ margin-left:auto; font-size:11px; color:var(--faint); }
