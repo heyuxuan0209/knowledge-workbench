@@ -14,6 +14,7 @@ import StudioView from '../components/wb/StudioView'
 import ReportsView from '../components/wb/ReportsView'
 import SettingsView from '../components/wb/SettingsView'
 import RightPanel from '../components/wb/RightPanel'
+import SkinPicker from '../components/wb/SkinPicker'
 import { IdeaModal, PoolModal, ImportModal } from '../components/wb/Modals'
 
 // 知识工作台主壳（视觉规格：prototype/design_handoff_knowledge_workbench）。
@@ -784,7 +785,10 @@ export default function WorkbenchPage() {
           <div className="wb-brand-dot" />
           <div className="wb-brand-name">知识工作台</div>
         </div>
-        <div className="wb-avatar">Z</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SkinPicker />
+          <div className="wb-avatar">Z</div>
+        </div>
       </header>
 
       <div className="wb-body">
