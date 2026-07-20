@@ -89,6 +89,7 @@ function extractRefs(bodyText, notes) {
       marker: `[素材${idx + 1}]`,
       noteId: notes[idx].id,
       sourceTitle: notes[idx].title || notes[idx].source_title,
+      sourceUrl: notes[idx].source_url || null,
       contentId: notes[idx].content_id,
     });
   }
@@ -141,6 +142,10 @@ export async function humanize(draftText, platform = 'long') {
 // 与老 generateFromTopic 完全并存，不改老路径。ADR-027：第一人称文体豁免强制溯源 + 综述块。
 const FIRST_PERSON_GENRES = ['实践复盘体', '个人叙事体'];
 
+// 输出干净正文（覆盖平台模板里的 Markdown 说法）——用户要"干净正文，不要 ## 和 **"
+const CLEAN_OUTPUT = `【输出格式·最高优先】直接输出可发布的干净正文，**不要用任何 Markdown 符号**：不要 # / ##（标题）、不要 **加粗**、不要 - 或 * 列表符号、不要 \`代码\`反引号。需要小标题时，单独成一行写一句普通文字（前面不加 #）；需要强调时靠措辞，不靠加粗。段落之间用空行分隔。[素材N] 溯源标记要保留。\n\n`;
+
+
 function buildPromptV2(topic, body, notes, composedSpec, viewpoint, skipOverview) {
   const viewsBlock = (body.views || []).length
     ? body.views.map(v => `- ${v.who}：${v.what}${v.conflict ? '（⚡与他方冲突）' : ''}`).join('\n')
@@ -174,7 +179,7 @@ export async function generateFromTopicV2(topicId, genreKey, platformFormKey, vi
   let exemption = '';
   if (materialsPicked) exemption += `【只用选中素材·ADR-028】本篇只基于下方勾选的 ${selectedNoteIds.length} 条素材创作；**不要引入主题页综述、也不要引入任何未勾选的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】本篇是第一人称亲历文体：[素材N] 溯源只在"引用外部信息/数据"时标，不对你自己的经历强制标注。底线不变：用到外部信息照样必须标、不许编。\n\n`;
-  const composedSpec = `${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const composedSpec = `${CLEAN_OUTPUT}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
 
   const { topic, body, notes } = gatherTopicMaterials(topicId, selectedNoteIds);
   console.log(`  ↳ 生成用素材：${materialsPicked ? `选中 ${notes.length} 条（跳过主题综述）` : `主题全部 ${notes.length} 条`}`);
@@ -215,7 +220,7 @@ export async function generateFromMaterials(noteIds, genreKey, platformFormKey, 
 
   let exemption = `【只用选中素材·ADR-028】本篇只基于下方 ${notes.length} 条素材创作；**不要引入任何未提供的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】第一人称亲历文体：[素材N] 只在引用外部信息时标。底线不变：用到外部信息照样标、不许编。\n\n`;
-  const composedSpec = `${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const composedSpec = `${CLEAN_OUTPUT}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
 
   // 无主题：造一个最小 topic + 空 body，skipOverview=true（不塞综述）
   const result = await chat([{ role: 'user', content: buildPromptV2({ name: '自选素材', description: '' }, {}, notes, composedSpec, viewpoint, true) }]);

@@ -22,6 +22,15 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [combosOpen, setCombosOpen] = useState(false)
   const gLabel = k => genres.find(g => g.key === k)?.label || k
   const pLabel = k => pforms.find(p => p.key === k)?.label || k
+  // 阶段3 溯源态：只读渲染草稿，[素材N] 可点 → 高亮左栏对应引用
+  const [srcMode, setSrcMode] = useState(false)
+  const [activeRef, setActiveRef] = useState(null)
+  const renderTraced = () => String(studio.draft || '').split(/(\[素材\d+\])/g).map((p, i) => (
+    /^\[素材\d+\]$/.test(p)
+      ? <span key={i} onClick={() => setActiveRef(activeRef === p ? null : p)}
+          style={{ color: activeRef === p ? '#fff' : 'var(--accent)', background: activeRef === p ? 'var(--accent)' : 'rgba(61,90,128,.1)', borderRadius: 5, padding: '1px 5px', fontFamily: 'system-ui', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{p}</span>
+      : <span key={i}>{p}</span>
+  ))
   useEffect(() => {
     if (!v2Mode || genres.length) return
     ;(async () => {
@@ -154,9 +163,10 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setTimeout(() => genDraft(p), 0)
   }
 
+  const stripRefs = t => String(t || '').replace(/\s*\[素材\d+\]/g, '')   // 批量去 [素材N] 溯源标记（发布用）
   const copyAll = async () => {
-    try { await navigator.clipboard.writeText(studio.draft) } catch { /* 剪贴板受限时忽略 */ }
-    showToast('已复制全文')
+    try { await navigator.clipboard.writeText(stripRefs(studio.draft)) } catch { /* 剪贴板受限时忽略 */ }
+    showToast('已复制全文（自动去掉了 [素材N] 溯源标记）')
   }
 
   // 溯源检查：草稿有内容但没有任何 [素材N]/引用标记时提示
@@ -217,6 +227,19 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 </label>
               ))}
             </div>
+            {studio.paragraphRefs?.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line08)' }}>
+                <div style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginBottom: 6 }}>本文引用（{studio.paragraphRefs.length}）· 点原文溯源</div>
+                {studio.paragraphRefs.map((r, i) => (
+                  <div key={i} onClick={() => setActiveRef(activeRef === r.marker ? null : r.marker)}
+                    style={{ fontSize: 11.5, marginBottom: 3, lineHeight: 1.45, display: 'flex', gap: 5, alignItems: 'baseline', cursor: 'pointer', padding: '3px 5px', borderRadius: 5, background: activeRef === r.marker ? 'rgba(61,90,128,.12)' : 'transparent', border: activeRef === r.marker ? '1px solid rgba(61,90,128,.35)' : '1px solid transparent' }}>
+                    <span style={{ color: 'var(--accent)', fontWeight: 600, flex: 'none' }}>{r.marker}</span>
+                    <span style={{ color: 'var(--body)', flex: 1, minWidth: 0 }}>{r.sourceTitle || '素材'}</span>
+                    {r.sourceUrl && <a href={r.sourceUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ color: 'var(--accent)', textDecoration: 'none', flex: 'none' }}>原文↗</a>}
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line08)', fontSize: 11, color: 'var(--sub2)', lineHeight: 1.55 }}>
               <b style={{ color: 'var(--sub)' }}>右侧「创作助手」= 改稿</b><br />起稿在中间；某段不满意，选中它用底部「审稿 / 改一段」调。
             </div>
@@ -365,12 +388,22 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         </div>
       )}
 
-      <textarea
-        ref={draftRef}
-        className="wb-draft" value={studio.draft}
-        onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
-        placeholder="点上方「生成初稿」，或直接在这里手写；从右侧可插入素材…"
-      />
+      {v2Mode && !isEmpty && (
+        <div style={{ display: 'inline-flex', border: '1px solid var(--line10)', borderRadius: 8, overflow: 'hidden', marginTop: 14, marginBottom: -4 }}>
+          <button className={!srcMode ? 'wb-btn-primary' : 'wb-btn-ghost'} style={{ borderRadius: 0, border: 'none', fontSize: 12, padding: '6px 14px' }} onClick={() => setSrcMode(false)}>编辑</button>
+          <button className={srcMode ? 'wb-btn-primary' : 'wb-btn-ghost'} style={{ borderRadius: 0, border: 'none', fontSize: 12, padding: '6px 14px' }} onClick={() => setSrcMode(true)}>溯源（点 [素材N] 溯源）</button>
+        </div>
+      )}
+      {srcMode && v2Mode && !isEmpty ? (
+        <div className="wb-draft" style={{ whiteSpace: 'pre-wrap', overflowY: 'auto', cursor: 'default' }}>{renderTraced()}</div>
+      ) : (
+        <textarea
+          ref={draftRef}
+          className="wb-draft" value={studio.draft}
+          onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
+          placeholder="点上方「生成初稿」，或直接在这里手写；从右侧可插入素材…"
+        />
+      )}
 
       {noRefs && (
         <div className="wb-warnbar" style={{ marginTop: 10 }}>
@@ -403,6 +436,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             <div className="wb-more-menu">
               <button className="wb-more-item" title="导出发布版：溯源标记转文末来源列表"
                 onClick={() => { setMoreOpen(false); exportMd() }}>导出 Markdown</button>
+              <button className="wb-more-item" title="一键删掉正文里所有 [素材N] 溯源标记（发布前用；不可撤销请先存草稿）"
+                onClick={() => { setMoreOpen(false); setStudio(s => ({ ...s, draft: stripRefs(s.draft) })); showToast('已去掉正文里所有 [素材N] 标记') }}>去引用标记</button>
               {(v2Mode ? (v2Pform === 'gzh-long' || v2Pform === 'xhs-long') : studio.platform === 'long') && (
                 <button className="wb-more-item" onClick={() => { setMoreOpen(false); suggestTitles() }}>标题候选</button>
               )}
