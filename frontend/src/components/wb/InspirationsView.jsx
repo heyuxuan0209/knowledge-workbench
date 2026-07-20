@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { timeAgo, api } from './util'
-import { IconBulb, IconExternal, IconTrash } from './Icons'
+import { IconExternal, IconTrash } from './Icons'
 import InstantAnalysisHero from './InstantAnalysisHero'
 
 // 灵感库（ADR-029）：选题种子收集箱，和素材（料）分工——灵感是"要写什么"。
@@ -217,7 +217,7 @@ export default function InspirationsView({
       )}
 
       <div className="wb-page-head">
-        <h2 className="wb-page-title"><IconBulb size={16} /> 灵感库</h2>
+        <h2 className="wb-page-title">灵感库</h2>
         <div className="wb-page-sub">要写什么的种子。素材是「料」、灵感是「要写什么」——刷到能写的、脑里冒出的，先收下来，别忙完就忘。</div>
       </div>
 
