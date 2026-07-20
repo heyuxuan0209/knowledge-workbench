@@ -48,6 +48,10 @@ export function detectInputType(input) {
   // X/推特 直链：需登录态才能抓取（本产品未接入，ADR-014 后置）。识别出来 → 若库里已有(AI HOT 收录过)
   // 直接从库解读，否则秒回清晰提示，不再白等 25s Jina。
   if (/(^|\.)(x|twitter)\.com$/.test(url.hostname)) return 'x';
+  // 微信公众号文章：正文**在裸 HTML 里**（#js_content，本例 2713 字），但通用 Readability 只抽到 7 字
+  // ——它读不懂公众号的 markup。识别出来直接抽 #js_content。（区别于 ADR-007 的"关注公众号源不抓取"：
+  // 那是自动追更的策略；这里是用户主动粘一篇要读，抓得到就该抓。）
+  if (url.hostname.includes('mp.weixin.qq.com') && url.pathname.startsWith('/s')) return 'wechat';
   if (url.hostname.includes('xiaoyuzhoufm.com') && url.pathname.includes('/episode/')) return 'xiaoyuzhou';
   if (/bilibili\.com|b23\.tv/.test(url.hostname)) return 'bilibili'; // B站视频→转写（复用已有 ASR 下载管道）
   const isYoutube = YOUTUBE_HOSTS.some(host => url.hostname.includes(host));
@@ -130,6 +134,53 @@ async function ingestX(input) {
     fetchError: 'X / 推特链接需要登录态才能抓取（本产品未接入）。最快：直接把推文文字粘进来；'
       + '若它在你的资讯里（AI HOT 已收录），去「资讯」页找到它点「AI 精读」。',
   };
+}
+
+// 微信公众号文章：正文在裸 HTML 的 #js_content 里，直接抽（通用 Readability 抽不出）。
+// 触发反爬时公众号会返回验证/占位页（#js_content 为空）→ 给清晰提示。
+async function ingestWechat(input) {
+  const url = input.trim();
+  try {
+    const response = await axios.get(url, {
+      timeout: 15000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+      maxRedirects: 5,
+    });
+    const doc = new JSDOM(String(response.data || ''), { url }).window.document;
+    const container = doc.querySelector('#js_content') || doc.querySelector('.rich_media_content');
+    // 保段落：优先按块级子节点取文本，否则退回整体 textContent
+    let body = '';
+    if (container) {
+      const blocks = [...container.querySelectorAll('p, section, h1, h2, h3, blockquote, li')]
+        .filter(b => !b.querySelector('p, section')); // 只取叶子块，避嵌套重复
+      body = (blocks.length
+        ? blocks.map(b => b.textContent.replace(/[ \t ]+/g, ' ').trim()).filter(Boolean).join('\n\n')
+        : container.textContent).replace(/\n{3,}/g, '\n\n').trim();
+    }
+    const title = (doc.querySelector('#activity-name')?.textContent
+      || doc.querySelector('meta[property="og:title"]')?.getAttribute('content')
+      || doc.querySelector('.rich_media_title')?.textContent || '').trim() || null;
+    const author = (doc.querySelector('#js_name')?.textContent
+      || doc.querySelector('meta[name="author"]')?.getAttribute('content') || '').trim() || null;
+
+    if (body.length >= 100) {
+      return {
+        title, body, type: 'article', via: 'wechat',
+        metadata: { originalTitle: title, author, platform: '微信公众号', publishedAt: null, sourceUrl: url },
+        fetchStatus: 'success', fetchError: null,
+      };
+    }
+    // #js_content 空/短 = 触发了访问验证或文章已删
+    return {
+      title, body: null, type: 'article', fetchStatus: 'failed',
+      fetchError: '公众号返回了访问验证/占位页（触发反爬或文章已删）。请在微信里打开这篇文章，复制正文粘进来。',
+    };
+  } catch (error) {
+    return {
+      title: null, body: null, type: 'article', fetchStatus: 'failed',
+      fetchError: `公众号文章抓取失败：${error.message}。可在微信里打开复制正文粘进来。`,
+    };
+  }
 }
 
 async function ingestBilibili(input) {
@@ -455,6 +506,10 @@ export async function ingest(input) {
 
     case 'x':
       result = await ingestX(input);
+      return { ...result, inputMethod: 'url_auto' };
+
+    case 'wechat':
+      result = await ingestWechat(input);
       return { ...result, inputMethod: 'url_auto' };
 
     case 'xiaoyuzhou':
