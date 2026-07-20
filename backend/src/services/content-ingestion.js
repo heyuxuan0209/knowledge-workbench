@@ -41,6 +41,13 @@ export function detectInputType(input) {
     return 'text';
   }
 
+  // AI HOT 收录页（aihot.virxact.com/items/<id>）是客户端渲染 SPA，裸 HTML 只有空壳（约 900 字节），
+  // Readability 抓不到、Jina 渲染又超时。但这条我们**同步时早已入库**——识别出来直接从本地库取，
+  // 不再去抓那个 SPA（也避免底层是推文/X 链接时的二次抓取失败）。
+  if (url.hostname.includes('aihot.virxact.com') && /\/items\/[a-z0-9]+/i.test(url.pathname)) return 'aihot';
+  // X/推特 直链：需登录态才能抓取（本产品未接入，ADR-014 后置）。识别出来 → 若库里已有(AI HOT 收录过)
+  // 直接从库解读，否则秒回清晰提示，不再白等 25s Jina。
+  if (/(^|\.)(x|twitter)\.com$/.test(url.hostname)) return 'x';
   if (url.hostname.includes('xiaoyuzhoufm.com') && url.pathname.includes('/episode/')) return 'xiaoyuzhou';
   if (/bilibili\.com|b23\.tv/.test(url.hostname)) return 'bilibili'; // B站视频→转写（复用已有 ASR 下载管道）
   const isYoutube = YOUTUBE_HOSTS.some(host => url.hostname.includes(host));
@@ -49,6 +56,82 @@ export function detectInputType(input) {
 
 // B站视频（UI 改造：此前 B站链接当普通网页抓，拿不到视频内容）：
 // 复用 asr.transcribeVideo（bili-cli 免登录下载音频 + 本地转写）。默认 15 分钟上限（视频口播够用）。
+// AI HOT 收录页 → 从本地库解读（不抓 SPA）。复用 resolveContentBody（"AI 精读"同款管道）：
+// 推文取摘要（推文≈全文）、文章抓全文、视频转写——同化引擎/解读都走它，一致。
+// 动态 import 避免与 content-body-resolver 的循环依赖。
+async function ingestAihot(input) {
+  const id = input.trim().match(/aihot\.virxact\.com\/items\/([a-z0-9]+)/i)?.[1];
+  const { getContentById } = await import('../db/contents.js');
+  const c = id ? getContentById(id) : null;
+  if (!c) {
+    return {
+      title: null, body: null, type: 'article', fetchStatus: 'failed',
+      fetchError: '这是 AI HOT 的收录页（动态渲染，抓不到正文）。该条不在你的本地库——请到「资讯」页找到它点「AI 精读」，或直接粘贴原文文字。',
+    };
+  }
+  try {
+    const { resolveContentBody } = await import('./content-body-resolver.js');
+    const resolved = await resolveContentBody(c);
+    const body = (resolved.body || '').trim();
+    if (body.length < 20) {
+      return {
+        title: c.zh_title || c.en_title || null, body: null, type: c.content_type || 'article',
+        fetchStatus: 'failed',
+        fetchError: `这条 AI HOT 条目（${c.content_type === 'tweet' ? '推文' : '内容'}）暂无可解读的正文/摘要，请打开原文：${c.url || '（无原文链接）'}`,
+      };
+    }
+    return {
+      title: c.zh_title || c.en_title || null,
+      body,
+      type: c.content_type || 'article',
+      via: 'aihot-db',
+      metadata: {
+        originalTitle: c.en_title || null,
+        author: c.source_display_name || null,
+        platform: 'AI HOT',
+        publishedAt: (c.published_at || '').slice(0, 10) || null,
+        sourceUrl: c.url || null, // 溯源回链到真实来源（推文/文章原文）
+      },
+      note: resolved.note || (c.content_type === 'tweet' ? '来源是一条推文，摘要≈全文' : null),
+      fetchStatus: 'success', fetchError: null,
+    };
+  } catch (err) {
+    return {
+      title: c.zh_title || c.en_title || null, body: null, type: c.content_type || 'article',
+      fetchStatus: 'failed', fetchError: `从本地库解读失败：${err.message}`,
+    };
+  }
+}
+
+// X/推特 直链：先查"是不是我已经有了"（AI HOT 常已收录该推文）——命中就走本地解读（同 aihot）；
+// 没命中 → 立即给清晰提示（X 需登录抓取，粘推文文字最快），不再空等 25s。
+async function ingestX(input) {
+  const statusId = input.trim().match(/status(?:es)?\/(\d+)/)?.[1];
+  const { getContentByUrlLike } = await import('../db/contents.js');
+  const c = statusId ? getContentByUrlLike(statusId) : null;
+  if (c) {
+    try {
+      const { resolveContentBody } = await import('./content-body-resolver.js');
+      const body = ((await resolveContentBody(c)).body || '').trim();
+      if (body.length >= 20) {
+        return {
+          title: c.zh_title || c.en_title || null, body, type: c.content_type || 'tweet', via: 'x-db',
+          metadata: {
+            originalTitle: c.en_title || null, author: c.source_display_name || null,
+            platform: 'X', publishedAt: (c.published_at || '').slice(0, 10) || null, sourceUrl: c.url || input.trim(),
+          },
+          note: '来源是一条推文，摘要≈全文', fetchStatus: 'success', fetchError: null,
+        };
+      }
+    } catch { /* 落到下面的提示 */ }
+  }
+  return {
+    title: null, body: null, type: 'tweet', fetchStatus: 'failed',
+    fetchError: 'X / 推特链接需要登录态才能抓取（本产品未接入）。最快：直接把推文文字粘进来；'
+      + '若它在你的资讯里（AI HOT 已收录），去「资讯」页找到它点「AI 精读」。',
+  };
+}
+
 async function ingestBilibili(input) {
   const url = input.trim();
   try {
@@ -366,6 +449,14 @@ export async function ingest(input) {
 
   let result;
   switch (inputType) {
+    case 'aihot':
+      result = await ingestAihot(input);
+      return { ...result, inputMethod: 'url_auto' };
+
+    case 'x':
+      result = await ingestX(input);
+      return { ...result, inputMethod: 'url_auto' };
+
     case 'xiaoyuzhou':
       result = await ingestXiaoyuzhou(input);
       return { ...result, inputMethod: 'url_auto' };

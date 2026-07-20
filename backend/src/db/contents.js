@@ -168,3 +168,16 @@ export function getContentById(id) {
   db.close();
   return row;
 }
+
+// 按 url 片段找已入库内容（如推文 status id）——摄入前先查"是不是我已经有了"，命中就从库里解读。
+export function getContentByUrlLike(fragment) {
+  if (!fragment) return null;
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT c.*, s.display_name as source_display_name
+    FROM contents c LEFT JOIN sources s ON c.source_id = s.id
+    WHERE c.url LIKE ? ORDER BY datetime(c.created_at) DESC LIMIT 1
+  `).get(`%${fragment}%`);
+  db.close();
+  return row;
+}
