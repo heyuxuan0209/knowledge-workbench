@@ -17,10 +17,12 @@ function hydrate(db, ideas) {
   for (const idea of ideas) {
     idea.supporting_content_ids = JSON.parse(idea.supporting_content_ids || '[]');
     idea.supporting_note_ids = JSON.parse(idea.supporting_note_ids || '[]');
+    idea.related_note_ids = JSON.parse(idea.related_note_ids || '[]'); // 自动补料的建议（未采纳，不计火候）
     idea.consensus = JSON.parse(idea.consensus || '[]');
     idea.non_consensus = JSON.parse(idea.non_consensus || '[]');
     idea.supporting_content_ids.forEach(id => contentIds.add(id));
     idea.supporting_note_ids.forEach(id => noteIds.add(id));
+    idea.related_note_ids.forEach(id => noteIds.add(id));
   }
   const inClause = (ids) => ids.map(() => '?').join(',');
   const contentMap = new Map(contentIds.size
@@ -34,6 +36,10 @@ function hydrate(db, ideas) {
   for (const idea of ideas) {
     idea.supporting_contents = idea.supporting_content_ids.map(id => contentMap.get(id)).filter(Boolean);
     idea.supporting_notes = idea.supporting_note_ids.map(id => noteMap.get(id)).filter(Boolean);
+    // 相关素材建议：排除已在 supporting 里的（采纳后不重复出现）
+    idea.related_notes = idea.related_note_ids
+      .filter(id => !idea.supporting_note_ids.includes(id))
+      .map(id => noteMap.get(id)).filter(Boolean);
   }
   return ideas;
 }
@@ -88,6 +94,70 @@ export function createIdea({
   hydrate(db, [row]);
   db.close();
   return row;
+}
+
+// 合并支撑素材（真·料）：把 noteIds 并进 supporting_note_ids，去重。返回是否有新增。
+export function addIdeaSupportNotes(id, noteIds = []) {
+  if (!noteIds.length) return false;
+  const db = getDatabase();
+  const row = db.prepare('SELECT supporting_note_ids FROM ideas WHERE id = ?').get(id);
+  if (!row) { db.close(); return false; }
+  const cur = JSON.parse(row.supporting_note_ids || '[]');
+  const merged = [...new Set([...cur, ...noteIds])];
+  const changed = merged.length !== cur.length;
+  if (changed) {
+    db.prepare("UPDATE ideas SET supporting_note_ids = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(JSON.stringify(merged), id);
+  }
+  db.close();
+  return changed;
+}
+
+// 写相关素材建议（自动补料的落点，不计火候）：并进 related_note_ids，去重。返回是否有新增。
+export function addIdeaRelatedNotes(id, noteIds = []) {
+  if (!noteIds.length) return false;
+  const db = getDatabase();
+  const row = db.prepare('SELECT related_note_ids, supporting_note_ids FROM ideas WHERE id = ?').get(id);
+  if (!row) { db.close(); return false; }
+  const supporting = new Set(JSON.parse(row.supporting_note_ids || '[]'));
+  const cur = JSON.parse(row.related_note_ids || '[]');
+  // 已是 supporting 的不必再当建议
+  const merged = [...new Set([...cur, ...noteIds])].filter(x => !supporting.has(x));
+  const changed = JSON.stringify(merged) !== JSON.stringify(cur);
+  if (changed) {
+    db.prepare("UPDATE ideas SET related_note_ids = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(JSON.stringify(merged), id);
+  }
+  db.close();
+  return changed;
+}
+
+// 采纳一条相关建议为真·料：从 related 移到 supporting。
+export function adoptRelatedNote(id, noteId) {
+  const db = getDatabase();
+  const row = db.prepare('SELECT related_note_ids, supporting_note_ids FROM ideas WHERE id = ?').get(id);
+  if (!row) { db.close(); return false; }
+  const related = JSON.parse(row.related_note_ids || '[]').filter(x => x !== noteId);
+  const supporting = [...new Set([...JSON.parse(row.supporting_note_ids || '[]'), noteId])];
+  db.prepare("UPDATE ideas SET related_note_ids = ?, supporting_note_ids = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(JSON.stringify(related), JSON.stringify(supporting), id);
+  db.close();
+  return true;
+}
+
+// 编辑灵感（Q3 可编辑）：改标题/角度/为什么现在。只更新传入的字段。
+export function updateIdea(id, { title, angle, whyNow } = {}) {
+  const sets = [];
+  const params = [];
+  if (title !== undefined) { sets.push('title = ?'); params.push(String(title).trim().slice(0, 300)); }
+  if (angle !== undefined) { sets.push('angle = ?'); params.push(angle || null); }
+  if (whyNow !== undefined) { sets.push('why_now = ?'); params.push(whyNow || null); }
+  if (!sets.length) return false;
+  const db = getDatabase();
+  const r = db.prepare(`UPDATE ideas SET ${sets.join(', ')}, updated_at = datetime('now') WHERE id = ?`)
+    .run(...params, id);
+  db.close();
+  return r.changes > 0;
 }
 
 // 硬删（用户主动删一条灵感）。区别于 updateIdeaStatus('dismissed')——后者是"忽略但留痕"。

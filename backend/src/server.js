@@ -757,14 +757,16 @@ app.get('/api/industry-brief', async (req, res) => {
 });
 
 // 灵感库列表（ADR-029）：跨全部报告 + 用户手记 + 外部连接器一处收口。?status= / ?sourceKind= 过滤。
+// 每条附「火候」readiness（批次2 写作看板）：料厚/贴合主题/时效 → 阶段，驱动看板列。
 app.get('/api/ideas', async (req, res) => {
   try {
     const { listIdeas } = await import('./db/ideas.js');
-    const data = listIdeas({
+    const { annotateReadiness } = await import('./services/idea-readiness.js');
+    const data = annotateReadiness(listIdeas({
       status: req.query.status || null,
       sourceKind: req.query.sourceKind || null,
       includeDismissed: req.query.includeDismissed === '1',
-    });
+    }));
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -772,21 +774,69 @@ app.get('/api/ideas', async (req, res) => {
 });
 
 // 手记一条灵感（随手记：备忘录/群聊/脑内瞬间想法）。source_kind 默认 user。
+// 手记（user）且没自带料时，自动补料——拿标题语义检索素材库挂上相关素材（解决"手记灵感是孤岛"）。
 app.post('/api/ideas', async (req, res) => {
   try {
     const { title } = req.body || {};
     if (!title?.trim()) return res.status(400).json({ success: false, error: 'title is required' });
-    const { createIdea } = await import('./db/ideas.js');
+    const { createIdea, getIdea } = await import('./db/ideas.js');
+    const sourceKind = req.body.sourceKind || 'user';
     const idea = createIdea({
       title,
       angle: req.body.angle || null,
       whyNow: req.body.whyNow || null,
-      sourceKind: req.body.sourceKind || 'user',
+      sourceKind,
       sourceRef: req.body.sourceRef || null,
       supportingContentIds: req.body.supportingContentIds || [],
       supportingNoteIds: req.body.supportingNoteIds || [],
     });
-    res.json({ success: true, data: idea });
+    if (sourceKind === 'user' && !(req.body.supportingNoteIds?.length)) {
+      try {
+        const { autoLinkIdea } = await import('./services/idea-readiness.js');
+        await autoLinkIdea(idea.id);
+      } catch (e) { console.warn('[ideas] 自动补料失败（不影响保存）:', e.message); }
+    }
+    res.json({ success: true, data: getIdea(idea.id) });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 按需补料（看板"攒着"栏的 ✨补料 按钮）：重跑语义检索，把相关素材作为**建议**挂上（related）。
+app.post('/api/ideas/:id/autolink', async (req, res) => {
+  try {
+    const { autoLinkIdea } = await import('./services/idea-readiness.js');
+    const { getIdea } = await import('./db/ideas.js');
+    const added = await autoLinkIdea(req.params.id);
+    res.json({ success: true, added, data: getIdea(req.params.id) });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 采纳一条相关建议为真·料（related → supporting）。采纳后火候才把它算进去。
+app.post('/api/ideas/:id/adopt-note', async (req, res) => {
+  try {
+    const { noteId } = req.body || {};
+    if (!noteId) return res.status(400).json({ success: false, error: 'noteId is required' });
+    const { adoptRelatedNote, getIdea } = await import('./db/ideas.js');
+    const done = adoptRelatedNote(req.params.id, noteId);
+    res.json({ success: done, data: done ? getIdea(req.params.id) : null });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 编辑灵感（Q3）：改标题/角度/为什么现在。
+app.patch('/api/ideas/:id/edit', async (req, res) => {
+  try {
+    const { updateIdea, getIdea } = await import('./db/ideas.js');
+    const done = updateIdea(req.params.id, {
+      title: req.body?.title,
+      angle: req.body?.angle,
+      whyNow: req.body?.whyNow,
+    });
+    res.json({ success: done, data: done ? getIdea(req.params.id) : null });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }

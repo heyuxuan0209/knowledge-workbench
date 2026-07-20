@@ -356,8 +356,8 @@ export default function FeedView({
               <div className="wb-fcard-act">
                 {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} title="AI 帮你读懂这篇，出精读稿" onClick={openRead}>AI 精读</button>}
                 <button className="wb-fcard-a" title="送入右侧一起解读/对话" onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中解读'}</button>
-                <button className="wb-fcard-a" title="收进灵感：这个以后能写" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
-                <button className={`wb-fcard-a${c.starred ? ' on' : ''}`} title={c.starred ? '取消收藏' : '收藏'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
+                <button className="wb-fcard-a" title="💡 收进灵感：以后能写（区别于 ★ 收藏＝以后再看）" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
+                <button className={`wb-fcard-a${c.starred ? ' on' : ''}`} title={c.starred ? '取消收藏' : '★ 收藏：以后再看（区别于 💡 收进灵感＝以后能写）'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
                 {c.url && <a className="wb-fcard-a" href={c.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ display: 'inline-flex', alignItems: 'center' }}><IconExternal /></a>}
                 {!followed && c.source_id !== undefined && (
                   <button className="wb-fcard-a" disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)} title="关注这个作者/来源，以后自动追更">
