@@ -524,6 +524,21 @@ app.post('/api/materials/draft-v2', async (req, res) => {
   }
 });
 
+// ADR-035 带稿重塑：把用户自己写的草稿按 文体×平台形态 重塑（无需素材）。
+// 用于"从灵感带稿去创作"——带过来的是你的原文，选好文体/平台点「用这个生成/重新生成」即走这里。
+app.post('/api/studio/reshape', async (req, res) => {
+  try {
+    const { draft, genre, platformForm, viewpoint } = req.body || {};
+    if (!genre || !platformForm) return res.status(400).json({ success: false, error: 'genre 和 platformForm 必填' });
+    if (!draft?.trim()) return res.status(400).json({ success: false, error: '草稿为空——先在编辑器里写/带一段内容' });
+    const { generateFromDraft } = await import('./services/draft-generation.js');
+    const result = await generateFromDraft(draft, genre, platformForm, viewpoint || null);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 长文标题候选（标题决定打开率，按平台分组生成、每个带【平台·策略】标注供挑选；prompt 见 creation/titles.md）
 app.post('/api/studio/titles', async (req, res) => {
   try {
@@ -785,6 +800,7 @@ app.post('/api/ideas', async (req, res) => {
     const sourceKind = req.body.sourceKind || 'user';
     const idea = createIdea({
       title,
+      body: req.body.body || null,
       angle: req.body.angle || null,
       whyNow: req.body.whyNow || null,
       sourceKind,
@@ -835,6 +851,7 @@ app.patch('/api/ideas/:id/edit', async (req, res) => {
     const { updateIdea, getIdea } = await import('./db/ideas.js');
     const done = updateIdea(req.params.id, {
       title: req.body?.title,
+      body: req.body?.body,
       angle: req.body?.angle,
       whyNow: req.body?.whyNow,
     });

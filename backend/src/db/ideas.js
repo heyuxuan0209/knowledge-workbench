@@ -72,7 +72,7 @@ export function getIdea(id) {
 // 收录一条灵感。手记(user)/资讯收进(feed)/外部连接器(feishu…)共用。
 // title 必填（就是那句"要写什么"）；其余可选。source_ref 存回链（URL 或 JSON 字符串）。
 export function createIdea({
-  title, angle = null, whyNow = null,
+  title, body = null, angle = null, whyNow = null,
   sourceKind = 'user', sourceRef = null,
   supportingContentIds = [], supportingNoteIds = [],
   status = 'suggested',
@@ -80,15 +80,17 @@ export function createIdea({
   if (!title || !title.trim()) throw new Error('title is required');
   if (!SOURCE_KINDS.includes(sourceKind)) throw new Error(`invalid sourceKind: ${sourceKind}`);
   title = stripPreamble(title).trim().slice(0, 300);
+  // ADR-035：body 是"你自己的字/草稿种子"——不截断（title 才是那句"要写什么"）
+  const bodyVal = body != null && String(body).trim() ? String(body) : null;
 
   const db = getDatabase();
   const id = randomUUID();
   const ref = sourceRef && typeof sourceRef === 'object' ? JSON.stringify(sourceRef) : sourceRef;
   db.prepare(`
-    INSERT INTO ideas (id, report_id, title, angle, why_now, source_kind, source_ref,
+    INSERT INTO ideas (id, report_id, title, body, angle, why_now, source_kind, source_ref,
       supporting_content_ids, supporting_note_ids, status)
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, angle, whyNow, sourceKind, ref || null,
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, bodyVal, angle, whyNow, sourceKind, ref || null,
     JSON.stringify(supportingContentIds || []), JSON.stringify(supportingNoteIds || []), status);
   const row = db.prepare('SELECT * FROM ideas WHERE id = ?').get(id);
   hydrate(db, [row]);
@@ -145,11 +147,13 @@ export function adoptRelatedNote(id, noteId) {
   return true;
 }
 
-// 编辑灵感（Q3 可编辑）：改标题/角度/为什么现在。只更新传入的字段。
-export function updateIdea(id, { title, angle, whyNow } = {}) {
+// 编辑灵感（Q3 可编辑）：改标题/正文/角度/为什么现在。只更新传入的字段。
+// body（ADR-035）：卡片就地展开写的正文，不截断；空串视为清空。
+export function updateIdea(id, { title, body, angle, whyNow } = {}) {
   const sets = [];
   const params = [];
   if (title !== undefined) { sets.push('title = ?'); params.push(String(title).trim().slice(0, 300)); }
+  if (body !== undefined) { sets.push('body = ?'); params.push(String(body).trim() ? String(body) : null); }
   if (angle !== undefined) { sets.push('angle = ?'); params.push(angle || null); }
   if (whyNow !== undefined) { sets.push('why_now = ?'); params.push(whyNow || null); }
   if (!sets.length) return false;

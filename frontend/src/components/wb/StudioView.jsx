@@ -103,9 +103,19 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   }, [selMat, v2Mode])
   const genDraftV2 = async () => {
     if (!v2Genre || !v2Pform) { showToast('先选文体和平台形态'); return }
-    if (selMat.size === 0) { showToast('先从素材库勾选至少 1 条素材'); return }
+    // ADR-035 带稿：没勾素材但编辑器里有草稿 → 把你的原文按 文体×平台 重塑（而非逼你选素材）
+    const draftReshape = selMat.size === 0 && studio.draft.trim().length >= 10
+    if (selMat.size === 0 && !draftReshape) { showToast('先从素材库勾选素材，或在编辑器里写/带一段草稿'); return }
+    const gl = genres.find(g => g.key === v2Genre)?.label, pl = pforms.find(p => p.key === v2Pform)?.label
     setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在按 文体×平台 起稿（约 30 秒）…' }))
     try {
+      if (draftReshape) {
+        const json = await api('/api/studio/reshape', { method: 'POST', body: { draft: studio.draft, genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null } })
+        const d = json.data
+        setStudio(s => ({ ...s, busy: false, draft: d.body, title: d.title, draftId: d.id, platform: d.platform, paragraphRefs: [], refs: [] }))
+        showToast(`已按「${gl}×${pl}」重塑你的稿（¥${d.cost_yuan?.toFixed(3)}）`)
+        return
+      }
       const json = await api('/api/materials/draft-v2', { method: 'POST', body: { genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null, selectedNoteIds: [...selMat] } })
       const d = json.data
       setStudio(s => ({
@@ -113,7 +123,6 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         paragraphRefs: d.paragraph_refs,
         refs: (d.paragraph_refs || []).map(r => ({ note: r.sourceTitle || '素材', para: r.marker })),
       }))
-      const gl = genres.find(g => g.key === v2Genre)?.label, pl = pforms.find(p => p.key === v2Pform)?.label
       showToast(`已按「${gl}×${pl}」起稿（引用 ${d.paragraph_refs?.length || 0} 条，¥${d.cost_yuan?.toFixed(3)}）`)
     } catch (err) {
       setStudio(s => ({ ...s, busy: false }))
@@ -220,9 +229,12 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   }
 
   // 溯源检查：草稿有内容但没有任何 [素材N]/引用标记时提示
-  const noRefs = studio.draft.trim() && !/\[素材|—— 引自/.test(studio.draft)
+  // 只在"选了素材却没引用"时提醒；带稿（没勾素材、是你自己的字）不算缺引用（ADR-035）
+  const noRefs = selMat.size > 0 && studio.draft.trim() && !/\[素材|—— 引自/.test(studio.draft)
   // 冷启动态：还没有草稿 → 出三步向导 + 一个明确的「生成初稿」，而不是空框+按钮墙
   const isEmpty = !studio.draft.trim()
+  // ADR-035 带稿态：没勾素材但编辑器里已有草稿 → 生成=重塑我的稿（而非从素材写）
+  const reshapeMode = selMat.size === 0 && studio.draft.trim().length >= 10
   const selPlatform = platforms.find(p => p.key === studio.platform)
 
   return (
@@ -341,7 +353,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           {/* 右：推荐卡 + 换文体/换平台/更多组合 */}
           <section style={{ padding: 14 }}>
             <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 9 }}>
-              {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议：` : '勾选左侧素材后，按下面的组合生成：'}
+              {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议：` : reshapeMode ? '你带来的稿在下面——选好文体×平台，点「用这个生成」把它重塑成这个形态：' : '勾选左侧素材，或直接在下面编辑器写/带一段草稿，再按组合生成：'}
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1.9, border: '1px solid rgba(61,90,128,.35)', borderRadius: 11, padding: '12px 14px' }}>
@@ -350,7 +362,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                   <h3 style={{ fontFamily: 'var(--serif)', fontSize: 15.5, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{gLabel(v2Genre)} · {pLabel(v2Pform)}</h3>
                 </div>
                 <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>{recReason ? recReason + (recPinned ? '（你已手动指定文体）' : '') : `用「${gLabel(v2Genre)}」骨架 +「${pLabel(v2Pform)}」形态起稿；想换见下面「换文体 / 换平台」。`}</p>
-                <button className="wb-btn-primary" disabled={studio.busy || selMat.size === 0} onClick={genDraftV2}>用这个生成</button>
+                <button className="wb-btn-primary" disabled={studio.busy || (selMat.size === 0 && studio.draft.trim().length < 10)} onClick={genDraftV2}>{reshapeMode ? '用我的稿生成' : '用这个生成'}</button>
               </div>
               <div style={{ flex: 1, border: '1px solid var(--line10)', borderRadius: 11, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
@@ -448,7 +460,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             {/* 产出 */}
             <div className="wb-studio-actions">
               <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginRight: 2 }}>产出</span>
-              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title="用同样的素材·文体·平台再出一版（起稿请用上方推荐卡「用这个生成」）" onClick={genDraftV2}>重新生成</button>
+              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title={reshapeMode ? '把你的稿按上方文体×平台再重塑一版' : '用同样的素材·文体·平台再出一版（起稿请用上方推荐卡「用这个生成」）'} onClick={genDraftV2}>{reshapeMode ? '重塑我的稿' : '重新生成'}</button>
               <button className="wb-btn-ghost" disabled={isEmpty} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="导出发布版：溯源标记转文末来源列表" onClick={exportMd}>导出 Markdown</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="删掉正文里所有 [素材N] 标记（发布前用；先存草稿）" onClick={() => { setStudio(s => ({ ...s, draft: stripRefs(s.draft) })); showToast('已去掉正文里所有 [素材N] 标记') }}>去引用标记</button>

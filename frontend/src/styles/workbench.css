@@ -292,9 +292,25 @@ input, textarea { font-family: inherit; }
 .wb-lane-lab.deep { color: var(--accent); background: rgba(61,90,128,.1); }
 .wb-lane-lab.quick { color: var(--green); background: rgba(63,115,80,.12); }
 .wb-lane-cap { font-size: 11.5px; color: var(--sub2); margin-top: 6px; line-height: 1.5; }
-.wb-lane-row { display: flex; gap: 7px; align-items: center; margin-top: 10px; }
+.wb-lane-row { display: flex; gap: 7px; align-items: flex-end; margin-top: 10px; }
 .wb-lane-row input { flex: 1; min-width: 0; border: 1px solid var(--line10); border-radius: 8px; padding: 9px 12px; font-size: 12.5px; background: var(--surface); color: var(--text); }
 .wb-lane-row input:focus { outline: none; border-color: var(--accent); }
+/* ADR-035 · 1A：随手记自适应输入——单行起，粘长文/换行自动长高，首行标题、其余正文 */
+.wb-quick-ta { flex: 1; min-width: 0; border: 1px solid var(--line10); border-radius: 8px; padding: 9px 12px; font-size: 12.5px; line-height: 1.6; background: var(--surface); color: var(--text); font-family: inherit; resize: none; overflow-y: auto; max-height: 180px; }
+.wb-quick-ta:focus { outline: none; border-color: var(--accent); }
+.wb-quick-hint { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 7px; font-size: 11px; color: var(--faint); }
+.wb-quick-hint b { color: var(--sub); }
+/* ADR-035 · 2A：卡片标题下的正文位——空占位 / 预览 / 就地编辑 */
+.wb-insp-bodyempty { display: block; width: 100%; text-align: left; font-size: 12px; color: var(--faint); border: 1px dashed var(--line14); border-radius: 8px; padding: 8px 11px; margin-top: 9px; cursor: text; background: none; }
+.wb-insp-bodyempty:hover { border-color: var(--accent); color: var(--accent); }
+.wb-insp-bodyprev { margin-top: 9px; background: rgba(33, 31, 26, 0.03); border-radius: 8px; padding: 9px 11px; cursor: text; }
+.wb-insp-bodyprev:hover { background: rgba(61, 90, 128, 0.05); }
+.wb-insp-bodyprev .txt { font-size: 12.5px; color: var(--body2); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+.wb-insp-bodyprev .wb-insp-bodymore { color: var(--faint); font-size: 11px; margin-top: 4px; }
+.wb-insp-bodyedit { margin-top: 9px; }
+.wb-insp-bodyinput { width: 100%; border: 1px solid var(--accent); border-radius: 8px; padding: 9px 11px; font-size: 12.5px; line-height: 1.6; background: var(--surface); color: var(--text); font-family: inherit; resize: vertical; }
+.wb-insp-bodyinput:focus { outline: none; }
+.wb-insp-bodyhint { font-size: 10.5px; color: var(--faint); margin-top: 5px; }
 .wb-lane-plus { width: 34px; height: 34px; border: 1px solid var(--line10); border-radius: 8px; background: var(--surface); font-size: 18px; color: var(--sub); cursor: pointer; flex-shrink: 0; }
 .wb-lane-plus:hover { border-color: var(--accent); color: var(--accent); }
 .wb-lane-fmt { margin-top: 9px; display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--sub); line-height: 1.5; }

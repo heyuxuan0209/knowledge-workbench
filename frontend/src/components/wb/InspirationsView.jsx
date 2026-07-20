@@ -68,6 +68,7 @@ export default function InspirationsView({
   const [aiOpen, setAiOpen] = useState(false) // 收集视图：AI 攒的默认折叠
   const [linking, setLinking] = useState(null) // 正在补料的 ideaId
   const [editing, setEditing] = useState(null) // {id, val} 正在编辑标题的灵感（Q3）
+  const [editingBody, setEditingBody] = useState(null) // {id, val} 正在就地展开写正文（ADR-035 · 2A）
 
   const live = useMemo(() => ideas.filter(i => i.status !== 'dismissed'), [ideas])
   // "该动手了"优先：可以写了 > 料厚 > 新鲜；已起稿/已养成沉后
@@ -93,11 +94,17 @@ export default function InspirationsView({
   }, [live])
   const hotReady = cols.ready.filter(i => rd(i).timeliness === 'hot').length
 
+  // 1A：粘长文/换行自动长高（上限 180px 内滚动）
+  const autoGrow = (el) => { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 180) + 'px' }
   const quickSave = async () => {
-    const t = draft.trim()
-    if (!t || saving) return
+    const raw = draft.trim()
+    if (!raw || saving) return
     setSaving(true)
-    const ok = await saveIdea({ title: t, sourceKind: 'user' })
+    // ADR-035 · 1A：首行=标题，其余=正文——粘一大段不再全塞标题、不再静默截断
+    const [first, ...rest] = raw.split('\n')
+    const title = first.trim() || raw.slice(0, 60)
+    const body = rest.join('\n').trim()
+    const ok = await saveIdea({ title, body: body || undefined, sourceKind: 'user' })
     if (ok) setDraft('')
     setSaving(false)
   }
@@ -127,11 +134,25 @@ export default function InspirationsView({
       catch (err) { showToast?.(`保存失败：${err.message}`) }
     }
   }
+  // ADR-035 · 2A：卡片就地展开写正文——失焦 / ⌘↵ 自动存，Esc 取消。让灵感在卡片里养大，不必跳走。
+  const startBodyEdit = (idea) => setEditingBody({ id: idea.id, val: idea.body || '' })
+  const saveBodyEdit = async () => {
+    if (!editingBody) return
+    const cur = editingBody
+    setEditingBody(null)
+    const val = cur.val.trim()
+    const orig = (ideas.find(i => i.id === cur.id)?.body || '').trim()
+    if (val !== orig) {
+      try { await api(`/api/ideas/${cur.id}/edit`, { method: 'PATCH', body: { body: val } }); loadIdeas?.() }
+      catch (err) { showToast?.(`保存失败：${err.message}`) }
+    }
+  }
 
   // ---- 单张卡片（collect=完整；board=紧凑，按 stage 变动作） ----
   const card = (idea, { compact = false } = {}) => {
     const src = srcOf(idea)
     const r = rd(idea)
+    const hasBody = !!(idea.body && idea.body.trim()) // ADR-035：有你自己的字 → 去创作带稿
     const del = () => { if (confirm('删除这条灵感？')) deleteIdea?.(idea) }
     return (
       <div key={idea.id} className={`wb-insp-card${compact ? ' mini' : ''}${r.stage === 'topic' ? ' done' : ''}`}>
@@ -151,6 +172,27 @@ export default function InspirationsView({
             <span onClick={() => viewIdea?.(idea)} title="看详情">{idea.title}</span>
             <button className="wb-insp-edit" title="编辑标题" onClick={() => startEdit(idea)}>✏️</button>
           </div>
+        )}
+
+        {/* ADR-035 · 2A：标题下的正文位——空态虚线占位，有内容显预览，点开就地写 */}
+        {!compact && (
+          editingBody?.id === idea.id ? (
+            <div className="wb-insp-bodyedit">
+              <textarea className="wb-insp-bodyinput" autoFocus rows={3} value={editingBody.val}
+                placeholder="接着把想法写下来，随时来补，不丢…"
+                onChange={(e) => setEditingBody(s => ({ ...s, val: e.target.value }))}
+                onBlur={saveBodyEdit}
+                onKeyDown={(e) => { if (e.key === 'Escape') setEditingBody(null); if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); saveBodyEdit() } }} />
+              <div className="wb-insp-bodyhint">失焦自动保存 · Esc 收起</div>
+            </div>
+          ) : hasBody ? (
+            <div className="wb-insp-bodyprev" title="点开继续写" onClick={() => startBodyEdit(idea)}>
+              <div className="txt">{idea.body}</div>
+              <div className="wb-insp-bodymore">共 {idea.body.trim().length} 字 · 点开继续写 ▾</div>
+            </div>
+          ) : (
+            <button className="wb-insp-bodyempty" onClick={() => startBodyEdit(idea)}>＋ 展开写…（把这个想法养大）</button>
+          )
         )}
 
         {!compact && idea.angle && <div className="wb-insp-angle">角度：{idea.angle}</div>}
@@ -192,14 +234,15 @@ export default function InspirationsView({
                 title="拿标题去素材库找贴合的料挂上——料够了会自动升到「可以写了」">
                 {linking === idea.id ? '找料中…' : '✨ 补料'}
               </button>
-              <button className="wb-btn-ghost" style={{ padding: 0, fontSize: 12 }} onClick={() => createFromIdea?.(idea)}>直接写</button>
+              <button className={hasBody ? 'wb-btn-primary' : 'wb-btn-ghost'} style={{ padding: hasBody ? '4px 12px' : 0, fontSize: 12 }}
+                title={hasBody ? '带你写的正文进创作台当初稿' : '直接去创作台起稿'} onClick={() => createFromIdea?.(idea)}>{hasBody ? '带稿去创作 →' : '直接写'}</button>
             </>
           ) : r.stage === 'writing' ? (
-            <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => createFromIdea?.(idea)}>继续写 →</button>
+            <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => createFromIdea?.(idea)}>{hasBody ? '带稿去创作 →' : '继续写 →'}</button>
           ) : (
             <>
               <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
-                title="拿这条灵感直接去创作台起稿" onClick={() => createFromIdea?.(idea)}>去创作 →</button>
+                title={hasBody ? '带你写的正文进创作台当初稿' : '拿这条灵感直接去创作台起稿'} onClick={() => createFromIdea?.(idea)}>{hasBody ? '带稿去创作 →' : '去创作 →'}</button>
               {isMine(idea) && <button className="wb-btn-ghost" style={{ padding: 0, fontSize: 12 }}
                 title="值得长期养 → 升级成主题页" onClick={() => upgradeIdea?.(idea)}>养成主题</button>}
             </>
@@ -238,12 +281,19 @@ export default function InspirationsView({
               <div className="wb-lane-ttl"><span className="wb-lane-lab quick">闪念</span>随手记</div>
               <div className="wb-lane-cap">脑里冒出的一句话、一个角度 → 直接成一条灵感（存后自动找贴合素材）</div>
               <div className="wb-lane-row">
-                <input value={draft} onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) quickSave() }}
-                  placeholder="随手记一句…" />
+                <textarea className="wb-quick-ta" value={draft} rows={1}
+                  onChange={(e) => { setDraft(e.target.value); autoGrow(e.target) }}
+                  onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') quickSave() }}
+                  placeholder="随手记一句…粘一大段也行，首行当标题、其余当正文" />
                 <button className="wb-btn-primary" style={{ padding: '8px 12px', fontSize: 12.5 }}
                   disabled={!draft.trim() || saving} onClick={quickSave}>{saving ? '记下…' : '＋ 记'}</button>
               </div>
+              {draft.trim() && (
+                <div className="wb-quick-hint">
+                  <span>首行 <b>{(draft.split('\n')[0] || '').trim().slice(0, 22) || '…'}</b> → 标题{draft.includes('\n') ? '，其余 → 正文' : ''}</span>
+                  <span>{draft.trim().length} 字 · ⌘↵ 保存</span>
+                </div>
+              )}
             </div>
           </div>
 

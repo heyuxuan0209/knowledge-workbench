@@ -269,3 +269,36 @@ export async function generateFromMaterials(noteIds, genreKey, platformFormKey, 
   console.log(`✅ Draft(materials) ${genre.label}×${pform.label}, ${notes.length} 素材, ${draft.paragraph_refs.length} refs, ¥${result.cost?.toFixed(4)}`);
   return draft;
 }
+
+// ── ADR-035 带稿去创作：把用户自己写的草稿按 文体×平台形态 重塑 ──
+// 与 generateFromMaterials 分工：那条从素材"写新的"，这条把"你已有的原文"重塑成目标形态——
+// 不需要素材、不强制 [素材N] 溯源（是你自己的字），保留原意与事实、不新增不编造。
+export async function generateFromDraft(draftText, genreKey, platformFormKey, viewpoint = null) {
+  const src = String(draftText || '').trim();
+  if (src.length < 10) throw new Error('草稿太短——先在编辑器里写/带一段内容再重塑');
+  const genre = getGenre(genreKey);           // 未知文体在此抛错（附可用清单）
+  const pform = getPlatformForm(platformFormKey);
+
+  const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
+  const exemption = `【带稿重塑·ADR-035】下面「作者的草稿」是作者自己写的原文。请把它按上面的「文体骨架 × 平台形态」重塑成一篇可发布的成稿：**保留作者的原意、观点、事实与例子；不要新增未提供的事实/数据、不要编造**。这是作者自己的文字，无需 [素材N] 溯源标记。\n\n`;
+  const stanceBlock = viewpoint?.trim()
+    ? render(loadPrompt('stance-with.md'), { viewpoint: viewpoint.trim() })
+    : loadPrompt('stance-without.md');
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+
+  const prompt = `${composedSpec}\n\n---\n\n${stanceBlock}\n\n---\n\n【作者的草稿】\n${src.slice(0, 8000)}\n\n---\n\n现在按上面的「文体骨架 × 平台形态」，把「作者的草稿」重塑成一篇干净、可直接发布的成稿。\n**只输出成稿本身**：不要复述文体名/平台名、不要加「XX体 · XX版」这类规格性小标题、不要任何前言或解释。第一行直接是成稿的开头（标题或正文首句）。`;
+
+  const result = await chat([{ role: 'user', content: prompt }]);
+  if (!result.success) throw new Error(`LLM 调用失败: ${result.error}`);
+
+  const text = result.content.trim();
+  const title = text.split('\n')[0].replace(/^#+\s*/, '').slice(0, 80);
+  const draft = createDraft({
+    platform: platformFormKey, title, body: text,
+    paragraphRefs: [], sourceKind: 'manual', sourceId: null,
+    sourceLabel: `带稿重塑｜${genre.label}×${pform.label}`,
+    tokens: result.tokens || 0, costYuan: result.cost || 0,
+  });
+  console.log(`✅ Draft(from-draft) ${genre.label}×${pform.label}, ¥${result.cost?.toFixed(4)}`);
+  return draft;
+}

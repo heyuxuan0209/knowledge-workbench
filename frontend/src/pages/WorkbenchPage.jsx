@@ -511,9 +511,16 @@ export default function WorkbenchPage() {
   const createFromIdea = async (idea, platform = 'thread') => {
     setModal(null); setReturnPage(page); setPage('studio') // 记住来路（灵感库/素材页），创作台顶部可一键返回
     const supportId = (idea.supporting_content_ids || [])[0]
-    setStudio(s => ({ ...s, platform, source: `选题：${idea.title}`, sourceContentId: supportId || null, draft: '', refs: [] }))
+    // ADR-035 · ③：卡片里有你写的正文 → 带稿进编辑器当初稿，不 AI 现写（文体/平台仍在创作台选）；
+    // 没正文 → 维持原行为（AI 起稿）。带稿时清掉可能残留的活页/草稿态，纯当一份新初稿。
+    const hasBody = !!(idea.body && idea.body.trim())
+    setStudio(s => ({
+      ...s, platform, source: `选题：${idea.title}`, sourceContentId: supportId || null,
+      draft: hasBody ? idea.body : '', refs: [],
+      ...(hasBody ? { draftId: null, title: null, sourceTopicId: null, paragraphRefs: [], viewpoint: '' } : {}),
+    }))
     api(`/api/ideas/${idea.id}`, { method: 'PATCH', body: { status: 'created' } }).then(() => loadIdeas()).catch(() => {})
-    setTimeout(() => genDraftRef.current(platform, supportId), 0)
+    if (!hasBody) setTimeout(() => genDraftRef.current(platform, supportId), 0)
   }
 
   // ---- 创作台 ----
