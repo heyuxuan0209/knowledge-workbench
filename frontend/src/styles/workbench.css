@@ -559,6 +559,36 @@ input, textarea { font-family: inherit; }
 
 /* ---- 资讯页平铺网格（UI 改造：B 方案） ---- */
 .wb-feed-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:14px; }
+.wb-feed-list{ background:var(--surface); border:1px solid var(--line10); border-radius:10px; overflow:hidden; }
+
+/* 资讯卡片：分诊态——静息只留标题+一行要点+极简来源，操作 hover 才出 */
+.wb-fdot{ width:7px; height:7px; border-radius:50%; background:var(--faint); flex:none; display:inline-block; }
+.wb-fdot.f{ background:var(--green); }
+.wb-fcard-a{ font-size:11.5px; color:var(--sub); background:none; border:none; cursor:pointer; padding:0; white-space:nowrap; }
+.wb-fcard-a:hover{ color:var(--accent); }
+.wb-fcard-a.on{ color:var(--amber); }
+/* 舒适：分诊卡 */
+.wb-fcard{ background:var(--surface); border:1px solid var(--line10); border-radius:10px; padding:13px 15px; }
+.wb-fcard.selected{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(61,90,128,.15); }
+.wb-fcard:hover{ box-shadow:0 4px 16px rgba(0,0,0,.06); border-color:var(--line14); }
+.wb-fcard-title{ font-family:var(--serif); font-weight:600; font-size:15px; line-height:1.4; color:var(--body); cursor:pointer; }
+.wb-fcard-title:hover{ color:var(--accent); }
+.wb-fcard-gist{ font-size:12.5px; color:var(--sub); line-height:1.55; margin-top:5px; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+.wb-fcard-meta{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--faint); margin-top:8px; }
+.wb-fcard-act{ display:none; gap:11px; align-items:center; margin-top:10px; padding-top:9px; border-top:1px dashed var(--line08); flex-wrap:wrap; }
+.wb-fcard:hover .wb-fcard-act{ display:flex; }
+/* 紧凑：列表行 */
+.wb-frow{ display:flex; align-items:center; gap:11px; padding:11px 15px; border-top:1px solid var(--line08); }
+.wb-feed-list .wb-frow:first-child{ border-top:none; }
+.wb-frow.selected{ background:rgba(61,90,128,.06); }
+.wb-frow-title{ font-family:var(--serif); font-weight:600; font-size:14px; flex:none; max-width:40%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; color:var(--body); }
+.wb-frow-title:hover{ color:var(--accent); }
+.wb-frow-gist{ font-size:12px; color:var(--sub2); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wb-frow-meta{ font-size:11px; color:var(--faint); flex:none; margin-left:auto; }
+.wb-frow .wb-fcard-act{ display:none; margin:0; padding:0; border:none; flex:none; margin-left:auto; }
+.wb-frow:hover{ background:var(--brief-bg); }
+.wb-frow:hover .wb-frow-meta{ display:none; }
+.wb-frow:hover .wb-fcard-act{ display:flex; }
 .wb-gcard{ background:var(--surface); border:1px solid var(--line10, rgba(33,31,26,.1)); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
 .wb-gcard.selected{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(61,90,128,.15); }
 .wb-gcard-title{ font-family:var(--serif); font-weight:600; font-size:14.5px; line-height:1.4; color:var(--ink,#26241f); }

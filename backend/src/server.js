@@ -42,6 +42,7 @@ app.get('/api/contents', async (req, res) => {
     const contents = getContents(limit, offset, {
       q: req.query.q || null,
       starred: req.query.starred === '1',
+      followed: req.query.followed === '1',
       category: req.query.category || null,
     });
 

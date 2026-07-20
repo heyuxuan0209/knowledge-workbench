@@ -109,7 +109,7 @@ function normalizeHeat(sourceApp, externalScore) {
   return null;
 }
 
-export function getContents(limit = 20, offset = 0, { q = null, starred = false, category = null } = {}) {
+export function getContents(limit = 20, offset = 0, { q = null, starred = false, category = null, followed = false } = {}) {
   const db = getDatabase();
   // GitHub Trending 不混入资讯流（产品与内容分离，走 /api/github-trending 独立区块）。
   // 已登记信息源（ADR-007 登记处）的内容加权：等效于把发布时间前移 12 小时，
@@ -127,6 +127,7 @@ export function getContents(limit = 20, offset = 0, { q = null, starred = false,
     }
   }
   if (starred) where.push('c.starred = 1');
+  if (followed) where.push('s.registered_by_user = 1'); // 「关注」筛选：只看你关注的信源
   if (category) { where.push('c.category = ?'); params.push(category); } // 资讯页分类 chips（2b）
 
   const rows = db.prepare(`

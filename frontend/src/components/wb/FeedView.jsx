@@ -136,7 +136,10 @@ export default function FeedView({
   const [projCat, setProjCat] = useState(null)  // 项目分类 chip（2b）
   const [artCatCounts, setArtCatCounts] = useState({}) // 文章各类目计数（后端，全量）
   const [recs, setRecs] = useState([]) // 为你推荐（后端向量匹配主题，读缓存）
-  const hasFilter = feedTab === 'starred' || Boolean(feedQuery.trim()) || Boolean(artCat)
+  const hasFilter = feedTab === 'starred' || feedTab === 'followed' || Boolean(feedQuery.trim()) || Boolean(artCat)
+  // 卡片密度：舒适（分诊卡）/ 紧凑（列表），记本地
+  const [density, setDensity] = useState(() => localStorage.getItem('wb-feed-density') || 'cozy')
+  const setDens = (d) => { localStorage.setItem('wb-feed-density', d); setDensity(d) }
   useEffect(() => {
     api('/api/contents/categories').then(j => setArtCatCounts(j.data || {})).catch(() => {})
     api('/api/recommendations').then(j => setRecs(j.data || [])).catch(() => {})
@@ -148,6 +151,7 @@ export default function FeedView({
         const params = new URLSearchParams({ limit: '200' })
         if (feedQuery.trim()) params.set('q', feedQuery.trim())
         if (feedTab === 'starred') params.set('starred', '1')
+        if (feedTab === 'followed') params.set('followed', '1')
         if (artCat) params.set('category', artCat)
         const json = await api(`/api/contents?${params}`)
         setFiltered((json.data || []).map(c => ({ ...c, tags: safeParseTags(c.tags) })))
@@ -294,6 +298,7 @@ export default function FeedView({
           <span className="wb-tb-sep" />
           <div className="wb-seg-toggle" style={{ flexShrink: 0 }}>
             <button className={feedTab === 'all' ? 'active' : ''} onClick={() => setFeedTab('all')}>全部</button>
+            <button className={feedTab === 'followed' ? 'active' : ''} onClick={() => setFeedTab('followed')} title="只看你关注的信源">关注</button>
             <button className={feedTab === 'starred' ? 'active' : ''} onClick={() => setFeedTab('starred')}>★ 收藏</button>
           </div>
           <input className="wb-feed-search" placeholder="搜索资讯（空格分隔多关键词）…"
@@ -304,6 +309,10 @@ export default function FeedView({
             <option value="hot">排序：最热</option>
             <option value="followed">排序：关注优先</option>
           </select>
+          <div className="wb-seg-toggle" style={{ flexShrink: 0 }} title="舒适=分诊卡；紧凑=列表，一屏扫更多">
+            <button className={density === 'cozy' ? 'active' : ''} onClick={() => setDens('cozy')}>舒适</button>
+            <button className={density === 'compact' ? 'active' : ''} onClick={() => setDens('compact')}>紧凑</button>
+          </div>
           <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
           <button className="wb-brief-link" disabled={syncing} onClick={syncAllSources}
             title="同步全部信源：AI HOT + RSS 抓取 + B站/YouTube/GitHub 主动查询">
@@ -330,7 +339,7 @@ export default function FeedView({
           <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有收藏。在卡片右上角点 ☆ 一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
         )}
 
-        <div className="wb-feed-grid">
+        <div className={density === 'compact' ? 'wb-feed-list' : 'wb-feed-grid'}>
           {sortContents(filtered ?? contents).map(c => {
             const checked = selIds.has(c.id)
             const followed = c.source_registered === 1 || c.source_registered === true
@@ -339,37 +348,39 @@ export default function FeedView({
             const author = c.source_display_name || repoOwner || channel
             const canRead = Boolean(c.permalink) || (c.url && c.content_type !== 'tweet')
             const openRead = () => { dismissAirHint(); if (c.permalink) window.open(c.permalink, '_blank', 'noopener'); else setReaderContent(c) }
+            const title = c.zh_title || c.en_title || '（无标题）'
+            // 关注状态 → 小圆点（绿=已关注/灰=未关注），不再用满色 pill；分类降成尾巴小灰字
+            const dot = <span className={`wb-fdot${followed ? ' f' : ''}`} title={followed ? '来自你关注的源' : '来自你没关注的源'} />
+            const meta = `${author} · ${timeAgo(c.published_at)}${c.category ? ' · ' + c.category : ''}`
+            const actions = (
+              <div className="wb-fcard-act">
+                {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} title="AI 帮你读懂这篇，出精读稿" onClick={openRead}>AI 精读</button>}
+                <button className="wb-fcard-a" title="送入右侧一起解读/对话" onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中解读'}</button>
+                <button className="wb-fcard-a" title="收进灵感：这个以后能写" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
+                <button className={`wb-fcard-a${c.starred ? ' on' : ''}`} title={c.starred ? '取消收藏' : '收藏'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
+                {c.url && <a className="wb-fcard-a" href={c.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ display: 'inline-flex', alignItems: 'center' }}><IconExternal /></a>}
+                {!followed && c.source_id !== undefined && (
+                  <button className="wb-fcard-a" disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)} title="关注这个作者/来源，以后自动追更">
+                    {followingIds?.has(c.id) ? '识别中…' : '＋关注'}
+                  </button>
+                )}
+              </div>
+            )
+            if (density === 'compact') return (
+              <div key={c.id} className={`wb-frow${checked ? ' selected' : ''}`}>
+                {dot}
+                <span className="wb-frow-title" onClick={openRead} title="点击 AI 精读">{title}</span>
+                {c.zh_summary && <span className="wb-frow-gist">{c.zh_summary}</span>}
+                <span className="wb-frow-meta">{meta}</span>
+                {actions}
+              </div>
+            )
             return (
-              <div key={c.id} className={`wb-gcard${checked ? ' selected' : ''}`}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
-                  {followed
-                    ? <span className="wb-pill" style={{ color: '#3f7350', background: 'rgba(63,115,80,.12)' }}>已关注</span>
-                    : <span className="wb-pill" style={{ color: '#8a8478', background: 'rgba(33,31,26,.06)' }}>未标注</span>}
-                  <span style={{ color: 'var(--sub)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{author}</span>
-                  <span style={{ color: 'var(--faint)', flexShrink: 0 }}>· {timeAgo(c.published_at)}</span>
-                  {c.category && <span className="wb-cat">{c.category}</span>}
-                  <button className="wb-star" style={{ marginLeft: 'auto', fontSize: 13 }}
-                    title="收进灵感：这个以后能写（区别于收藏=以后再看）"
-                    onClick={() => saveIdea?.({ title: c.zh_title || c.en_title || '（无标题）', sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
-                  <button className={`wb-star${c.starred ? ' on' : ''}`}
-                    title={c.starred ? '取消收藏' : '收藏：一键钉住，事后找得回'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
-                </div>
-                <div className="wb-gcard-title">{c.zh_title || c.en_title || '（无标题）'}</div>
-                {c.zh_summary && <div className="wb-gcard-sum">{c.zh_summary}</div>}
-                <div className="wb-gcard-foot">
-                  {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
-                    title="AI 帮你读懂这篇，出精读稿，不用啃原文" onClick={openRead}>AI 精读</button>}
-                  <button className="wb-btn-ghost" style={{ padding: 0 }} title="送入右侧一起解读/对话"
-                    onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中解读'}</button>
-                  {c.url && <a className="wb-btn-ghost" style={{ padding: 0, display: 'inline-flex', alignItems: 'center' }}
-                    href={c.url} target="_blank" rel="noreferrer" title="跳转原文"><IconExternal /></a>}
-                  {!followed && c.source_id !== undefined && (
-                    <button className="wb-btn-ghost" style={{ padding: 0, marginLeft: 'auto', fontSize: 11.5 }}
-                      disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)} title="关注这个作者/来源，以后自动追更">
-                      {followingIds?.has(c.id) ? '识别中…' : '＋ 关注'}
-                    </button>
-                  )}
-                </div>
+              <div key={c.id} className={`wb-fcard${checked ? ' selected' : ''}`}>
+                <div className="wb-fcard-title" onClick={openRead} title="点击 AI 精读">{title}</div>
+                {c.zh_summary && <div className="wb-fcard-gist">{c.zh_summary}</div>}
+                <div className="wb-fcard-meta">{dot}<span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</span></div>
+                {actions}
               </div>
             )
           })}
