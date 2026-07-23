@@ -14,6 +14,12 @@ import { feishuFetch } from './feishu-auth.js';
 
 const num = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
 
+// 归口：判断一个飞书对象是否"可读散文文档"（docx/doc）。飞书有两套 obj_type 编码——
+// 云文档搜索用字符串 'docx'/'doc'，wiki 用数字枚举 8=docx/1=doc；这里都认。
+// 其它（sheet/bitable/mindnote…）不是散文，取料读不了，一律排除。
+const READABLE_DOC = new Set([1, 8, 'doc', 'docx']);
+const isReadableDoc = (t) => READABLE_DOC.has(t);
+
 // ---------- 云文档 docx ----------
 
 // 根目录 token（drive 列文件需要 folder_token；空 token 部分租户会报错，故显式取根）
@@ -144,43 +150,74 @@ export async function listWikiNodes(spaceId, { pageSize = 30 } = {}) {
   const d = await feishuFetch(`/open-apis/wiki/v2/spaces/${spaceId}/nodes`, {
     query: { page_size: num(pageSize, 30) }, preferUser: true,
   });
+  // 归口成 docx by document_id（obj_token 即它包的 docx id）→ 读取统一走 getDocxText。
   return (d?.items || [])
-    .filter(n => n.obj_type === 'docx' || n.obj_type === 'doc')
+    .filter(n => isReadableDoc(n.obj_type) && n.obj_token)
     .map(n => ({
-      objType: 'wiki',
-      feishuId: n.node_token,
-      title: n.title || '(无标题)',
-      sourceName: '知识库',
-      extra: { objToken: n.obj_token, objType: n.obj_type, spaceId },
-    }));
-}
-
-// wiki 节点正文 = 解析其挂载的 docx obj_token 后抓 raw_content
-export async function getWikiNodeText(extra) {
-  if (!extra?.objToken) return '';
-  return getDocxText(extra.objToken);
-}
-
-// 飞书原生全文搜索（ADR-039 取料·搜索）：POST /suite/docs-api/search/object。
-// 覆盖你整个飞书里应用可见的文档、实时、零维护（飞书自己维护索引）；字面/关键词匹配、非语义。
-// 只返回 docx（可读正文）——bitable/sheet/mindnote 不是可读散文，取料读不了，过滤掉。
-export async function searchDocs(query, { count = 10 } = {}) {
-  if (!query || !query.trim()) return [];
-  const d = await feishuFetch('/open-apis/suite/docs-api/search/object', {
-    method: 'POST',
-    body: { search_key: query.trim(), count, offset: 0 }, preferUser: true,
-  });
-  const ents = d?.docs_entities || [];
-  return ents
-    .filter(e => e.docs_type === 'docx' || e.docs_type === 'doc')
-    .map(e => ({
       objType: 'docx',
-      feishuId: e.docs_token,
-      title: e.title || '(无标题文档)',
-      url: null,               // 搜索不返回 URL；「拉来读」按 token 直抓正文，不需要 URL
-      sourceName: '搜索',
+      feishuId: n.obj_token,
+      title: n.title || '(无标题)',
+      url: null,
+      sourceName: '知识库',
       extra: {},
     }));
+}
+
+// wiki 节点正文 = 解析其挂载的 docx obj_token 后抓 raw_content。
+// 搜索结果可能只给 node_token 没给 obj_token → 用 node_token 反查一次。
+export async function getWikiNodeText(extra) {
+  let objToken = extra?.objToken;
+  if (!objToken && extra?.nodeToken) {
+    const node = await getWikiNode(extra.nodeToken).catch(() => null);
+    objToken = node?.obj_token;
+  }
+  if (!objToken) return '';
+  return getDocxText(objToken);
+}
+
+// 飞书原生全文搜索（ADR-039 取料·搜索）：**同时搜两处**，覆盖全、实时、零维护。
+//   ① 云文档：POST /suite/docs-api/search/object（drive 里的 docx）
+//   ② 知识库：POST /wiki/v1/nodes/search（wiki 节点——只有用户令牌能调；云文档搜索搜不到 wiki 内容）
+// 只返回 docx（可读正文），bitable/sheet 等过滤掉。任一处失败不阻断另一处。
+export async function searchDocs(query, { count = 10 } = {}) {
+  if (!query || !query.trim()) return [];
+  const q = query.trim();
+  const results = [];
+
+  // ① 云文档
+  try {
+    const d = await feishuFetch('/open-apis/suite/docs-api/search/object', {
+      method: 'POST', body: { search_key: q, count, offset: 0 }, preferUser: true,
+    });
+    for (const e of (d?.docs_entities || [])) {
+      if (e.docs_type === 'docx' || e.docs_type === 'doc') {
+        results.push({ objType: 'docx', feishuId: e.docs_token, title: e.title || '(无标题文档)', url: null, sourceName: '云文档', extra: {} });
+      }
+    }
+  } catch (e) { console.warn('[feishu] 云文档搜索失败（不阻断 wiki）:', e.message); }
+
+  // ② 知识库（wiki）
+  try {
+    const d = await feishuFetch('/open-apis/wiki/v1/nodes/search', {
+      method: 'POST', body: { query: q, page_size: count }, preferUser: true,
+    });
+    // wiki 返回 obj_type 数字枚举（8=docx）+ obj_token（它包的 docx id）+ url。归口成 docx by id。
+    for (const n of (d?.items || d?.nodes || [])) {
+      if (!isReadableDoc(n.obj_type) || !n.obj_token) continue;
+      results.push({
+        objType: 'docx',
+        feishuId: n.obj_token,
+        title: n.title || '(无标题)',
+        url: n.url || null,
+        sourceName: '知识库',
+        extra: {},
+      });
+    }
+  } catch (e) { console.warn('[feishu] 知识库搜索失败（多半没授权/没权限）:', e.message); }
+
+  // 去重（按 feishuId）
+  const seen = new Set();
+  return results.filter(r => r.feishuId && !seen.has(r.feishuId) && seen.add(r.feishuId));
 }
 
 // 取 wiki 节点信息（含它挂的 obj_token）——粘 wiki 链接时用 node_token 解析出真实 docx
