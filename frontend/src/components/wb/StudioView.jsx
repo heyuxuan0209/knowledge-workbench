@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { IconWarn, IconBolt } from './Icons'
 import { api } from './util'
+import FeishuPicker from './FeishuPicker'
 
 // 创作台（视觉对齐原型 06-studio）：平台模板分段 + 衬线草稿区 + 溯源警示 + 复制/导出。
 // 平台列表动态化（P1）：来自 /api/studio/platforms（reference/prompts/creation/platforms/
@@ -81,6 +82,20 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [addTitle, setAddTitle] = useState('')
   const [addText, setAddText] = useState('')
   const [addBusy, setAddBusy] = useState(false)
+  const [fsOpen, setFsOpen] = useState(false) // 「从飞书取料」面板（ADR-039）
+  // 从飞书拉一篇文档 → 抓正文 → 存成素材并选中（复用 addNote 的落库+刷新逻辑）
+  const takeFeishuAsNote = async (item) => {
+    try {
+      const a = await api('/api/feishu/analyze', { method: 'POST', body: { objType: item.objType, feishuId: item.feishuId, extra: item.extra, title: item.title, url: item.url } })
+      if (!a.success) { showToast('飞书抓取失败：' + (a.error || '')); return }
+      const j = await api('/api/notes', { method: 'POST', body: { excerpt: a.data.zhBody, sourceTitle: a.data.zhTitle, sourceUrl: a.data.url || null, noteType: 'chat' } })
+      const id = j.data?.id
+      const mj = await api('/api/materials'); setMats(mj.data || [])
+      if (id) setSelMat(s => new Set([...s, id]))
+      setFsOpen(false)
+      showToast(`已把《${a.data.zhTitle}》拉进素材台并选中`)
+    } catch (err) { showToast('从飞书取料失败：' + err.message) }
+  }
   const addNote = async () => {
     if (!addText.trim()) { showToast('先粘一段素材文字'); return }
     setAddBusy(true)
@@ -331,8 +346,10 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           <aside style={{ borderRight: '1px solid var(--line08)', padding: 14, display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
               <span style={{ fontSize: 12, color: 'var(--sub2)', fontWeight: 600 }}>素材（已选 {selMat.size}）</span>
-              <button onClick={() => setAddOpen(o => !o)} title="新增一条素材到素材库" style={{ marginLeft: 'auto', border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--accent)', borderRadius: 6, padding: '2px 8px', fontSize: 11.5, cursor: 'pointer' }}>+ 新增</button>
+              <button onClick={() => setFsOpen(o => !o)} title="从飞书拉一篇文档进素材台" style={{ marginLeft: 'auto', border: '1px solid rgba(42,111,181,.3)', background: 'rgba(42,111,181,.06)', color: '#2a6fb5', borderRadius: 6, padding: '2px 8px', fontSize: 11.5, cursor: 'pointer' }}>飞 从飞书</button>
+              <button onClick={() => setAddOpen(o => !o)} title="新增一条素材到素材库" style={{ border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--accent)', borderRadius: 6, padding: '2px 8px', fontSize: 11.5, cursor: 'pointer' }}>+ 新增</button>
             </div>
+            {fsOpen && <FeishuPicker onPick={takeFeishuAsNote} showToast={showToast} />}
             <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 8 }}>从素材库挑（按收藏时间排），勾中的才用来起稿；缺就点「+新增」</div>
             {topicPreload && (
               <div style={{ marginBottom: 8, padding: '6px 9px', fontSize: 11.5, lineHeight: 1.5, color: 'var(--accent)', background: 'rgba(61,90,128,.07)', border: '1px solid rgba(61,90,128,.2)', borderRadius: 7 }}>

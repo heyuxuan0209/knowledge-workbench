@@ -155,8 +155,14 @@ app.post('/api/content/ingest', async (req, res) => {
       truncated = true;
     }
 
-    const { translateContent } = await import('./services/translation.js');
-    const translation = await translateContent(ingested);
+    // 飞书文档是你自己的内容（常已是中文或中英混排），无需翻译——直接用原文，省掉最慢那一步（ADR-039 提速）。
+    let translation;
+    if (ingested.type === 'feishu') {
+      translation = { zhTitle: ingested.title, zhBody: ingested.body };
+    } else {
+      const { translateContent } = await import('./services/translation.js');
+      translation = await translateContent(ingested);
+    }
 
     res.json({
       success: true,

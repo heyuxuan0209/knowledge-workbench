@@ -346,8 +346,9 @@ export default function WorkbenchPage() {
     } catch (err) { showToast(`保存失败：${err.message}`) }
   }
 
-  // 把当前解读提为一条灵感（ADR-029：即时分析产物落素材，同时一键提成"要写什么"的种子）。
-  // 标题取被解读内容的标题（去掉 "[类型]" 前缀），关联到当前选中的原始内容作支撑料。
+  // 把当前解读提为一条灵感（ADR-029/035：即时分析产物落素材，同时一键提成"要写什么"的种子）。
+  // 标题取被解读内容的标题（去掉 "[类型]" 前缀）；正文带上完整解读（ideas.body，ADR-035 不截断）——
+  // 这样灵感卡里就有标题 + 完整内容、且能在灵感页就地继续编辑，和"保存为素材"一致。
   const saveMsgAsIdea = async (index) => {
     const msg = chat[index]
     if (!msg || msg.role !== 'ai' || msg.pending || msg.error || msg.ideaId) return
@@ -356,7 +357,7 @@ export default function WorkbenchPage() {
     try {
       const json = await api('/api/ideas', {
         method: 'POST',
-        body: { title: rawTitle.slice(0, 200), sourceKind: 'user', supportingContentIds: contentIds },
+        body: { title: rawTitle.slice(0, 200), body: msg.text, sourceKind: 'user', supportingContentIds: contentIds },
       })
       setChat(prev => prev.map((m, i) => i === index ? { ...m, ideaId: json.data.id } : m))
       loadIdeas()
