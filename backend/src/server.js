@@ -386,7 +386,7 @@ app.get('/api/stories', async (req, res) => {
 app.post('/api/stories/rebuild', async (req, res) => {
   try {
     const { rebuildStories } = await import('./services/story-clustering.js');
-    const result = rebuildStories(parseInt(req.body?.days) || 7);
+    const result = await rebuildStories(parseInt(req.body?.days) || 7);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

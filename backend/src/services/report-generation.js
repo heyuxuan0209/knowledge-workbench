@@ -84,8 +84,8 @@ ${registeredBlock}
 }
 
 export async function generateDailyReport({ days = 7 } = {}) {
-  // 先重建聚类（本地零成本），保证日报基于最新数据
-  rebuildStories(days);
+  // 先重建聚类（bge-m3 事件簇），保证日报基于最新数据；首轮补嵌入稍慢、之后缓存
+  await rebuildStories(days);
 
   const db = getDatabase();
   const { stories, registeredContents } = gatherInputs(db);

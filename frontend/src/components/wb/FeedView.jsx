@@ -262,19 +262,35 @@ export default function FeedView({
           )}
           {stories.map((s, i) => {
             const open = expandedFocus === i
+            const members = s.members || []
+            const primary = members[0]                       // 主条：后端已按信任档排序，第一条即官方优先
+            const tierTag = TRUST_TAG[primary?.trust_tier]   // T1 官方一手 / T1.5 官方号；T2 不标
+            const others = members.length - 1
             return (
               <div key={s.id} className="wb-focus-item">
                 <div className="wb-focus-row" onClick={() => setExpandedFocus(open ? null : i)}>
                   <div className="wb-focus-num">{i + 1}</div>
-                  <div className="wb-focus-title">{s.headline}</div>
-                  <div className="wb-focus-count">{s.source_count} 源</div>
+                  <div className="wb-focus-title">
+                    {s.headline}
+                    {tierTag && <span className="wb-pill" style={{ marginLeft: 6, fontSize: 10, color: tierTag.fg, background: tierTag.bg, verticalAlign: '1px' }}>{tierTag.label}</span>}
+                  </div>
+                  <div className="wb-focus-count" title="这件事有几个来源在报道，展开看全部">{s.source_count} 源</div>
                   <div className="wb-focus-arrow">{open ? '▴' : '▾'}</div>
                 </div>
                 {open && (
                   <div className="wb-focus-detail">
-                    {(s.members || []).map(m => (
-                      <div key={m.id} className="wb-focus-src">
-                        <div className="wb-focus-src-name">{m.source_display_name || m.source_app}</div>
+                    {others > 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--faint)', margin: '2px 0 6px' }}>
+                        主源{TRUST_TAG[primary?.trust_tier] ? `（${TRUST_TAG[primary.trust_tier].label}）` : ''}在上，另有 {others} 个来源也报道了这件事：
+                      </div>
+                    )}
+                    {members.map((m, mi) => (
+                      <div key={m.id} className="wb-focus-src" style={mi === 0 ? { borderLeft: '2px solid var(--accent)', paddingLeft: 8 } : undefined}>
+                        <div className="wb-focus-src-name">
+                          {mi === 0 && <span style={{ color: 'var(--accent)', fontWeight: 600 }}>主源 · </span>}
+                          {m.source_display_name || m.source_app}
+                          {TRUST_TAG[m.trust_tier] && <span className="wb-pill" style={{ marginLeft: 5, fontSize: 9.5, color: TRUST_TAG[m.trust_tier].fg, background: TRUST_TAG[m.trust_tier].bg }}>{TRUST_TAG[m.trust_tier].label}</span>}
+                        </div>
                         <div className="wb-focus-src-meta">{TYPE_LABEL[m.content_type] || 'Article'} · {timeAgo(m.published_at)}</div>
                         <div className="wb-focus-src-note">
                           {m.url
@@ -484,6 +500,12 @@ export default function FeedView({
       {readerContent && <ReaderModal content={readerContent} onClose={() => setReaderContent(null)} showToast={showToast} loadNotes={loadNotes} />}
     </>
   )
+}
+
+// 信任档小标（P1 层3/层2）：只标官方，KOL/媒体(T2)不标——避免满屏标签，官方一手是稀缺信号
+const TRUST_TAG = {
+  T1: { label: '官方一手', fg: '#3f7350', bg: 'rgba(63,115,80,.14)' },
+  'T1.5': { label: '官方号', fg: '#3d5a80', bg: 'rgba(61,90,128,.12)' },
 }
 
 // 分类 chips（UI 改造 2b）——文章/项目各一套类目，只显示有内容的类目。

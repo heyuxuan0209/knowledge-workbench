@@ -1,15 +1,19 @@
 import { getDatabase } from '../db/init.js';
 import { randomUUID } from 'crypto';
+import { embedBatch, cosine as vecCosine, MODEL_NAME } from './embeddings.js';
+import { TRUST_RANK } from './trust-tier.js';
 
-// Story 聚类（M2 洞察层，ADR-008）：把近 N 天的 Feed 内容按"讲同一件事"粗粒度分组，
-// 驱动"近期焦点"模块和日报生成。只基于用户自己的信息流，不做全网挖掘。
+// Story 聚类（M2 洞察层，ADR-008；P1 层3 升级为 bge-m3 事件簇，ADR-040）：
+// 把近 N 天的 Feed 内容按"讲同一件事"聚成事件簇，主条按信任档选（官方 > 官方号 > KOL），
+// 其余折叠成"另有 N 个来源报道"——解决"同一件事 N 个来源重复轰炸"。
 //
-// 实现约束（TBD-003 决议）：不用向量库/Embedding。轻量 TF-IDF + 余弦相似度：
-// - 分词：英文按词（小写），中文按 bigram（无需分词库，对短标题+摘要足够）
-// - 贪心聚类：按热度降序遍历，与已有簇的质心相似度超过阈值则并入，否则自成一簇
-// - 只保留 >= 2 条内容的簇（单条不构成"焦点"）
+// 升级点（原 TF-IDF bigram 0.25 → bge-m3 语义 0.80）：
+// - 复用本地 bge-m3 向量（embeddings.js，零 API 成本），存进 contents.embedding（schema 预留）增量嵌入；
+// - 贪心聚类：按热度降序遍历，与簇质心的向量余弦超阈值(0.80)则并入，否则自成一簇（素材查重 0.85 供参照，
+//   事件簇取略低，因不同来源改写同一事件比"重复素材"差异更大）；质心存进 stories.centroid_embedding（预留字段）；
+// - 主条按 trust tier 选（TRUST_RANK：T1 官方一手 > T1.5 官方号 > T2 KOL/媒体），同档比热度/新鲜度。
 //
-// 范围声明（沿用 schema-v3 §6）：只做粗粒度分组供排序展示，不追求精确事件级去重。
+// tokenize 仍导出（material-ranking / topic-pages / period-report 复用其中文 bigram 分词，勿删）。
 
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'with', 'is', 'are',
@@ -40,80 +44,66 @@ export function tokenize(text) {
   return tokens;
 }
 
-function buildTfIdfVectors(docs) {
-  // docs: [{id, tokens}]
-  const df = new Map();
-  for (const doc of docs) {
-    for (const t of new Set(doc.tokens)) df.set(t, (df.get(t) || 0) + 1);
-  }
-  const N = docs.length;
-
-  return docs.map(doc => {
-    const tf = new Map();
-    for (const t of doc.tokens) tf.set(t, (tf.get(t) || 0) + 1);
-    const vec = new Map();
-    let norm = 0;
-    for (const [t, f] of tf) {
-      const idf = Math.log(1 + N / (df.get(t) || 1));
-      const w = f * idf;
-      vec.set(t, w);
-      norm += w * w;
+// 内容嵌入（增量）：给缺向量 / 换过模型的条目补 bge-m3 向量，存进 contents.embedding。
+// 返回 id → 向量数组（含库里已存的），供聚类用。
+async function ensureContentEmbeddings(db, contents) {
+  const embedText = (c) => `${c.zh_title || c.en_title || ''} ${c.zh_summary || ''}`.trim();
+  const need = contents.filter(c => !c.embedding || c.embedding_model !== MODEL_NAME);
+  if (need.length) {
+    const upd = db.prepare("UPDATE contents SET embedding = ?, embedding_model = ? WHERE id = ?");
+    const BATCH = 32;
+    for (let i = 0; i < need.length; i += BATCH) {
+      const batch = need.slice(i, i + BATCH);
+      const vecs = await embedBatch(batch.map(embedText));
+      for (let j = 0; j < batch.length; j++) {
+        const json = JSON.stringify(vecs[j]);
+        upd.run(json, MODEL_NAME, batch[j].id);
+        batch[j].embedding = json; // 供本次聚类直接用
+      }
     }
-    return { id: doc.id, vec, norm: Math.sqrt(norm) || 1 };
-  });
-}
-
-function cosine(a, b) {
-  // 遍历较小的向量
-  const [small, big] = a.vec.size <= b.vec.size ? [a, b] : [b, a];
-  let dot = 0;
-  for (const [t, w] of small.vec) {
-    const w2 = big.vec.get(t);
-    if (w2) dot += w * w2;
+    console.log(`  🧠 事件簇：新增嵌入 ${need.length} 条内容`);
   }
-  return dot / (a.norm * b.norm);
+  const byId = new Map();
+  for (const c of contents) {
+    try { const v = JSON.parse(c.embedding); if (Array.isArray(v) && v.length) byId.set(c.id, v); } catch { /* 跳过坏向量 */ }
+  }
+  return byId;
 }
 
-// 贪心聚类。threshold 经验值：bigram TF-IDF 下 0.25 能把"同一事件不同来源"聚起来，
-// 又不至于把泛主题（都提到 AI）误并。
-export function clusterContents(contents, threshold = 0.25) {
-  const docs = contents.map(c => ({
-    id: c.id,
-    tokens: tokenize(`${c.zh_title || ''} ${c.en_title || ''} ${c.zh_summary || ''}`),
-  }));
-  const vectors = buildTfIdfVectors(docs);
-  const byId = new Map(vectors.map(v => [v.id, v]));
-
-  // 按外部评分降序：热内容优先成簇心
+// 贪心向量聚类。threshold 0.80：bge-m3 归一化余弦下，"同一事件不同来源"通常 ≥0.8，
+// 相关但不同事件在 0.5-0.7，据此分开（素材查重用 0.85，事件簇取略低）。质心=成员均值重归一化。
+export function clusterByVectors(contents, byId, threshold = 0.80) {
   const sorted = [...contents].sort((a, b) => (b.external_score || 0) - (a.external_score || 0));
-
-  const clusters = []; // { memberIds: [], centroid: {vec, norm} }
+  const clusters = []; // { memberIds:[], centroid:[number], n }
   for (const content of sorted) {
     const v = byId.get(content.id);
-    if (!v || v.vec.size === 0) continue;
-
-    let best = null;
-    let bestSim = threshold;
-    for (const cluster of clusters) {
-      const sim = cosine(v, cluster.centroid);
-      if (sim > bestSim) { best = cluster; bestSim = sim; }
+    if (!v) continue;
+    let best = null, bestSim = threshold;
+    for (const cl of clusters) {
+      const sim = vecCosine(v, cl.centroid);
+      if (sim > bestSim) { best = cl; bestSim = sim; }
     }
-
     if (best) {
       best.memberIds.push(content.id);
-      // 质心增量更新：合并词权（简单求和后重归一化）
-      for (const [t, w] of v.vec) {
-        best.centroid.vec.set(t, (best.centroid.vec.get(t) || 0) + w);
-      }
-      let norm = 0;
-      for (const w of best.centroid.vec.values()) norm += w * w;
-      best.centroid.norm = Math.sqrt(norm) || 1;
+      const cen = best.centroid, n = best.n;
+      for (let k = 0; k < cen.length; k++) cen[k] = (cen[k] * n + v[k]) / (n + 1); // 增量均值
+      let nrm = 0; for (const x of cen) nrm += x * x; nrm = Math.sqrt(nrm) || 1;
+      for (let k = 0; k < cen.length; k++) cen[k] /= nrm; // 重归一化，保持点积=余弦
+      best.n = n + 1;
     } else {
-      clusters.push({ memberIds: [content.id], centroid: { vec: new Map(v.vec), norm: v.norm } });
+      clusters.push({ memberIds: [content.id], centroid: v.slice(), n: 1 });
     }
   }
-
   return clusters;
+}
+
+// 簇内选主条：信任档优先（T1>T1.5>T2），同档比外部热度，再比新鲜度
+function pickPrimary(members) {
+  return [...members].sort((a, b) =>
+    (TRUST_RANK[a.trust_tier] ?? 9) - (TRUST_RANK[b.trust_tier] ?? 9) ||
+    (b.external_score || 0) - (a.external_score || 0) ||
+    (new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at))
+  )[0];
 }
 
 // 热度：独立内容数为主 + 新鲜度衰减 + 平台评分微调
@@ -125,17 +115,23 @@ function heatScore(members, now) {
   return Math.round((members.length * 10 * freshness + avgScore / 10) * 10) / 10;
 }
 
-// 重建近 N 天的 stories（全删重建：聚类是派生数据，无需增量维护）
-export function rebuildStories(days = 7) {
+// 重建近 N 天的 stories（全删重建：聚类是派生数据，无需增量维护）。
+// 异步：需要给内容补 bge-m3 向量（增量，首轮较慢、之后缓存秒级）。
+export async function rebuildStories(days = 7, { threshold = 0.80 } = {}) {
   const db = getDatabase();
   const contents = db.prepare(`
-    SELECT id, zh_title, en_title, zh_summary, published_at, created_at, external_score, source_id
-    FROM contents
-    WHERE datetime(COALESCE(published_at, created_at)) > datetime('now', ?)
+    SELECT c.id, c.zh_title, c.en_title, c.zh_summary, c.published_at, c.created_at,
+           c.external_score, c.source_id, c.embedding, c.embedding_model,
+           COALESCE(s.trust_tier, 'T2') AS trust_tier
+    FROM contents c
+    LEFT JOIN sources s ON c.source_id = s.id
+    WHERE datetime(COALESCE(c.published_at, c.created_at)) > datetime('now', ?)
+      AND c.source_app != 'github_trending'
   `).all(`-${days} days`);
 
-  const clusters = clusterContents(contents).filter(c => c.memberIds.length >= 2);
-  const byId = new Map(contents.map(c => [c.id, c]));
+  const byId = await ensureContentEmbeddings(db, contents);
+  const clusters = clusterByVectors(contents, byId, threshold).filter(c => c.memberIds.length >= 2);
+  const byContent = new Map(contents.map(c => [c.id, c]));
   const now = Date.now();
 
   db.exec('BEGIN');
@@ -144,21 +140,21 @@ export function rebuildStories(days = 7) {
     db.exec('DELETE FROM stories;');
 
     const insertStory = db.prepare(`
-      INSERT INTO stories (id, headline, heat_score, source_count, first_seen_at, last_updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO stories (id, headline, centroid_embedding, heat_score, source_count, first_seen_at, last_updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     const insertLink = db.prepare('INSERT INTO story_contents (story_id, content_id) VALUES (?, ?)');
 
     for (const cluster of clusters) {
-      const members = cluster.memberIds.map(id => byId.get(id));
-      // 代表标题：评分最高的成员（日报生成时 LLM 会重新起标题，这里够用）
-      const rep = members.reduce((a, b) => ((b.external_score || 0) > (a.external_score || 0) ? b : a));
+      const members = cluster.memberIds.map(id => byContent.get(id));
+      const rep = pickPrimary(members); // 主条：信任档优先
       const times = members.map(m => m.published_at || m.created_at).sort();
 
       const storyId = randomUUID();
       insertStory.run(
         storyId,
         rep.zh_title || rep.en_title || '(无标题)',
+        JSON.stringify(cluster.centroid),
         heatScore(members, now),
         members.length,
         times[0],
@@ -176,11 +172,12 @@ export function rebuildStories(days = 7) {
 
   const count = db.prepare('SELECT COUNT(*) c FROM stories').get().c;
   db.close();
-  console.log(`✅ Stories rebuilt: ${count} clusters from ${contents.length} contents (last ${days} days)`);
+  console.log(`✅ Stories rebuilt (bge-m3, thr=${threshold}): ${count} clusters from ${contents.length} contents (last ${days} days)`);
   return { stories: count, contents: contents.length };
 }
 
-// 近期焦点：stories + 成员内容（标题/来源），按热度排序
+// 近期焦点：stories + 成员内容（标题/来源/信任档），按热度排序。
+// 成员按信任档排序 → members[0] 即主条（官方优先），前端把其余折叠成"另有 N 个来源报道"。
 export function getStories(limit = 10) {
   const db = getDatabase();
   const stories = db.prepare(`
@@ -188,16 +185,20 @@ export function getStories(limit = 10) {
   `).all(limit);
 
   const memberStmt = db.prepare(`
-    SELECT c.id, c.zh_title, c.en_title, c.url, c.source_app, c.external_score, c.published_at,
-           s.display_name AS source_display_name
+    SELECT c.id, c.zh_title, c.en_title, c.url, c.source_app, c.external_score, c.published_at, c.content_type,
+           s.display_name AS source_display_name, COALESCE(s.trust_tier, 'T2') AS trust_tier
     FROM story_contents sc
     JOIN contents c ON sc.content_id = c.id
     LEFT JOIN sources s ON c.source_id = s.id
     WHERE sc.story_id = ?
-    ORDER BY c.external_score DESC
   `);
   for (const story of stories) {
-    story.members = memberStmt.all(story.id);
+    const members = memberStmt.all(story.id);
+    members.sort((a, b) =>
+      (TRUST_RANK[a.trust_tier] ?? 9) - (TRUST_RANK[b.trust_tier] ?? 9) ||
+      (b.external_score || 0) - (a.external_score || 0)
+    );
+    story.members = members;
   }
   db.close();
   return stories;
