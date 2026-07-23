@@ -910,6 +910,95 @@ app.patch('/api/ideas/:id', async (req, res) => {
   }
 });
 
+// ========== 飞书接入（ADR-037）：来源不是打字框 ==========
+// 触点① 即时分析「从飞书选」：GET /pick 列可挑对象 → POST /analyze 抓正文送即时分析管道。
+// 触点② 被动收件箱：POST /sync 定时/手动拉取 → GET /inbox 列待整理 → POST /inbox/:id/triage 分诊。
+// 凭证只在 backend/.env（FEISHU_APP_ID/SECRET），核心库不依赖；未配置时各接口给清晰提示、不空转。
+
+app.get('/api/feishu/status', async (req, res) => {
+  try {
+    const { feishuConfigured, feishuBase } = await import('./services/feishu-auth.js');
+    const { pendingCount } = await import('./db/feishu-inbox.js');
+    const { feishuBotStarted } = await import('./services/feishu-bot.js');
+    res.json({
+      success: true,
+      data: {
+        configured: feishuConfigured(),
+        base: feishuBase(),
+        botStarted: feishuBotStarted(),   // 私信机器人长连接是否已起
+        pending: feishuConfigured() ? pendingCount() : 0,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/feishu/sync', async (req, res) => {
+  try {
+    const { syncFeishu } = await import('./services/feishu-sync.js');
+    const result = await syncFeishu({ perSource: parseInt(req.body?.perSource) || 20 });
+    res.json({ success: result.ok, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/feishu/inbox', async (req, res) => {
+  try {
+    const { listInbox } = await import('./db/feishu-inbox.js');
+    res.json({ success: true, data: listInbox({ status: req.query.status || 'pending' }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/feishu/inbox/:id/triage', async (req, res) => {
+  try {
+    const { triageInboxItem } = await import('./services/feishu-triage.js');
+    const result = await triageInboxItem(req.params.id, req.body?.action);
+    res.json({ success: result.ok, data: result, error: result.ok ? undefined : result.error });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/feishu/pick', async (req, res) => {
+  try {
+    const { listPickable } = await import('./services/feishu-sync.js');
+    const result = await listPickable({ perSource: parseInt(req.query.perSource) || 15 });
+    res.json({ success: result.ok, data: result.items || [], error: result.ok ? undefined : result.error });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 「从飞书选」挑中一条 → 抓正文，返回与 /api/content/ingest 同 shape 的 data，前端直接送右栏解读。
+app.post('/api/feishu/analyze', async (req, res) => {
+  try {
+    const { objType, feishuId, extra, title, url } = req.body || {};
+    if (!objType || !feishuId) return res.status(400).json({ success: false, error: 'objType/feishuId 必填' });
+    const { getObjectText, getDocxTitle } = await import('./services/feishu-client.js');
+    const body = await getObjectText(objType, feishuId, extra || {});
+    if (!body?.trim()) {
+      return res.json({ success: false, error: '飞书这篇正文为空或没抓到（文档需把应用加为协作者，妙记需开转写权限）' });
+    }
+    let zhTitle = title;
+    if (!zhTitle && objType === 'docx') zhTitle = await getDocxTitle(feishuId).catch(() => null);
+    res.json({
+      success: true,
+      data: {
+        zhTitle: zhTitle || '飞书内容',
+        zhBody: body,
+        url: url || null,
+        metadata: { 来源: '飞书', 类型: objType },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== M3 知识层：Topic 活页 + 同化（ADR-009） ==========
 
 app.get('/api/topics', async (req, res) => {
@@ -1493,6 +1582,19 @@ app.post('/api/sync-all', async (req, res) => {
   res.json({ success: true, data: await syncAllChannels() });
 });
 
+// 同步状态（P0-7 可感知性）：暴露上次同步时间，让资讯页显示"上次同步 x 小时前 · 自动"。
+// 自动同步能力早已在（cron 8:10/20:10 + 离线超 12h 补跑 + 每小时兜底），此前 UI 上一个字都没提。
+app.get('/api/sync-status', async (req, res) => {
+  try {
+    const { readFileSync } = await import('fs');
+    const { fileURLToPath } = await import('url');
+    const { at } = JSON.parse(readFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)), 'utf-8'));
+    res.json({ success: true, data: { lastSyncAt: at || null } });
+  } catch {
+    res.json({ success: true, data: { lastSyncAt: null } }); // 无记录 → 前端显示"尚未同步"
+  }
+});
+
 // ========== v0.2.0 工作区对话 API ==========
 
 // 工作区管理
@@ -1878,6 +1980,11 @@ app.listen(PORT, () => {
       console.error('[startup] 为你推荐刷新失败:', err.message);
     }
   }, 20000);
+
+  // 飞书私信机器人（ADR-039）：长连接监听私信 → 捕获进灵感待整理、问句才回。
+  // 配了飞书凭证就随 backend 常驻启动；未配置/失败只记日志不中断。
+  import('./services/feishu-bot.js').then(({ startFeishuBot }) => startFeishuBot())
+    .catch(err => console.error('[startup] 飞书私信机器人启动异常:', err.message));
 });
 
 // 定时全渠道同步 + 日报生成：每天 08:10 / 20:10（2026-07-16 反馈 #2/#5 的共同根因：

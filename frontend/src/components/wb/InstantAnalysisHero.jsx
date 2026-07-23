@@ -1,15 +1,23 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
+import { IconFeishu } from './Icons'
 
-// 即时分析入口（ADR-029）——方案1 双入口的「消化」lane。丢链接/纪要/音频/PDF → AI 读懂 →
-// 产物落**素材库**（保持"素材=料"），解读结果上另给「💡提为灵感」（右栏解读区）。
-// 支持格式按动作分两行（B 式）：粘链接能放哪些平台 / 传文件能传哪些格式，正好对上输入框(粘)和＋(传)。
-// 逻辑（acquire/uploadFile）由 WorkbenchPage 提供，本组件只管 lane UI + 进度。
-export default function InstantAnalysisHero({ acquire, uploadFile }) {
+// 即时分析入口（ADR-029 + ADR-039 简化版）——「消化一个东西 → AI 读懂 → 存素材」。
+// 来源三选一、都带字：🔗粘链接/文字 · 📎传文件 · 飞 从飞书。飞书只给一个门（避免"粘链接里有飞书、旁边又有从飞书"撞车）：
+//   点「从飞书」→ 门里挑一篇（搜最近文档，点拉来读）；有链接就直接粘到上面输入框（飞书链接已支持直抓）。
+// 逻辑（acquire/uploadFile/pickFeishu/analyzeFeishu）由 WorkbenchPage 提供，本组件只管 lane UI。
+export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, analyzeFeishu }) {
   const [acquireVal, setAcquireVal] = useState('')
   const [ingesting, setIngesting] = useState(false)
-  const [uploading, setUploading] = useState(null) // { status, kind, filename, elapsedSec, error }
+  const [uploading, setUploading] = useState(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
+  const inputRef = useRef(null)
+
+  const [src, setSrc] = useState('link') // 'link' | 'file' | 'feishu'（哪个来源亮着）
+  const [fsList, setFsList] = useState(null) // 从飞书门的候选（null=未拉）
+  const [fsLoading, setFsLoading] = useState(false)
+  const [fsFilter, setFsFilter] = useState('')
+  const [fsPicking, setFsPicking] = useState(null)
 
   const onFileChosen = async (file) => {
     if (!file || !uploadFile) return
@@ -27,13 +35,36 @@ export default function InstantAnalysisHero({ acquire, uploadFile }) {
     setIngesting(false)
   }
 
+  // 来源切换：粘链接→聚焦输入；传文件→开文件框；从飞书→展开门 + 首次拉候选
+  const pickSrc = async (s) => {
+    setSrc(s)
+    if (s === 'link') setTimeout(() => inputRef.current?.focus(), 0)
+    if (s === 'file') fileInputRef.current?.click()
+    if (s === 'feishu' && fsList === null && pickFeishu) {
+      setFsLoading(true)
+      try { setFsList(await pickFeishu()) } catch { setFsList([]) }
+      setFsLoading(false)
+    }
+  }
+  const pickOne = async (item) => {
+    if (!analyzeFeishu) return
+    setFsPicking(item.feishuId)
+    await analyzeFeishu(item)
+    setFsPicking(null)
+  }
+  const fsShown = useMemo(() => {
+    const list = fsList || []
+    const q = fsFilter.trim().toLowerCase()
+    return q ? list.filter(x => (x.title || '').toLowerCase().includes(q)) : list
+  }, [fsList, fsFilter])
+
   return (
     <div className={`wb-insp-lane deep${dragOver ? ' dragover' : ''}`}
       onDragOver={(e) => { if (uploadFile) { e.preventDefault(); setDragOver(true) } }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) onFileChosen(f) }}>
       <div className="wb-lane-ttl"><span className="wb-lane-lab deep">消化</span>即时分析</div>
-      <div className="wb-lane-cap">丢一个东西进来 → AI 读懂 → 存成素材，可提为灵感</div>
+      <div className="wb-lane-cap">要读/消化一个东西 → AI 读懂 → 存成素材</div>
 
       {uploading ? (
         <div className="wb-uploading" style={{ marginTop: 10 }}>
@@ -47,7 +78,7 @@ export default function InstantAnalysisHero({ acquire, uploadFile }) {
             : <>
                 <div className="wb-progress"><i /></div>
                 <div className="wb-lane-cap" style={{ margin: 0 }}>
-                  {uploading.kind === 'audio' ? `正在本地转写全程…已 ${uploading.elapsedSec || 0}s · 会议音频要几分钟，完成后自动进解读，你可先去干别的` : '正在抽取文字…'}
+                  {uploading.kind === 'audio' ? `正在本地转写全程…已 ${uploading.elapsedSec || 0}s · 会议音频要几分钟，完成后自动进解读` : '正在抽取文字…'}
                 </div>
               </>}
         </div>
@@ -59,16 +90,57 @@ export default function InstantAnalysisHero({ acquire, uploadFile }) {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileChosen(f); e.target.value = '' }} />
             <button className="wb-lane-plus" title="上传音频 / PDF / Word / Markdown（也可拖进来）"
               onClick={() => fileInputRef.current?.click()}>＋</button>
-            <input value={acquireVal} onChange={(e) => setAcquireVal(e.target.value)}
+            <input ref={inputRef} value={acquireVal} onChange={(e) => setAcquireVal(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) doAcquire() }}
               placeholder="粘链接，或粘大段文字…" />
             <button className="wb-btn-primary" style={{ padding: '8px 12px', fontSize: 12.5 }}
               disabled={!acquireVal.trim() || ingesting} onClick={doAcquire}>{ingesting ? '抓取中…' : '读懂它'}</button>
           </div>
-          <div className="wb-lane-fmt">
-            <div>🔗 <b>粘链接</b>：网页 · 公众号 · YouTube · 小宇宙 · B站，或直接粘会议纪要等大段文字</div>
-            <div>📎 <b>传文件</b>：音频（转全程）· PDF · Word · Markdown，也可拖进来</div>
+
+          {/* 来源三选一、都带字 */}
+          <div className="wb-src-row">
+            <span className="wb-src-lbl">来源</span>
+            <button className={`wb-src${src === 'link' ? ' on' : ''}`} onClick={() => pickSrc('link')}>🔗 粘链接 / 文字</button>
+            <button className={`wb-src${src === 'file' ? ' on' : ''}`} onClick={() => pickSrc('file')}>📎 传文件</button>
+            {pickFeishu && (
+              <button className={`wb-src${src === 'feishu' ? ' on' : ''}`} onClick={() => pickSrc('feishu')}>
+                <span className="wb-src-fs"><IconFeishu size={15} /></span> 从飞书
+              </button>
+            )}
           </div>
+          {src !== 'feishu' && (
+            <div className="wb-lane-fmt">
+              <div>🔗 <b>粘链接</b>：网页 · 公众号 · YouTube · 小宇宙 · B站，或粘会议纪要等大段文字</div>
+              <div>📎 <b>传文件</b>：音频（转全程）· PDF · Word · Markdown，也可拖进来</div>
+            </div>
+          )}
+
+          {/* 从飞书门：挑一篇（搜最近文档）；有链接就直接粘到上面输入框 */}
+          {src === 'feishu' && pickFeishu && (
+            <div className="wb-fsdoor">
+              <div className="wb-fsdoor-h">
+                <span className="wb-src-fs"><IconFeishu size={17} /></span>
+                <b>从飞书找一篇</b>
+                <span className="sub2">— 挑一篇拉来读；知道链接的话直接粘到上面输入框（飞书链接已支持）</span>
+              </div>
+              <input className="wb-fsdoor-filter" value={fsFilter} onChange={(e) => setFsFilter(e.target.value)}
+                placeholder="按标题筛最近的飞书文档 / 知识库…（全文搜索·按意思找 稍后接入）" />
+              <div className="wb-fsdoor-list">
+                {fsLoading && <div className="wb-fs-empty">读取飞书内容…</div>}
+                {!fsLoading && fsList !== null && fsShown.length === 0 && (
+                  <div className="wb-fs-empty">{(fsList.length ? '没有匹配的' : '没拉到可选内容——飞书未配置，或没有可读的文档/知识库')}。也可把飞书链接直接粘到上面。</div>
+                )}
+                {!fsLoading && fsShown.map(it => (
+                  <button key={it.feishuId} className="wb-fs-pick-item" disabled={fsPicking === it.feishuId}
+                    onClick={() => pickOne(it)}>
+                    <span className="ty">{it.sourceName || (it.objType === 'wiki' ? '知识库' : '云文档')}</span>
+                    <span className="nm">{it.title || '(无标题)'}</span>
+                    <span className="go">{fsPicking === it.feishuId ? '抓取中…' : '拉来读 →'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

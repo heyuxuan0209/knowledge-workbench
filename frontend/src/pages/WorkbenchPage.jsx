@@ -396,6 +396,26 @@ export default function WorkbenchPage() {
     }
   }
 
+  // ---- 触点①「从飞书选」：列可挑的飞书文档/知识库，挑中后抓正文送右栏解读（飞书=来源不是打字框）----
+  const pickFeishu = async () => {
+    try {
+      const json = await api('/api/feishu/pick')
+      if (!json.success) { showToast(json.error || '飞书未配置'); return [] }
+      return json.data || []
+    } catch (err) { showToast(`飞书读取失败：${err.message}`); return [] }
+  }
+  const analyzeFeishu = async (item) => {
+    showToast('正在从飞书抓取正文…')
+    try {
+      const json = await api('/api/feishu/analyze', {
+        method: 'POST',
+        body: { objType: item.objType, feishuId: item.feishuId, extra: item.extra, title: item.title, url: item.url },
+      })
+      if (!json.success) { showToast(json.error || '飞书抓取失败'); return }
+      beginAnalysisWith(json.data, '飞书', json.data.url || null)
+    } catch (err) { showToast(`飞书抓取失败：${err.message}`) }
+  }
+
   // ---- 上传文件（音频→转写全程 / PDF→抽文字）：异步任务，轮询进度，完成后进解读 ----
   const uploadFile = async (file, onStatus) => {
     try {
@@ -767,7 +787,7 @@ export default function WorkbenchPage() {
 
   const pageProps = {
     showToast, contents, report, stories, ghTrending, notes, sources, topics, ideas, toggleStar,
-    selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile, syncing, syncAllSources,
+    selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile, pickFeishu, analyzeFeishu, syncing, syncAllSources,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea, dismissIdea, deleteIdea, saveIdea, loadIdeas,
     loadNotes, loadSources, loadTopics, loadBrief, setPage, setModal,
     notesTab, setNotesTab, toggleSelectNote,

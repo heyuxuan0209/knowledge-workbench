@@ -5,6 +5,18 @@ const S = ({ size = 16, sw = 1.5, style, children }) => (
     strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={style}>{children}</svg>
 )
 
+// 飞书 logo（品牌蓝渐变填充 + 白色飞鸟）——近似官方 mark；如需精确替换这段 SVG 即可。
+export const IconFeishu = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ display: 'block' }}>
+    <defs><linearGradient id="fs-g" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#3370FF" /><stop offset="1" stopColor="#00D6B9" />
+    </linearGradient></defs>
+    <rect width="24" height="24" rx="6" fill="url(#fs-g)" />
+    <path d="M5.4 15.6c3.7.4 6.9-1 9-4.1 1.3-2 2.9-3.1 4.7-3.3-1 3.2-2.8 5.4-5.4 6.6-2.4 1.1-5.2 1.3-7.3 1z" fill="#fff" />
+    <path d="M5.4 15.6c1.3-.2 2.5-.8 3.5-1.7-.6 1.1-1.5 2-2.6 2.6-.4-.2-.7-.5-.9-.9z" fill="#fff" opacity=".85" />
+  </svg>
+)
+
 // 资讯=广播波纹（信息流不断进来）；素材=书签（你挑出来收藏留存的）——两者形状差异最大，不再撞脸
 export const IconFeed = () => (
   <S><circle cx="4" cy="12" r="1" /><path d="M4 8.5a3.5 3.5 0 0 1 3.5 3.5" /><path d="M4 5a7 7 0 0 1 7 7" /></S>

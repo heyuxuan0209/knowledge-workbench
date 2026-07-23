@@ -44,6 +44,10 @@ export function detectInputType(input) {
   // AI HOT 收录页（aihot.virxact.com/items/<id>）是客户端渲染 SPA，裸 HTML 只有空壳（约 900 字节），
   // Readability 抓不到、Jina 渲染又超时。但这条我们**同步时早已入库**——识别出来直接从本地库取，
   // 不再去抓那个 SPA（也避免底层是推文/X 链接时的二次抓取失败）。
+  // 飞书文档/妙记/知识库链接（ADR-039 取料·粘链接）：通用抓取拿不到（要登录态），走飞书鉴权直抓正文。
+  // 只在路径确是 docx/wiki/minutes/docs 时才认，避免抓飞书首页等杂链接。
+  if ((url.hostname.includes('feishu.') || url.hostname.includes('larksuite.')) &&
+      /\/(docx|wiki|minutes|docs)\/[A-Za-z0-9_-]+/.test(url.pathname)) return 'feishu';
   if (url.hostname.includes('aihot.virxact.com') && /\/items\/[a-z0-9]+/i.test(url.pathname)) return 'aihot';
   // X/推特 直链：需登录态才能抓取（本产品未接入，ADR-014 后置）。识别出来 → 若库里已有(AI HOT 收录过)
   // 直接从库解读，否则秒回清晰提示，不再白等 25s Jina。
@@ -472,6 +476,22 @@ export async function ingestUrl(input) {
   }
 }
 
+// 粘飞书链接（ADR-039）：走飞书鉴权抓正文，返回与其它 ingestor 同 shape。
+async function ingestFeishuLink(input) {
+  try {
+    const { fetchFeishuLink } = await import('./feishu-client.js');
+    const { title, body } = await fetchFeishuLink(input.trim());
+    if (!body?.trim()) {
+      return { title, body: null, type: 'feishu', fetchStatus: 'failed',
+        fetchError: '飞书这篇正文为空或没抓到（文档需把应用加为协作者、妙记需开转写权限）' };
+    }
+    return { title: title || '飞书内容', body, type: 'feishu', fetchStatus: 'success', fetchError: null };
+  } catch (e) {
+    return { title: null, body: null, type: 'feishu', fetchStatus: 'failed',
+      fetchError: `飞书抓取失败：${e.message}` };
+  }
+}
+
 function ingestText(input) {
   const body = input.trim();
   return {
@@ -500,6 +520,10 @@ export async function ingest(input) {
 
   let result;
   switch (inputType) {
+    case 'feishu':
+      result = await ingestFeishuLink(input);
+      return { ...result, inputMethod: 'feishu_link' };
+
     case 'aihot':
       result = await ingestAihot(input);
       return { ...result, inputMethod: 'url_auto' };
