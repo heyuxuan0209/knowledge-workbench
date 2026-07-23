@@ -1640,7 +1640,7 @@ async function syncAllChannels() {
   // 摘要兜底（P1 层1）：异步补齐"有正文没摘要"的条目（Anthropic/OpenAI 官网 RSS 常无 description
   // → 列表只剩光杆标题）。fire-and-forget，不阻塞同步返回；cron 与手动同步都会触发。
   import('./services/summary-backfill.js')
-    .then(m => m.backfillMissingSummaries({ limit: 30 }))
+    .then(m => m.backfillMissingSummaries({ limit: 10 }))
     .then(r => r.summarized && console.log(`[sync] 摘要兜底：补 ${r.summarized}/${r.total} 条`))
     .catch(err => console.error('[sync] 摘要兜底失败:', err.message));
 
