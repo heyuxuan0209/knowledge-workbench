@@ -236,6 +236,18 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     const text = String(studio.draft || '').replace(/\s*\[素材\d+\]/g, '')  // 图卡用去掉溯源标记的干净文案
     try { cardFrame.current?.contentWindow?.postMessage({ type: 'kw-fill-cards', text }, '*') } catch { /* 跨窗口受限时忽略 */ }
   }
+  // P0#3：卡片是草稿的派生视图——在卡片 tab 时监听 draft 变化自动重灌（防"派生视图装死"）。
+  // 否则你在右侧「创作助手」/改稿改了文案，卡片纹丝不动。首次进卡片不弹提示，之后因改稿刷新给一句确认。
+  const cardFedOnce = useRef(false)
+  useEffect(() => {
+    if (!cardsMode) { cardFedOnce.current = false; return }
+    const t = setTimeout(() => {
+      postDraftToCards()
+      if (cardFedOnce.current) showToast('卡片已按最新文案刷新')
+      cardFedOnce.current = true
+    }, 400)
+    return () => clearTimeout(t)
+  }, [studio.draft, cardsMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPlatform = (p) => {
     setXhsMode('text')
@@ -372,7 +384,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               </div>
             )}
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line08)', fontSize: 11, color: 'var(--sub2)', lineHeight: 1.55 }}>
-              <b style={{ color: 'var(--sub)' }}>起稿 → 改稿 → 产出，从上到下</b><br />· 改稿（润色/审稿/改一段）就在草稿正下方。<br />· 也可到右侧「创作助手」用大白话改（如“开头更狠”“压到 5 条”）。
+              <b style={{ color: 'var(--sub)' }}>起稿 → 改稿 → 产出，从上到下</b><br />· 改稿（去 AI 味 / AI 挑毛病 / 改选中段落）就在草稿正下方。<br />· 也可到右侧「创作助手」用大白话改（如“开头更狠”“压到 5 条”）。
             </div>
           </aside>
 
@@ -477,17 +489,17 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             {/* 改稿：贴着草稿（「改一段」要读草稿里选中的文字），与产出分开 */}
             <div className="wb-studio-actions">
               <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginRight: 2 }}>改稿</span>
-              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title="整篇改得更顺更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断" onClick={humanizeDraft}>润色</button>
-              <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy || isEmpty} title="三个批评视角通读全稿，给出批注——只批注不改稿" onClick={critiqueDraft}>{critiqueBusy ? '审稿中…' : '审稿'}</button>
-              <button className="wb-btn-outline" disabled={variantsBusy || studio.busy || isEmpty} title="选中一段，给 3 个策略不同的改法" onClick={makeVariants}>{variantsBusy ? '生成中…' : '改一段'}</button>
-              <button className="wb-btn-ghost" disabled={!studio.prevDraft} title="改写前后两版互换（润色/改一段后可用）" onClick={undoRewrite}>撤销改写</button>
+              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title="整篇改得更顺更好读：换掉 AI 高频词 / 拆套路句式 / 加入第一人称判断" onClick={humanizeDraft}>去 AI 味</button>
+              <button className="wb-btn-outline" disabled={critiqueBusy || studio.busy || isEmpty} title="三个批评视角通读全稿，挑出问题给批注——只挑毛病不改稿，你决定改哪条" onClick={critiqueDraft}>{critiqueBusy ? '挑毛病中…' : 'AI 挑毛病'}</button>
+              <button className="wb-btn-outline" disabled={variantsBusy || studio.busy || isEmpty} title="先在草稿里选中一段（≥10 字），给这段 3 个策略不同的改法" onClick={makeVariants}>{variantsBusy ? '生成中…' : '改选中段落'}</button>
+              <button className="wb-btn-ghost" disabled={!studio.prevDraft} title="改写前后两版互换（去 AI 味 / 改选中段落后可用）" onClick={undoRewrite}>撤销改写</button>
               <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--faint)' }}>或到右侧「创作助手」用大白话改</span>
             </div>
             {/* 产出 */}
             <div className="wb-studio-actions">
               <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginRight: 2 }}>产出</span>
               <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title={reshapeMode ? '把你的稿按上方文体×平台再重塑一版' : '用同样的素材·文体·平台再出一版（起稿请用上方推荐卡「用这个生成」）'} onClick={genDraftV2}>{reshapeMode ? '重塑我的稿' : '重新生成'}</button>
-              <button className="wb-btn-ghost" disabled={isEmpty} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
+              <button className="wb-btn-ghost" disabled={isEmpty} title={studio.draftId ? '把改动存回当前草稿（不发布）' : '把当前草稿存进草稿箱，之后可继续改（不发布）'} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="导出发布版：溯源标记转文末来源列表" onClick={exportMd}>导出 Markdown</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="删掉正文里所有 [素材N] 标记（发布前用；先存草稿）" onClick={() => { setStudio(s => ({ ...s, draft: stripRefs(s.draft) })); showToast('已去掉正文里所有 [素材N] 标记') }}>去引用标记</button>
               {(v2Pform === 'gzh-long' || v2Pform === 'xhs-long') && (
@@ -500,7 +512,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               {(v2Pform || '').includes('card') ? (
                 <button className="wb-btn-primary" disabled={isEmpty} title="把卡片文字渲染成图（复用图卡工具）" onClick={() => { setV2Cards(true); setTimeout(postDraftToCards, 150) }}>生成图文卡片</button>
               ) : (
-                <button className="wb-btn-primary" disabled={isEmpty} onClick={copyAll}>复制全文</button>
+                <button className="wb-btn-primary" disabled={isEmpty} title="复制正文到剪贴板（自动去掉 [素材N] 溯源标记，可直接粘去发布）" onClick={copyAll}>复制全文</button>
               )}
             </div>
           </section>
@@ -537,7 +549,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       {critique && (
         <div className="wb-card" style={{ marginTop: 12, padding: '14px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="wb-card-label" style={{ flex: 'none' }}>审稿批注（{critique.points.length}）</span>
+            <span className="wb-card-label" style={{ flex: 'none' }}>AI 挑出的问题（{critique.points.length}）</span>
             <span style={{ fontSize: 12.5, color: 'var(--sub2)', flex: 1 }}>{critique.verdict}</span>
             <button className="wb-note-del" style={{ flex: 'none' }} title="关闭批注" onClick={() => setCritique(null)}>✕</button>
           </div>
