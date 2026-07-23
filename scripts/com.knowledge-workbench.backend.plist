@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent：让后端"电脑一开就在跑"（P0-7 最后一步）。
+  能力（cron 8:10/20:10 自动同步 + 离线超 12h 补跑 + 每小时兜底）早已在代码里，
+  这个 plist 只负责把后端做成开机自启常驻，不再依赖你手动 `npm start`。
+
+  安装（一次性，需你亲自执行——属于本机持久化改动）：
+    cp scripts/com.knowledge-workbench.backend.plist ~/Library/LaunchAgents/
+    launchctl load  ~/Library/LaunchAgents/com.knowledge-workbench.backend.plist
+  卸载：
+    launchctl unload ~/Library/LaunchAgents/com.knowledge-workbench.backend.plist
+  看日志：
+    tail -f "/Users/heyuxuan/Documents/项目/knowledge-workbench/backend/data/backend.out.log"
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.knowledge-workbench.backend</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>src/server.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/heyuxuan/Documents/项目/knowledge-workbench/backend</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>NODE_ENV</key>
+    <string>production</string>
+  </dict>
+
+  <!-- 开机 / 登录即拉起，崩了自动重启（常驻） -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/heyuxuan/Documents/项目/knowledge-workbench/backend/data/backend.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/heyuxuan/Documents/项目/knowledge-workbench/backend/data/backend.err.log</string>
+</dict>
+</plist>

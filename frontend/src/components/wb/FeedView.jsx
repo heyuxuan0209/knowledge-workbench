@@ -167,10 +167,17 @@ export default function FeedView({
   // 卡片密度：舒适（分诊卡）/ 紧凑（列表），记本地
   const [density, setDensity] = useState(() => localStorage.getItem('wb-feed-density') || 'cozy')
   const setDens = (d) => { localStorage.setItem('wb-feed-density', d); setDensity(d) }
+  // 同步状态可感知（P0-7）：自动同步能力早已在，此前 UI 上没提过。undefined=加载中，null=从未同步
+  const [lastSyncAt, setLastSyncAt] = useState(undefined)
   useEffect(() => {
     api('/api/contents/categories').then(j => setArtCatCounts(j.data || {})).catch(() => {})
     api('/api/recommendations').then(j => setRecs(j.data || [])).catch(() => {})
   }, [])
+  // 上次同步时间：进页面拉一次；每次同步完成（syncing true→false）再拉一次刷新
+  useEffect(() => {
+    if (syncing) return
+    api('/api/sync-status').then(j => setLastSyncAt(j.data?.lastSyncAt ?? null)).catch(() => {})
+  }, [syncing])
   useEffect(() => {
     if (!hasFilter) { setFiltered(null); return }
     const t = setTimeout(async () => {
@@ -195,6 +202,14 @@ export default function FeedView({
       : prev.map(x => x.id === c.id ? { ...x, starred } : x)))
   }
 
+  const syncAgo = (iso) => {
+    if (!iso) return null
+    const t = new Date(/[zZ+]/.test(iso) ? iso : iso + 'Z').getTime()
+    const h = Math.floor((Date.now() - t) / 3600000)
+    if (h < 1) return '刚刚'
+    if (h < 24) return `${h} 小时前`
+    return `${Math.floor(h / 24)} 天前`
+  }
   const today = new Date()
   const dateLabel = `${today.getMonth() + 1} 月 ${today.getDate()} 日`
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -348,6 +363,20 @@ export default function FeedView({
         </>)}
       </div>
 
+      {/* 同步状态一行（P0-7）：让"每天自动同步一直在跑"这件事被看见——不再让用户误以为要手动同步 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '0 2px 12px', fontSize: 11.5, color: 'var(--faint)', lineHeight: 1.5 }}>
+        <span aria-hidden="true">🔄</span>
+        <span style={{ minWidth: 0 }}>
+          {lastSyncAt === undefined
+            ? '同步状态加载中…'
+            : lastSyncAt
+              ? <>上次同步 <b style={{ color: 'var(--sub2)', fontWeight: 600 }}>{syncAgo(lastSyncAt)}</b> · 每天 8:10 / 20:10 自动，离线超 12 小时自动补跑</>
+              : '尚未同步 · 每天 8:10 / 20:10 会自动同步，离线超 12 小时自动补跑'}
+        </span>
+        <button className="wb-brief-link" disabled={syncing} style={{ flexShrink: 0 }} onClick={syncAllSources}
+          title="不用等，立即手动同步一次全部信源">{syncing ? '同步中…' : '手动同步'}</button>
+      </div>
+
       {mainTab === 'articles' && (<>
         {/* 分类 chips（2b）：只在无搜索/收藏筛选时出现，避免叠加混乱 */}
         {feedTab !== 'starred' && !feedQuery.trim() && (
@@ -397,8 +426,8 @@ export default function FeedView({
             if (density === 'compact') return (
               <div key={c.id} className={`wb-frow${checked ? ' selected' : ''}`}>
                 {dot}
-                <span className="wb-frow-title" onClick={openRead} title="点击 AI 精读">{title}</span>
-                {c.zh_summary && <span className="wb-frow-gist">{c.zh_summary}</span>}
+                <span className="wb-frow-title" onClick={openRead} title={c.zh_summary ? `${title}\n\n${c.zh_summary}` : title}>{title}</span>
+                {c.zh_summary && <span className="wb-frow-gist" title={c.zh_summary}>{c.zh_summary}</span>}
                 <span className="wb-frow-meta">{meta}</span>
                 {actions}
               </div>
