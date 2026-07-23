@@ -143,8 +143,6 @@ export default function FeedView({
   const [mainTab, setMainTab] = useState('articles') // 'articles' | 'projects'（UI 改造：文章/AI项目分开）
   const [airHint, setAirHint] = useState(() => !localStorage.getItem('wb-seen-airead-hint')) // 「AI 精读」首次说明气泡
   const dismissAirHint = () => { localStorage.setItem('wb-seen-airead-hint', '1'); setAirHint(false) }
-  const [leadOpen, setLeadOpen] = useState(() => localStorage.getItem('wb-ov-lead-collapsed') !== '1') // 概览两栏领起句可折叠
-  const toggleLead = () => setLeadOpen(o => { localStorage.setItem('wb-ov-lead-collapsed', o ? '1' : '0'); return !o })
 
   // Feed 搜索 + 星标过滤（2026-07-16 反馈 #2：被新内容推下去的条目要找得回来）。
   // 与素材库同款：有筛选时走后端 SQL（不是只筛已加载的 30 条），无筛选回全局列表
@@ -162,7 +160,14 @@ export default function FeedView({
   const [artCat, setArtCat] = useState(null)   // 文章分类 chip（2b）
   const [projCat, setProjCat] = useState(null)  // 项目分类 chip（2b）
   const [artCatCounts, setArtCatCounts] = useState({}) // 文章各类目计数（后端，全量）
-  const [recs, setRecs] = useState([]) // 为你推荐（后端向量匹配主题，读缓存）
+  const [mustRead, setMustRead] = useState([]) // 今日必看（层1 双通道：行业大事 + 个人相关）
+  const muteMustRead = async (m) => {
+    setMustRead(prev => prev.filter(x => x.id !== m.id))
+    try {
+      await api('/api/must-read/mute', { method: 'POST', body: m.sourceId ? { sourceId: m.sourceId } : { contentId: m.id } })
+      showToast?.('好的，以后少推这类')
+    } catch { /* 静默 */ }
+  }
   const hasFilter = feedTab === 'starred' || feedTab === 'followed' || Boolean(feedQuery.trim()) || Boolean(artCat)
   // 卡片密度：舒适（分诊卡）/ 紧凑（列表），记本地
   const [density, setDensity] = useState(() => localStorage.getItem('wb-feed-density') || 'cozy')
@@ -171,7 +176,7 @@ export default function FeedView({
   const [lastSyncAt, setLastSyncAt] = useState(undefined)
   useEffect(() => {
     api('/api/contents/categories').then(j => setArtCatCounts(j.data || {})).catch(() => {})
-    api('/api/recommendations').then(j => setRecs(j.data || [])).catch(() => {})
+    api('/api/must-read').then(j => setMustRead(j.data || [])).catch(() => {})
   }, [])
   // 上次同步时间：进页面拉一次；每次同步完成（syncing true→false）再拉一次刷新
   useEffect(() => {
@@ -243,15 +248,29 @@ export default function FeedView({
         {/* 一句话总结（露出日报导语，此前藏着；UI 改造 2a） */}
         {report?.summary && <div className="wb-lead">一句话总结：<b>{report.summary}</b></div>}
 
-        {recs.length > 0 && (leadOpen ? (
-          <div className="wb-ov-lead">
-            左边是<b>今天多个信息源都在说的热点</b>，右边是<b>按你关注的主题挑给你的</b>——一个看大盘、一个看你自己。
-            <button className="wb-ov-lead-x" title="收起说明" onClick={toggleLead}>收起 ▴</button>
+        {/* 层1 今日必看：双通道配额制（行业大事 + 个人相关），各带一句人话理由 · P1层4 */}
+        {mustRead.length > 0 && (
+          <div style={{ margin: '6px 0 14px' }}>
+            <div className="wb-brief-label" title="每天先看这几条：既不漏行业大事，也贴合你近期在看的">今日必看 · 先看这几条</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {mustRead.map(m => {
+                const industry = m.channel === 'industry'
+                return (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 11px', borderRadius: 8, background: 'var(--brief-bg)', borderLeft: `3px solid ${industry ? '#a9791f' : '#3d5a80'}` }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <a href={m.url} target="_blank" rel="noreferrer" style={{ fontFamily: 'var(--serif)', fontWeight: 600, fontSize: 13.5, color: 'var(--body)', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</a>
+                      <div style={{ fontSize: 11.5, color: industry ? '#8a6a1a' : 'var(--accent)', marginTop: 2 }}>{industry ? '📢 ' : '✨ '}{m.reason}</div>
+                    </div>
+                    <button title="不感兴趣：以后少推这个来源/这条（只过滤，不会拿去自动调权重）" onClick={() => muteMustRead(m)}
+                      style={{ flex: 'none', border: 'none', background: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 12, padding: '2px 4px', lineHeight: 1 }}>✕</button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        ) : (
-          <button className="wb-ov-lead-toggle" onClick={toggleLead}>两栏有啥区别？▾</button>
-        ))}
-        <div className={recs.length ? 'wb-ov-cols' : ''}>
+        )}
+
+        {/* 层2 今日热点：事件簇（bge-m3 聚类，主条按信任档），全宽 */}
         <div>
         <div className="wb-brief-label">今日热点 · 多个信息源都在说</div>
         <div className="wb-focus">
@@ -309,18 +328,6 @@ export default function FeedView({
             )
           })}
         </div>
-        </div>
-        {recs.length > 0 && (
-          <div>
-            <div className="wb-brief-label">为你精选 · 命中你关注的主题</div>
-            {recs.map(r => (
-              <div key={r.id} className="wb-rec">
-                <div className="wb-rec-t"><a href={r.url} target="_blank" rel="noreferrer">{r.title}</a></div>
-                <div className="wb-rec-why">{r.reason}</div>
-              </div>
-            ))}
-          </div>
-        )}
         </div>
 
         {report ? (

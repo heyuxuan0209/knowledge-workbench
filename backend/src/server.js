@@ -763,6 +763,27 @@ app.get('/api/recommendations', async (req, res) => {
   }
 });
 
+// 今日必看（P1 层4）：双通道配额制（行业大事 + 个人相关），实时算（无 LLM/嵌入，读向量即可，毫秒级）
+app.get('/api/must-read', async (req, res) => {
+  try {
+    const { getMustRead } = await import('./services/must-read.js');
+    res.json({ success: true, data: getMustRead() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+// 显式 mute（源/内容级"没兴趣"）——只过滤、不自动学权重（卡兹克红线）
+app.post('/api/must-read/mute', async (req, res) => {
+  try {
+    const { sourceId, contentId } = req.body || {};
+    if (!sourceId && !contentId) return res.status(400).json({ success: false, error: 'sourceId 或 contentId 必填' });
+    const { addMute } = await import('./services/must-read.js');
+    res.json({ success: true, data: addMute({ sourceId, contentId }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 行业面（VISION-V4 阶段2）：复用 AI HOT 热门内容做行业提要 + 跳转，不重新生成（零 LLM）
 app.get('/api/industry-brief', async (req, res) => {
   try {
