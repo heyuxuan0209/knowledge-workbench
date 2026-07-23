@@ -30,12 +30,15 @@ async function sendText(chatId, text) {
 async function generateReply(text) {
   const { chat } = await import('./llm.js');
   const sys = '你是用户的思考搭子。用户在飞书私信里随手抛来一个想法或问题。用中文、口语、简短（2-4 句）回应：是问题就给要点判断 + 一个提醒或反问；是想法就点出值得深挖的角度或一个坑。别客套、别复述原话、别列长清单。';
-  const out = await chat([{ role: 'system', content: sys }, { role: 'user', content: text }], 'deepseek', null, { maxTokens: 300 });
-  return (out || '').trim();
+  // chat() 返回 { success, content }（不抛错、不返回字符串）——读 content，失败则不回
+  const res = await chat([{ role: 'system', content: sys }, { role: 'user', content: text }], 'deepseek');
+  if (!res?.success) { console.warn('[feishu-bot] DeepSeek 生成回复失败:', res?.error); return ''; }
+  return (res.content || '').trim();
 }
 
 async function handleMessage(data) {
   const msg = data?.message;
+  console.log(`[feishu-bot] 收到消息事件: chat_type=${msg?.chat_type} msg_type=${msg?.message_type}`); // 诊断：确认事件到达
   if (!msg || msg.chat_type !== 'p2p') return; // 只收私信，群消息不碰
   const text = extractText(msg);
   if (!text) return; // 非文本（图片/文件等）跳过
