@@ -27,9 +27,15 @@ async function sendText(chatId, text) {
   });
 }
 
+// 用户背景 + 理解口径——决定回复答不答得对路（改这一处即可，日后可移到设置页）。
+const USER_CONTEXT = `你在跟【用户本人】私聊，当他的思考搭子。
+背景：用户是独立 AI 产品人 / 内容创作者，自己在做一个"知识→内容"的工作台（把高价值信息沉淀成认知、再产出多平台内容：公众号/小红书/抖音等）；日常关注 AI 产品与模型、Agent、内容创作、独立开发。
+理解口径（重要）：消息里的术语默认按 **AI / 科技 / 产品 / 内容创作** 领域理解，**不要往金融、炒币、投资标的上带**。例如 "fable5"/"Fable 5" 指 Anthropic 的 Claude Fable 5 模型；"上"多半指"要不要用/接入/上手"，不是"建仓"。拿不准就往 AI/产品/写作 场景靠。`
+
 async function generateReply(text) {
   const { chat } = await import('./llm.js');
-  const sys = '你是用户的思考搭子。用户在飞书私信里随手抛来一个想法或问题。用中文、口语、简短（2-4 句）回应：是问题就给要点判断 + 一个提醒或反问；是想法就点出值得深挖的角度或一个坑。别客套、别复述原话、别列长清单。';
+  const sys = `${USER_CONTEXT}
+回应方式：中文、口语、简短（2-4 句）。是问题就给要点判断 + 一个提醒或反问；是想法就点出值得深挖的角度或一个坑。别客套、别复述原话、别列长清单。`;
   // chat() 返回 { success, content }（不抛错、不返回字符串）——读 content，失败则不回
   const res = await chat([{ role: 'system', content: sys }, { role: 'user', content: text }], 'deepseek');
   if (!res?.success) { console.warn('[feishu-bot] DeepSeek 生成回复失败:', res?.error); return ''; }

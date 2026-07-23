@@ -973,6 +973,18 @@ app.get('/api/feishu/pick', async (req, res) => {
   }
 });
 
+// 从飞书门·搜索 tab：飞书原生全文搜索（覆盖整个飞书、实时）。返回与 pick 同 shape，可直接「拉来读」。
+app.get('/api/feishu/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.json({ success: true, data: [] });
+    const { searchDocs } = await import('./services/feishu-client.js');
+    res.json({ success: true, data: await searchDocs(q, { count: 12 }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 「从飞书选」挑中一条 → 抓正文，返回与 /api/content/ingest 同 shape 的 data，前端直接送右栏解读。
 app.post('/api/feishu/analyze', async (req, res) => {
   try {

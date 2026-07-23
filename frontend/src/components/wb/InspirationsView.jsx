@@ -60,7 +60,7 @@ function SupportChips({ idea, gotoNote }) {
 export default function InspirationsView({
   ideas = [], loadIdeas, saveIdea, showToast,
   createFromIdea, upgradeIdea, deleteIdea, viewIdea, gotoNote,
-  acquire, uploadFile, returnPage, goBack, loadNotes, pickFeishu, analyzeFeishu,
+  acquire, uploadFile, returnPage, goBack, loadNotes, pickFeishu, analyzeFeishu, searchFeishu,
 }) {
   const [view, setView] = useState(() => localStorage.getItem('wb-insp-view') || 'collect') // 'collect' | 'board'（默认收集）
   const setViewP = (v) => { localStorage.setItem('wb-insp-view', v); setView(v) }
@@ -277,7 +277,7 @@ export default function InspirationsView({
           {/* 主动·即时：方案1 双入口（即时分析 消化 / 随手记 闪念） */}
           <div className="wb-insp-layertag">主动 · 即时（你此刻丢一个进来）</div>
           <div className="wb-insp-intake">
-            <InstantAnalysisHero acquire={acquire} uploadFile={uploadFile} pickFeishu={pickFeishu} analyzeFeishu={analyzeFeishu} />
+            <InstantAnalysisHero acquire={acquire} uploadFile={uploadFile} pickFeishu={pickFeishu} analyzeFeishu={analyzeFeishu} searchFeishu={searchFeishu} />
             <div className="wb-insp-lane quick">
               <div className="wb-lane-ttl"><span className="wb-lane-lab quick">闪念</span>随手记</div>
               <div className="wb-lane-cap">脑里冒出的一句话、一个角度 → 直接成一条灵感（存后自动找贴合素材）</div>

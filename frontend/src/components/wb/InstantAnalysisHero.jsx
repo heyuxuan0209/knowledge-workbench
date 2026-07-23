@@ -1,11 +1,11 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef } from 'react'
 import { IconFeishu } from './Icons'
 
 // 即时分析入口（ADR-029 + ADR-039 简化版）——「消化一个东西 → AI 读懂 → 存素材」。
 // 来源三选一、都带字：🔗粘链接/文字 · 📎传文件 · 飞 从飞书。飞书只给一个门（避免"粘链接里有飞书、旁边又有从飞书"撞车）：
 //   点「从飞书」→ 门里挑一篇（搜最近文档，点拉来读）；有链接就直接粘到上面输入框（飞书链接已支持直抓）。
 // 逻辑（acquire/uploadFile/pickFeishu/analyzeFeishu）由 WorkbenchPage 提供，本组件只管 lane UI。
-export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, analyzeFeishu }) {
+export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, analyzeFeishu, searchFeishu }) {
   const [acquireVal, setAcquireVal] = useState('')
   const [ingesting, setIngesting] = useState(false)
   const [uploading, setUploading] = useState(null)
@@ -14,10 +14,12 @@ export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, a
   const inputRef = useRef(null)
 
   const [src, setSrc] = useState('link') // 'link' | 'file' | 'feishu'（哪个来源亮着）
-  const [fsList, setFsList] = useState(null) // 从飞书门的候选（null=未拉）
+  const [fsList, setFsList] = useState(null) // 「最近」浏览候选（null=未拉）
   const [fsLoading, setFsLoading] = useState(false)
-  const [fsFilter, setFsFilter] = useState('')
   const [fsPicking, setFsPicking] = useState(null)
+  const [fsQuery, setFsQuery] = useState('') // 搜索框
+  const [fsResults, setFsResults] = useState(null) // null=没搜（显示最近）/ []=搜了没结果 / [...]
+  const [fsSearching, setFsSearching] = useState(false)
 
   const onFileChosen = async (file) => {
     if (!file || !uploadFile) return
@@ -52,11 +54,17 @@ export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, a
     await analyzeFeishu(item)
     setFsPicking(null)
   }
-  const fsShown = useMemo(() => {
-    const list = fsList || []
-    const q = fsFilter.trim().toLowerCase()
-    return q ? list.filter(x => (x.title || '').toLowerCase().includes(q)) : list
-  }, [fsList, fsFilter])
+  const doSearch = async () => {
+    const q = fsQuery.trim()
+    if (!q) { setFsResults(null); return } // 清空=回到「最近」
+    if (!searchFeishu) return
+    setFsSearching(true)
+    try { setFsResults(await searchFeishu(q)) } catch { setFsResults([]) }
+    setFsSearching(false)
+  }
+  // 门里显示：搜过 → 搜索结果；没搜 → 最近浏览
+  const searched = fsResults !== null
+  const fsShown = searched ? fsResults : (fsList || [])
 
   return (
     <div className={`wb-insp-lane deep${dragOver ? ' dragover' : ''}`}
@@ -121,16 +129,26 @@ export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, a
               <div className="wb-fsdoor-h">
                 <span className="wb-src-fs"><IconFeishu size={17} /></span>
                 <b>从飞书找一篇</b>
-                <span className="sub2">— 挑一篇拉来读；知道链接的话直接粘到上面输入框（飞书链接已支持）</span>
+                <span className="sub2">— 搜你整个飞书（实时），或看最近；知道链接就直接粘到上面输入框</span>
               </div>
-              <input className="wb-fsdoor-filter" value={fsFilter} onChange={(e) => setFsFilter(e.target.value)}
-                placeholder="按标题筛最近的飞书文档 / 知识库…（全文搜索·按意思找 稍后接入）" />
+              <div className="wb-fsdoor-search">
+                <input value={fsQuery}
+                  onChange={(e) => setFsQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) doSearch() }}
+                  placeholder="搜飞书里的文档（关键词，搜整个飞书）…" />
+                <button className="wb-btn-primary" style={{ padding: '8px 13px', fontSize: 12.5 }}
+                  disabled={fsSearching} onClick={doSearch}>{fsSearching ? '搜…' : '搜'}</button>
+                {searched && <button className="wb-fsdoor-clear" onClick={() => { setFsQuery(''); setFsResults(null) }}>清空看最近</button>}
+              </div>
               <div className="wb-fsdoor-list">
-                {fsLoading && <div className="wb-fs-empty">读取飞书内容…</div>}
-                {!fsLoading && fsList !== null && fsShown.length === 0 && (
-                  <div className="wb-fs-empty">{(fsList.length ? '没有匹配的' : '没拉到可选内容——飞书未配置，或没有可读的文档/知识库')}。也可把飞书链接直接粘到上面。</div>
+                {(fsLoading || fsSearching) && <div className="wb-fs-empty">{fsSearching ? '搜索中…' : '读取飞书内容…'}</div>}
+                {!fsLoading && !fsSearching && fsShown.length === 0 && (
+                  <div className="wb-fs-empty">{searched ? '没搜到匹配的文档（换个关键词，或直接粘飞书链接到上面）' : '没拉到最近内容——上面搜一下，或把飞书链接直接粘到输入框'}</div>
                 )}
-                {!fsLoading && fsShown.map(it => (
+                {!fsLoading && !fsSearching && fsShown.length > 0 && (
+                  <div className="wb-fsdoor-listhint">{searched ? `搜到 ${fsShown.length} 篇` : '最近的文档'}</div>
+                )}
+                {!fsLoading && !fsSearching && fsShown.map(it => (
                   <button key={it.feishuId} className="wb-fs-pick-item" disabled={fsPicking === it.feishuId}
                     onClick={() => pickOne(it)}>
                     <span className="ty">{it.sourceName || (it.objType === 'wiki' ? '知识库' : '云文档')}</span>

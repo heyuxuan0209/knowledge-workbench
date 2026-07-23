@@ -161,6 +161,28 @@ export async function getWikiNodeText(extra) {
   return getDocxText(extra.objToken);
 }
 
+// 飞书原生全文搜索（ADR-039 取料·搜索）：POST /suite/docs-api/search/object。
+// 覆盖你整个飞书里应用可见的文档、实时、零维护（飞书自己维护索引）；字面/关键词匹配、非语义。
+// 只返回 docx（可读正文）——bitable/sheet/mindnote 不是可读散文，取料读不了，过滤掉。
+export async function searchDocs(query, { count = 10 } = {}) {
+  if (!query || !query.trim()) return [];
+  const d = await feishuFetch('/open-apis/suite/docs-api/search/object', {
+    method: 'POST',
+    body: { search_key: query.trim(), count, offset: 0 },
+  });
+  const ents = d?.docs_entities || [];
+  return ents
+    .filter(e => e.docs_type === 'docx' || e.docs_type === 'doc')
+    .map(e => ({
+      objType: 'docx',
+      feishuId: e.docs_token,
+      title: e.title || '(无标题文档)',
+      url: null,               // 搜索不返回 URL；「拉来读」按 token 直抓正文，不需要 URL
+      sourceName: '搜索',
+      extra: {},
+    }));
+}
+
 // 取 wiki 节点信息（含它挂的 obj_token）——粘 wiki 链接时用 node_token 解析出真实 docx
 export async function getWikiNode(nodeToken) {
   const d = await feishuFetch('/open-apis/wiki/v2/spaces/get_node', { query: { token: nodeToken } });

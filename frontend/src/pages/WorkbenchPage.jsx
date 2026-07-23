@@ -404,6 +404,13 @@ export default function WorkbenchPage() {
       return json.data || []
     } catch (err) { showToast(`飞书读取失败：${err.message}`); return [] }
   }
+  const searchFeishu = async (q) => {
+    try {
+      const json = await api(`/api/feishu/search?q=${encodeURIComponent(q)}`)
+      if (!json.success) { showToast(json.error || '飞书搜索失败'); return [] }
+      return json.data || []
+    } catch (err) { showToast(`飞书搜索失败：${err.message}`); return [] }
+  }
   const analyzeFeishu = async (item) => {
     showToast('正在从飞书抓取正文…')
     try {
@@ -787,7 +794,7 @@ export default function WorkbenchPage() {
 
   const pageProps = {
     showToast, contents, report, stories, ghTrending, notes, sources, topics, ideas, toggleStar,
-    selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile, pickFeishu, analyzeFeishu, syncing, syncAllSources,
+    selectedItems, toggleSelect, followSource, followingIds, acquire, uploadFile, pickFeishu, analyzeFeishu, searchFeishu, syncing, syncAllSources,
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea, dismissIdea, deleteIdea, saveIdea, loadIdeas,
     loadNotes, loadSources, loadTopics, loadBrief, setPage, setModal,
     notesTab, setNotesTab, toggleSelectNote,
