@@ -41,11 +41,15 @@ export function addMute({ sourceId = null, contentId = null } = {}) {
 }
 
 // 行业大事通道：事件簇 top（簇大小 × AIHOT 分 × 信任加权，全是代码里的数字）
+// 聚类窗是 30 天（覆盖跨天事件），但"今日必看"只要近 3 天还在更新的簇——否则月初大事一直霸榜。
+const INDUSTRY_FRESH_DAYS = 3;
 function industryPicks(stories, quota, muted) {
   const trustBoost = t => (t === 'T1' ? 1.3 : t === 'T1.5' ? 1.15 : 1);
   const tierTag = t => (t === 'T1' ? ' · 官方一手' : t === 'T1.5' ? ' · 官方号' : '');
+  const freshCut = Date.now() - INDUSTRY_FRESH_DAYS * 86400000;
   return stories
-    .filter(s => s.source_count >= 2 && s.members?.[0] && !muted.contents.has(s.members[0].id))
+    .filter(s => s.source_count >= 2 && s.members?.[0] && !muted.contents.has(s.members[0].id)
+      && tsMs(s.last_updated_at) >= freshCut)
     .map(s => {
       const p = s.members[0]; // 主条（getStories 已按信任档排序）
       const maxScore = Math.max(0, ...s.members.map(m => m.external_score || 0));

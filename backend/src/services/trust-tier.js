@@ -13,9 +13,9 @@
 
 // 官方一手域名（出现在 handle 的 feed URL / 原文域名里即判 T1）
 const OFFICIAL_DOMAINS = [
-  'openai.com', 'anthropic.com', 'blog.google', 'research.google', 'deepmind.google',
-  'deepmind.com', 'ai.meta.com', 'ai.googleblog.com', 'huggingface.co', 'mistral.ai',
-  'stability.ai', 'cohere.com', 'x.ai', 'blogs.nvidia.com', 'apple.com/newsroom',
+  'openai.com', 'anthropic.com', 'claude.com', 'claude.ai', 'blog.google', 'research.google',
+  'deepmind.google', 'deepmind.com', 'ai.meta.com', 'ai.googleblog.com', 'huggingface.co',
+  'mistral.ai', 'stability.ai', 'cohere.com', 'x.ai', 'blogs.nvidia.com', 'apple.com/newsroom',
   'databricks.com/blog', 'together.ai', 'scale.com/blog', 'runwayml.com',
   'deepseek.com', 'qwenlm.github.io', 'microsoft.com/en-us/research',
 ];
@@ -52,6 +52,20 @@ export function classifyTrustTier({ sourceType = '', platform = '', handle = '',
 
   // 默认 T2：KOL / 媒体 / 资讯站 / 个人
   return 'T2';
+}
+
+// 只按内容 URL 域名判官方一手（T1）——RSS 文章多无 source_id、拿不到源的 trust_tier，
+// 但 item.link 是真实原文域名（anthropic.com/news/…），据此补 T1。命中不了返回 null。
+export function officialDomainTier(url) {
+  const u = String(url || '').toLowerCase();
+  return OFFICIAL_DOMAINS.some(d => u.includes(d)) ? 'T1' : null;
+}
+
+// 内容的**有效信任档**：源档有值且非默认 T2 时用源档；否则看内容 URL 域名兜住官方一手。
+// 用于事件簇选主条 / 今日必看理由——让"无 source_id 的官方 RSS 文章"也能被认作 T1。
+export function effectiveTier(sourceTier, url) {
+  if (sourceTier && sourceTier !== 'T2') return sourceTier;
+  return officialDomainTier(url) || sourceTier || 'T2';
 }
 
 export const TRUST_TIERS = ['T1', 'T1.5', 'T2'];

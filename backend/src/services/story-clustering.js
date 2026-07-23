@@ -1,7 +1,7 @@
 import { getDatabase } from '../db/init.js';
 import { randomUUID } from 'crypto';
 import { embedBatch, cosine as vecCosine, MODEL_NAME } from './embeddings.js';
-import { TRUST_RANK } from './trust-tier.js';
+import { TRUST_RANK, effectiveTier } from './trust-tier.js';
 
 // Story 聚类（M2 洞察层，ADR-008；P1 层3 升级为 bge-m3 事件簇，ADR-040）：
 // 把近 N 天的 Feed 内容按"讲同一件事"聚成事件簇，主条按信任档选（官方 > 官方号 > KOL），
@@ -94,13 +94,40 @@ export function clusterByVectors(contents, byId, threshold = 0.80) {
       clusters.push({ memberIds: [content.id], centroid: v.slice(), n: 1 });
     }
   }
-  return clusters;
+
+  // 第二遍补挂：把落单条目（单成员簇）按**最终稳定质心**补进多成员簇。
+  // 为什么需要：贪心单遍受处理顺序影响——落单条目在簇还没聚全时先被判过，对某个单成员 <阈值
+  // 就自成一簇；但对去噪后的簇质心往往 ≥阈值（实测 Bun/苹果 HN 条目对成员 0.72-0.745、对质心 0.78-0.79）。
+  // 只把"单条并进大簇"、绝不合并两个大簇 → 召回上来了、精度不动（跨窗事件也靠这个补挂）。
+  const multi = clusters.filter(c => c.memberIds.length >= 2);
+  const singles = clusters.filter(c => c.memberIds.length === 1);
+  const leftover = [];
+  for (const s of singles) {
+    const v = byId.get(s.memberIds[0]);
+    let best = null, bestSim = threshold;
+    for (const c of multi) { const sim = vecCosine(v, c.centroid); if (sim > bestSim) { best = c; bestSim = sim; } }
+    if (best) {
+      best.memberIds.push(s.memberIds[0]);
+      const cen = best.centroid, n = best.n;
+      for (let k = 0; k < cen.length; k++) cen[k] = (cen[k] * n + v[k]) / (n + 1);
+      let nrm = 0; for (const x of cen) nrm += x * x; nrm = Math.sqrt(nrm) || 1;
+      for (let k = 0; k < cen.length; k++) cen[k] /= nrm;
+      best.n = n + 1;
+    } else leftover.push(s);
+  }
+  return [...multi, ...leftover];
 }
 
-// 簇内选主条：信任档优先（T1>T1.5>T2），同档比外部热度，再比新鲜度
+// 来源直接度（同信任档内二次序）：官方 RSS 直发 > AI HOT 聚合 > 其它。
+// 卡兹克"官方源 > 官方推 > 聚合/媒体"：伯南克簇里 aihot 和 rss 都指向 anthropic.com（都判 T1），
+// 但直发的 rss 才是"一手"，聚合站 aihot 只是转载——同档必须让 rss 当主条（验收点：簇C 主条须 rss）。
+const SRC_DIRECTNESS = { rss: 0, aihot: 1, hackernews: 2, active_query: 2 };
+
+// 簇内选主条：信任档优先（T1>T1.5>T2）→ 来源直接度 → 外部热度 → 新鲜度
 function pickPrimary(members) {
   return [...members].sort((a, b) =>
     (TRUST_RANK[a.trust_tier] ?? 9) - (TRUST_RANK[b.trust_tier] ?? 9) ||
+    (SRC_DIRECTNESS[a.source_app] ?? 3) - (SRC_DIRECTNESS[b.source_app] ?? 3) ||
     (b.external_score || 0) - (a.external_score || 0) ||
     (new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at))
   )[0];
@@ -117,10 +144,12 @@ function heatScore(members, now) {
 
 // 重建近 N 天的 stories（全删重建：聚类是派生数据，无需增量维护）。
 // 异步：需要给内容补 bge-m3 向量（增量，首轮较慢、之后缓存秒级）。
-export async function rebuildStories(days = 7, { threshold = 0.80 } = {}) {
+// 阈值默认 0.75：P1 返工三档 dump（docs/p1-cluster-dump-*.md）实测 0.75 命中金标准 8/8
+// 且反例零合并（0.80=5/8、0.85=2/8），暂定 0.75，待设计窗口最终裁决。
+export async function rebuildStories(days = 30, { threshold = 0.75 } = {}) {
   const db = getDatabase();
   const contents = db.prepare(`
-    SELECT c.id, c.zh_title, c.en_title, c.zh_summary, c.published_at, c.created_at,
+    SELECT c.id, c.zh_title, c.en_title, c.zh_summary, c.url, c.source_app, c.published_at, c.created_at,
            c.external_score, c.source_id, c.embedding, c.embedding_model,
            COALESCE(s.trust_tier, 'T2') AS trust_tier
     FROM contents c
@@ -128,6 +157,8 @@ export async function rebuildStories(days = 7, { threshold = 0.80 } = {}) {
     WHERE datetime(COALESCE(c.published_at, c.created_at)) > datetime('now', ?)
       AND c.source_app != 'github_trending'
   `).all(`-${days} days`);
+  // 有效信任档：无 source_id 的官方 RSS 文章靠 URL 域名补 T1（主条选择要用）
+  for (const c of contents) c.trust_tier = effectiveTier(c.trust_tier, c.url);
 
   const byId = await ensureContentEmbeddings(db, contents);
   const clusters = clusterByVectors(contents, byId, threshold).filter(c => c.memberIds.length >= 2);
@@ -140,20 +171,21 @@ export async function rebuildStories(days = 7, { threshold = 0.80 } = {}) {
     db.exec('DELETE FROM stories;');
 
     const insertStory = db.prepare(`
-      INSERT INTO stories (id, headline, centroid_embedding, heat_score, source_count, first_seen_at, last_updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO stories (id, headline, primary_content_id, centroid_embedding, heat_score, source_count, first_seen_at, last_updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertLink = db.prepare('INSERT INTO story_contents (story_id, content_id) VALUES (?, ?)');
 
     for (const cluster of clusters) {
       const members = cluster.memberIds.map(id => byContent.get(id));
-      const rep = pickPrimary(members); // 主条：信任档优先
+      const rep = pickPrimary(members); // 主条：信任档优先（含 URL 域名补的 T1）
       const times = members.map(m => m.published_at || m.created_at).sort();
 
       const storyId = randomUUID();
       insertStory.run(
         storyId,
         rep.zh_title || rep.en_title || '(无标题)',
+        rep.id,                                    // 主条落库（primary_content_id）
         JSON.stringify(cluster.centroid),
         heatScore(members, now),
         members.length,
@@ -194,7 +226,11 @@ export function getStories(limit = 10) {
   `);
   for (const story of stories) {
     const members = memberStmt.all(story.id);
+    for (const m of members) m.trust_tier = effectiveTier(m.trust_tier, m.url); // 官方 RSS 补 T1
+    // 落库的主条排最前（primary_content_id 为准），其余按信任档/热度
+    const pid = story.primary_content_id;
     members.sort((a, b) =>
+      (b.id === pid) - (a.id === pid) ||
       (TRUST_RANK[a.trust_tier] ?? 9) - (TRUST_RANK[b.trust_tier] ?? 9) ||
       (b.external_score || 0) - (a.external_score || 0)
     );

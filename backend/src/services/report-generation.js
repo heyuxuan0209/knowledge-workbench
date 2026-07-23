@@ -83,9 +83,9 @@ ${registeredBlock}
 - 全部用中文`;
 }
 
-export async function generateDailyReport({ days = 7 } = {}) {
-  // 先重建聚类（bge-m3 事件簇），保证日报基于最新数据；首轮补嵌入稍慢、之后缓存
-  await rebuildStories(days);
+export async function generateDailyReport({ days = 7 } = {}) { // eslint-disable-line no-unused-vars
+  // 先重建聚类（bge-m3 事件簇，默认 30 天窗覆盖跨天事件 + 0.75 阈值）；首轮补嵌入稍慢、之后缓存
+  await rebuildStories();
 
   const db = getDatabase();
   const { stories, registeredContents } = gatherInputs(db);
