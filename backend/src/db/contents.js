@@ -1,5 +1,6 @@
 import { getDatabase } from './init.js';
 import { randomUUID } from 'crypto';
+import { classifyTrustTier } from '../services/trust-tier.js';
 
 // 找到或创建 Source（按 platform+handle 判重，同一个人重复出现时复用已有记录）。
 // sourceInfo 为空（无法识别作者，如 RSS 媒体源）时返回 null，content.source_id 留空。
@@ -15,10 +16,12 @@ function findOrCreateSource(db, sourceInfo) {
   if (existing) return existing.source_id;
 
   const sourceId = randomUUID();
+  // trust_tier（P1 层2）：新源入库即定信任档（官方一手/官方号/KOL），喂事件簇选主条与必看理由
+  const tier = classifyTrustTier({ sourceType: 'Person', platform: sourceInfo.platform, handle: sourceInfo.handle, displayName: sourceInfo.displayName });
   db.prepare(`
-    INSERT INTO sources (id, source_type, display_name, followed_since, status)
-    VALUES (?, 'Person', ?, datetime('now'), 'active')
-  `).run(sourceId, sourceInfo.displayName);
+    INSERT INTO sources (id, source_type, display_name, followed_since, status, trust_tier)
+    VALUES (?, 'Person', ?, datetime('now'), 'active', ?)
+  `).run(sourceId, sourceInfo.displayName, tier);
 
   // AI HOT 覆盖到的内容按 ADR-007 定为 passive（纯被动，等 AI HOT 推送，零额外成本）
   db.prepare(`

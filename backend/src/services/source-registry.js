@@ -1,5 +1,6 @@
 import { getDatabase } from '../db/init.js';
 import { randomUUID } from 'crypto';
+import { classifyTrustTier } from './trust-tier.js';
 
 // 优质源登记处（ADR-007）：丢入 X 链接 / YouTube 链接 / 网页链接 / 公众号名称 → 自动识别身份 → 登记。
 // 登记后的效果只有两个：该源内容进 Feed + 高权重排序（getContents 加权）。不是订阅系统。
@@ -422,10 +423,12 @@ export function registerSource(identified) {
       db.prepare("UPDATE sources SET registered_by_user = 1, updated_at = datetime('now') WHERE id = ?").run(sourceId);
     } else {
       sourceId = randomUUID();
+      // trust_tier（P1 层2）：登记即定信任档；handle 兜不住时用 feed/站点 URL 兜住官方域名
+      const tier = classifyTrustTier({ sourceType, platform, handle: handle || feedUrl || siteUrl, displayName });
       db.prepare(`
-        INSERT INTO sources (id, source_type, display_name, registered_by_user, status)
-        VALUES (?, ?, ?, 1, 'active')
-      `).run(sourceId, sourceType, displayName);
+        INSERT INTO sources (id, source_type, display_name, registered_by_user, status, trust_tier)
+        VALUES (?, ?, ?, 1, 'active', ?)
+      `).run(sourceId, sourceType, displayName, tier);
       db.prepare(`
         INSERT INTO source_platforms (source_id, platform, handle, track_mode, platform_metadata)
         VALUES (?, ?, ?, ?, ?)
