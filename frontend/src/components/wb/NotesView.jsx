@@ -593,6 +593,13 @@ export default function NotesView({
           if (!long) return <div className="wb-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(note.excerpt) }} />
           return (
             <div>
+              {/* 展开时顶部也放一个收起条（sticky）——长文不用滚到底才能收起（P0-4） */}
+              {open && (
+                <button className="wb-note-jump" onClick={() => toggleExpand(note.id)}
+                  style={{ padding: '3px 0', marginBottom: 6, position: 'sticky', top: 0, zIndex: 2, background: 'var(--surface)', display: 'block', width: '100%', textAlign: 'left' }}>
+                  收起 ▴
+                </button>
+              )}
               {open
                 ? <div className="wb-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(note.excerpt) }} />
                 : <div className="wb-note-excerpt">{plainPreview(note.excerpt, 180)}…</div>}
