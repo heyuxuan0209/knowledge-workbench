@@ -54,6 +54,27 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       try { const j = await api('/api/materials'); setMats(j.data || []) } catch { /* 静默 */ }
     })()
   }, [v2Mode])
+  // 断链修复（P0-1）：从主题「开始创作」进来 → 预取该主题下已归位素材并自动勾选，
+  // 透明标注"已带主题《X》的 N 条，可增减"。每个 sourceTopicId 只带一次，用户之后增减不覆盖。
+  const [topicPreload, setTopicPreload] = useState(null) // { name, count }
+  const preloadedTopicRef = useRef(null)
+  useEffect(() => {
+    if (!v2Mode) return
+    const tid = studio.sourceTopicId
+    if (!tid) { preloadedTopicRef.current = null; setTopicPreload(null); return }
+    if (preloadedTopicRef.current === tid) return
+    preloadedTopicRef.current = tid
+    ;(async () => {
+      try {
+        const j = await api(`/api/topics/${tid}/materials`)
+        const list = j.data || []
+        if (!list.length) { setTopicPreload(null); return }
+        setMats(prev => { const have = new Set(prev.map(m => m.id)); return [...list.filter(m => !have.has(m.id)), ...prev] })
+        setSelMat(new Set(list.map(m => m.id)))
+        setTopicPreload({ name: String(studio.source || '').replace(/^Topic：/, '').trim() || '该主题', count: list.length })
+      } catch { /* 静默：拉不到就退回手选 */ }
+    })()
+  }, [studio.sourceTopicId, v2Mode])
   const toggleMat = id => setSelMat(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   // A+：缺素材当场「+新增」写进 notes 库；起稿后某条素材可「插入」正文（不重新生成）
   const [addOpen, setAddOpen] = useState(false)
@@ -301,6 +322,11 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               <button onClick={() => setAddOpen(o => !o)} title="新增一条素材到素材库" style={{ marginLeft: 'auto', border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--accent)', borderRadius: 6, padding: '2px 8px', fontSize: 11.5, cursor: 'pointer' }}>+ 新增</button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 8 }}>从素材库挑（按收藏时间排），勾中的才用来起稿；缺就点「+新增」</div>
+            {topicPreload && (
+              <div style={{ marginBottom: 8, padding: '6px 9px', fontSize: 11.5, lineHeight: 1.5, color: 'var(--accent)', background: 'rgba(61,90,128,.07)', border: '1px solid rgba(61,90,128,.2)', borderRadius: 7 }}>
+                已带上主题《{topicPreload.name}》的 {topicPreload.count} 条素材，可增减
+              </div>
+            )}
             <input value={matQ} onChange={e => setMatQ(e.target.value)} placeholder="搜索素材…"
               style={{ width: '100%', marginBottom: 8, padding: '6px 10px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)' }} />
             {addOpen && (

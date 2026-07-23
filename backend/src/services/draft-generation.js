@@ -60,13 +60,20 @@ export function recommendForMaterials(noteIds) {
 }
 
 // 供前端勾选用：列出某主题的已并入素材（id + 短摘要 + 来源）
+// 创作台预勾选用（P0#2）：带出用户归入该主题的**全部**素材，不只 assimilated——
+// 归入即"我要用它写"，pending（还没并进综述）也是这个主题的料。库里 pending 数量远多于
+// assimilated（实测 128 vs 84），只取 assimilated 会让预勾选大面积落空、甚至为 0。
+// 排序：已并进综述的排前（assimilated_at），其余按归入时间（created_at）。
+// 注意：真正生成初稿时 generateFromTopicV2 仍只喂 assimilated（那是"进综述的料"，口径不同）。
 export function listTopicMaterials(topicId) {
   const db = getDatabase();
   const rows = db.prepare(`
-    SELECT n.id, n.excerpt, n.source_title, n.source_url
+    SELECT n.id, n.excerpt, n.source_title, n.source_url, nt.status
     FROM note_topics nt JOIN notes n ON nt.note_id = n.id
-    WHERE nt.topic_id = ? AND nt.status = 'assimilated'
-    ORDER BY nt.assimilated_at DESC LIMIT 30
+    WHERE nt.topic_id = ?
+    ORDER BY (nt.status = 'assimilated') DESC,
+             COALESCE(nt.assimilated_at, nt.created_at, '') DESC
+    LIMIT 40
   `).all(topicId);
   db.close();
   return rows.map(r => ({ id: r.id, excerpt: (r.excerpt || '').slice(0, 90), sourceTitle: r.source_title || '未命名素材', sourceUrl: r.source_url || null }));
