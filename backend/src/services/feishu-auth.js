@@ -38,9 +38,18 @@ export async function getTenantAccessToken() {
 }
 
 // 统一的飞书 API 调用：自动带 token、拼 query、解析 { code, msg, data }。
+// preferUser=true：优先用【用户授权令牌】（取料读个人文档用），没连接/失败则退回应用令牌（读共享文档）。
+// 私信机器人（收发消息）不传 preferUser，始终用应用身份。
 // code!==0 抛出带 code/msg 的错误（上层可按 code 区分权限不足 vs 资源不存在，给用户具体指引）。
-export async function feishuFetch(path, { method = 'GET', query = null, body = null } = {}) {
-  const token = await getTenantAccessToken();
+export async function feishuFetch(path, { method = 'GET', query = null, body = null, preferUser = false } = {}) {
+  let token = null;
+  if (preferUser) {
+    try {
+      const { getUserAccessTokenIfConnected } = await import('./feishu-user-auth.js');
+      token = await getUserAccessTokenIfConnected();
+    } catch { /* 退回应用令牌 */ }
+  }
+  if (!token) token = await getTenantAccessToken();
   const url = new URL(feishuBase() + path);
   if (query) for (const [k, v] of Object.entries(query)) if (v != null) url.searchParams.set(k, v);
   const res = await fetch(url, {

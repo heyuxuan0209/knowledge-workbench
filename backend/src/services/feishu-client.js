@@ -18,7 +18,7 @@ const num = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n
 
 // 根目录 token（drive 列文件需要 folder_token；空 token 部分租户会报错，故显式取根）
 async function rootFolderToken() {
-  const d = await feishuFetch('/open-apis/drive/explorer/v2/root_folder/meta');
+  const d = await feishuFetch('/open-apis/drive/explorer/v2/root_folder/meta', { preferUser: true });
   return d?.token || null;
 }
 
@@ -26,7 +26,7 @@ async function rootFolderToken() {
 export async function listDocs({ pageSize = 20 } = {}) {
   const folder = process.env.FEISHU_DOC_FOLDER_TOKEN || (await rootFolderToken());
   const d = await feishuFetch('/open-apis/drive/v1/files', {
-    query: { folder_token: folder, page_size: num(pageSize, 20) },
+    query: { folder_token: folder, page_size: num(pageSize, 20) }, preferUser: true,
   });
   const files = d?.files || [];
   return files
@@ -44,12 +44,12 @@ export async function listDocs({ pageSize = 20 } = {}) {
 
 // 抓文档正文纯文本。raw_content 直接返回文本（需应用被加为该文档协作者，否则 403/权限错误）。
 export async function getDocxText(documentId) {
-  const d = await feishuFetch(`/open-apis/docx/v1/documents/${documentId}/raw_content`);
+  const d = await feishuFetch(`/open-apis/docx/v1/documents/${documentId}/raw_content`, { preferUser: true });
   return d?.content || '';
 }
 
 export async function getDocxTitle(documentId) {
-  const d = await feishuFetch(`/open-apis/docx/v1/documents/${documentId}`);
+  const d = await feishuFetch(`/open-apis/docx/v1/documents/${documentId}`, { preferUser: true });
   return d?.document?.title || null;
 }
 
@@ -57,14 +57,14 @@ export async function getDocxTitle(documentId) {
 // 无列表接口。按单条 minute_token 取信息 + 文字记录。token 通常从妙记 URL 里解析。
 
 export async function getMinuteInfo(minuteToken) {
-  const d = await feishuFetch(`/open-apis/minutes/v1/minutes/${minuteToken}`);
+  const d = await feishuFetch(`/open-apis/minutes/v1/minutes/${minuteToken}`, { preferUser: true });
   return d?.minute || d || null;
 }
 
 export async function getMinuteText(minuteToken) {
   // 文字记录接口：GET /open-apis/minutes/v1/minutes/{token}/transcript（需 minutes:minutes:readonly）
   try {
-    const d = await feishuFetch(`/open-apis/minutes/v1/minutes/${minuteToken}/transcript`);
+    const d = await feishuFetch(`/open-apis/minutes/v1/minutes/${minuteToken}/transcript`, { preferUser: true });
     // 不同租户返回结构略异：优先 data.transcript（纯文本）；否则拼 sentence 列表
     if (typeof d?.transcript === 'string') return d.transcript;
     if (Array.isArray(d?.sentences)) return d.sentences.map(s => s.content || s.text || '').join('\n');
@@ -135,14 +135,14 @@ function extractMessageText(m) {
 // ---------- 知识库 wiki ----------
 
 export async function listWikiSpaces({ pageSize = 20 } = {}) {
-  const d = await feishuFetch('/open-apis/wiki/v2/spaces', { query: { page_size: num(pageSize, 20) } });
+  const d = await feishuFetch('/open-apis/wiki/v2/spaces', { query: { page_size: num(pageSize, 20) }, preferUser: true });
   return (d?.items || []).map(s => ({ spaceId: s.space_id, name: s.name || '(未命名知识库)' }));
 }
 
 // 列一个空间的节点（每个 wiki 节点挂着一个真实对象 obj_token，通常是 docx）。
 export async function listWikiNodes(spaceId, { pageSize = 30 } = {}) {
   const d = await feishuFetch(`/open-apis/wiki/v2/spaces/${spaceId}/nodes`, {
-    query: { page_size: num(pageSize, 30) },
+    query: { page_size: num(pageSize, 30) }, preferUser: true,
   });
   return (d?.items || [])
     .filter(n => n.obj_type === 'docx' || n.obj_type === 'doc')
@@ -168,7 +168,7 @@ export async function searchDocs(query, { count = 10 } = {}) {
   if (!query || !query.trim()) return [];
   const d = await feishuFetch('/open-apis/suite/docs-api/search/object', {
     method: 'POST',
-    body: { search_key: query.trim(), count, offset: 0 },
+    body: { search_key: query.trim(), count, offset: 0 }, preferUser: true,
   });
   const ents = d?.docs_entities || [];
   return ents
@@ -185,7 +185,7 @@ export async function searchDocs(query, { count = 10 } = {}) {
 
 // 取 wiki 节点信息（含它挂的 obj_token）——粘 wiki 链接时用 node_token 解析出真实 docx
 export async function getWikiNode(nodeToken) {
-  const d = await feishuFetch('/open-apis/wiki/v2/spaces/get_node', { query: { token: nodeToken } });
+  const d = await feishuFetch('/open-apis/wiki/v2/spaces/get_node', { query: { token: nodeToken }, preferUser: true });
   return d?.node || null;
 }
 

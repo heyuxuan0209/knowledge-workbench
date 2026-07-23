@@ -920,12 +920,14 @@ app.get('/api/feishu/status', async (req, res) => {
     const { feishuConfigured, feishuBase } = await import('./services/feishu-auth.js');
     const { pendingCount } = await import('./db/feishu-inbox.js');
     const { feishuBotStarted } = await import('./services/feishu-bot.js');
+    const { feishuUserConnected } = await import('./services/feishu-user-auth.js');
     res.json({
       success: true,
       data: {
         configured: feishuConfigured(),
         base: feishuBase(),
-        botStarted: feishuBotStarted(),   // 私信机器人长连接是否已起
+        botStarted: feishuBotStarted(),        // 私信机器人长连接是否已起
+        userConnected: feishuUserConnected(),  // 是否已完成用户授权（取料能读你个人文档）
         pending: feishuConfigured() ? pendingCount() : 0,
       },
     });
@@ -971,6 +973,46 @@ app.get('/api/feishu/pick', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// ---- 飞书用户授权 OAuth（ADR-039 · 取料读个人文档）----
+// 个人版飞书不让把应用加协作者 → 走用户授权，以你身份读你能看到的一切。redirect_uri 用 localhost。
+app.get('/api/feishu/oauth/start', async (req, res) => {
+  try {
+    const { authorizeUrl } = await import('./services/feishu-user-auth.js');
+    res.redirect(authorizeUrl('kw'));
+  } catch (error) {
+    res.status(500).send('飞书授权发起失败：' + error.message);
+  }
+});
+app.get('/api/feishu/oauth/callback', async (req, res) => {
+  const { code, error, error_description } = req.query || {};
+  const page = (title, body, ok) => `<!doctype html><meta charset="utf-8"><body style="font-family:-apple-system,PingFang SC,sans-serif;max-width:520px;margin:60px auto;text-align:center;color:#332f27">
+    <div style="font-size:44px">${ok ? '✅' : '⚠️'}</div>
+    <h2 style="color:${ok ? '#3f7350' : '#a24b3f'}">${title}</h2><p style="color:#706b60;line-height:1.7">${body}</p>
+    <p style="color:#8a8478;font-size:13px">这个页面可以关掉，回工作台的「灵感」页刷新即可。</p></body>`;
+  if (error) return res.status(400).send(page('授权未完成', `飞书返回：${error} ${error_description || ''}`, false));
+  if (!code) return res.status(400).send(page('授权未完成', '没拿到授权码，请重试。', false));
+  try {
+    const { exchangeCode } = await import('./services/feishu-user-auth.js');
+    await exchangeCode(code);
+    res.send(page('已连接飞书', '现在工作台能以你的身份读你飞书里的文档了——粘链接 / 搜索 / 拉来读 都能读你的个人文档。', true));
+  } catch (e) {
+    res.status(500).send(page('连接失败', e.message + '<br>多半是重定向 URL 没配对，或云文档读权限没开/没发版。', false));
+  }
+});
+app.get('/api/feishu/oauth/status', async (req, res) => {
+  try {
+    const { feishuUserConnected } = await import('./services/feishu-user-auth.js');
+    res.json({ success: true, data: { connected: feishuUserConnected() } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/feishu/oauth/disconnect', async (req, res) => {
+  try {
+    const { disconnect } = await import('./services/feishu-user-auth.js');
+    disconnect();
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
 // 从飞书门·搜索 tab：飞书原生全文搜索（覆盖整个飞书、实时）。返回与 pick 同 shape，可直接「拉来读」。

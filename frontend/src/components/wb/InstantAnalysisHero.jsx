@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { IconFeishu } from './Icons'
+import { api } from './util'
 
 // 即时分析入口（ADR-029 + ADR-039 简化版）——「消化一个东西 → AI 读懂 → 存素材」。
 // 来源三选一、都带字：🔗粘链接/文字 · 📎传文件 · 飞 从飞书。飞书只给一个门（避免"粘链接里有飞书、旁边又有从飞书"撞车）：
@@ -20,6 +21,7 @@ export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, a
   const [fsQuery, setFsQuery] = useState('') // 搜索框
   const [fsResults, setFsResults] = useState(null) // null=没搜（显示最近）/ []=搜了没结果 / [...]
   const [fsSearching, setFsSearching] = useState(false)
+  const [fsConnected, setFsConnected] = useState(null) // 用户授权状态：null未知/true已连/false未连
 
   const onFileChosen = async (file) => {
     if (!file || !uploadFile) return
@@ -42,10 +44,13 @@ export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, a
     setSrc(s)
     if (s === 'link') setTimeout(() => inputRef.current?.focus(), 0)
     if (s === 'file') fileInputRef.current?.click()
-    if (s === 'feishu' && fsList === null && pickFeishu) {
-      setFsLoading(true)
-      try { setFsList(await pickFeishu()) } catch { setFsList([]) }
-      setFsLoading(false)
+    if (s === 'feishu') {
+      api('/api/feishu/oauth/status').then(j => setFsConnected(!!j.data?.connected)).catch(() => {})
+      if (fsList === null && pickFeishu) {
+        setFsLoading(true)
+        try { setFsList(await pickFeishu()) } catch { setFsList([]) }
+        setFsLoading(false)
+      }
     }
   }
   const pickOne = async (item) => {
@@ -130,7 +135,15 @@ export default function InstantAnalysisHero({ acquire, uploadFile, pickFeishu, a
                 <span className="wb-src-fs"><IconFeishu size={17} /></span>
                 <b>从飞书找一篇</b>
                 <span className="sub2">— 搜你整个飞书（实时），或看最近；知道链接就直接粘到上面输入框</span>
+                {fsConnected === true && <span className="wb-fs-connected">已连接你的飞书 ✓</span>}
               </div>
+              {fsConnected === false && (
+                <div className="wb-fs-connectbar">
+                  <span>只连了应用、读不到你的个人文档。<b>连接你的飞书</b>后，凡是你能看到的文档都能读。</span>
+                  <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
+                    onClick={() => window.open('/api/feishu/oauth/start', '_blank')}>连接飞书 →</button>
+                </div>
+              )}
               <div className="wb-fsdoor-search">
                 <input value={fsQuery}
                   onChange={(e) => setFsQuery(e.target.value)}
