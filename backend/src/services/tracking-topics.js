@@ -145,26 +145,46 @@ export async function suggestTrackingCandidates({ limit = 3 } = {}) {
   const db = getDatabase();
   const existing = db.prepare("SELECT name, aliases FROM tracking_topics WHERE archived=0").all();
   const exNames = new Set(existing.flatMap(t => [normEntity(t.name), ...JSON.parse(t.aliases || '[]').map(normEntity)]));
-  // 行为文本：近 60 天星标内容标题 + 素材标题
-  const behav = db.prepare(`
-    SELECT COALESCE(zh_title,en_title) t FROM contents WHERE starred=1 AND datetime(COALESCE(updated_at,created_at))>datetime('now','-60 days')
-    UNION ALL SELECT COALESCE(title,source_title) t FROM notes WHERE datetime(created_at)>datetime('now','-60 days')`).all().map(r => r.t).filter(Boolean).slice(0, 40);
-  // 近期大簇的 headline（事件级）
+  // 行为条目（带 id，供"依据条目清单"点跳）：近 60 天星标内容 + 存下的素材
+  const behav = [
+    ...db.prepare(`SELECT id, COALESCE(zh_title,en_title) title, 'content' kind FROM contents WHERE starred=1 AND datetime(COALESCE(updated_at,created_at))>datetime('now','-60 days')`).all(),
+    ...db.prepare(`SELECT id, COALESCE(title,source_title) title, 'note' kind FROM notes WHERE datetime(created_at)>datetime('now','-60 days')`).all(),
+  ].filter(x => x.title).slice(0, 50);
   const clusters = db.prepare("SELECT headline FROM stories WHERE source_count>=3 ORDER BY heat_score DESC LIMIT 12").all().map(r => r.headline);
-  db.close();
-  if (!behav.length && !clusters.length) return [];
-  const prompt = `根据用户近期的真实动作（下面是他星标/存下的内容标题）和当下的热点事件，提议 ${limit} 个**值得长期追踪的话题/实体**（如某公司、某产品线、某技术方向）。
-- 只提"以某个实体/话题为主角、会持续有新进展"的（能织成脉络的），别提一次性事件。
-- 每个给 name（简洁实体名）+ aliases（3-6 个别名/相关词）+ why（一句：为什么根据他的行为值得追）。
-- 不要提这些已在追踪的：${[...exNames].slice(0, 20).join('、') || '（无）'}
-【用户星标/素材】${behav.join('｜').slice(0, 1500)}
-【近期热点】${clusters.join('｜').slice(0, 600)}
-只输出 JSON：{"candidates":[{"name":"...","aliases":["..."],"why":"..."}]}`;
+  if (!behav.length && !clusters.length) { db.close(); return []; }
+  const behavList = behav.map((b, i) => `${i}. ${b.title}`).join('\n');
+  const prompt = `根据用户近期的真实动作（下面编号的星标/存下内容）和当下热点，提议 ${limit} 个**值得长期追踪的话题/实体**（公司/产品线/技术方向）。
+- 只提"以某实体/话题为主角、会持续有新进展"的（能织成脉络），别提一次性事件。
+- 每个给 name（简洁实体名）+ aliases（3-6 个别名/相关词）+ why（完整说清为什么根据他的行为值得追，两三句别怕长）+
+  evidence（**你据以推断的条目序号数组**，就是下面编号里支撑这个话题的那几条）。
+- 不要提已在追踪的：${[...exNames].slice(0, 20).join('、') || '（无）'}
+【用户星标/素材（带序号）】
+${behavList.slice(0, 1800)}
+【近期热点】${clusters.join('｜').slice(0, 500)}
+只输出 JSON：{"candidates":[{"name":"...","aliases":["..."],"why":"...","evidence":[0,3]}]}`;
   const r = await chat([{ role: 'user', content: prompt }]);
   const arr = r.success && extractJson(r.content)?.candidates;
-  if (!Array.isArray(arr)) return [];
-  return arr.filter(c => c?.name && !exNames.has(normEntity(c.name))).slice(0, limit)
-    .map(c => ({ name: String(c.name).slice(0, 40), aliases: Array.isArray(c.aliases) ? c.aliases.slice(0, 6) : [], why: String(c.why || '').slice(0, 60) }));
+  if (!Array.isArray(arr)) { db.close(); return []; }
+  const out = [];
+  for (const c of arr) {
+    if (!c?.name || exNames.has(normEntity(c.name))) continue;
+    const aliases = Array.isArray(c.aliases) ? c.aliases.slice(0, 6) : [];
+    const terms = [c.name, ...aliases].map(normEntity).filter(Boolean);
+    // 依据条目 = LLM 自己引的序号（保证与理由一致）；漏引则回退到词面命中
+    let evidence = (Array.isArray(c.evidence) ? c.evidence : []).filter(i => Number.isInteger(i) && i >= 0 && i < behav.length)
+      .map(i => ({ id: behav[i].id, kind: behav[i].kind, title: behav[i].title }));
+    if (!evidence.length) evidence = behav.filter(b => { const t = normEntity(b.title); return terms.some(x => x.length > 2 && t.includes(x)); }).slice(0, 5).map(b => ({ id: b.id, kind: b.kind, title: b.title }));
+    evidence = evidence.slice(0, 6);
+    // 预计"过去 31 天此话题约 N 条"：31 天内标题/摘要词面命中任一 alias 的内容数
+    const like = terms.map(() => "(lower(COALESCE(c.zh_title,'')||COALESCE(c.zh_summary,'')||COALESCE(c.en_title,'')) LIKE ?)").join(' OR ');
+    const estimate = terms.length
+      ? db.prepare(`SELECT COUNT(*) n FROM contents c WHERE source_app!='github_trending' AND datetime(COALESCE(published_at,created_at))>datetime('now','-31 days') AND (${like})`).get(...terms.map(t => `%${t}%`)).n
+      : 0;
+    out.push({ name: String(c.name).slice(0, 40), aliases, reason: String(c.why || '').trim(), evidence, estimate });
+    if (out.length >= limit) break;
+  }
+  db.close();
+  return out;
 }
 
 // ① 成员判定：向量召回 + LLM aboutness（主角性）

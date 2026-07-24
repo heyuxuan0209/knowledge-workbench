@@ -15,7 +15,7 @@ const PHASE = {
   archived: { label: '已归档', fg: '#706b60', bg: 'rgba(33,31,26,.08)' },
 }
 
-export default function TopicsView({ topics, loadTopics, topicView, setTopicView, activeTopic, setActiveTopic, setPage, setStudio, showToast, returnPage, goBack, gotoTracking }) {
+export default function TopicsView({ topics, loadTopics, topicView, setTopicView, activeTopic, setActiveTopic, setPage, setStudio, showToast, returnPage, goBack, gotoTracking, gotoNote }) {
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
 
@@ -23,6 +23,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
   const [tracking, setTracking] = useState([])
   const [newTrack, setNewTrack] = useState('')
   const [candidates, setCandidates] = useState([])  // AI 提议候选（收尾④）
+  const [candOpen, setCandOpen] = useState(null)     // 展开的提议（看全理由+依据+范围+预计）
   const [trackMenu, setTrackMenu] = useState(null)   // 卡片 ⋯ 菜单打开的 id
   const loadTracking = () => api('/api/tracking-topics').then(j => setTracking(j.data || [])).catch(() => {})
   const dismissedCand = () => { try { return JSON.parse(localStorage.getItem('wb-track-cand-dismissed') || '[]') } catch { return [] } }
@@ -136,14 +137,38 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
 
       {candidates.length > 0 && (
         <div className="tk-propose">
-          <div className="pt">💡 AI 提议 · 供你裁决<span style={{ color: 'var(--faint)', fontWeight: 400 }}>（看你近期在关注的，要不要长期追？拒绝后不再提）</span></div>
-          {candidates.map(c => (
-            <div key={c.name} className="prow">
-              <b>{c.name}</b><span className="why">{c.why}</span>
-              <button className="yes" onClick={() => adoptCandidate(c)}>要，开始追踪</button>
-              <button className="no" onClick={() => dismissCandidate(c)}>不要</button>
-            </div>
-          ))}
+          <div className="pt">💡 AI 提议 · 供你裁决<span style={{ color: 'var(--faint)', fontWeight: 400 }}>（依据你的星标/精读，要不要长期追？点一行看全部依据；拒绝后不再提）</span></div>
+          {candidates.map(c => {
+            const open = candOpen === c.name
+            return (
+              <div key={c.name} className="pitem">
+                <div className="phead" onClick={() => setCandOpen(open ? null : c.name)}>
+                  <b>{c.name}</b>
+                  <span className="why2">{c.reason}</span>
+                  <span className="pchev">{open ? '收起 ▴' : '展开 ▾'}</span>
+                  <button className="yes" onClick={(e) => { e.stopPropagation(); adoptCandidate(c) }}>要，开始追踪</button>
+                  <button className="no" onClick={(e) => { e.stopPropagation(); dismissCandidate(c) }}>不要</button>
+                </div>
+                {open && (
+                  <div className="pbody">
+                    <div className="prow2"><span className="k">为什么推给你</span><span className="v">{c.reason}</span></div>
+                    {c.evidence?.length > 0 && (
+                      <div className="prow2"><span className="k">依据这几条（你收藏/存过）</span>
+                        <span className="v">{c.evidence.map(e => (
+                          <span key={e.id} className="ev" onClick={() => e.kind === 'note' ? gotoNote?.(e.id) : setPage?.('feed')} title={e.kind === 'note' ? '去素材卡' : '去资讯'}>· {e.title.slice(0, 34)}</span>
+                        ))}</span>
+                      </div>
+                    )}
+                    <div className="prow2"><span className="k">将追踪的范围（可微调）</span>
+                      <span className="v">{[c.name, ...(c.aliases || [])].map(a => <span key={a} className="tk-chip" style={{ marginRight: 5 }}>{a}</span>)}</span>
+                    </div>
+                    <div className="prow2"><span className="k">预计规模</span><span className="v">过去 31 天此话题约 <b>{c.estimate || 0}</b> 条（建后自动收录归线）</span></div>
+                    <div style={{ marginTop: 8 }}><button className="yes" onClick={() => adoptCandidate(c)}>要，开始追踪</button> <button className="no" style={{ marginLeft: 6 }} onClick={() => dismissCandidate(c)}>不要，别再提</button></div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
