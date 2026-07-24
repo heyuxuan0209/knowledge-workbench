@@ -241,6 +241,47 @@ export async function generateFromTopicV2(topicId, genreKey, platformFormKey, vi
   return draft;
 }
 
+// ── ADR-046 出片：母稿 → 各平台形态「适配稿」（不落库，返回文本供前端看/改/渲染）──
+// 与 generateFromDraft 的区别：那条把用户原稿重塑成一份成稿并落库；这条是「出片」阶段
+// 把已定稿的母稿（最厚版）压成某个平台形态的适配稿，一稿多形态、按需生成、不进草稿箱。
+// 每个平台形态自带一个合适的内建文体（form→genre），平台形态的 spec 决定结构与体量。
+const FORM_GENRE = {
+  'gzh-long': '读书精读体',
+  'xhs-long': '读书精读体',
+  'xhs-card': '一句话提炼体',
+  'douyin-card': '一句话提炼体',
+  'douyin-koubo': '实践复盘体',
+  'bilibili': '方法教程体',
+  'x-short': '一句话提炼体',
+  'x-thread': '思辨辨析体',
+  'jike': '一句话提炼体',
+  'reddit': '思辨辨析体',
+};
+
+export async function adaptDraftToForm(draftText, platformFormKey, viewpoint = null, genreOverride = null) {
+  const src = String(draftText || '').trim();
+  if (src.length < 10) throw new Error('母稿太短，无法适配——先在②定稿把母稿写好');
+  const genreKey = genreOverride || FORM_GENRE[platformFormKey] || '读书精读体';
+  const genre = getGenre(genreKey);          // 未知文体在此抛错
+  const pform = getPlatformForm(platformFormKey);
+
+  const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
+  const exemption = `【母稿适配·ADR-046】下面「母稿」是已定稿的最厚版本。请把它压缩/改写成符合「${pform.label}」平台形态的适配稿：**保留母稿的核心观点、事实与例子**，按目标形态的结构与体量重新组织；不要新增未提供的事实/数据、不要编造。这是作者自己的内容，无需 [素材N] 溯源标记。\n\n`;
+  const stanceBlock = viewpoint?.trim()
+    ? render(loadPrompt('stance-with.md'), { viewpoint: viewpoint.trim() })
+    : loadPrompt('stance-without.md');
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+
+  const prompt = `${composedSpec}\n\n---\n\n${stanceBlock}\n\n---\n\n【母稿】\n${src.slice(0, 8000)}\n\n---\n\n现在把「母稿」适配成一篇符合上面平台形态的成稿。\n**只输出成稿本身**：不要复述文体名/平台名、不要「XX体 · XX版」这类规格性小标题、不要任何前言或解释。第一行直接是成稿的开头。`;
+
+  const result = await chat([{ role: 'user', content: prompt }]);
+  if (!result.success) throw new Error(`LLM 调用失败: ${result.error}`);
+  const text = result.content.trim();
+  const title = text.split('\n')[0].replace(/^#+\s*/, '').slice(0, 80);
+  console.log(`✅ 适配稿 ${genre.label}×${pform.label}, ¥${result.cost?.toFixed(4)}`);
+  return { platformForm: platformFormKey, formLabel: pform.label, genre: genreKey, title, body: text, cost: result.cost || 0, tokens: result.tokens || 0 };
+}
+
 // ── ADR-028 阶段1·B：不依赖主题，直接按一组素材 id 生成 ──
 // 从整个素材库挑的素材集 → 生成，永远只用这些、无主题综述。
 export async function generateFromMaterials(noteIds, genreKey, platformFormKey, viewpoint = null) {

@@ -26,7 +26,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [recReason, setRecReason] = useState('')        // 推荐理由（基于素材）
   const [recPinned, setRecPinned] = useState(false)     // 用户手动改过 → 不再自动覆盖
   const gLabel = k => genres.find(g => g.key === k)?.label || k
-  const pLabel = k => pforms.find(p => p.key === k)?.label || k
+  // 母稿固定用「公众号·长文」形态（最厚那版）；平台裂变移到「③ 出片」多选。定稿只挑文体。
   // 阶段3 溯源态：只读渲染草稿，[素材N] 可点 → 高亮左栏对应引用
   const [srcMode, setSrcMode] = useState(false)
   const [activeRef, setActiveRef] = useState(null)
@@ -138,18 +138,18 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     return () => { cancelled = true }
   }, [selMat, v2Mode])
   const genDraftV2 = async () => {
-    if (!v2Genre || !v2Pform) { showToast('先选文体和平台形态'); return }
+    if (!v2Genre) { showToast('先选文体'); return }
     // ADR-035 带稿：没勾素材但编辑器里有草稿 → 把你的原文按 文体×平台 重塑（而非逼你选素材）
     const draftReshape = selMat.size === 0 && studio.draft.trim().length >= 10
     if (selMat.size === 0 && !draftReshape) { showToast('先从素材库勾选素材，或在编辑器里写/带一段草稿'); return }
-    const gl = genres.find(g => g.key === v2Genre)?.label, pl = pforms.find(p => p.key === v2Pform)?.label
+    const gl = genres.find(g => g.key === v2Genre)?.label
     setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在按 文体×平台 起稿（约 30 秒）…' }))
     try {
       if (draftReshape) {
         const json = await api('/api/studio/reshape', { method: 'POST', body: { draft: studio.draft, genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null } })
         const d = json.data
         setStudio(s => ({ ...s, busy: false, draft: d.body, title: d.title, draftId: d.id, platform: d.platform, paragraphRefs: [], refs: [] }))
-        showToast(`已按「${gl}×${pl}」重塑你的稿（¥${d.cost_yuan?.toFixed(3)}）`)
+        showToast(`已按「${gl}」重塑成母稿（¥${d.cost_yuan?.toFixed(3)}）`)
         return
       }
       const json = await api('/api/materials/draft-v2', { method: 'POST', body: { genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null, selectedNoteIds: [...selMat] } })
@@ -159,7 +159,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         paragraphRefs: d.paragraph_refs,
         refs: (d.paragraph_refs || []).map(r => ({ note: r.sourceTitle || '素材', para: r.marker })),
       }))
-      showToast(`已按「${gl}×${pl}」起稿（引用 ${d.paragraph_refs?.length || 0} 条，¥${d.cost_yuan?.toFixed(3)}）`)
+      showToast(`已按「${gl}」起稿母稿（引用 ${d.paragraph_refs?.length || 0} 条，¥${d.cost_yuan?.toFixed(3)}）`)
     } catch (err) {
       setStudio(s => ({ ...s, busy: false }))
       showToast(`起稿失败：${err.message}`)
@@ -243,12 +243,52 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   // ---- 卡片图 tab（小红书专属）：iframe 嵌入卡片工作台，切过去自动灌入当前草稿 ----
   const [xhsMode, setXhsMode] = useState('text')  // 'text' 文案 | 'cards' 卡片图
   const [v2Cards, setV2Cards] = useState(false)   // 阶段4：v2 卡片平台打开图卡工具
+  const [cardFeedText, setCardFeedText] = useState(null)  // 出片渲染图卡时喂给 iframe 的适配稿（非空则优先于母稿）
+  // ── ADR-046 出片：中栏「② 定稿 ｜ ③ 出片」tab + 母稿→多平台适配稿 ──
+  const [studioTab, setStudioTab] = useState('edit')      // 'edit' 定稿(母稿) | 'film' 出片
+  const [filmForms, setFilmForms] = useState(new Set(['gzh-long', 'xhs-card']))  // 出片选中的平台形态
+  const [adapted, setAdapted] = useState({})              // { formKey: {body,title,genre,formLabel,passthrough?,error?,editing?,open?} }
+  const [adaptBusy, setAdaptBusy] = useState(false)
+  const [filmTheme, setFilmTheme] = useState('warm')      // 视觉主题（P1 占位，喂图卡渲染器）
+  const CARD_FORMS = new Set(['xhs-card', 'douyin-card'])  // 走图卡渲染器
+  const VIDEO_FORMS = new Set(['douyin-koubo', 'bilibili']) // 视频渲染器（P2，出片先占位）
+  const THEMES = [['warm', '暖莫兰迪', '#f2ede2', '#c9784e'], ['mono', '极简黑白', '#111', '#7fd1c0'], ['mag', '杂志编辑', '#f6f1e7', '#a24b3f'], ['macaron', '马卡龙', '#fbeef2', '#d98aa6']]
+  const toggleFilmForm = k => setFilmForms(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
+  const adaptBatch = async () => {
+    if (!studio.draft.trim()) { showToast('先在②定稿把母稿写好，再来出片'); return }
+    if (filmForms.size === 0) { showToast('先选至少一个平台形态'); return }
+    setAdaptBusy(true)
+    showToast(`正在把母稿适配成 ${filmForms.size} 个平台形态（每个约 20 秒）…`)
+    try {
+      const json = await api('/api/studio/adapt-batch', { method: 'POST', body: { draft: studio.draft, forms: [...filmForms], viewpoint: studio.viewpoint || null } })
+      const map = {}
+      for (const r of (json.data || [])) map[r.platformForm] = { ...r, open: false }
+      // 第一个非透传的默认展开，方便直接看
+      const firstReal = (json.data || []).find(r => !r.passthrough && !r.error)
+      if (firstReal) map[firstReal.platformForm].open = true
+      setAdapted(map)
+      const okCost = (json.data || []).reduce((s, r) => s + (r.cost || 0), 0)
+      showToast(`已适配 ${Object.keys(map).length} 个平台（¥${okCost.toFixed(3)}）`)
+    } catch (err) { showToast(`适配失败：${err.message}`) }
+    setAdaptBusy(false)
+  }
+  const openCardsFor = (formKey) => {
+    const body = adapted[formKey]?.body || studio.draft
+    setCardFeedText(body)
+    setV2Cards(true)
+    setTimeout(() => postDraftToCards(), 150)
+  }
+  const copyText = async (text) => {
+    try { await navigator.clipboard.writeText(stripRefs(text)) } catch { /* 剪贴板受限时忽略 */ }
+    showToast('已复制适配稿（自动去掉 [素材N] 标记）')
+  }
   const [draftsOpen, setDraftsOpen] = useState(false)   // 草稿箱面板
   const [selDrafts, setSelDrafts] = useState(new Set()) // 勾选待删的草稿
   const cardFrame = useRef(null)
   const cardsMode = (studio.platform === 'xhs' && xhsMode === 'cards') || v2Cards
   const postDraftToCards = () => {
-    const text = String(studio.draft || '').replace(/\s*\[素材\d+\]/g, '')  // 图卡用去掉溯源标记的干净文案
+    // 出片渲染适配稿时喂 cardFeedText（不动母稿）；否则喂母稿。都去掉 [素材N] 溯源标记
+    const text = String(cardFeedText ?? studio.draft ?? '').replace(/\s*\[素材\d+\]/g, '')
     try { cardFrame.current?.contentWindow?.postMessage({ type: 'kw-fill-cards', text }, '*') } catch { /* 跨窗口受限时忽略 */ }
   }
   // P0#3：卡片是草稿的派生视图——在卡片 tab 时监听 draft 变化自动重灌（防"派生视图装死"）。
@@ -262,7 +302,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       cardFedOnce.current = true
     }, 400)
     return () => clearTimeout(t)
-  }, [studio.draft, cardsMode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [studio.draft, cardsMode, cardFeedText]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPlatform = (p) => {
     setXhsMode('text')
@@ -338,7 +378,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           </div>
         )}
       </div>
-      <div className="wb-page-sub">选素材 → 按文体 × 平台生成 · 每段可溯源、发布前一键去标记</div>
+      <div className="wb-page-sub">选素材 → ②定文体起母稿 → ③出片裂变各平台 · 每段可溯源、发布前一键去标记</div>
 
       {v2Mode && !cardsMode && (
         <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '236px 1fr', border: '1px solid var(--line10)', borderRadius: 12, margin: '10px 0', background: 'var(--surface)', minHeight: 300 }}>
@@ -407,26 +447,30 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 
           {/* 右：推荐卡 + 换文体/换平台/更多组合 */}
           <section style={{ padding: 14 }}>
-            <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 9 }}>
-              {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议：` : reshapeMode ? '你带来的稿在下面——选好文体×平台，点「用这个生成」把它重塑成这个形态：' : '勾选左侧素材，或直接在下面编辑器写/带一段草稿，再按组合生成：'}
+            {/* ADR-046：中栏两段 tab —— ② 定稿(母稿) ｜ ③ 出片(多平台) */}
+            <div style={{ display: 'inline-flex', background: 'var(--brief-bg)', border: '1px solid var(--line10)', borderRadius: 10, padding: 3, marginBottom: 12 }}>
+              {[['edit', '2', '定稿 · 母稿'], ['film', '3', '出片 · 多平台']].map(([k, n, label]) => (
+                <button key={k} onClick={() => setStudioTab(k)}
+                  style={{ border: 'none', background: studioTab === k ? 'var(--accent)' : 'transparent', color: studioTab === k ? '#fff' : 'var(--sub)', padding: '7px 15px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'inherit' }}>
+                  <span style={{ width: 18, height: 18, borderRadius: '50%', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: studioTab === k ? 'rgba(255,255,255,.25)' : 'var(--line07)', color: studioTab === k ? '#fff' : 'var(--sub)' }}>{n}</span>{label}
+                </button>
+              ))}
             </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div style={{ flex: 1.9, border: '1px solid rgba(61,90,128,.35)', borderRadius: 11, padding: '12px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                  <span style={{ fontSize: 10.5, color: 'var(--accent)', background: 'rgba(61,90,128,.09)', borderRadius: 5, padding: '2px 7px' }}>推荐</span>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 15.5, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{gLabel(v2Genre)} · {pLabel(v2Pform)}</h3>
-                </div>
-                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>{recReason ? recReason + (recPinned ? '（你已手动指定文体）' : '') : `用「${gLabel(v2Genre)}」骨架 +「${pLabel(v2Pform)}」形态起稿；想换见下面「换文体 / 换平台」。`}</p>
-                <button className="wb-btn-primary" disabled={studio.busy || (selMat.size === 0 && studio.draft.trim().length < 10)} onClick={genDraftV2}>{reshapeMode ? '用我的稿生成' : '用这个生成'}</button>
+
+            {studioTab === 'edit' && (<>
+            <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 9 }}>
+              {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议文体：` : reshapeMode ? '你带来的稿在下面——选好文体，点「用这个生成母稿」重塑：' : '勾选左侧素材，或直接在下面编辑器写/带一段草稿，选文体生成母稿：'}
+            </div>
+            <div style={{ border: '1px solid rgba(61,90,128,.35)', borderRadius: 11, padding: '12px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                <span style={{ fontSize: 10.5, color: 'var(--accent)', background: 'rgba(61,90,128,.09)', borderRadius: 5, padding: '2px 7px' }}>推荐文体</span>
+                <h3 style={{ fontFamily: 'var(--serif)', fontSize: 15.5, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{gLabel(v2Genre)}</h3>
               </div>
-              <div style={{ flex: 1, border: '1px solid var(--line10)', borderRadius: 11, padding: '12px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                  <span style={{ fontSize: 10.5, color: 'var(--sub2)', background: 'var(--line07)', borderRadius: 5, padding: '2px 7px' }}>备选</span>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>读书精读体 · 小红书卡片</h3>
-                </div>
-                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>拆成收藏卡，接图卡工具。</p>
-                <button className="wb-btn-ghost" onClick={() => { setV2Genre('读书精读体'); setV2Pform('xhs-card'); setRecPinned(true) }}>选它</button>
-              </div>
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sub)', lineHeight: 1.55 }}>
+                {recReason ? recReason + (recPinned ? '（你已手动指定文体）' : '') : `用「${gLabel(v2Genre)}」骨架起稿；想换见下面「换文体」。`}
+                <br /><span style={{ color: 'var(--faint)' }}>母稿＝最厚那版（公众号深稿）；平台裂变到「③ 出片」里多选。</span>
+              </p>
+              <button className="wb-btn-primary" disabled={studio.busy || (selMat.size === 0 && studio.draft.trim().length < 10)} onClick={genDraftV2}>{reshapeMode ? '用我的稿生成母稿' : '用这个生成母稿'}</button>
             </div>
 
             <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 12.5, color: 'var(--sub)' }}>
@@ -443,36 +487,16 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                   </div>
                 )}
               </div>
-              <div style={{ position: 'relative' }}>
-                <span style={{ cursor: 'pointer' }} onClick={() => { setCombosOpen(false); setOpenDD(openDD === 'platform' ? null : 'platform') }}>换平台 ▾</span>
-                {openDD === 'platform' && (
-                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 10, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 5, minWidth: 170, maxHeight: 260, overflowY: 'auto' }}>
-                    {pforms.map(p => (
-                      <div key={p.key} onClick={() => { setV2Pform(p.key); setRecPinned(true); setOpenDD(null) }}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: v2Pform === p.key ? 'var(--accent)' : 'var(--body)', background: v2Pform === p.key ? 'rgba(61,90,128,.07)' : 'transparent' }}>
-                        {p.label}{p.key === 'gzh-long' && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(61,90,128,.11)', borderRadius: 4, padding: '1px 6px' }}>推荐</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <span style={{ cursor: 'pointer' }} onClick={() => { setOpenDD(null); setCombosOpen(o => !o) }}>更多组合 ▾</span>
+              <span style={{ cursor: 'pointer' }} onClick={() => { setOpenDD(null); setCombosOpen(o => !o) }}>更多文体 ▾</span>
             </div>
 
             {combosOpen && (
               <div style={{ marginTop: 12, border: '1px solid var(--line10)', borderRadius: 11, padding: 13, background: 'var(--brief-bg)' }}>
-                <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 7 }}>文体</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 7 }}>选文体 <span style={{ color: 'var(--faint)' }}>· 平台形态在「③ 出片」里选</span></div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                   {genres.map(g => (
                     <span key={g.key} onClick={() => { setV2Genre(g.key); setRecPinned(true) }}
                       style={{ border: '1px solid var(--line10)', background: v2Genre === g.key ? 'var(--accent)' : 'var(--surface)', color: v2Genre === g.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{g.label}</span>
-                  ))}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 7 }}>平台形态</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                  {pforms.map(p => (
-                    <span key={p.key} onClick={() => { setV2Pform(p.key); setRecPinned(true) }}
-                      style={{ border: '1px solid var(--line10)', background: v2Pform === p.key ? 'var(--accent)' : 'var(--surface)', color: v2Pform === p.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{p.label}</span>
                   ))}
                 </div>
               </div>
@@ -498,7 +522,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             ) : (
               <textarea ref={draftRef} className="wb-draft" style={{ marginTop: 4 }} value={studio.draft}
                 onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
-                placeholder="点上方「用这个生成」起稿，或直接在这里手写；改稿见下方或右侧「创作助手」…" />
+                placeholder="点上方「用这个生成母稿」起稿，或直接在这里手写；改稿见下方或右侧「创作助手」…" />
             )}
             {noRefs && (
               <div className="wb-warnbar" style={{ marginTop: 10 }}><IconWarn />草稿中没有素材引用，创作前请补充引用（每段可溯源）</div>
@@ -515,23 +539,27 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             {/* 产出 */}
             <div className="wb-studio-actions">
               <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginRight: 2 }}>产出</span>
-              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title={reshapeMode ? '把你的稿按上方文体×平台再重塑一版' : '用同样的素材·文体·平台再出一版（起稿请用上方推荐卡「用这个生成」）'} onClick={genDraftV2}>{reshapeMode ? '重塑我的稿' : '重新生成'}</button>
+              <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title={reshapeMode ? '把你的稿按上方文体再重塑一版母稿' : '用同样的素材·文体再出一版母稿（起稿请用上方推荐卡「用这个生成母稿」）'} onClick={genDraftV2}>{reshapeMode ? '重塑我的稿' : '重新生成'}</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title={studio.draftId ? '把改动存回当前草稿（不发布）' : '把当前草稿存进草稿箱，之后可继续改（不发布）'} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="导出发布版：溯源标记转文末来源列表" onClick={exportMd}>导出 Markdown</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="删掉正文里所有 [素材N] 标记（发布前用；先存草稿）" onClick={() => { setStudio(s => ({ ...s, draft: stripRefs(s.draft) })); showToast('已去掉正文里所有 [素材N] 标记') }}>去引用标记</button>
-              {(v2Pform === 'gzh-long' || v2Pform === 'xhs-long') && (
-                <button className="wb-btn-ghost" disabled={isEmpty} title="生成几个标题候选" onClick={suggestTitles}>标题候选</button>
-              )}
+              <button className="wb-btn-ghost" disabled={isEmpty} title="生成几个标题候选" onClick={suggestTitles}>标题候选</button>
+              <button className="wb-btn-ghost" disabled={isEmpty} title="复制母稿全文（自动去掉 [素材N] 溯源标记，公众号长文可直接发）" onClick={copyAll}>复制全文</button>
               {studio.draftId && (
                 <button className="wb-btn-ghost" title="删除当前草稿" style={{ color: 'var(--red)' }} onClick={deleteCurrentDraft}>删除草稿</button>
               )}
               <span style={{ marginLeft: 'auto' }} />
-              {(v2Pform || '').includes('card') ? (
-                <button className="wb-btn-primary" disabled={isEmpty} title="把卡片文字渲染成图（复用图卡工具）" onClick={() => { setV2Cards(true); setTimeout(postDraftToCards, 150) }}>生成图文卡片</button>
-              ) : (
-                <button className="wb-btn-primary" disabled={isEmpty} title="复制正文到剪贴板（自动去掉 [素材N] 溯源标记，可直接粘去发布）" onClick={copyAll}>复制全文</button>
-              )}
+              <button className="wb-btn-primary" disabled={isEmpty} title="母稿定了？去出片：选平台形态、一鱼多吃各平台稿" onClick={() => setStudioTab('film')}>去出片 · 各平台 →</button>
             </div>
+            </>)}
+
+            {studioTab === 'film' && (
+              <FilmPane
+                draftEmpty={isEmpty} pforms={pforms} filmForms={filmForms} toggleFilmForm={toggleFilmForm}
+                adapted={adapted} setAdapted={setAdapted} adaptBusy={adaptBusy} adaptBatch={adaptBatch}
+                CARD_FORMS={CARD_FORMS} VIDEO_FORMS={VIDEO_FORMS} openCardsFor={openCardsFor} copyText={copyText}
+                THEMES={THEMES} filmTheme={filmTheme} setFilmTheme={setFilmTheme} setStudioTab={setStudioTab} />
+            )}
           </section>
 
           {openDD && <div onClick={() => setOpenDD(null)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />}
@@ -551,8 +579,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 
       {v2Cards && (
         <div style={{ display: 'flex', gap: 8, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button className="wb-btn-ghost" onClick={() => setV2Cards(false)}>← 返回文稿</button>
-          <span style={{ fontSize: 12, color: 'var(--sub2)' }}>已填入当前文案（已去 [素材N]）· 切风格/比例、点着改字、下载图</span>
+          <button className="wb-btn-ghost" onClick={() => { setV2Cards(false); setCardFeedText(null) }}>← 返回文稿</button>
+          <span style={{ fontSize: 12, color: 'var(--sub2)' }}>{cardFeedText != null ? '已填入出片适配稿（已去 [素材N]）· 切风格/比例、点着改字、下载图' : '已填入当前文案（已去 [素材N]）· 切风格/比例、点着改字、下载图'}</span>
         </div>
       )}
 
@@ -626,6 +654,121 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           ))}
         </div>
       )}
+    </>
+  )
+}
+
+// ADR-046 ③ 出片：母稿 → 选平台形态（多选）→ 适配稿(看/改) → 主题占位 → 各平台出片。
+// P1 渲染只接：图卡渲染器（小红书/抖音卡片）+ 公众号长文直用；视频渲染器(hyperframes)是 P2 占位。
+function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setAdapted, adaptBusy, adaptBatch,
+  CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, THEMES, filmTheme, setFilmTheme, setStudioTab }) {
+  const pf = k => pforms.find(p => p.key === k) || { key: k, label: k, icon: '📝', note: '' }
+  const rendHint = k => k === 'gzh-long' ? '长文体 · 直用母稿' : CARD_FORMS.has(k) ? '卡片体 · 图卡渲染器' : VIDEO_FORMS.has(k) ? '口播体 · 视频渲染器 (P2)' : '文案 · 复制发布'
+  const editBody = (k, v) => setAdapted(a => ({ ...a, [k]: { ...a[k], body: v } }))
+  const toggleOpen = k => setAdapted(a => a[k] ? ({ ...a, [k]: { ...a[k], open: !a[k].open } }) : a)
+  const toggleEdit = k => setAdapted(a => ({ ...a, [k]: { ...a[k], editing: !a[k].editing, open: true } }))
+  const selected = [...filmForms]
+
+  if (draftEmpty) {
+    return (
+      <div className="wb-card" style={{ padding: '18px 20px', textAlign: 'center', color: 'var(--sub)' }}>
+        <div style={{ fontSize: 13.5, marginBottom: 10 }}>还没有母稿——出片是把定稿的母稿一鱼多吃成各平台稿。</div>
+        <button className="wb-btn-primary" onClick={() => setStudioTab('edit')}>← 先去②定稿写好母稿</button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 11 }}>母稿是最厚那版；下面把它压/改成各平台稿，渲染前你过一眼、可改。</div>
+
+      {/* ① 选平台形态（多选，每个自带合适文体） */}
+      <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginBottom: 11, background: 'var(--surface)' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>① 选平台形态 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· 可多选，每个自带合适文体，自动从母稿适配</span></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 7, marginTop: 10 }}>
+          {pforms.map(p => {
+            const on = filmForms.has(p.key)
+            return (
+              <div key={p.key} onClick={() => toggleFilmForm(p.key)}
+                style={{ display: 'flex', alignItems: 'center', gap: 9, border: `1.4px solid ${on ? 'var(--accent)' : 'var(--line10)'}`, background: on ? 'rgba(61,90,128,.06)' : 'var(--surface)', borderRadius: 9, padding: '8px 11px', cursor: 'pointer' }}>
+                <span style={{ fontSize: 16 }}>{p.icon || '📝'}</span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--body)' }}>{p.label}</span>
+                  <span style={{ display: 'block', fontSize: 9.5, color: 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>· {rendHint(p.key)}</span>
+                </span>
+                <span style={{ flex: 'none', width: 17, height: 17, borderRadius: 5, border: `1.4px solid ${on ? 'var(--accent)' : 'var(--line14)'}`, background: on ? 'var(--accent)' : 'transparent', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{on ? '✓' : ''}</span>
+              </div>
+            )
+          })}
+        </div>
+        <button className="wb-btn-primary" style={{ marginTop: 12 }} disabled={adaptBusy || filmForms.size === 0} onClick={adaptBatch}>
+          {adaptBusy ? '适配中…' : `⚡ 一键适配母稿 → ${filmForms.size} 个平台`}
+        </button>
+      </div>
+
+      {/* ② 适配稿·看/改 */}
+      <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginBottom: 11, background: 'var(--surface)' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>② 适配稿 · 看 / 改 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· 母稿已按各平台适配，渲染前过一眼、可改</span></div>
+        {selected.filter(k => adapted[k]).length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--faint)', padding: '10px 2px' }}>还没适配——选好平台形态，点上面「一键适配母稿」。</div>
+        )}
+        {selected.filter(k => adapted[k]).map(k => {
+          const a = adapted[k], p = pf(k)
+          const render = a.passthrough
+            ? <button className="wb-btn-outline" onClick={() => copyText(a.body)}>复制长文</button>
+            : a.error ? <span style={{ fontSize: 11, color: 'var(--red)' }}>适配失败</span>
+            : CARD_FORMS.has(k) ? <button className="wb-btn-primary" onClick={() => openCardsFor(k)}>生成图文卡片 →</button>
+            : VIDEO_FORMS.has(k) ? <button className="wb-btn-ghost" disabled title="视频渲染器 hyperframes 为 P2">▶ 出片（视频 P2）</button>
+            : <button className="wb-btn-outline" onClick={() => copyText(a.body)}>复制文案</button>
+          return (
+            <div key={k} style={{ border: '1px solid var(--line10)', borderRadius: 9, marginTop: 9, overflow: 'hidden', background: 'var(--surface)' }}>
+              <div onClick={() => toggleOpen(k)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', cursor: 'pointer' }}>
+                <span style={{ fontSize: 15 }}>{p.icon || '📝'}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--body)' }}>{p.label}</span>
+                {a.error
+                  ? <span style={{ fontSize: 10.5, color: 'var(--red)' }}>✕ {a.error.slice(0, 20)}</span>
+                  : <span style={{ fontSize: 10.5, color: a.passthrough ? 'var(--sub2)' : 'var(--green)' }}>{a.passthrough ? '= 母稿本身' : '✓ 已适配'}</span>}
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--accent)' }}>{a.open ? '收起 ▴' : '看 / 改 ▾'}</span>
+              </div>
+              {a.open && !a.error && (
+                <div style={{ borderTop: '1px solid var(--line08)', padding: '10px 12px 12px' }}>
+                  {a.editing ? (
+                    <textarea value={a.body} onChange={e => editBody(k, e.target.value)}
+                      style={{ width: '100%', minHeight: 160, fontSize: 12.5, lineHeight: 1.7, padding: '9px 11px', border: '1px solid var(--line10)', borderRadius: 7, background: 'var(--surface)', color: 'var(--body)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                  ) : (
+                    <div style={{ fontSize: 12.5, lineHeight: 1.75, color: 'var(--body)', whiteSpace: 'pre-wrap', maxHeight: 260, overflowY: 'auto' }}>{a.body}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+                    <button className={a.editing ? 'wb-btn-primary' : 'wb-btn-ghost'} onClick={() => toggleEdit(k)}>{a.editing ? '✓ 改完' : '✎ 直接改文字'}</button>
+                    <button className="wb-btn-ghost" title="到右侧「创作助手」用大白话改（如「钩子再狠点」「压到 60 秒」）" onClick={() => copyText(a.body)}>📋 复制</button>
+                    <span style={{ marginLeft: 'auto' }}>{render}</span>
+                  </div>
+                </div>
+              )}
+              {!a.open && !a.error && (
+                <div style={{ borderTop: '1px solid var(--line08)', padding: '8px 12px', display: 'flex', justifyContent: 'flex-end' }}>{render}</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ③ 视觉主题（P1 占位，喂图卡渲染器）+ 配音（P2） */}
+      <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', background: 'var(--surface)' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>③ 视觉主题 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· 图卡/视频共用（配音 P2）</span></div>
+        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+          {THEMES.map(([key, name, bg, fg]) => {
+            const on = filmTheme === key
+            return (
+              <div key={key} onClick={() => setFilmTheme(key)} style={{ width: 80, border: `2px solid ${on ? 'var(--accent)' : 'var(--line14)'}`, borderRadius: 9, overflow: 'hidden', cursor: 'pointer' }}>
+                <div style={{ height: 38, background: bg, color: fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontSize: 14, fontWeight: 700 }}>{name.slice(0, 1)}</div>
+                <div style={{ fontSize: 10, padding: 4, textAlign: 'center', color: on ? 'var(--accent)' : 'var(--body)', fontWeight: on ? 700 : 400 }}>{name}</div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 11 }}>🎙 配音 · 音色试听 · 背景乐 —— 随视频渲染器 P2 上线</div>
+      </div>
     </>
   )
 }
