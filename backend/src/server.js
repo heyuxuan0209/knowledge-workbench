@@ -1091,6 +1091,34 @@ app.get('/api/topics', async (req, res) => {
   }
 });
 
+// ========== P3 追踪型主题（ADR-040 补充）：只由用户建，收录/归线/综述自动 ==========
+app.get('/api/tracking-topics', async (req, res) => {
+  try { const { listTrackingTopics } = await import('./services/tracking-topics.js'); res.json({ success: true, data: listTrackingTopics() }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.get('/api/tracking-topics/:id', async (req, res) => {
+  try { const { getTrackingSynthesis } = await import('./services/tracking-topics.js'); const d = getTrackingSynthesis(req.params.id); d ? res.json({ success: true, data: d }) : res.status(404).json({ success: false, error: 'not found' }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/tracking-topics', async (req, res) => {
+  try {
+    const { name, aliases } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ success: false, error: 'name 必填' });
+    const { createTrackingTopic, refreshTrackingTopic } = await import('./services/tracking-topics.js');
+    const t = await createTrackingTopic({ name: name.trim(), aliases: Array.isArray(aliases) ? aliases : [], createdBy: 'user' });
+    res.json({ success: true, data: t });
+    refreshTrackingTopic(t.id).catch(e => console.error('[tracking] 首轮生成失败:', e.message)); // 异步跑首轮
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/tracking-topics/:id/refresh', async (req, res) => {
+  try { const { refreshTrackingTopic } = await import('./services/tracking-topics.js'); res.json({ success: true, data: await refreshTrackingTopic(req.params.id) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/tracking-topics/:id/eject', async (req, res) => {
+  try { const { ejectContent } = await import('./services/tracking-topics.js'); res.json({ success: true, data: ejectContent(req.params.id, req.body?.contentId) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 // 手动建页（主题库搜索框输入新主题）。零 LLM，建页时回扫已有素材挂为待并入。
 app.post('/api/topics', async (req, res) => {
   try {
