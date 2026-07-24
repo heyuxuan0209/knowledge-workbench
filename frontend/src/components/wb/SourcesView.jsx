@@ -44,7 +44,9 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
   const [auditOpen, setAuditOpen] = useState(false)
   const [audit, setAudit] = useState(null)
   const [keep, setKeep] = useState(() => new Set())      // 勾选保留关注的 source id
-  const [createSel, setCreateSel] = useState(() => new Set()) // 勾选新建的 B 组 handle
+  const [rosterSel, setRosterSel] = useState(() => new Set()) // B1/A缺口：勾选新建的采集 handle（默认全勾）
+  const [mediaSel, setMediaSel] = useState(() => new Set())   // B2 媒体/名人：勾选新建的 handle（默认全空）
+  const [mediaOpen, setMediaOpen] = useState(false)           // B2 灰置底默认收起
   const [auditBusy, setAuditBusy] = useState(false)
   // 第4件 自助添加 X 账号 → 入 sync-x 采集名单
   const [xHandle, setXHandle] = useState('')
@@ -64,20 +66,29 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
     try {
       const j = await api('/api/sources/follow-audit'); const d = j.data
       setAudit(d)
-      setKeep(new Set(d.items.filter(i => i.followed || i.precheck).map(i => i.id)))  // 预勾：已关注 + 名单匹配
-      setCreateSel(new Set((d.toCreate || []).map(c => c.handle)))                     // B 组默认全勾
+      // 预勾：已关注 + 名单匹配的库内源；媒体（isMedia）默认不勾
+      setKeep(new Set(d.items.filter(i => (i.followed || i.precheck) && !i.isMedia).map(i => i.id)))
+      setRosterSel(new Set((d.toCreateRoster || []).map(c => c.handle)))  // A缺口+B1 默认全勾
+      setMediaSel(new Set())                                             // B2 媒体默认全空
+      setMediaOpen(false)
     } catch (e) { showToast?.('盘点加载失败：' + e.message) }
   }
   const applyAudit = async () => {
     setAuditBusy(true)
     try {
-      const createHandles = (audit.toCreate || []).filter(c => createSel.has(c.handle))
-      const j = await api('/api/sources/follow-audit/apply', { method: 'POST', body: { keepIds: [...keep], createHandles } })
-      showToast?.(`已重设关注：保留 ${j.data.kept} 个 · 新建 ${j.data.created} 个作者源`)
+      const createRoster = (audit.toCreateRoster || []).filter(c => rosterSel.has(c.handle))
+      const createMedia = (audit.toCreateMedia || []).filter(c => mediaSel.has(c.handle))
+      const j = await api('/api/sources/follow-audit/apply', { method: 'POST', body: { keepIds: [...keep], createRoster, createMedia } })
+      const extra = j.data.aliased ? ` · 合并同人 ${j.data.aliased}` : ''
+      showToast?.(`已重设关注：保留 ${j.data.kept} 个 · 新建 ${j.data.created} 个源${extra}`)
       setAuditOpen(false); loadSources?.()
     } catch (e) { showToast?.('应用失败：' + e.message) }
     setAuditBusy(false)
   }
+  // sync-x 采集名单计数（已选 N/35）：库内已选的 X active-query 源 + 勾选的采集档新建源
+  const rosterCount = audit
+    ? audit.items.filter(i => i.isRoster && keep.has(i.id)).length + rosterSel.size
+    : 0
 
   const registerPack = async () => {
     setPackBusy(true)
@@ -263,16 +274,20 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
             {audit && (<>
               <div style={{ fontSize: 12.5, color: 'var(--sub)', lineHeight: 1.6, padding: '2px 2px 10px' }}>
                 勾选你<b>真正想长期关注</b>的作者——它们进 feed 组2「你关注的 Builder」。取消勾选的会撤销关注（不删源、内容还在）。
-                已预勾：当前已关注 + 从你 X following 实拉匹配上的 <b>{audit.precheckCount}</b> 个。
+                v2 完整重拉你 X 关注 95 个；<b>X 关注 ≠ 工作台信源</b>，媒体/名人默认不采集（防非 AI 噪音灌库）。
+                已预勾：库内匹配 <b>{audit.precheckCount}</b> 个 + 建议采集 {(audit.toCreateRoster || []).length} 个。
+                {(audit.aliasNotes || []).length > 0 && <span style={{ color: 'var(--faint)' }}> · 同人已合并：{audit.aliasNotes.map(a => `@${a.alias}→${a.name}`).join('、')}。</span>}
               </div>
               <div style={{ overflowY: 'auto', flex: 1 }}>
-                {(audit.toCreate || []).length > 0 && (
+                {/* A缺口 + B1：建议采集，默认全勾，建 active-query 采集源 */}
+                {(audit.toCreateRoster || []).length > 0 && (
                   <div style={{ border: '1px dashed rgba(61,90,128,.4)', borderRadius: 9, padding: '9px 12px', marginBottom: 10 }}>
-                    <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>🆕 库里还没有的 {audit.toCreate.length} 个（你 X 关注、aihot 从没带来过）——勾上会新建作者源并纳入 X 直连采集：</div>
-                    {audit.toCreate.map(c => (
+                    <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>🆕 库里还没有、建议采集的 {audit.toCreateRoster.length} 个（AI/科技作者 + 官方主号）——勾上会新建作者源并纳入 X 直连采集：</div>
+                    {audit.toCreateRoster.map(c => (
                       <label key={c.handle} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0', fontSize: 12.5, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={createSel.has(c.handle)} onChange={() => setCreateSel(s => { const n = new Set(s); n.has(c.handle) ? n.delete(c.handle) : n.add(c.handle); return n })} />
+                        <input type="checkbox" checked={rosterSel.has(c.handle)} onChange={() => setRosterSel(s => { const n = new Set(s); n.has(c.handle) ? n.delete(c.handle) : n.add(c.handle); return n })} />
                         <b>{c.name}</b><span style={{ color: 'var(--faint)' }}>@{c.handle}</span>
+                        {c.kind === 'matched' && <span className="wb-pill" style={{ fontSize: 9, color: 'var(--green)', background: 'rgba(63,115,80,.1)', flex: 'none' }}>官方/主号</span>}
                       </label>
                     ))}
                   </div>
@@ -282,15 +297,33 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
                     <input type="checkbox" checked={keep.has(it.id)} onChange={() => setKeep(s => { const n = new Set(s); n.has(it.id) ? n.delete(it.id) : n.add(it.id); return n })} />
                     <span style={{ flex: 'none', fontWeight: 600, minWidth: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
                     {it.precheck && <span className="wb-pill" style={{ fontSize: 9.5, color: 'var(--accent)', background: 'rgba(61,90,128,.1)', flex: 'none' }}>X 名单</span>}
+                    {it.isMedia && <span className="wb-pill" style={{ fontSize: 9.5, color: 'var(--faint)', background: 'var(--surface)', flex: 'none' }}>媒体</span>}
+                    {it.isRoster && <span className="wb-pill" style={{ fontSize: 9, color: 'var(--amber)', background: 'rgba(169,121,31,.1)', flex: 'none' }}>采集中</span>}
                     {it.platform && <span style={{ fontSize: 10.5, color: 'var(--faint)', flex: 'none' }}>{it.platform}</span>}
                     <span style={{ flex: 1, minWidth: 0, color: 'var(--sub2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.latest || '（近期无内容）'}</span>
                     <span style={{ fontSize: 11, color: 'var(--faint)', flex: 'none' }}>30天 {it.count30d} 条</span>
                   </label>
                 ))}
+                {/* B2 媒体/名人：灰置底、默认收起、默认不勾；勾了只建 passive 不采集 */}
+                {(audit.toCreateMedia || []).length > 0 && (
+                  <div style={{ marginTop: 10, borderTop: '1px dashed var(--line14)', paddingTop: 8 }}>
+                    <div style={{ fontSize: 11.5, color: 'var(--faint)', cursor: 'pointer', userSelect: 'none' }} onClick={() => setMediaOpen(o => !o)}>
+                      {mediaOpen ? '▾' : '▸'} 大众媒体/名人 {audit.toCreateMedia.length} 个（默认不采集——X 关注≠信源，勾了只登记不进 X 采集）
+                    </div>
+                    {mediaOpen && <div style={{ opacity: 0.7, marginTop: 4 }}>{audit.toCreateMedia.map(c => (
+                      <label key={c.handle} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 0', fontSize: 12, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={mediaSel.has(c.handle)} onChange={() => setMediaSel(s => { const n = new Set(s); n.has(c.handle) ? n.delete(c.handle) : n.add(c.handle); return n })} />
+                        {c.name}<span style={{ color: 'var(--faint)' }}>@{c.handle}</span>
+                      </label>
+                    ))}</div>}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, borderTop: '1px solid var(--line08)', marginTop: 8 }}>
-                <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>确认后 followed 只保留勾选项</span>
-                <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} disabled={auditBusy} onClick={applyAudit}>{auditBusy ? '应用中…' : `确认关注（保留 ${keep.size} + 新建 ${[...createSel].length}）`}</button>
+                <span style={{ fontSize: 11.5, color: rosterCount > audit.rosterCap ? 'var(--red)' : 'var(--faint)' }}>
+                  X 采集名单 已选 <b>{rosterCount}/{audit.rosterCap}</b>{rosterCount > audit.rosterCap ? ` · 超 ${rosterCount - audit.rosterCap} 个，去掉几个冷门再确认` : ''}
+                </span>
+                <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} disabled={auditBusy} onClick={applyAudit}>{auditBusy ? '应用中…' : `确认关注（保留 ${keep.size} + 新建 ${rosterSel.size + mediaSel.size}）`}</button>
               </div>
             </>)}
           </div>
