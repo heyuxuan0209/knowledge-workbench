@@ -135,8 +135,19 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
 export default function FeedView({
   contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, followingIds,
   generateReport, generating, setPage, setNotesTab, syncing, syncAllSources,
-  toggleStar, saveIdea, showToast, loadNotes, setReturnPage, gotoNote,
+  toggleStar, saveIdea, showToast, loadNotes, setReturnPage, gotoNote, gotoTracking,
 }) {
+  // 资讯卡「追踪这个话题」（P3 收尾④）：从这条内容起一个追踪主题（用户确认话题名；查重命中则去看已有）
+  const trackFromContent = async (c) => {
+    const guess = (c.zh_title || c.en_title || '').replace(/[：:，,。].*$/, '').slice(0, 20)
+    const name = window.prompt('追踪哪个话题/实体？（AI 会每天把「以它为主角」的资讯归进来）', guess)
+    if (!name?.trim()) return
+    try {
+      const j = await api('/api/tracking-topics', { method: 'POST', body: { name: name.trim(), aliases: [name.trim()] } })
+      if (j.data?.duplicate) { showToast?.(`已在追踪《${j.data.duplicate.name}》`, { label: '去看', onClick: () => gotoTracking?.(j.data.duplicate.id) }); return }
+      showToast?.(`已追踪《${name.trim()}》，AI 正在收录归线（约 1-2 分钟）…`, j.data?.id ? { label: '去看', onClick: () => gotoTracking?.(j.data.id) } : null)
+    } catch (e) { showToast?.('追踪失败：' + e.message) }
+  }
   const [expandedFocus, setExpandedFocus] = useState(null) // 默认全收起（UI 改造：第 1 条摊开挤掉后两条）
   const [readerContent, setReaderContent] = useState(null) // 站内全文阅读器
   const [ghStar, setGhStar] = useState({}) // GitHub 区块星标的本地覆盖（数据源在 ghTrending，父级不重载）
@@ -451,6 +462,7 @@ export default function FeedView({
                 {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} title="AI 帮你读懂这篇，出精读稿" onClick={openRead}>AI 精读</button>}
                 <button className="wb-fcard-a" title="送入右侧一起解读/对话" onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中解读'}</button>
                 <button className="wb-fcard-a" title="💡 收进灵感：以后能写（区别于 ★ 收藏＝以后再看）" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
+                <button className="wb-fcard-a" title="🛰 追踪这个话题：AI 每天把以它为主角的资讯归进来、织成脉络综述" onClick={() => trackFromContent(c)}>🛰</button>
                 <button className={`wb-fcard-a${c.starred ? ' on' : ''}`} title={c.starred ? '取消收藏' : '★ 收藏：以后再看（区别于 💡 收进灵感＝以后能写）'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
                 {c.url && <a className="wb-fcard-a" href={c.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ display: 'inline-flex', alignItems: 'center' }}><IconExternal /></a>}
                 {!followed && c.source_id !== undefined && (

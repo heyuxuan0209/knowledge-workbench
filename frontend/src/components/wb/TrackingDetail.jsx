@@ -3,12 +3,26 @@ import { api } from './util'
 
 // P3 追踪主题详情页（mock D · ADR-040 补充）：本月总览 + 主线四槽位（脉络[#n]句级溯源 / 判断 /
 // 待追 / 钩子）+ 零散动态 + 追踪范围 chips + 「这一页怎么工作」策略注释。状态自适应：回访先看增量。
-export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea, gotoContent }) {
+export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea, gotoContent, reloadList }) {
   const [data, setData] = useState(null)
   const [busy, setBusy] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
-  const load = () => api(`/api/tracking-topics/${trackingId}`).then(j => setData(j.data)).catch(e => showToast?.('加载失败：' + e.message))
-  useEffect(() => { load() }, [trackingId]) // eslint-disable-line
+  const [readMode, setReadMode] = useState('read')  // 'read' 通读 / 'delta' 增量（收尾⑤）
+  const load = () => api(`/api/tracking-topics/${trackingId}`).then(j => {
+    setData(j.data)
+    if ((j.data?.newSinceSeen || 0) > 0) setReadMode('delta') // 有新的默认先看增量
+  }).catch(e => showToast?.('加载失败：' + e.message))
+  useEffect(() => {
+    load()
+    api(`/api/tracking-topics/${trackingId}/seen`, { method: 'POST' }).catch(() => {}) // 记 last_seen（在 GET 之后，下次回访才重算 since）
+  }, [trackingId]) // eslint-disable-line
+  const delSelf = async () => {
+    if (!confirm(`删除追踪主题《${data?.name}》？收录与综述都会删除（素材本身不受影响）。`)) return
+    try { await api(`/api/tracking-topics/${trackingId}`, { method: 'DELETE' }); showToast?.('已删除'); reloadList?.(); goBack() } catch (e) { showToast?.('删除失败：' + e.message) }
+  }
+  const archiveSelf = async () => {
+    try { await api(`/api/tracking-topics/${trackingId}/archive`, { method: 'POST', body: { archived: true } }); showToast?.('已归档（可恢复）'); reloadList?.(); goBack() } catch (e) { showToast?.('归档失败：' + e.message) }
+  }
 
   const refresh = async () => {
     setBusy(true); showToast?.('正在重新收录 + 归线 + 综述（约 1-2 分钟）…')
@@ -25,7 +39,6 @@ export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea
   const active = (data.storylines || []).filter(s => s.status === 'active')
   const scattered = (data.storylines || []).find(s => s.status === 'scattered')
   const dedup = data.memberCount // 去重后件数近似
-  const weekNew = (data.storylines || []).flatMap(s => s.members || []).filter(m => (Date.now() - new Date((m.ts || '').replace(' ', 'T') + (/[zZ]/.test(m.ts || '') ? '' : 'Z')).getTime()) < 7 * 864e5).length
 
   // 把脉络里的 [#n] 渲染成可点角标 → 该主线第 n 条成员的原文
   const renderNarrative = (text, members) => String(text || '').split(/(\[#\d+\])/g).map((seg, i) => {
@@ -45,7 +58,22 @@ export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea
         <span className="wb-topic-name">{data.name}</span>
         <span className="wb-pill" style={{ color: '#3d5a80', background: 'rgba(61,90,128,.1)' }}>🛰 追踪中</span>
         <span style={{ fontSize: 12, color: 'var(--sub2)' }}>收录 {data.memberCount} 条 · 去重约 {dedup} 件事 · {active.length} 条主线</span>
-        <button className="wb-btn-ghost" style={{ marginLeft: 'auto' }} disabled={busy} onClick={refresh}>{busy ? '更新中…' : '↻ 重新生成'}</button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button className="wb-btn-ghost" disabled={busy} onClick={refresh}>{busy ? '更新中…' : '↻ 重新生成'}</button>
+          <button className="wb-btn-ghost" title="停收录不删数据，进归档区可恢复" onClick={archiveSelf}>📥 归档</button>
+          <button className="wb-btn-ghost" style={{ color: 'var(--red)' }} onClick={delSelf}>🗑 删除</button>
+        </div>
+      </div>
+
+      {/* 回访可感知（收尾⑤）：常驻显示"上次看到 + 新增 N 件事"（N=0 也显示）+ 通读/增量切换 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0 2px', fontSize: 12, color: 'var(--sub2)' }}>
+        <span>{data.lastSeenAt ? <>上次看到 <b>{(data.lastSeenAt || '').slice(5, 16)}</b> · 之后新增 <b style={{ color: data.newSinceSeen ? '#8a6a1a' : 'var(--sub2)' }}>{data.newSinceSeen} 件事</b></> : '首次访问 · 通读全部'}</span>
+        {data.lastSeenAt && (
+          <div className="wb-seg-toggle" style={{ marginLeft: 'auto' }}>
+            <button className={readMode === 'read' ? 'active' : ''} onClick={() => setReadMode('read')}>通读</button>
+            <button className={readMode === 'delta' ? 'active' : ''} onClick={() => setReadMode('delta')}>只看增量{data.newSinceSeen ? `（${data.newSinceSeen}）` : ''}</button>
+          </div>
+        )}
       </div>
 
       {/* 追踪范围 chips */}
@@ -71,13 +99,26 @@ export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea
         )}
       </div>
 
-      {/* 增量态：本周新进展 */}
-      {weekNew > 0 && (
-        <div style={{ border: '1px solid rgba(169,121,31,.3)', background: 'rgba(169,121,31,.06)', borderRadius: 9, padding: '10px 13px', marginBottom: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#8a6a1a' }}>🗓 近 7 天新收录 {weekNew} 条</div>
-          <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 2 }}>已自动归入下面各主线；回访不用重读全文。</div>
-        </div>
-      )}
+      {/* 增量态：只看"上次之后新发生的"，不用重读全文 */}
+      {readMode === 'delta' && (() => {
+        const seenMs = data.lastSeenAt ? new Date((data.lastSeenAt || '').replace(' ', 'T') + 'Z').getTime() : 0
+        const news = active.flatMap(sl => (sl.members || []).filter(m => new Date((m.ts || '').replace(' ', 'T') + (/[zZ]/.test(m.ts || '') ? '' : 'Z')).getTime() > seenMs).map(m => ({ m, sl }))).sort((a, b) => (b.m.ts || '').localeCompare(a.m.ts || ''))
+        return (
+          <div style={{ border: '1px solid rgba(169,121,31,.3)', background: 'rgba(169,121,31,.06)', borderRadius: 9, padding: '11px 13px', marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#8a6a1a', marginBottom: 6 }}>🗓 上次看过之后，新发生了 {news.length} 件事</div>
+            {news.length === 0 && <div style={{ fontSize: 12, color: 'var(--sub2)' }}>没有新进展——切「通读」看全部。</div>}
+            {news.map(({ m, sl }) => (
+              <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, padding: '3px 0' }}>
+                <span style={{ color: 'var(--faint)', flex: 'none' }}>{(m.ts || '').slice(5, 10)}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
+                <span className="wb-pill" style={{ fontSize: 9.5, color: '#3d5a80', background: 'rgba(61,90,128,.1)', flex: 'none' }}>{sl.name.slice(0, 10)}</span>
+                {m.url && <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--faint)', flex: 'none' }}>↗</a>}
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: 'var(--sub2)', marginTop: 6 }}>已自动归入下面各主线；点「通读」看完整脉络。</div>
+          </div>
+        )
+      })()}
 
       {/* 本月总览 */}
       {data.overview && (
@@ -91,7 +132,9 @@ export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea
       {active.map((sl, i) => (
         <div key={sl.id} className="wb-card" style={{ marginBottom: 14, padding: '14px 16px' }}>
           <div style={{ fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>主线{'一二三四五六'[i] || (i + 1)}：{sl.name}<span style={{ fontSize: 12, color: 'var(--faint)', fontWeight: 400, marginLeft: 8 }}>{sl.members.length} 条</span></div>
-          {sl.narrative && <div style={{ fontSize: 13.5, lineHeight: 1.85, color: 'var(--body2)', marginBottom: 10 }}>{renderNarrative(sl.narrative, sl.members)}</div>}
+          {sl.narrative && (String(sl.narrative).startsWith('⚠️')
+            ? <div className="wb-warnbar" style={{ marginBottom: 10 }}>{sl.narrative}<button className="wb-btn-ghost" style={{ marginLeft: 8, padding: '2px 9px', fontSize: 11 }} onClick={refresh}>重新生成</button></div>
+            : <div style={{ fontSize: 13.5, lineHeight: 1.85, color: 'var(--body2)', marginBottom: 10 }}>{renderNarrative(sl.narrative, sl.members)}</div>)}
           {sl.verdict && (
             <div style={{ borderLeft: '3px solid var(--accent)', background: 'rgba(61,90,128,.06)', borderRadius: '0 8px 8px 0', padding: '9px 12px', margin: '8px 0' }}>
               <div style={{ fontSize: 10.5, color: 'var(--accent)', marginBottom: 3, fontWeight: 600 }}>⚖️ 一句话判断 · AI 判断，供你反驳</div>

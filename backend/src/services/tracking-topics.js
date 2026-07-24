@@ -13,6 +13,7 @@ const RECALL_THRESHOLD = 0.35;   // 向量召回宽松（保召回，aboutness �
 const RECALL_WINDOW_DAYS = 31;
 const MAX_STORYLINES = 6;
 const MIN_FOR_SYNTHESIS = 8;
+const GENRES = ['一句话提炼体', '个人叙事体', '实践复盘体', '思辨辨析体', '方法教程体', '读书精读体']; // 钩子文体词表（收尾⑥）
 
 const parseVec = (j) => { try { const v = JSON.parse(j); return Array.isArray(v) && v.length ? v : null; } catch { return null; } };
 const extractJson = (t) => { const s = t?.indexOf('{'), e = t?.lastIndexOf('}'); if (s == null || s < 0 || e <= s) return null; try { return JSON.parse(t.slice(s, e + 1)); } catch { return null; } };
@@ -54,7 +55,7 @@ export function getTrackingTopicByName(name) {
 // 列表（mock E）：每个追踪主题带成员数、主线数、本周新增、总览
 export function listTrackingTopics() {
   const db = getDatabase();
-  const topics = db.prepare('SELECT * FROM tracking_topics ORDER BY updated_at DESC').all();
+  const topics = db.prepare('SELECT * FROM tracking_topics WHERE archived=0 ORDER BY updated_at DESC').all();
   const out = topics.map(t => {
     const memberCount = db.prepare('SELECT COUNT(*) c FROM tracking_topic_contents WHERE tracking_topic_id=? AND muted=0').get(t.id).c;
     const storylineCount = db.prepare("SELECT COUNT(*) c FROM storylines WHERE tracking_topic_id=? AND status='active'").get(t.id).c;
@@ -85,6 +86,85 @@ export function ejectContent(topicId, contentId) {
   const r = db.prepare('UPDATE tracking_topic_contents SET muted=1 WHERE tracking_topic_id=? AND content_id=?').run(topicId, contentId);
   db.close();
   return { ejected: r.changes };
+}
+
+// 实体归一（收尾③）：大小写/空格不敏感的规范化
+const normEntity = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// 查重：创建前找相似追踪主题（词面不敏感 + 向量）。返回命中的现有主题或 null。
+export async function findSimilarTrackingTopic(name, aliases = []) {
+  const db = getDatabase();
+  const all = db.prepare("SELECT * FROM tracking_topics WHERE archived=0").all();
+  db.close();
+  const nName = normEntity(name);
+  const nAll = new Set([nName, ...aliases.map(normEntity)]);
+  // 词面：名字或别名规范化后相等/包含
+  for (const t of all) {
+    const set = new Set([normEntity(t.name), ...JSON.parse(t.aliases || '[]').map(normEntity)]);
+    for (const a of nAll) for (const b of set) { if (a && b && (a === b || a.includes(b) || b.includes(a))) return { topic: t, reason: '名称/别名重合' }; }
+  }
+  // 向量：新名 embed vs 现有 centroid
+  try {
+    const nv = await embedText([name, ...aliases].join(' / '));
+    for (const t of all) { const cv = parseVec(t.centroid_embedding); if (cv && cosine(nv, cv) >= 0.80) return { topic: t, reason: '语义高度相似' }; }
+  } catch { /* 向量失败就只靠词面 */ }
+  return null;
+}
+
+export function deleteTrackingTopic(id) {
+  const db = getDatabase();
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM storylines WHERE tracking_topic_id=?').run(id);
+    db.prepare('DELETE FROM tracking_topic_contents WHERE tracking_topic_id=?').run(id);
+    db.prepare('DELETE FROM tracking_topics WHERE id=?').run(id);
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); db.close(); throw e; }
+  db.close();
+  return { deleted: true };
+}
+export function setTrackingArchived(id, archived = true) {
+  const db = getDatabase();
+  const r = db.prepare("UPDATE tracking_topics SET archived=?, updated_at=datetime('now') WHERE id=?").run(archived ? 1 : 0, id);
+  db.close();
+  return { archived: !!archived, changed: r.changes };
+}
+
+// 回访可感知（收尾⑤）：记 last_seen；返回"上次看到的时间 + 之后新增件数"
+export function markSeen(id) {
+  const db = getDatabase();
+  const prev = db.prepare('SELECT last_seen_at FROM tracking_topics WHERE id=?').get(id)?.last_seen_at || null;
+  db.prepare("UPDATE tracking_topics SET last_seen_at=datetime('now') WHERE id=?").run(id);
+  db.close();
+  return prev;
+}
+
+// AI 提议候选（收尾④）：只依据真实行为（近 60 天星标内容 + 存下的素材）+ 近期大事件簇，给话题候选。
+// 用户裁决建；AI 绝不自动建。拒绝后不再提（前端记 localStorage 即可，简单）。
+export async function suggestTrackingCandidates({ limit = 3 } = {}) {
+  const db = getDatabase();
+  const existing = db.prepare("SELECT name, aliases FROM tracking_topics WHERE archived=0").all();
+  const exNames = new Set(existing.flatMap(t => [normEntity(t.name), ...JSON.parse(t.aliases || '[]').map(normEntity)]));
+  // 行为文本：近 60 天星标内容标题 + 素材标题
+  const behav = db.prepare(`
+    SELECT COALESCE(zh_title,en_title) t FROM contents WHERE starred=1 AND datetime(COALESCE(updated_at,created_at))>datetime('now','-60 days')
+    UNION ALL SELECT COALESCE(title,source_title) t FROM notes WHERE datetime(created_at)>datetime('now','-60 days')`).all().map(r => r.t).filter(Boolean).slice(0, 40);
+  // 近期大簇的 headline（事件级）
+  const clusters = db.prepare("SELECT headline FROM stories WHERE source_count>=3 ORDER BY heat_score DESC LIMIT 12").all().map(r => r.headline);
+  db.close();
+  if (!behav.length && !clusters.length) return [];
+  const prompt = `根据用户近期的真实动作（下面是他星标/存下的内容标题）和当下的热点事件，提议 ${limit} 个**值得长期追踪的话题/实体**（如某公司、某产品线、某技术方向）。
+- 只提"以某个实体/话题为主角、会持续有新进展"的（能织成脉络的），别提一次性事件。
+- 每个给 name（简洁实体名）+ aliases（3-6 个别名/相关词）+ why（一句：为什么根据他的行为值得追）。
+- 不要提这些已在追踪的：${[...exNames].slice(0, 20).join('、') || '（无）'}
+【用户星标/素材】${behav.join('｜').slice(0, 1500)}
+【近期热点】${clusters.join('｜').slice(0, 600)}
+只输出 JSON：{"candidates":[{"name":"...","aliases":["..."],"why":"..."}]}`;
+  const r = await chat([{ role: 'user', content: prompt }]);
+  const arr = r.success && extractJson(r.content)?.candidates;
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(c => c?.name && !exNames.has(normEntity(c.name))).slice(0, limit)
+    .map(c => ({ name: String(c.name).slice(0, 40), aliases: Array.isArray(c.aliases) ? c.aliases.slice(0, 6) : [], why: String(c.why || '').slice(0, 60) }));
 }
 
 // ① 成员判定：向量召回 + LLM aboutness（主角性）
@@ -269,12 +349,19 @@ ${evid}
    **每个事实句结尾必须带它的出处编号 [#n]**（如"…完成百万行迁移 [#3]。"）；写不进出处的事实句不许出现，宁可不写。
 2. verdict（判断）：犀利、独立、可反驳的一句——"AI 判断·供你反驳"，只下判断、不引用、不带出处。
 3. watch（待追）：中性一句"接下来值得盯什么"。
-4. hook（钩子）：给创作接缝，**结构固定**="角度：<一句选题角度>。可接：<建议文体×平台>。"——**禁止反问句**、禁议论文腔。
+4. hook（钩子）：给创作接缝，**结构固定**="角度：<一句选题角度>。可接：<文体>×<平台> · 对应你可能有的积累。"——
+   文体只能从这个词表选：${GENRES.join(' / ')}；平台如 公众号长文/小红书卡片/X thread/掘金。**禁止反问句**、禁议论文腔。
 只输出 JSON（不要代码块）：{"narrative":"...","verdict":"...","watch":"...","hook":"..."}`;
-    const r = await chat([{ role: 'user', content: prompt }], 'deepseek', null, { temperature: 0.2 });
-    const j = extractJson(r.content) || {};
+    // 守门（收尾⑥）：脉络/判断空槽重试一次；仍空则显式标失败，不静默出半成品
+    let j = {};
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await chat([{ role: 'user', content: prompt }], 'deepseek', null, { temperature: 0.2 });
+      j = extractJson(r.content) || {};
+      if ((j.narrative || '').trim() && (j.verdict || '').trim()) break;
+    }
     const narrative = stripUnsourced(j.narrative || ''); // 后校验：剔除无 [#n] 标记的陈述句
-    updSL.run(narrative, j.verdict || '', j.watch || '', j.hook || '', sl.id);
+    const failed = !narrative.trim() || !(j.verdict || '').trim();
+    updSL.run(failed ? '⚠️ 本段生成失败（脉络/判断缺失），点「重新生成」重试' : narrative, j.verdict || (failed ? '⚠️ 生成失败' : ''), j.watch || '', j.hook || '', sl.id);
     activeNames.push(sl.name);
   }
 
@@ -300,8 +387,12 @@ export function getTrackingSynthesis(topicId) {
   db.close();
   const byLine = new Map();
   for (const m of members) { if (!byLine.has(m.storyline_id)) byLine.set(m.storyline_id, []); byLine.get(m.storyline_id).push(m); }
+  // 回访增量（收尾⑤）：last_seen 之后新增的件数（N=0 也返回，前端常驻显示）
+  const seenMs = topic.last_seen_at ? new Date(topic.last_seen_at.replace(' ', 'T') + 'Z').getTime() : 0;
+  const newSinceSeen = seenMs ? members.filter(m => new Date((m.ts || '').replace(' ', 'T') + (/[zZ]/.test(m.ts || '') ? '' : 'Z')).getTime() > seenMs).length : 0;
   return {
     ...topic, aliases: JSON.parse(topic.aliases || '[]'), memberCount: members.length,
+    lastSeenAt: topic.last_seen_at, newSinceSeen,
     storylines: storylines.map(sl => ({ ...sl, members: byLine.get(sl.id) || [] })),
   };
 }

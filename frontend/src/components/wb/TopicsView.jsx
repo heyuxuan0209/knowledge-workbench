@@ -22,18 +22,40 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
   // P3 追踪主题（mock E）：主题库上「追踪中」下「创作主题」共存
   const [tracking, setTracking] = useState([])
   const [newTrack, setNewTrack] = useState('')
+  const [candidates, setCandidates] = useState([])  // AI 提议候选（收尾④）
+  const [trackMenu, setTrackMenu] = useState(null)   // 卡片 ⋯ 菜单打开的 id
   const loadTracking = () => api('/api/tracking-topics').then(j => setTracking(j.data || [])).catch(() => {})
-  useEffect(() => { loadTracking() }, [])
-  const createTracking = async () => {
-    const name = newTrack.trim()
+  const dismissedCand = () => { try { return JSON.parse(localStorage.getItem('wb-track-cand-dismissed') || '[]') } catch { return [] } }
+  const loadCandidates = () => api('/api/tracking-topics/suggest').then(j => setCandidates((j.data || []).filter(c => !dismissedCand().includes(c.name)))).catch(() => {})
+  useEffect(() => { loadTracking(); loadCandidates() }, []) // eslint-disable-line
+  // 建追踪：查重（命中已有→去看/仍建）+ 撤销 toast（收尾②③）
+  const createTracking = async (nameArg, aliasesArg, force = false) => {
+    const name = (nameArg ?? newTrack).trim()
     if (!name) return
-    setNewTrack('')
+    if (nameArg == null) setNewTrack('')
     try {
-      const j = await api('/api/tracking-topics', { method: 'POST', body: { name, aliases: [name] } })
-      showToast?.(`已建追踪主题「${name}」，AI 正在收录 + 归线 + 综述（约 1-2 分钟）…`)
+      const j = await api('/api/tracking-topics', { method: 'POST', body: { name, aliases: aliasesArg || [name], force } })
+      const dup = j.data?.duplicate
+      if (dup) {
+        if (confirm(`已在追踪《${dup.name}》（${dup.reason}）。\n确定=去看它；取消=仍然另建一个。`)) { gotoTracking?.(dup.id); return }
+        return createTracking(name, aliasesArg, true)
+      }
+      const id = j.data?.id
+      showToast?.(`已建追踪《${name}》，AI 正在收录+归线+综述（约 1-2 分钟）…`, id ? { label: '撤销', onClick: async () => { try { await api(`/api/tracking-topics/${id}`, { method: 'DELETE' }); loadTracking(); showToast?.('已撤销') } catch { /* noop */ } } } : null)
       setTimeout(loadTracking, 3000)
-      if (j.data?.id) gotoTracking?.(j.data.id)
+      if (id) gotoTracking?.(id)
     } catch (e) { showToast?.('新建失败：' + e.message) }
+  }
+  const adoptCandidate = (c) => createTracking(c.name, c.aliases?.length ? c.aliases : [c.name])
+  const dismissCandidate = (c) => { localStorage.setItem('wb-track-cand-dismissed', JSON.stringify([...dismissedCand(), c.name].slice(-50))); setCandidates(cs => cs.filter(x => x.name !== c.name)) }
+  const deleteTracking = async (t) => {
+    setTrackMenu(null)
+    if (!confirm(`删除追踪主题《${t.name}》？收录的 ${t.memberCount} 条与综述都会删除（素材本身不受影响）。`)) return
+    try { await api(`/api/tracking-topics/${t.id}`, { method: 'DELETE' }); showToast?.('已删除'); loadTracking() } catch (e) { showToast?.('删除失败：' + e.message) }
+  }
+  const archiveTracking = async (t) => {
+    setTrackMenu(null)
+    try { await api(`/api/tracking-topics/${t.id}/archive`, { method: 'POST', body: { archived: true } }); showToast?.('已归档（可在归档区恢复）'); loadTracking() } catch (e) { showToast?.('归档失败：' + e.message) }
   }
 
   // 建议主题（系统提议、用户拍板）：热点聚类 + 近期素材 + 涌现建议，每日一算
@@ -103,21 +125,48 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
           <span style={{ fontSize: 13.5, fontWeight: 700 }}>🛰 追踪中（{tracking.length}）</span>
           <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>替你盯着外面的话题</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            <input value={newTrack} onChange={e => setNewTrack(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') createTracking() }}
+            <input value={newTrack} onChange={e => setNewTrack(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) createTracking() }}
               placeholder="追踪一个话题（如 Claude、loop engineering）…"
               style={{ fontSize: 12.5, padding: '6px 10px', width: 240, border: '1px solid var(--line10)', borderRadius: 7, background: 'var(--surface)', color: 'var(--body)' }} />
-            <button className="wb-btn-primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={createTracking}>＋ 追踪</button>
+            <button className="wb-btn-primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => createTracking()}>＋ 追踪</button>
           </div>
         </div>
-        {tracking.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '6px 2px' }}>还没有追踪主题——建一个，AI 每天把「以它为主角」的资讯归进来、织成脉络综述。</div>}
+
+        {/* AI 提议 · 供你裁决（收尾④）：依据你的星标/精读行为，AI 绝不自动建 */}
+        {candidates.length > 0 && (
+          <div style={{ border: '1px dashed rgba(61,90,128,.4)', borderRadius: 9, padding: '9px 12px', marginBottom: 10, background: 'rgba(61,90,128,.04)' }}>
+            <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>💡 AI 提议 · 供你裁决<span style={{ color: 'var(--faint)' }}>（看你近期在关注的，要不要长期追？拒绝后不再提）</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {candidates.map(c => (
+                <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                  <b style={{ flex: 'none' }}>{c.name}</b>
+                  <span style={{ flex: 1, minWidth: 0, color: 'var(--sub2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.why}</span>
+                  <button className="wb-btn-outline" style={{ padding: '3px 10px', fontSize: 11, flex: 'none' }} onClick={() => adoptCandidate(c)}>＋ 追踪</button>
+                  <button className="wb-note-del" style={{ flex: 'none' }} title="不追，别再提" onClick={() => dismissCandidate(c)}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tracking.length === 0 && candidates.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '6px 2px' }}>还没有追踪主题——建一个，AI 每天把「以它为主角」的资讯归进来、织成脉络综述。</div>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
           {tracking.map(t => (
-            <div key={t.id} className="wb-card" style={{ padding: '12px 14px', cursor: 'pointer' }} onClick={() => gotoTracking?.(t.id)}>
+            <div key={t.id} className="wb-card" style={{ padding: '12px 14px', cursor: 'pointer', position: 'relative' }} onClick={() => gotoTracking?.(t.id)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                 <span style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600 }}>{t.name}</span>
                 {t.weekNew > 0 && <span className="wb-pill" style={{ fontSize: 10, color: '#8a6a1a', background: 'rgba(169,121,31,.12)' }}>本周 +{t.weekNew}</span>}
                 {t.status === 'paused' && <span className="wb-pill" style={{ fontSize: 10, color: 'var(--faint)', background: 'var(--line07)' }}>已暂停</span>}
+                <button className="wb-note-del" style={{ marginLeft: 'auto', flex: 'none' }} title="更多" onClick={(e) => { e.stopPropagation(); setTrackMenu(trackMenu === t.id ? null : t.id) }}>⋯</button>
               </div>
+              {trackMenu === t.id && (<>
+                <div onClick={(e) => { e.stopPropagation(); setTrackMenu(null) }} style={{ position: 'fixed', inset: 0, zIndex: 30 }} />
+                <div style={{ position: 'absolute', right: 10, top: 32, zIndex: 40, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 8, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 4, minWidth: 140 }} onClick={e => e.stopPropagation()}>
+                  <div className="wb-menu-item" style={{ padding: '7px 10px', fontSize: 12.5, cursor: 'pointer', borderRadius: 6 }} onClick={() => archiveTracking(t)}>📥 归档（可恢复）</div>
+                  <div className="wb-menu-item" style={{ padding: '7px 10px', fontSize: 12.5, cursor: 'pointer', borderRadius: 6, color: 'var(--red)' }} onClick={() => deleteTracking(t)}>🗑 删除</div>
+                </div>
+              </>)}
               <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 6 }}>{t.spanDays || 0} 天 · 收录 {t.memberCount} 条 · {t.storylineCount} 条主线</div>
               {t.gathering
                 ? <div style={{ fontSize: 12, color: 'var(--faint)', lineHeight: 1.5 }}>攒料中——条目够了（≥8）且串得成因果链，综述才会出现，不硬写。</div>
@@ -133,7 +182,7 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       <div className="wb-acquire" style={{ marginTop: 16 }}>
         <input placeholder="搜索已有主题，或输入新主题名建立主题页…" value={query}
           onChange={e => setQuery(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && filtered.length === 0) createTopic() }} />
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && filtered.length === 0) createTopic() }} />
         <button className="wb-btn-primary" disabled={creating} onClick={() => {
           if (filtered.length === 0 && query.trim()) createTopic()
         }}>{creating ? '建页中…' : (query.trim() && filtered.length === 0 ? '建立主题页' : '搜索')}</button>

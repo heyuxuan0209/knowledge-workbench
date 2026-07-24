@@ -1096,19 +1096,40 @@ app.get('/api/tracking-topics', async (req, res) => {
   try { const { listTrackingTopics } = await import('./services/tracking-topics.js'); res.json({ success: true, data: listTrackingTopics() }); }
   catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
+app.get('/api/tracking-topics/suggest', async (req, res) => { // 必须在 /:id 之前
+  try { const { suggestTrackingCandidates } = await import('./services/tracking-topics.js'); res.json({ success: true, data: await suggestTrackingCandidates({}) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
 app.get('/api/tracking-topics/:id', async (req, res) => {
   try { const { getTrackingSynthesis } = await import('./services/tracking-topics.js'); const d = getTrackingSynthesis(req.params.id); d ? res.json({ success: true, data: d }) : res.status(404).json({ success: false, error: 'not found' }); }
   catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 app.post('/api/tracking-topics', async (req, res) => {
   try {
-    const { name, aliases } = req.body || {};
+    const { name, aliases, force } = req.body || {};
     if (!name?.trim()) return res.status(400).json({ success: false, error: 'name 必填' });
-    const { createTrackingTopic, refreshTrackingTopic } = await import('./services/tracking-topics.js');
-    const t = await createTrackingTopic({ name: name.trim(), aliases: Array.isArray(aliases) ? aliases : [], createdBy: 'user' });
+    const al = Array.isArray(aliases) ? aliases : [];
+    const { createTrackingTopic, refreshTrackingTopic, findSimilarTrackingTopic } = await import('./services/tracking-topics.js');
+    if (!force) { // 查重（收尾③）：命中相似的先提示合并，不闷头新建
+      const sim = await findSimilarTrackingTopic(name.trim(), al);
+      if (sim) return res.json({ success: true, data: { duplicate: { id: sim.topic.id, name: sim.topic.name, reason: sim.reason } } });
+    }
+    const t = await createTrackingTopic({ name: name.trim(), aliases: al.length ? al : [name.trim()], createdBy: req.body?.createdBy === 'suggestion' ? 'suggestion' : 'user' });
     res.json({ success: true, data: t });
     refreshTrackingTopic(t.id).catch(e => console.error('[tracking] 首轮生成失败:', e.message)); // 异步跑首轮
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.delete('/api/tracking-topics/:id', async (req, res) => {
+  try { const { deleteTrackingTopic } = await import('./services/tracking-topics.js'); res.json({ success: true, data: deleteTrackingTopic(req.params.id) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/tracking-topics/:id/archive', async (req, res) => {
+  try { const { setTrackingArchived } = await import('./services/tracking-topics.js'); res.json({ success: true, data: setTrackingArchived(req.params.id, req.body?.archived !== false) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/tracking-topics/:id/seen', async (req, res) => {
+  try { const { markSeen } = await import('./services/tracking-topics.js'); res.json({ success: true, data: { prevSeen: markSeen(req.params.id) } }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 app.post('/api/tracking-topics/:id/refresh', async (req, res) => {
   try { const { refreshTrackingTopic } = await import('./services/tracking-topics.js'); res.json({ success: true, data: await refreshTrackingTopic(req.params.id) }); }
