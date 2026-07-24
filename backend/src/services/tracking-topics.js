@@ -17,6 +17,22 @@ const MIN_FOR_SYNTHESIS = 8;
 const parseVec = (j) => { try { const v = JSON.parse(j); return Array.isArray(v) && v.length ? v : null; } catch { return null; } };
 const extractJson = (t) => { const s = t?.indexOf('{'), e = t?.lastIndexOf('}'); if (s == null || s < 0 || e <= s) return null; try { return JSON.parse(t.slice(s, e + 1)); } catch { return null; } };
 const dstr = (iso) => (iso || '').slice(5, 10); // MM-DD
+const fulldate = (iso) => (iso || '').slice(0, 10) || '（无日期）'; // YYYY-MM-DD（注入用，防年份幻觉）
+
+// 后校验（返工④）：脉络里"没有 [#n] 出处标记的实质陈述句"剔除——落实"写不进出处不许出现"。
+// 保留：带 [#n] 的句子、很短的过渡句（<12 字，如"但转折出现："）。
+function stripUnsourced(text) {
+  if (!text) return '';
+  const parts = String(text).split(/(?<=[。！？])/); // 按句末标点切，保留标点
+  const kept = parts.filter(s => {
+    const t = s.trim();
+    if (!t) return false;
+    if (/\[#\d+\]/.test(t)) return true;          // 有出处角标 → 留
+    if (t.replace(/[，、：；""'']/g, '').length < 12) return true; // 短过渡句 → 留
+    return false;                                  // 无出处的实质陈述句 → 剔
+  });
+  return kept.join('').trim();
+}
 
 export async function createTrackingTopic({ name, aliases = [], createdBy = 'user' }) {
   const db = getDatabase();
@@ -135,7 +151,9 @@ function loadMembers(db, topicId) {
     ORDER BY datetime(COALESCE(c.published_at,c.created_at)) ASC`).all(topicId);
 }
 
-// ② 增量归线：LLM 按因果连通性把成员分主线（≤6）+ 零散区。首版全量分（增量版后续接）。
+// ② 归线（两步走·返工①）：先让 LLM **列候选因果链**（每链写明谁是谁的原因/后续/反应）再分配条目；
+// 零散区跑第二遍"能否挂入已有链"；薄线（<${MIN_LINE = 3} 条）并入零散。判据=因果连通性，禁话题/词面归堆。
+const MIN_LINE = 3;
 export async function assignStorylines(topicId) {
   const db = getDatabase();
   const topic = db.prepare('SELECT * FROM tracking_topics WHERE id=?').get(topicId);
@@ -144,47 +162,81 @@ export async function assignStorylines(topicId) {
   if (members.length < 2) return { storylines: 0 };
 
   const list = members.map((m, i) => `${i}. [${dstr(m.ts)}] ${m.title}`).join('\n');
-  const prompt = `下面是追踪主题「${topic.name}」的 ${members.length} 条内容（按时间排）。请按**因果连通性**把它们归成主线——
-判据：一条是另一条的原因/后续/证据/反驳/同一进程 → 同一条主线（不是"话题相似"就归堆，禁词面归类）。
-- 主线数 ≤ ${MAX_STORYLINES}，每条主线给一个能概括其"脉络"的名字（8-16 字，带张力，别用泛词）。
-- 真正成不了因果链的零散条目，全部放进最后一组、名字固定为"零散动态"。
-必须覆盖全部 0..${members.length - 1}，只输出 JSON（不要代码块）：
-{"storylines":[{"name":"主线名","members":[0,3,5]}, ..., {"name":"零散动态","members":[...]}]}
+  // ── 第一步：列因果链（要理由）+ 分配 ──
+  const promptA = `追踪主题「${topic.name}」有下面 ${members.length} 条内容（按时间）。把它们归成**因果链主线**。
+
+**判据 = 因果连通性**：一条是另一条的 原因 / 后续 / 反应 / 证据 / 反驳 / 同一进程的不同阶段 → 同一条链。
+**禁止**：按"话题/主体相似"归堆（如"都提到 ${topic.name}"就归一起）；主角不符的（如第三方滥用、别的产品）进零散或不归。
+
+示范这种链怎么找：
+- "秘密递交 IPO → 巨额投资/算力采购 → 版权和解获批 → 治理背书" = 一条"上市前商业冲刺"链（都是 IPO 前的清障/铺垫动作，互为因果）。
+- "开源模型登顶 → 市场震荡 → 制裁威胁 → 蒸馏指控" = 一条"护城河遭遇战"链（一环触发下一环）。
+
+要求：
+- 先想清每条链的**因果关系**（谁引发谁），再分配条目；主线 ≤ ${MAX_STORYLINES}，每链 ≥2 条。
+- 每条链给名字（8-16 字、带张力、非泛词）+ 一句 why（这条链的因果主轴是什么）。
+- 真串不成因果链的条目放进 scattered。
+
+只输出 JSON（不要代码块）：{"chains":[{"name":"...","why":"因果主轴一句话","members":[0,3,5]}],"scattered":[1,2]}
 
 ${list}`;
-  const r = await chat([{ role: 'user', content: prompt }], 'deepseek', null, { temperature: 0 });
-  const groups = r.success && extractJson(r.content)?.storylines;
-  if (!Array.isArray(groups) || !groups.length) return { storylines: 0, error: 'LLM 归线失败' };
+  const rA = await chat([{ role: 'user', content: promptA }], 'deepseek', null, { temperature: 0 });
+  const parsed = rA.success && extractJson(rA.content);
+  let chains = Array.isArray(parsed?.chains) ? parsed.chains : [];
+  let scattered = Array.isArray(parsed?.scattered) ? parsed.scattered.filter(i => Number.isInteger(i) && i >= 0 && i < members.length) : [];
+  if (!chains.length) return { storylines: 0, error: 'LLM 归线失败' };
+
+  // 去重 + 收集已分配
+  const assigned = new Set();
+  chains = chains.map(c => ({ name: (c.name || '未命名').slice(0, 40), why: c.why || '', members: (c.members || []).filter(i => Number.isInteger(i) && i >= 0 && i < members.length && !assigned.has(i) && (assigned.add(i), true)) }))
+    .filter(c => c.members.length);
+  // 未覆盖的补进 scattered
+  for (let i = 0; i < members.length; i++) if (!assigned.has(i) && !scattered.includes(i)) scattered.push(i);
+  scattered = scattered.filter(i => !assigned.has(i));
+
+  // ── 第二步：零散条目跑"能否挂入已有链" ──
+  if (scattered.length && chains.length) {
+    const chainList = chains.map((c, i) => `${i}. ${c.name}｜${c.why}`).join('\n');
+    const scatList = scattered.map(i => `${i}. [${dstr(members[i].ts)}] ${members[i].title}`).join('\n');
+    const promptB = `已有这些因果链：\n${chainList}\n\n下面是暂未归线的零散条目。逐条判断它是不是某条链的 原因/后续/反应/证据（因果相关，不是话题相似）——是则给 chain 序号，不是则 -1（真零散）。
+只输出 JSON：{"assign":[{"i":<条目序号>,"chain":<链序号或-1>}]}\n\n${scatList}`;
+    const rB = await chat([{ role: 'user', content: promptB }], 'deepseek', null, { temperature: 0 });
+    const asg = rB.success && extractJson(rB.content)?.assign;
+    if (Array.isArray(asg)) for (const a of asg) {
+      if (Number.isInteger(a?.i) && Number.isInteger(a?.chain) && a.chain >= 0 && a.chain < chains.length && scattered.includes(a.i)) {
+        chains[a.chain].members.push(a.i); assigned.add(a.i); scattered = scattered.filter(x => x !== a.i);
+      }
+    }
+  }
+
+  // 薄线（<3 条）并入零散（返工①：不硬留薄线）
+  const thin = chains.filter(c => c.members.length < MIN_LINE);
+  chains = chains.filter(c => c.members.length >= MIN_LINE);
+  for (const c of thin) scattered.push(...c.members);
+  scattered = [...new Set(scattered)];
 
   const wdb = getDatabase();
   wdb.exec('BEGIN');
   try {
     wdb.prepare('DELETE FROM storylines WHERE tracking_topic_id=?').run(topicId);
     wdb.prepare('UPDATE tracking_topic_contents SET storyline_id=NULL WHERE tracking_topic_id=?').run(topicId);
-    const insSL = wdb.prepare(`INSERT INTO storylines (id, tracking_topic_id, name, status, ord) VALUES (?,?,?,?,?)`);
+    const insSL = wdb.prepare(`INSERT INTO storylines (id, tracking_topic_id, name, narrative, status, ord) VALUES (?,?,?,?,?,?)`);
     const setLine = wdb.prepare('UPDATE tracking_topic_contents SET storyline_id=? WHERE tracking_topic_id=? AND content_id=?');
-    const seen = new Set();
     let ord = 0;
-    for (const g of groups) {
-      const idxs = (g.members || []).filter(i => Number.isInteger(i) && i >= 0 && i < members.length && !seen.has(i) && (seen.add(i), true));
-      if (!idxs.length) continue;
-      const scattered = /零散/.test(g.name || '');
+    for (const c of chains) {
       const slId = randomUUID();
-      insSL.run(slId, topicId, (g.name || '未命名').slice(0, 40), scattered ? 'scattered' : 'active', scattered ? 99 : ord++);
-      for (const i of idxs) setLine.run(slId, topicId, members[i].id);
+      insSL.run(slId, topicId, c.name, c.why || null, 'active', ord++); // 暂存 why 在 narrative，综述阶段覆盖
+      for (const i of c.members) setLine.run(slId, topicId, members[i].id);
     }
-    // 未被 LLM 覆盖的兜进零散
-    const leftover = members.filter((_, i) => !seen.has(i));
-    if (leftover.length) {
-      let sc = wdb.prepare("SELECT id FROM storylines WHERE tracking_topic_id=? AND status='scattered' LIMIT 1").get(topicId);
-      if (!sc) { const slId = randomUUID(); insSL.run(slId, topicId, '零散动态', 'scattered', 99); sc = { id: slId }; }
-      for (const m of leftover) setLine.run(sc.id, topicId, m.id);
+    if (scattered.length) {
+      const slId = randomUUID(); insSL.run(slId, topicId, '零散动态', null, 'scattered', 99);
+      for (const i of scattered) setLine.run(slId, topicId, members[i].id);
     }
     wdb.exec('COMMIT');
   } catch (e) { wdb.exec('ROLLBACK'); wdb.close(); throw e; }
-  const n = wdb.prepare('SELECT COUNT(*) c FROM storylines WHERE tracking_topic_id=?').get(topicId).c;
+  const n = wdb.prepare("SELECT COUNT(*) c FROM storylines WHERE tracking_topic_id=? AND status='active'").get(topicId).c;
   wdb.close();
-  return { storylines: n };
+  return { storylines: n, scattered: scattered.length };
 }
 
 // ③ 四槽位综述：每条 active 主线生成 脉络/判断/待追/钩子 + 总览。硬约束：写不进出处的事实句不许出现。
@@ -205,19 +257,24 @@ export async function generateSynthesis(topicId) {
   for (const sl of storylines) {
     const ms = byLine.get(sl.id) || [];
     if (sl.status === 'scattered' || ms.length < 2) continue; // 零散区不生成叙事
-    const evid = ms.map((m, i) => `[${dstr(m.ts)}] ${m.title}｜${(m.summary || '').slice(0, 80)}｜出处#${i + 1}${m.url ? '=' + m.url : '（无链接）'}`).join('\n');
-    const prompt = `你在给追踪主题「${topic.name}」写主线「${sl.name}」的综述段。素材（按时间）：
+    // 出处编号 [#n]（按时间序，与 UI 成员顺序一致）+ 真实日期（含年份，从 published_at 注入，不让 LLM 生成）
+    const evid = ms.map((m, i) => `[#${i + 1}] ${fulldate(m.ts)}｜${m.title}｜${(m.summary || '').slice(0, 90)}`).join('\n');
+    const prompt = `给追踪主题「${topic.name}」的主线「${sl.name}」写综述段。素材（按时间，[#n] 是出处编号）：
 ${evid}
 
-写成四个槽位，硬约束：**每个事实句都必须能落到上面某条素材（写不进出处的事实句不许出现，宁可不写）**：
-- narrative（脉络）：把这些事按时间/因果串成一段直白叙事，点名日期与主体，句句基于素材、不夸张不编造。
-- verdict（一句话判断）：犀利、独立、有观点的一句——这是"AI 判断·供你反驳"，不引用素材、只下判断。
-- watch（待追）：中性地提一句"接下来值得盯什么"。
-- hook（钩子）：给一个可写的角度（给角度不给腔调），一句话。
+严格按四槽位输出，硬性纪律：
+1. narrative（脉络）：**叙事，不是流水账**——按"起点 → 转折 → 现状"讲清这条线怎么演变的（谁引发谁），日期只做锚点。
+   **禁止**"X 日……；同日……；X 日……"的编年罗列句式。
+   **日期/数字只能用上面素材里给的，一个字都不许自己编（尤其年份）**。
+   **每个事实句结尾必须带它的出处编号 [#n]**（如"…完成百万行迁移 [#3]。"）；写不进出处的事实句不许出现，宁可不写。
+2. verdict（判断）：犀利、独立、可反驳的一句——"AI 判断·供你反驳"，只下判断、不引用、不带出处。
+3. watch（待追）：中性一句"接下来值得盯什么"。
+4. hook（钩子）：给创作接缝，**结构固定**="角度：<一句选题角度>。可接：<建议文体×平台>。"——**禁止反问句**、禁议论文腔。
 只输出 JSON（不要代码块）：{"narrative":"...","verdict":"...","watch":"...","hook":"..."}`;
     const r = await chat([{ role: 'user', content: prompt }], 'deepseek', null, { temperature: 0.2 });
     const j = extractJson(r.content) || {};
-    updSL.run(j.narrative || '', j.verdict || '', j.watch || '', j.hook || '', sl.id);
+    const narrative = stripUnsourced(j.narrative || ''); // 后校验：剔除无 [#n] 标记的陈述句
+    updSL.run(narrative, j.verdict || '', j.watch || '', j.hook || '', sl.id);
     activeNames.push(sl.name);
   }
 
