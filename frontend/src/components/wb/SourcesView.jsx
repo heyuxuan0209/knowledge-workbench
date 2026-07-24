@@ -56,9 +56,11 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
     try {
       const j = await api('/api/sources/x-account', { method: 'POST', body: { handle: h } })
       const d = j.data
-      if (d.overLimit) showToast?.(`X 采集名单已满（${d.current}/${d.cap}）——先在「关注盘点」里取舍掉几个再加`)
-      else if (d.existed && !d.addedToRoster) showToast?.(`@${d.handle} 已在采集名单`)
-      else { showToast?.(`已加 @${d.handle} 进 X 直连采集（下次同步开始拉取；未配 cookies 前先备着）`); loadSources?.() }
+      if (d.existed && !d.addedToRoster) showToast?.(`@${d.handle} 已在采集名单`)
+      else {
+        const warn = d.softWarn ? `（名单已 ${d.softWarn.current}，超软上限 ${d.softWarn.softCap}——不拦，轮换会拉长周期）` : ''
+        showToast?.(`已加 @${d.handle} 进 X 直连采集${warn}（分级轮换消化，未配 cookies 前先备着）`); loadSources?.()
+      }
     } catch (e) { showToast?.('添加失败：' + e.message) }
   }
   const openAudit = async () => {
@@ -85,10 +87,16 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
     } catch (e) { showToast?.('应用失败：' + e.message) }
     setAuditBusy(false)
   }
-  // sync-x 采集名单计数（已选 N/35）：库内已选的 X active-query 源 + 勾选的采集档新建源
+  // sync-x 采集名单计数（ADR-048 分级轮换）：库内已选的 X active-query 源 + 勾选的采集档新建源
   const rosterCount = audit
     ? audit.items.filter(i => i.isRoster && keep.has(i.id)).length + rosterSel.size
     : 0
+  // 客户端估算调度分级（与后端 planXSchedule 同逻辑）：每日必拉 min(20,N)、轮换池 N-20、每几天一轮
+  const dailyMust = audit?.dailyMust ?? 20, dailyTotal = audit?.dailyTotal ?? 40, softCap = audit?.softCap ?? 80
+  const mustDaily = Math.min(dailyMust, rosterCount)
+  const rotationPool = Math.max(0, rosterCount - mustDaily)
+  const rotationSlots = Math.max(0, dailyTotal - mustDaily)
+  const cycleDays = rotationPool > 0 && rotationSlots > 0 ? Math.max(1, Math.ceil(rotationPool / rotationSlots)) : 0
 
   const registerPack = async () => {
     setPackBusy(true)
@@ -320,8 +328,10 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, borderTop: '1px solid var(--line08)', marginTop: 8 }}>
-                <span style={{ fontSize: 11.5, color: rosterCount > audit.rosterCap ? 'var(--red)' : 'var(--faint)' }}>
-                  X 采集名单 已选 <b>{rosterCount}/{audit.rosterCap}</b>{rosterCount > audit.rosterCap ? ` · 超 ${rosterCount - audit.rosterCap} 个，去掉几个冷门再确认` : ''}
+                <span style={{ fontSize: 11.5, color: rosterCount > softCap ? 'var(--amber)' : 'var(--faint)', lineHeight: 1.5 }}>
+                  X 采集 已选 <b>{rosterCount}</b> · 每日必拉 ~{mustDaily}{rotationPool > 0 ? <> · 轮换 ~{rotationPool}（每 {cycleDays} 天一轮）</> : ''}
+                  {rosterCount > softCap && <span style={{ display: 'block', color: 'var(--amber)' }}>超软上限 {softCap}，仍可确认——轮换周期会拉长</span>}
+                  <span style={{ display: 'block', color: 'var(--faint)', fontSize: 10.5 }}>优先级自动算（产出频率 × 你的精读/星标），官方每日必拉，不用手配</span>
                 </span>
                 <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} disabled={auditBusy} onClick={applyAudit}>{auditBusy ? '应用中…' : `确认关注（保留 ${keep.size} + 新建 ${rosterSel.size + mediaSel.size}）`}</button>
               </div>

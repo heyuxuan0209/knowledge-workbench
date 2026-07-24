@@ -44,7 +44,8 @@ const EXCLUDED = {
 // 同人合并：别名 handle → 主 handle（保留主源，别名并入为它的第二个 platform 行）
 const ALIAS_MERGE = { bcherny: 'BorisChy' };
 
-const ROSTER_CAP = 35;
+// sync-x 上限设计（ADR-048）：硬 35 作废 → 软上限 80（仅提示不拦截）+ 分级轮换（每日必拉 20 / 总封顶 40）
+const SOFT_CAP = 80, DAILY_MUST = 20, DAILY_TOTAL = 40;
 const norm = (s) => String(s || '').trim().toLowerCase();
 const matchedSet = new Set(Object.keys(MATCHED).map(norm));
 const matchedNames = new Set(Object.values(MATCHED).map(norm));
@@ -111,8 +112,8 @@ export function getFollowAudit() {
     toCreateMedia,
     aliasNotes,                 // 面板提示：bcherny 已作为 BorisChy 的别名合并
     precheckCount: items.filter(i => i.precheck).length,
-    rosterCap: ROSTER_CAP,
-    rosterCreateCount: toCreateRoster.length, // 默认全勾时新增的采集源数（供 N/35 初值）
+    softCap: SOFT_CAP, dailyMust: DAILY_MUST, dailyTotal: DAILY_TOTAL, // ADR-048 分级轮换：软上限仅提示、每日预算调度
+    rosterCreateCount: toCreateRoster.length,
   };
 }
 
