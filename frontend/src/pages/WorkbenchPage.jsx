@@ -10,6 +10,7 @@ import NotesView from '../components/wb/NotesView'
 import InspirationsView from '../components/wb/InspirationsView'
 import SourcesView from '../components/wb/SourcesView'
 import TopicsView from '../components/wb/TopicsView'
+import TrackingDetail from '../components/wb/TrackingDetail'
 import StudioView from '../components/wb/StudioView'
 import ReportsView from '../components/wb/ReportsView'
 import SettingsView from '../components/wb/SettingsView'
@@ -105,6 +106,9 @@ export default function WorkbenchPage() {
   // 主题 / 创作台
   const [topicView, setTopicView] = useState('list')
   const [activeTopic, setActiveTopic] = useState(null)
+  const [trackingId, setTrackingId] = useState(null) // P3 追踪主题详情
+  const gotoTracking = (id) => { setTrackingId(id); setPage('topics') }
+  const gotoContent = (id) => { setPage('feed') } // 占位：跳资讯（无 url 的溯源兜底）
   const [studio, setStudio] = useState({
     platform: 'thread', source: null, refs: [], draft: '', busy: false,
     // M4：草稿落库 + 活页起稿 + 段落级溯源持久化 + 观点入口（作者立场）
@@ -799,7 +803,7 @@ export default function WorkbenchPage() {
     generateReport, generating, viewIdea, upgradeIdea, createFromIdea, dismissIdea, deleteIdea, saveIdea, loadIdeas,
     loadNotes, loadSources, loadTopics, loadBrief, setPage, setModal,
     notesTab, setNotesTab, toggleSelectNote,
-    topicView, setTopicView, activeTopic, setActiveTopic,
+    topicView, setTopicView, activeTopic, setActiveTopic, gotoTracking,
     studio, setStudio, platforms, genDraft: (...a) => genDraftRef.current(...a), exportMd,
     drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, removeRef,
     highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack, setReturnPage,
@@ -831,7 +835,9 @@ export default function WorkbenchPage() {
             {page === 'notes' && <NotesView {...pageProps} />}
             {page === 'inspirations' && <InspirationsView {...pageProps} />}
             {page === 'sources' && <SourcesView {...pageProps} />}
-            {page === 'topics' && <TopicsView {...pageProps} />}
+            {page === 'topics' && (trackingId
+              ? <TrackingDetail trackingId={trackingId} goBack={() => setTrackingId(null)} showToast={showToast} saveIdea={saveIdea} gotoContent={gotoContent} />
+              : <TopicsView {...pageProps} />)}
             {page === 'studio' && <StudioView {...pageProps} />}
             {page === 'reports' && <ReportsView {...pageProps} />}
             {page === 'settings' && <SettingsView />}

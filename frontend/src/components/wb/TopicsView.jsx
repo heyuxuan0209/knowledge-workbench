@@ -15,9 +15,26 @@ const PHASE = {
   archived: { label: '已归档', fg: '#706b60', bg: 'rgba(33,31,26,.08)' },
 }
 
-export default function TopicsView({ topics, loadTopics, topicView, setTopicView, activeTopic, setActiveTopic, setPage, setStudio, showToast, returnPage, goBack }) {
+export default function TopicsView({ topics, loadTopics, topicView, setTopicView, activeTopic, setActiveTopic, setPage, setStudio, showToast, returnPage, goBack, gotoTracking }) {
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
+
+  // P3 追踪主题（mock E）：主题库上「追踪中」下「创作主题」共存
+  const [tracking, setTracking] = useState([])
+  const [newTrack, setNewTrack] = useState('')
+  const loadTracking = () => api('/api/tracking-topics').then(j => setTracking(j.data || [])).catch(() => {})
+  useEffect(() => { loadTracking() }, [])
+  const createTracking = async () => {
+    const name = newTrack.trim()
+    if (!name) return
+    setNewTrack('')
+    try {
+      const j = await api('/api/tracking-topics', { method: 'POST', body: { name, aliases: [name] } })
+      showToast?.(`已建追踪主题「${name}」，AI 正在收录 + 归线 + 综述（约 1-2 分钟）…`)
+      setTimeout(loadTracking, 3000)
+      if (j.data?.id) gotoTracking?.(j.data.id)
+    } catch (e) { showToast?.('新建失败：' + e.message) }
+  }
 
   // 建议主题（系统提议、用户拍板）：热点聚类 + 近期素材 + 涌现建议，每日一算
   const [suggestions, setSuggestions] = useState([])
@@ -77,8 +94,41 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
 
   return (
     <>
-      <div className="wb-page-title">我的主题库（{topics.length}）</div>
-      <div className="wb-page-sub">每个主题是一篇 AI 帮你持续维护的综述：存进新素材，它自动更新正文、标出分歧，并记下每次修改</div>
+      <div className="wb-page-title">我的主题库</div>
+      <div className="wb-page-sub">上面是<b>替你盯着外面</b>的追踪主题（AI 每天把资讯里「以它为主角」的内容归进来，织成脉络综述）；下面是<b>你亲手沉淀</b>的创作主题。追踪主题都是你建的，AI 不会自己偷偷建。</div>
+
+      {/* 🛰 追踪中（mock E 上分区） */}
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700 }}>🛰 追踪中（{tracking.length}）</span>
+          <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>替你盯着外面的话题</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <input value={newTrack} onChange={e => setNewTrack(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') createTracking() }}
+              placeholder="追踪一个话题（如 Claude、loop engineering）…"
+              style={{ fontSize: 12.5, padding: '6px 10px', width: 240, border: '1px solid var(--line10)', borderRadius: 7, background: 'var(--surface)', color: 'var(--body)' }} />
+            <button className="wb-btn-primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={createTracking}>＋ 追踪</button>
+          </div>
+        </div>
+        {tracking.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '6px 2px' }}>还没有追踪主题——建一个，AI 每天把「以它为主角」的资讯归进来、织成脉络综述。</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
+          {tracking.map(t => (
+            <div key={t.id} className="wb-card" style={{ padding: '12px 14px', cursor: 'pointer' }} onClick={() => gotoTracking?.(t.id)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                <span style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600 }}>{t.name}</span>
+                {t.weekNew > 0 && <span className="wb-pill" style={{ fontSize: 10, color: '#8a6a1a', background: 'rgba(169,121,31,.12)' }}>本周 +{t.weekNew}</span>}
+                {t.status === 'paused' && <span className="wb-pill" style={{ fontSize: 10, color: 'var(--faint)', background: 'var(--line07)' }}>已暂停</span>}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 6 }}>{t.spanDays || 0} 天 · 收录 {t.memberCount} 条 · {t.storylineCount} 条主线</div>
+              {t.gathering
+                ? <div style={{ fontSize: 12, color: 'var(--faint)', lineHeight: 1.5 }}>攒料中——条目够了（≥8）且串得成因果链，综述才会出现，不硬写。</div>
+                : <div style={{ fontSize: 12.5, color: 'var(--body2)', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}><span style={{ color: 'var(--accent)', fontSize: 10.5 }}>本月一句话 · AI 判断　</span>{t.overview || '综述生成中…'}</div>}
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--accent)' }}>看综述 →</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 13.5, fontWeight: 700, margin: '20px 0 2px' }}>✍️ 创作主题（{topics.length}）<span style={{ fontSize: 11.5, fontWeight: 400, color: 'var(--faint)', marginLeft: 8 }}>你亲手沉淀、为写作服务</span></div>
 
       <div className="wb-acquire" style={{ marginTop: 16 }}>
         <input placeholder="搜索已有主题，或输入新主题名建立主题页…" value={query}
