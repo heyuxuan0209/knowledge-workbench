@@ -40,6 +40,31 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
   const [packBusy, setPackBusy] = useState(false)
   const [helpOpen, setHelpOpen] = useState(sources.length === 0)
   const [activeTab, setActiveTab] = useState('all')
+  // 第2件 关注盘点面板
+  const [auditOpen, setAuditOpen] = useState(false)
+  const [audit, setAudit] = useState(null)
+  const [keep, setKeep] = useState(() => new Set())      // 勾选保留关注的 source id
+  const [createSel, setCreateSel] = useState(() => new Set()) // 勾选新建的 B 组 handle
+  const [auditBusy, setAuditBusy] = useState(false)
+  const openAudit = async () => {
+    setAuditOpen(true); setAudit(null)
+    try {
+      const j = await api('/api/sources/follow-audit'); const d = j.data
+      setAudit(d)
+      setKeep(new Set(d.items.filter(i => i.followed || i.precheck).map(i => i.id)))  // 预勾：已关注 + 名单匹配
+      setCreateSel(new Set((d.toCreate || []).map(c => c.handle)))                     // B 组默认全勾
+    } catch (e) { showToast?.('盘点加载失败：' + e.message) }
+  }
+  const applyAudit = async () => {
+    setAuditBusy(true)
+    try {
+      const createHandles = (audit.toCreate || []).filter(c => createSel.has(c.handle))
+      const j = await api('/api/sources/follow-audit/apply', { method: 'POST', body: { keepIds: [...keep], createHandles } })
+      showToast?.(`已重设关注：保留 ${j.data.kept} 个 · 新建 ${j.data.created} 个作者源`)
+      setAuditOpen(false); loadSources?.()
+    } catch (e) { showToast?.('应用失败：' + e.message) }
+    setAuditBusy(false)
+  }
 
   const registerPack = async () => {
     setPackBusy(true)
@@ -117,13 +142,16 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
 
   return (
     <>
-      <div className="wb-page-title">信息源</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <div className="wb-page-title">信息源</div>
+        <button className="wb-btn-ghost" style={{ marginLeft: 'auto' }} title="重设关注名单：勾选真正想关注的作者，其余取消（喂 feed 组2「你关注的人」）" onClick={openAudit}>🧭 关注盘点</button>
+      </div>
       <div className="wb-page-sub">登记优质源：内容进 资讯流 并高权重排序 · 不是订阅系统</div>
 
       <div className="wb-acquire" style={{ marginTop: 16 }}>
         <input
           value={input} onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') doIdentify() }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) doIdentify() }}
           placeholder="粘贴链接（X / 博客 / 小宇宙 / B站 / YouTube / GitHub）或输入 @用户名、公众号名…"
         />
         <button className="wb-btn-primary" disabled={!input.trim() || identifying} onClick={() => doIdentify()}>
@@ -203,6 +231,52 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
       )}
 
       <div className="wb-src-grid">{shown.map(sourceCard)}</div>
+
+      {/* 第2件 · 关注盘点面板 */}
+      {auditOpen && (
+        <div className="wb-modal-mask" onClick={(e) => { if (e.target === e.currentTarget) setAuditOpen(false) }}>
+          <div className="wb-modal" style={{ maxWidth: 640, maxHeight: '86vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="wb-modal-head">
+              <div className="wb-modal-title">🧭 关注盘点</div>
+              <button className="wb-modal-close" style={{ marginLeft: 'auto' }} onClick={() => setAuditOpen(false)}>×</button>
+            </div>
+            {!audit && <div style={{ padding: 24, textAlign: 'center', color: 'var(--sub2)' }}>加载中…</div>}
+            {audit && (<>
+              <div style={{ fontSize: 12.5, color: 'var(--sub)', lineHeight: 1.6, padding: '2px 2px 10px' }}>
+                勾选你<b>真正想长期关注</b>的作者——它们进 feed 组2「你关注的 Builder」。取消勾选的会撤销关注（不删源、内容还在）。
+                已预勾：当前已关注 + 从你 X following 实拉匹配上的 <b>{audit.precheckCount}</b> 个。
+              </div>
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {(audit.toCreate || []).length > 0 && (
+                  <div style={{ border: '1px dashed rgba(61,90,128,.4)', borderRadius: 9, padding: '9px 12px', marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>🆕 库里还没有的 {audit.toCreate.length} 个（你 X 关注、aihot 从没带来过）——勾上会新建作者源并纳入 X 直连采集：</div>
+                    {audit.toCreate.map(c => (
+                      <label key={c.handle} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0', fontSize: 12.5, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={createSel.has(c.handle)} onChange={() => setCreateSel(s => { const n = new Set(s); n.has(c.handle) ? n.delete(c.handle) : n.add(c.handle); return n })} />
+                        <b>{c.name}</b><span style={{ color: 'var(--faint)' }}>@{c.handle}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {audit.items.map(it => (
+                  <label key={it.id} style={{ display: 'flex', gap: 9, alignItems: 'center', padding: '6px 4px', fontSize: 12.5, borderBottom: '1px solid var(--line08)', cursor: 'pointer', opacity: keep.has(it.id) ? 1 : 0.55 }}>
+                    <input type="checkbox" checked={keep.has(it.id)} onChange={() => setKeep(s => { const n = new Set(s); n.has(it.id) ? n.delete(it.id) : n.add(it.id); return n })} />
+                    <span style={{ flex: 'none', fontWeight: 600, minWidth: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
+                    {it.precheck && <span className="wb-pill" style={{ fontSize: 9.5, color: 'var(--accent)', background: 'rgba(61,90,128,.1)', flex: 'none' }}>X 名单</span>}
+                    {it.platform && <span style={{ fontSize: 10.5, color: 'var(--faint)', flex: 'none' }}>{it.platform}</span>}
+                    <span style={{ flex: 1, minWidth: 0, color: 'var(--sub2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.latest || '（近期无内容）'}</span>
+                    <span style={{ fontSize: 11, color: 'var(--faint)', flex: 'none' }}>30天 {it.count30d} 条</span>
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, borderTop: '1px solid var(--line08)', marginTop: 8 }}>
+                <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>确认后 followed 只保留勾选项</span>
+                <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} disabled={auditBusy} onClick={applyAudit}>{auditBusy ? '应用中…' : `确认关注（保留 ${keep.size} + 新建 ${[...createSel].length}）`}</button>
+              </div>
+            </>)}
+          </div>
+        </div>
+      )}
     </>
   )
 }

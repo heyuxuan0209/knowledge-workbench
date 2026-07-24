@@ -669,6 +669,28 @@ app.post('/api/studio/adapt', async (req, res) => {
   }
 });
 
+// ADR-046 出片·母稿一稿多形态：母稿 + 选中平台形态 → 各平台适配稿（不落库，供看/改/渲染）。
+// 每个形态用其 platform-form spec + 内建 genre（FORM_GENRE）；gzh-long = 母稿本身直接透传，不耗 LLM。
+app.post('/api/studio/adapt-batch', async (req, res) => {
+  try {
+    const { draft, forms, viewpoint } = req.body || {};
+    if (!draft?.trim()) return res.status(400).json({ success: false, error: '母稿为空——先在②定稿把母稿写好' });
+    if (!Array.isArray(forms) || !forms.length) return res.status(400).json({ success: false, error: '至少选一个平台形态' });
+    const { adaptDraftToForm } = await import('./services/draft-generation.js');
+    const src = draft.trim();
+    const results = [];
+    // 顺序执行（各形态一次 LLM 调用），避免并发打满限流；单个失败不拖垮整批
+    for (const f of forms) {
+      if (f === 'gzh-long') { results.push({ platformForm: f, formLabel: '公众号·长文', genre: '长文体', title: '', body: src, cost: 0, passthrough: true }); continue; }
+      try { results.push(await adaptDraftToForm(src, f, viewpoint || null)); }
+      catch (e) { results.push({ platformForm: f, error: e.message }); }
+    }
+    res.json({ success: true, data: results });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // LLM 返回的 JSON 偶带 markdown 代码块围栏，统一剥掉再解析（同 thread-generation 处理）
 function parseLlmJson(content) {
   const cleaned = content.replace(/^```(json)?\s*/i, '').replace(/```\s*$/, '').trim();
@@ -1603,6 +1625,16 @@ app.get('/api/sources', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// 关注盘点（第2件）：重设 followed 名单，预勾 X following 实拉的 26 个
+app.get('/api/sources/follow-audit', async (req, res) => {
+  try { const { getFollowAudit } = await import('./services/follow-audit.js'); res.json({ success: true, data: getFollowAudit() }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/sources/follow-audit/apply', async (req, res) => {
+  try { const { applyFollowAudit } = await import('./services/follow-audit.js'); res.json({ success: true, data: applyFollowAudit(req.body || {}) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
 // 取消登记（只摘标记，不删 source 记录，内容引用不受影响）
