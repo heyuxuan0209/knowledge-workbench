@@ -135,7 +135,7 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
 export default function FeedView({
   contents, report, stories, ghTrending, selectedItems, toggleSelect, followSource, followingIds,
   generateReport, generating, setPage, setNotesTab, syncing, syncAllSources,
-  toggleStar, saveIdea, showToast, loadNotes, setReturnPage,
+  toggleStar, saveIdea, showToast, loadNotes, setReturnPage, gotoNote,
 }) {
   const [expandedFocus, setExpandedFocus] = useState(null) // 默认全收起（UI 改造：第 1 条摊开挤掉后两条）
   const [readerContent, setReaderContent] = useState(null) // 站内全文阅读器
@@ -161,6 +161,14 @@ export default function FeedView({
   const [projCat, setProjCat] = useState(null)  // 项目分类 chip（2b）
   const [artCatCounts, setArtCatCounts] = useState({}) // 文章各类目计数（后端，全量）
   const [mustRead, setMustRead] = useState([]) // 今日必看（层1 双通道：行业大事 + 个人相关）
+  // §八：站内先读——点必看/热点条 → 拉 content 开精读阅读器（复用「AI 精读」同一 ReaderModal），原文降为次级
+  const openReaderById = async (id) => {
+    if (!id) return
+    try { const j = await api(`/api/contents/${id}`); if (j.data) { dismissAirHint(); setReaderContent(j.data) } else showToast?.('这条内容已不在库里') }
+    catch (e) { showToast?.('打开失败：' + e.message) }
+  }
+  // 点推荐依据《XX》：content→站内精读；note→跳素材卡
+  const openAnchor = (a) => { if (!a) return; a.kind === 'note' ? gotoNote?.(a.id) : openReaderById(a.id) }
   const muteMustRead = async (m) => {
     setMustRead(prev => prev.filter(x => x.id !== m.id))
     try {
@@ -258,8 +266,15 @@ export default function FeedView({
                 return (
                   <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 11px', borderRadius: 8, background: 'var(--brief-bg)', borderLeft: `3px solid ${industry ? '#a9791f' : '#3d5a80'}` }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <a href={m.url} target="_blank" rel="noreferrer" style={{ fontFamily: 'var(--serif)', fontWeight: 600, fontSize: 13.5, color: 'var(--body)', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</a>
-                      <div style={{ fontSize: 11.5, color: industry ? '#8a6a1a' : 'var(--accent)', marginTop: 2 }}>{industry ? '📢 ' : '✨ '}{m.reason}</div>
+                      <span onClick={() => openReaderById(m.id)} title="点开站内精读（读中文，原文在阅读器里）"
+                        style={{ fontFamily: 'var(--serif)', fontWeight: 600, fontSize: 13.5, color: 'var(--body)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                        onMouseOver={e => e.currentTarget.style.color = 'var(--accent)'} onMouseOut={e => e.currentTarget.style.color = 'var(--body)'}>{m.title}</span>
+                      <div style={{ fontSize: 11.5, color: industry ? '#8a6a1a' : 'var(--accent)', marginTop: 2 }}>
+                        {industry ? '📢 ' : '✨ '}
+                        {m.anchor
+                          ? <>贴合你近期在看的<span onClick={() => openAnchor(m.anchor)} title={m.anchor.kind === 'note' ? '打开这条素材卡' : '打开这条的站内精读'} style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}>《{(m.anchor.title || '').slice(0, 16)}》</span></>
+                          : m.reason}
+                      </div>
                     </div>
                     <button title="不感兴趣：以后少推这个来源/这条（只过滤，不会拿去自动调权重）" onClick={() => muteMustRead(m)}
                       style={{ flex: 'none', border: 'none', background: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 12, padding: '2px 4px', lineHeight: 1 }}>✕</button>
@@ -312,13 +327,12 @@ export default function FeedView({
                         </div>
                         <div className="wb-focus-src-meta">{TYPE_LABEL[m.content_type] || 'Article'} · {timeAgo(m.published_at)}</div>
                         <div className="wb-focus-src-note">
-                          {m.url
-                            ? <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}
-                                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                                onMouseOut={(e) => e.target.style.textDecoration = 'none'}>
-                                {(m.zh_title || m.en_title || '').slice(0, 40)} <IconExternal size={9} style={{ verticalAlign: '-1px' }} />
-                              </a>
-                            : (m.zh_title || m.en_title || '').slice(0, 40)}
+                          <span onClick={() => openReaderById(m.id)} title="站内精读（读中文）" style={{ cursor: 'pointer' }}
+                            onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                            onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}>
+                            {(m.zh_title || m.en_title || '').slice(0, 40)}
+                          </span>
+                          {m.url && <a href={m.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ color: 'var(--faint)', marginLeft: 6 }} onClick={e => e.stopPropagation()}><IconExternal size={9} style={{ verticalAlign: '-1px' }} /></a>}
                         </div>
                       </div>
                     ))}

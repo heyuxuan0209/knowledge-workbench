@@ -75,7 +75,7 @@ function personalPicks(db, quota, muted, excludeIds) {
         const v = JSON.parse(r.embedding);
         if (!Array.isArray(v) || !v.length) continue;
         const ageD = Math.max(0, (Date.now() - tsMs(r.ts)) / 86400000);
-        anchors.push({ vec: v, title: r.title || '', decay: Math.exp(-ageD / DECAY_TAU), kind });
+        anchors.push({ vec: v, title: r.title || '', decay: Math.exp(-ageD / DECAY_TAU), kind, id: r.id });
       } catch { /* 跳过坏向量 */ }
     }
   };
@@ -83,12 +83,12 @@ function personalPicks(db, quota, muted, excludeIds) {
     SELECT id, COALESCE(zh_title, en_title) AS title, embedding, COALESCE(updated_at, created_at) AS ts
     FROM contents WHERE starred = 1 AND embedding IS NOT NULL
       AND datetime(COALESCE(updated_at, created_at)) > datetime('now', '-${ANCHOR_WINDOW_DAYS} days')
-  `).all(), 'star');
+  `).all(), 'content'); // 星标的是 content（点《XX》→ 站内精读）
   push(db.prepare(`
-    SELECT COALESCE(title, source_title) AS title, embedding, created_at AS ts
+    SELECT id, COALESCE(title, source_title) AS title, embedding, created_at AS ts
     FROM notes WHERE embedding IS NOT NULL
       AND datetime(created_at) > datetime('now', '-${ANCHOR_WINDOW_DAYS} days')
-  `).all(), 'note');
+  `).all(), 'note');  // 存下的是 note（点《XX》→ 素材卡）
   if (!anchors.length) return [];
 
   const cands = db.prepare(`
@@ -104,19 +104,21 @@ function personalPicks(db, quota, muted, excludeIds) {
     if (excludeIds.has(c.id) || muted.contents.has(c.id) || (c.source_id && muted.sources.has(c.source_id))) continue;
     let cv; try { cv = JSON.parse(c.embedding); } catch { continue; }
     if (!Array.isArray(cv) || !cv.length) continue;
-    let bestRaw = -1, bestDecayed = -1, bestTitle = null;
+    let bestRaw = -1, bestDecayed = -1, bestAnchor = null;
     for (const a of anchors) {
       const raw = cosine(cv, a.vec);
       const decayed = raw * a.decay;
-      if (decayed > bestDecayed) { bestDecayed = decayed; bestRaw = raw; bestTitle = a.title; }
+      if (decayed > bestDecayed) { bestDecayed = decayed; bestRaw = raw; bestAnchor = a; }
     }
-    if (bestRaw >= REL_THRESHOLD) picks.push({ c, score: bestDecayed, anchorTitle: bestTitle });
+    if (bestRaw >= REL_THRESHOLD) picks.push({ c, score: bestDecayed, anchor: bestAnchor });
   }
   picks.sort((a, b) => b.score - a.score);
   return picks.slice(0, quota).map(p => ({
     id: p.c.id, title: p.c.title, url: p.c.permalink || p.c.url,
     channel: 'personal',
-    reason: `贴合你近期在看的《${(p.anchorTitle || '').slice(0, 16)}》`,
+    reason: `贴合你近期在看的《${(p.anchor?.title || '').slice(0, 16)}》`,
+    // 推荐依据的出处（点《XX》可跳）：content→站内精读，note→素材卡
+    anchor: p.anchor ? { kind: p.anchor.kind, id: p.anchor.id, title: p.anchor.title } : null,
     sourceId: p.c.source_id,
   }));
 }
