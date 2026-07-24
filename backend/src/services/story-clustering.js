@@ -118,19 +118,30 @@ export function clusterByVectors(contents, byId, threshold = 0.80) {
   return [...multi, ...leftover];
 }
 
-// 来源直接度（同信任档内二次序）：官方 RSS 直发 > AI HOT 聚合 > 其它。
-// 卡兹克"官方源 > 官方推 > 聚合/媒体"：伯南克簇里 aihot 和 rss 都指向 anthropic.com（都判 T1），
-// 但直发的 rss 才是"一手"，聚合站 aihot 只是转载——同档必须让 rss 当主条（验收点：簇C 主条须 rss）。
+// 来源直接度：官方直发 RSS > 官方聚合 AI HOT。**只在 T1 内部做 tiebreak**（§六 终审修正）——
+// T1 认定完全靠官方域名白名单（effectiveTier / OFFICIAL_DOMAINS），"是 RSS"本身不加分：
+// 否则 T2 的个人博客 RSS（如"利兹与青鸟"）会跨档压过 aihot 原始报道当主条。
+// 伯南克簇里 aihot 和 rss 都指向 anthropic.com（都判 T1），此时才让直发 rss 当主条（验收点：簇C 主条须 rss）。
 const SRC_DIRECTNESS = { rss: 0, aihot: 1, hackernews: 2, active_query: 2 };
+const directness = m => (m.trust_tier === 'T1' ? (SRC_DIRECTNESS[m.source_app] ?? 3) : 0);
 
-// 簇内选主条：信任档优先（T1>T1.5>T2）→ 来源直接度 → 外部热度 → 新鲜度
+// 簇内选主条：信任档优先（T1>T1.5>T2）→（仅 T1 内）来源直接度 → 外部热度 → 新鲜度
 function pickPrimary(members) {
   return [...members].sort((a, b) =>
     (TRUST_RANK[a.trust_tier] ?? 9) - (TRUST_RANK[b.trust_tier] ?? 9) ||
-    (SRC_DIRECTNESS[a.source_app] ?? 3) - (SRC_DIRECTNESS[b.source_app] ?? 3) ||
+    directness(a) - directness(b) ||
     (b.external_score || 0) - (a.external_score || 0) ||
     (new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at))
   )[0];
+}
+
+// 一组向量的归一化均值（拆分复核后重算子簇质心用）
+function meanNormalize(vecs) {
+  const dim = vecs[0].length;
+  const c = new Array(dim).fill(0);
+  for (const v of vecs) for (let k = 0; k < dim; k++) c[k] += v[k];
+  let n = 0; for (const x of c) n += x * x; n = Math.sqrt(n) || 1;
+  return c.map(x => x / n);
 }
 
 // 热度：独立内容数为主 + 新鲜度衰减 + 平台评分微调
@@ -146,7 +157,7 @@ function heatScore(members, now) {
 // 异步：需要给内容补 bge-m3 向量（增量，首轮较慢、之后缓存秒级）。
 // 阈值默认 0.75：P1 返工三档 dump（docs/p1-cluster-dump-*.md）实测 0.75 命中金标准 8/8
 // 且反例零合并（0.80=5/8、0.85=2/8），暂定 0.75，待设计窗口最终裁决。
-export async function rebuildStories(days = 30, { threshold = 0.75 } = {}) {
+export async function rebuildStories(days = 30, { threshold = 0.75, splitReview = true } = {}) {
   const db = getDatabase();
   const contents = db.prepare(`
     SELECT c.id, c.zh_title, c.en_title, c.zh_summary, c.url, c.source_app, c.published_at, c.created_at,
@@ -161,9 +172,32 @@ export async function rebuildStories(days = 30, { threshold = 0.75 } = {}) {
   for (const c of contents) c.trust_tier = effectiveTier(c.trust_tier, c.url);
 
   const byId = await ensureContentEmbeddings(db, contents);
-  const clusters = clusterByVectors(contents, byId, threshold).filter(c => c.memberIds.length >= 2);
+  const rawClusters = clusterByVectors(contents, byId, threshold).filter(c => c.memberIds.length >= 2);
   const byContent = new Map(contents.map(c => [c.id, c]));
   const now = Date.now();
+
+  // ③ LLM 拆分复核（§六）：embedding 管召回，便宜 DeepSeek 裁决管精度——把"同主体不同事件/误聚"拆开。
+  let clusters = rawClusters;
+  if (splitReview && rawClusters.length) {
+    const { splitReviewAll } = await import('./story-split-review.js');
+    const membersPer = rawClusters.map(cl => cl.memberIds.map(id => byContent.get(id)));
+    const groupsPer = await splitReviewAll(membersPer);
+    clusters = [];
+    let splitCount = 0;
+    rawClusters.forEach((cl, ci) => {
+      const groups = groupsPer[ci];
+      if (!groups || groups.length <= 1) { clusters.push(cl); return; } // 判定同一事件，原样
+      splitCount++;
+      const members = membersPer[ci];
+      for (const g of groups) {
+        if (g.length < 2) continue; // 拆出的单条不成簇（丢弃）
+        const gIds = g.map(i => members[i].id);
+        const gVecs = gIds.map(id => byId.get(id)).filter(Boolean);
+        clusters.push({ memberIds: gIds, centroid: gVecs.length ? meanNormalize(gVecs) : cl.centroid });
+      }
+    });
+    if (splitCount) console.log(`  ✂️  拆分复核：${splitCount} 个簇被判含多事件、已拆细 → 共 ${clusters.length} 簇`);
+  }
 
   db.exec('BEGIN');
   try {
