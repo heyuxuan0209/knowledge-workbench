@@ -496,7 +496,7 @@ export default function FeedView({
           const staleDays = stale.length ? Math.floor((Date.now() - Math.min(...stale.map(timeOf))) / 864e5) : 0
           const GH = {
             1: { t: '📌 官方一手', cls: 'g1', what: '官方 blog + 官方号/员工号（T1·T1.5）' },
-            2: { t: '🎯 你关注的人', cls: 'g2', what: 'X builders · YouTube · 播客（你标了关注的）' },
+            2: { t: '🎯 你关注的 Builder · 一手', cls: 'g2', what: 'X builders · YouTube · 播客（你标了关注的）' },
             3: { t: '🔥 精选与热点', cls: 'g3', what: 'AI HOT 精选 + 事件簇主条（同事件已去重）' },
           }
           if (urgentOnly) return (
