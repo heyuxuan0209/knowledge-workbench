@@ -12,8 +12,11 @@ export default function CleanupPanel({ onClose, showToast, reload }) {
   const [keep, setKeep] = useState(() => new Set())   // 关联：反选保留的 key（默认全移除）
   const [tstate, setTstate] = useState({})             // 主题：topicId -> {skip, action, targetId, newName}
   const [busy, setBusy] = useState(false)
+  const [statsBefore, setStatsBefore] = useState(null) // 进面板时的库体检（清理报告 before）
+  const [report, setReport] = useState(null)           // apply 后的清理报告：{ removedAssoc, topicActions:[], after }
 
   useEffect(() => {
+    api('/api/cleanup/stats').then(j => setStatsBefore(j.data)).catch(() => {})
     api('/api/cleanup/associations').then(j => setAssoc(j.data)).catch(e => showToast?.('关联提议加载失败：' + e.message))
     api('/api/cleanup/topics').then(j => {
       setTopics(j.data)
@@ -30,8 +33,12 @@ export default function CleanupPanel({ onClose, showToast, reload }) {
     const pairs = (assoc?.groups || []).flatMap(g => g.items).filter(it => !keep.has(pairKey(it))).map(it => ({ noteId: it.noteId, topicId: it.topicId }))
     if (!pairs.length) { showToast?.('没有选中要移除的关联'); return }
     setBusy(true)
-    try { const j = await api('/api/cleanup/associations/apply', { method: 'POST', body: { pairs } }); showToast?.(`已移除 ${j.data.removed} 条弱关联`); reload?.(); const r = await api('/api/cleanup/associations'); setAssoc(r.data); setKeep(new Set()) }
-    catch (e) { showToast?.('应用失败：' + e.message) }
+    try {
+      const j = await api('/api/cleanup/associations/apply', { method: 'POST', body: { pairs } })
+      const after = (await api('/api/cleanup/stats').then(x => x.data).catch(() => null))
+      setReport(r => ({ removedAssoc: (r?.removedAssoc || 0) + j.data.removed, topicActions: r?.topicActions || [], after }))
+      reload?.(); const r = await api('/api/cleanup/associations'); setAssoc(r.data); setKeep(new Set())
+    } catch (e) { showToast?.('应用失败：' + e.message) }
     setBusy(false)
   }
 
@@ -44,29 +51,69 @@ export default function CleanupPanel({ onClose, showToast, reload }) {
     }).filter(a => a.action !== 'rename' || a.newName)
     if (!actions.length) { showToast?.('没有选中的主题操作'); return }
     setBusy(true)
-    try { const j = await api('/api/cleanup/topics/apply', { method: 'POST', body: { actions } }); showToast?.(`已收编 ${j.data.applied} 个主题`); reload?.(); const r = await api('/api/cleanup/topics'); setTopics(r.data); const init = {}; for (const p of r.data.proposals) init[p.topicId] = { skip: false, action: p.action === 'dissolve' && p.mergeInto ? 'dissolve' : p.action, targetId: p.mergeInto?.id || '', newName: p.suggestedName || '' }; setTstate(init) }
-    catch (e) { showToast?.('应用失败：' + e.message) }
+    try {
+      const j = await api('/api/cleanup/topics/apply', { method: 'POST', body: { actions } })
+      const after = (await api('/api/cleanup/stats').then(x => x.data).catch(() => null))
+      const acted = actions.map(a => { const p = (topics?.proposals || []).find(pp => pp.topicId === a.topicId); return { name: p?.name || '', action: a.action, newName: a.newName || null, target: a.action === 'merge' ? (p?.mergeInto?.name || null) : null } })
+      setReport(r => ({ removedAssoc: r?.removedAssoc || 0, topicActions: [...(r?.topicActions || []), ...acted], after }))
+      showToast?.(`已收编 ${j.data.applied} 个主题`); reload?.()
+      const r = await api('/api/cleanup/topics'); setTopics(r.data); const init = {}; for (const p of r.data.proposals) init[p.topicId] = { skip: false, action: p.action === 'dissolve' && p.mergeInto ? 'dissolve' : p.action, targetId: p.mergeInto?.id || '', newName: p.suggestedName || '' }; setTstate(init)
+    } catch (e) { showToast?.('应用失败：' + e.message) }
     setBusy(false)
   }
 
   const setTS = (id, patch) => setTstate(s => ({ ...s, [id]: { ...s[id], ...patch } }))
   const removeSelectedCount = (assoc?.groups || []).flatMap(g => g.items).filter(it => !keep.has(pairKey(it))).length
-  const survivors = (topics?.proposals || []) // 供 merge 下拉：非本条、非 dissolve 的都算候选（简化用 mergeInto 建议）
 
   return (
     <div className="wb-modal-mask" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="wb-modal" style={{ maxWidth: 720, maxHeight: '86vh', display: 'flex', flexDirection: 'column' }}>
         <div className="wb-modal-head">
-          <div className="wb-modal-title">🧹 素材库大扫除</div>
-          <div className="wb-seg-toggle" style={{ marginLeft: 'auto', marginRight: 10 }}>
-            <button className={tab === 'assoc' ? 'active' : ''} onClick={() => setTab('assoc')}>关联清理{assoc ? `（${assoc.removeCount}）` : ''}</button>
-            <button className={tab === 'topics' ? 'active' : ''} onClick={() => setTab('topics')}>主题收编{topics ? `（${topics.proposals.length}）` : ''}</button>
-          </div>
-          <button className="wb-modal-close" onClick={onClose}>×</button>
+          <div className="wb-modal-title">{report ? '🧹 大扫除 · 清理报告' : '🧹 素材库大扫除'}</div>
+          {!report && (
+            <div className="wb-seg-toggle" style={{ marginLeft: 'auto', marginRight: 10 }}>
+              <button className={tab === 'assoc' ? 'active' : ''} onClick={() => setTab('assoc')}>关联清理{assoc ? `（${assoc.removeCount}）` : ''}</button>
+              <button className={tab === 'topics' ? 'active' : ''} onClick={() => setTab('topics')}>主题收编{topics ? `（${topics.proposals.length}）` : ''}</button>
+            </div>
+          )}
+          <button className="wb-modal-close" style={report ? { marginLeft: 'auto' } : undefined} onClick={onClose}>×</button>
         </div>
 
         <div style={{ overflowY: 'auto', padding: '4px 4px 0' }}>
-          {tab === 'assoc' && (
+          {/* apply 后的清理报告：数据层变化必须在 UI 层给交代（机制交付≠可感知交付） */}
+          {report && (
+            <div style={{ padding: '8px 6px' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>✅ 清理完成，库变清爽了</div>
+              <div style={{ fontSize: 12.5, color: 'var(--sub)', marginBottom: 14 }}>刚刚这些变化都记在这——不是默默生效。</div>
+              {statsBefore && report.after && (
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                  {[['总关联', statsBefore.associations, report.after.associations],
+                    ['活跃主题', statsBefore.activeTopics, report.after.activeTopics],
+                    ['平均每素材归属主题', statsBefore.avgPerNote, report.after.avgPerNote]].map(([label, b, a]) => (
+                    <div key={label} style={{ flex: 1, border: '1px solid var(--line10)', borderRadius: 9, padding: '10px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 10.5, color: 'var(--sub2)', marginBottom: 5, lineHeight: 1.3 }}>{label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}><span style={{ color: 'var(--faint)' }}>{b}</span> <span style={{ color: 'var(--sub2)', fontSize: 12 }}>→</span> <span style={{ color: 'var(--accent)' }}>{a}</span></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {report.removedAssoc > 0 && <div style={{ fontSize: 13, marginBottom: 10 }}>🔗 移除了 <b>{report.removedAssoc}</b> 条 AI 乱挂的弱关联（每条素材只留最贴的 3 个）</div>}
+              {report.topicActions.length > 0 && (
+                <div style={{ fontSize: 13, marginBottom: 10 }}>
+                  <div style={{ marginBottom: 5 }}>📂 收编了 <b>{report.topicActions.length}</b> 个主题：</div>
+                  {report.topicActions.map((t, i) => (
+                    <div key={i} style={{ fontSize: 12.5, color: 'var(--sub)', padding: '2px 0 2px 6px' }}>
+                      {t.action === 'dissolve' && <>· 解散《{t.name}》（归档）</>}
+                      {t.action === 'merge' && <>· 《{t.name}》并入《{t.target}》</>}
+                      {t.action === 'rename' && <>· 《{t.name}》改名为「{t.newName}」</>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: 'var(--sub2)', marginTop: 12, padding: '9px 11px', background: 'var(--brief-bg)', borderRadius: 8 }}>💾 都没删——解散的主题、移除的关联、归档的素材都在冷区，随时可恢复。</div>
+            </div>
+          )}
+          {!report && tab === 'assoc' && (
             <>
               <div style={{ fontSize: 12.5, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 10 }}>
                 AI 按词面把每条素材平均挂了 6 个主题（大多弱相关）。按语义重算后，建议移除下面这些弱关联——
@@ -100,7 +147,7 @@ export default function CleanupPanel({ onClose, showToast, reload }) {
             </>
           )}
 
-          {tab === 'topics' && (
+          {!report && tab === 'topics' && (
             <>
               <div style={{ fontSize: 12.5, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 10 }}>
                 主题太碎（≤2 条）/ 太泛（Agent、Context）/ 名字是文章标题 → 建议收编成有边界的话题。
@@ -142,10 +189,16 @@ export default function CleanupPanel({ onClose, showToast, reload }) {
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 4px 4px', borderTop: '1px solid var(--line08)', marginTop: 8 }}>
+          {report ? (<>
+            <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>还有想清的可以继续</span>
+            <button className="wb-btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => setReport(null)}>继续清理</button>
+            <button className="wb-btn-primary" onClick={onClose}>完成</button>
+          </>) : (<>
           <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>所有操作可恢复；裁决只应用你选中的</span>
           {tab === 'assoc'
             ? <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} disabled={busy || !assoc || removeSelectedCount === 0} onClick={applyAssoc}>{busy ? '处理中…' : `移除选中的 ${removeSelectedCount} 条关联`}</button>
             : <button className="wb-btn-primary" style={{ marginLeft: 'auto' }} disabled={busy || !topics} onClick={applyTopics}>{busy ? '处理中…' : '应用主题收编'}</button>}
+          </>)}
         </div>
       </div>
     </div>

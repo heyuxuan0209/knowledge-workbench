@@ -1344,6 +1344,19 @@ app.get('/api/notes/duplicates', async (req, res) => {
 });
 
 // ========== P2 大扫除（HANDOFF §P2）：关联重算 / 主题收编 / 素材归档，全是"提议→用户裁决" ==========
+// 库体检数字（清理报告 before/after 用）：总关联 / 活跃主题 / 平均每素材归属主题数
+app.get('/api/cleanup/stats', async (req, res) => {
+  try {
+    const { getDatabase } = await import('./db/init.js');
+    const db = getDatabase();
+    const associations = db.prepare('SELECT COUNT(*) c FROM note_topics').get().c;
+    const notesWithTopics = db.prepare('SELECT COUNT(DISTINCT note_id) c FROM note_topics').get().c;
+    const activeTopics = db.prepare("SELECT COUNT(*) c FROM topics WHERE status = 'active'").get().c;
+    const archivedTopics = db.prepare("SELECT COUNT(*) c FROM topics WHERE status = 'archived'").get().c;
+    db.close();
+    res.json({ success: true, data: { associations, activeTopics, archivedTopics, avgPerNote: notesWithTopics ? Math.round(associations / notesWithTopics * 10) / 10 : 0 } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
 app.get('/api/cleanup/associations', async (req, res) => {
   try {
     const { proposeAssociationCleanup } = await import('./services/cleanup-associations.js');
