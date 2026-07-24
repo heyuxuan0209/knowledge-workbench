@@ -7,11 +7,14 @@ export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea
   const [data, setData] = useState(null)
   const [busy, setBusy] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
-  const [readMode, setReadMode] = useState('read')  // 'read' 通读 / 'delta' 增量（收尾⑤）
+  const [openLines, setOpenLines] = useState(null)  // 展开的主线 id 集（首访全开、回访折叠为判断预览）
   const load = () => api(`/api/tracking-topics/${trackingId}`).then(j => {
     setData(j.data)
-    if ((j.data?.newSinceSeen || 0) > 0) setReadMode('delta') // 有新的默认先看增量
+    const act = (j.data?.storylines || []).filter(s => s.status === 'active')
+    // 状态自适应：首访（无 last_seen）全展开通读；回访折叠成标题+判断预览
+    setOpenLines(j.data?.lastSeenAt ? new Set() : new Set(act.map(s => s.id)))
   }).catch(e => showToast?.('加载失败：' + e.message))
+  const toggleLine = (id) => setOpenLines(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   useEffect(() => {
     load()
     api(`/api/tracking-topics/${trackingId}/seen`, { method: 'POST' }).catch(() => {}) // 记 last_seen（在 GET 之后，下次回访才重算 since）
@@ -46,134 +49,132 @@ export default function TrackingDetail({ trackingId, goBack, showToast, saveIdea
     if (!m) return <span key={i}>{seg}</span>
     const idx = parseInt(m[1]) - 1
     const mem = members[idx]
-    return <sup key={i} onClick={() => mem && (mem.url ? window.open(mem.url, '_blank', 'noopener') : gotoContent?.(mem.id))}
-      title={mem ? `出处：${(mem.title || '').slice(0, 40)}（点击核验原文）` : '出处'}
-      style={{ color: 'var(--accent)', cursor: 'pointer', fontSize: 10, fontWeight: 700, margin: '0 1px' }}>[{m[1]}]</sup>
+    return <span key={i} className="tk-cite" onClick={() => mem && (mem.url ? window.open(mem.url, '_blank', 'noopener') : gotoContent?.(mem.id))}
+      title={mem ? `出处：${(mem.title || '').slice(0, 40)}（点击核验原文）` : '出处'}>{m[1]}</span>
   })
+
+  const seenMs = data.lastSeenAt ? new Date((data.lastSeenAt || '').replace(' ', 'T') + 'Z').getTime() : 0
+  const isNew = (m) => seenMs && new Date((m.ts || '').replace(' ', 'T') + (/[zZ]/.test(m.ts || '') ? '' : 'Z')).getTime() > seenMs
+  const deltaNews = active.flatMap(sl => (sl.members || []).filter(isNew).map(m => ({ m, sl }))).sort((a, b) => (b.m.ts || '').localeCompare(a.m.ts || ''))
+  const num = '一二三四五六七八'
 
   return (
     <>
       <button className="wb-back" onClick={goBack}>← 返回主题库</button>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-        <span className="wb-topic-name">{data.name}</span>
-        <span className="wb-pill" style={{ color: '#3d5a80', background: 'rgba(61,90,128,.1)' }}>🛰 追踪中</span>
-        <span style={{ fontSize: 12, color: 'var(--sub2)' }}>收录 {data.memberCount} 条 · 去重约 {dedup} 件事 · {active.length} 条主线</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <button className="wb-btn-ghost" disabled={busy} onClick={refresh}>{busy ? '更新中…' : '↻ 重新生成'}</button>
-          <button className="wb-btn-ghost" title="停收录不删数据，进归档区可恢复" onClick={archiveSelf}>📥 归档</button>
-          <button className="wb-btn-ghost" style={{ color: 'var(--red)' }} onClick={delSelf}>🗑 删除</button>
+      {/* 头部（mock D .hd） */}
+      <div className="tk-hd">
+        <div>
+          <h1>{data.name}<span className="type">🛰 追踪中</span></h1>
+          <div className="meta">收录 <b>{data.memberCount}</b> 条 · 去重约 <b>{dedup}</b> 件事 · <b>{active.length}</b> 条主线{data.lastSeenAt ? <> · 上次看到 <b>{(data.lastSeenAt || '').slice(5, 16)}</b></> : ''}</div>
+        </div>
+        <div className="acts">
+          <button disabled={busy} onClick={refresh}>{busy ? '更新中…' : '↻ 重新生成'}</button>
+          <button title="停收录不删数据，进归档区可恢复" onClick={archiveSelf}>📥 归档</button>
+          <button className="del" onClick={delSelf}>🗑 删除</button>
         </div>
       </div>
 
-      {/* 回访可感知（收尾⑤）：常驻显示"上次看到 + 新增 N 件事"（N=0 也显示）+ 通读/增量切换 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0 2px', fontSize: 12, color: 'var(--sub2)' }}>
-        <span>{data.lastSeenAt ? <>上次看到 <b>{(data.lastSeenAt || '').slice(5, 16)}</b> · 之后新增 <b style={{ color: data.newSinceSeen ? '#8a6a1a' : 'var(--sub2)' }}>{data.newSinceSeen} 件事</b></> : '首次访问 · 通读全部'}</span>
-        {data.lastSeenAt && (
-          <div className="wb-seg-toggle" style={{ marginLeft: 'auto' }}>
-            <button className={readMode === 'read' ? 'active' : ''} onClick={() => setReadMode('read')}>通读</button>
-            <button className={readMode === 'delta' ? 'active' : ''} onClick={() => setReadMode('delta')}>只看增量{data.newSinceSeen ? `（${data.newSinceSeen}）` : ''}</button>
-          </div>
-        )}
+      {/* 追踪范围 chips（mock D .scope） */}
+      <div className="tk-scope">
+        <span className="slab">追踪范围</span>
+        {(data.aliases || []).map(a => <span key={a} className="tk-chip">{a}</span>)}
+        <span className="hint">内容的<b>主角</b>命中这些词才收录——只提一句的不算，员工发的无关内容也不算。</span>
       </div>
 
-      {/* 追踪范围 chips */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', margin: '10px 0 4px' }}>
-        <span style={{ fontSize: 12, color: 'var(--sub2)', marginRight: 2 }}>追踪范围</span>
-        {(data.aliases || []).map(a => <span key={a} className="wb-chip">{a}</span>)}
-      </div>
-      <div style={{ fontSize: 11.5, color: 'var(--faint)', marginBottom: 10 }}>内容的<b>主角</b>命中这些词才收录——只提一句的不算，员工发的无关内容也不算。</div>
-
-      {/* 怎么工作 折叠 */}
-      <div style={{ border: '1px solid var(--line10)', borderRadius: 9, marginBottom: 12, overflow: 'hidden' }}>
-        <div onClick={() => setRulesOpen(o => !o)} style={{ cursor: 'pointer', padding: '9px 12px', fontSize: 12.5, color: 'var(--sub)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          ⓘ 这一页是怎么工作的（收录 / 主线 / 观点 / 更新 的规则）<span style={{ marginLeft: 'auto', color: 'var(--faint)' }}>{rulesOpen ? '收起 ▴' : '展开 ▾'}</span>
-        </div>
+      {/* 怎么工作（mock D .explain） */}
+      <div className={`tk-explain${rulesOpen ? ' open' : ''}`}>
+        <div className="ehead" onClick={() => setRulesOpen(o => !o)}>ⓘ 这一页是怎么工作的（收录 / 主线 / 观点 / 更新 的规则）<span style={{ marginLeft: 'auto', fontSize: 10 }}>{rulesOpen ? '▾' : '▸'}</span></div>
         {rulesOpen && (
-          <div style={{ padding: '0 12px 11px', fontSize: 12, color: 'var(--sub2)', lineHeight: 1.7 }}>
-            · <b>收什么</b>：以追踪对象为<b>主角</b>的内容（向量召回 + AI 判主角性；只提一句/员工生活贴不算）。<br />
-            · <b>主线怎么来</b>：按<b>因果连通性</b>串（一条是另一条的原因/后续/证据），不是话题相似就归堆；串不成的进「零散动态」。<br />
-            · <b>哪些是 AI 的观点</b>：每条主线的「判断」是 AI 下的、标了「供你反驳」，与可溯源的事实脉络隔开。<br />
-            · <b>新内容怎么进来</b>：每天同步后自动归线；回访时最上面先告诉你"上次之后新发生了什么"。<br />
-            · <b>这主题怎么来</b>：追踪主题都是<b>你手动建的</b>，AI 不会自己偷偷建。每条事实都可点 [n] 角标核验原文。
+          <div className="ebody">
+            <div className="rule"><b>收什么：</b>以追踪对象为主角的内容（向量召回 + AI 判主角性；只提一句/员工生活贴不算）。</div>
+            <div className="rule"><b>主线怎么来：</b>按因果连通性串（一条是另一条的原因/后续/证据），不是话题相似就归堆；串不成的进「零散动态」。</div>
+            <div className="rule"><b>哪些是 AI 的观点：</b>每条主线的「判断」是 AI 下的、标了「供你反驳」，与可溯源的事实脉络隔开。</div>
+            <div className="rule"><b>新内容怎么进来：</b>每天同步后自动归线；回访时最上面先告诉你"上次之后新发生了什么"。</div>
+            <div className="rule"><b>这主题怎么来：</b>追踪主题都是你手动建的，AI 不会自己偷偷建。每条事实都可点 [n] 角标核验原文。</div>
           </div>
         )}
       </div>
 
-      {/* 增量态：只看"上次之后新发生的"，不用重读全文 */}
-      {readMode === 'delta' && (() => {
-        const seenMs = data.lastSeenAt ? new Date((data.lastSeenAt || '').replace(' ', 'T') + 'Z').getTime() : 0
-        const news = active.flatMap(sl => (sl.members || []).filter(m => new Date((m.ts || '').replace(' ', 'T') + (/[zZ]/.test(m.ts || '') ? '' : 'Z')).getTime() > seenMs).map(m => ({ m, sl }))).sort((a, b) => (b.m.ts || '').localeCompare(a.m.ts || ''))
-        return (
-          <div style={{ border: '1px solid rgba(169,121,31,.3)', background: 'rgba(169,121,31,.06)', borderRadius: 9, padding: '11px 13px', marginBottom: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#8a6a1a', marginBottom: 6 }}>🗓 上次看过之后，新发生了 {news.length} 件事</div>
-            {news.length === 0 && <div style={{ fontSize: 12, color: 'var(--sub2)' }}>没有新进展——切「通读」看全部。</div>}
-            {news.map(({ m, sl }) => (
-              <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, padding: '3px 0' }}>
-                <span style={{ color: 'var(--faint)', flex: 'none' }}>{(m.ts || '').slice(5, 10)}</span>
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
-                <span className="wb-pill" style={{ fontSize: 9.5, color: '#3d5a80', background: 'rgba(61,90,128,.1)', flex: 'none' }}>{sl.name.slice(0, 10)}</span>
-                {m.url && <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--faint)', flex: 'none' }}>↗</a>}
+      {/* 状态自适应：首访通读引导 / 回访增量条 */}
+      {!data.lastSeenAt
+        ? <div className="tk-firstbar">👋 首次访问——下面 {active.length} 条主线已全部展开，通读一遍；之后回访会自动折叠，只提醒你新发生了什么。</div>
+        : (
+          <div className="tk-delta">
+            <h3>🗓 你上次看过之后，新发生了 {deltaNews.length} 件事</h3>
+            {deltaNews.length === 0 && <div style={{ fontSize: 12, color: 'var(--sub2)' }}>没有新进展——展开下面主线看完整脉络。</div>}
+            {deltaNews.map(({ m, sl }) => (
+              <div key={m.id} className="drow">
+                <span className="dd">{(m.ts || '').slice(5, 10)}</span>
+                <span className="dt">{m.title}</span>
+                <span className="dl">{sl.name.slice(0, 10)}</span>
+                {m.url && <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--faint)' }}>↗</a>}
               </div>
             ))}
-            <div style={{ fontSize: 11, color: 'var(--sub2)', marginTop: 6 }}>已自动归入下面各主线；点「通读」看完整脉络。</div>
+            {deltaNews.length > 0 && <div className="dnote">已自动归入下面各主线；展开看完整脉络。</div>}
+          </div>
+        )}
+
+      {/* 本月总览（mock D .lede） */}
+      {data.overview && <div className="tk-lede"><span className="lab">📌 本月一句话 · AI 判断</span><p>{data.overview}</p></div>}
+
+      <div className="tk-seclab">脉络 · {active.length} 条主线（点标题展开/折叠）</div>
+      {active.map((sl, i) => {
+        const open = openLines?.has(sl.id)
+        const failed = String(sl.narrative || '').startsWith('⚠️')
+        const newInLine = (sl.members || []).filter(isNew).length
+        return (
+          <div key={sl.id} className={`tk-acc${open ? ' open' : ''}`}>
+            <div className="head" onClick={() => toggleLine(sl.id)}>
+              <span className="n">主线{num[i] || i + 1}</span>
+              <span className="t">{sl.name}</span>
+              <span className="mini">{newInLine > 0 && <b style={{ color: 'var(--amber)' }}>+{newInLine} · </b>}{sl.members.length} 条</span>
+              <span className="chev">▸</span>
+            </div>
+            {!open && <div className="teaser">{failed ? '⚠️ 本段生成失败——展开可重试' : (sl.verdict || '展开看脉络与判断')}</div>}
+            {open && (
+              <div className="body">
+                {failed
+                  ? <div className="wb-warnbar" style={{ marginTop: 12 }}>{sl.narrative}<button className="wb-btn-ghost" style={{ marginLeft: 8, padding: '2px 9px', fontSize: 11 }} onClick={refresh}>重新生成</button></div>
+                  : <div className="tk-acc-narr" style={{ paddingTop: 12, fontSize: 14.5, color: 'var(--body)', lineHeight: 1.9 }}>{renderNarrative(sl.narrative, sl.members)}</div>}
+                {sl.verdict && !failed && (
+                  <div className="tk-verdict"><div className="vlab">⚖️ 一句话判断 · AI 判断，供你反驳</div><p>{sl.verdict}</p></div>
+                )}
+                {sl.watch && <div className="tk-watch">🔭 待追：{sl.watch}</div>}
+                {sl.hook && (
+                  <div className="tk-hook">
+                    <span className="t">✍️ {sl.hook}</span>
+                    <button onClick={() => saveIdea?.({ title: `${data.name}·${sl.name}`, sourceKind: 'tracking', supportingContentIds: sl.members.map(m => m.id) })}>提为灵感 →</button>
+                  </div>
+                )}
+                <details className="tk-srcbox">
+                  <summary>来源 · {sl.members.length} 条（点开可审计 / 踢出）</summary>
+                  {sl.members.map((m, mi) => (
+                    <div key={m.id} className="srow">
+                      <span className="sn">[{mi + 1}]</span>
+                      <span className="st">{(m.ts || '').slice(5, 10)} {m.title}</span>
+                      {m.reason && <span className="wb-pill" style={{ fontSize: 9.5, color: 'var(--sub2)', background: 'var(--line07)', flex: 'none' }}>{m.reason}</span>}
+                      {m.url && <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--faint)', flex: 'none' }}>原文↗</a>}
+                      <button className="tk-mute" title="踢出（收错了）" onClick={() => eject(m)}>✕</button>
+                    </div>
+                  ))}
+                </details>
+              </div>
+            )}
           </div>
         )
-      })()}
+      })}
 
-      {/* 本月总览 */}
-      {data.overview && (
-        <div style={{ margin: '4px 0 16px', padding: '12px 14px', background: 'var(--brief-bg)', borderRadius: 10 }}>
-          <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 4 }}>📌 本月一句话 · AI 判断</div>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: 15, lineHeight: 1.6, color: 'var(--text)' }}>{data.overview}</div>
-        </div>
-      )}
-
-      {/* 主线四槽位 */}
-      {active.map((sl, i) => (
-        <div key={sl.id} className="wb-card" style={{ marginBottom: 14, padding: '14px 16px' }}>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>主线{'一二三四五六'[i] || (i + 1)}：{sl.name}<span style={{ fontSize: 12, color: 'var(--faint)', fontWeight: 400, marginLeft: 8 }}>{sl.members.length} 条</span></div>
-          {sl.narrative && (String(sl.narrative).startsWith('⚠️')
-            ? <div className="wb-warnbar" style={{ marginBottom: 10 }}>{sl.narrative}<button className="wb-btn-ghost" style={{ marginLeft: 8, padding: '2px 9px', fontSize: 11 }} onClick={refresh}>重新生成</button></div>
-            : <div style={{ fontSize: 13.5, lineHeight: 1.85, color: 'var(--body2)', marginBottom: 10 }}>{renderNarrative(sl.narrative, sl.members)}</div>)}
-          {sl.verdict && (
-            <div style={{ borderLeft: '3px solid var(--accent)', background: 'rgba(61,90,128,.06)', borderRadius: '0 8px 8px 0', padding: '9px 12px', margin: '8px 0' }}>
-              <div style={{ fontSize: 10.5, color: 'var(--accent)', marginBottom: 3, fontWeight: 600 }}>⚖️ 一句话判断 · AI 判断，供你反驳</div>
-              <div style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)' }}>{sl.verdict}</div>
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: 'var(--sub2)' }}>
-            {sl.watch && <div style={{ flex: 1, minWidth: 200 }}>🔭 <b>待追</b>：{sl.watch}</div>}
-            {sl.hook && <div style={{ flex: 1, minWidth: 200 }}>✍️ <b>钩子</b>：{sl.hook}
-              <button className="wb-btn-ghost" style={{ marginLeft: 8, padding: '2px 9px', fontSize: 11 }}
-                onClick={() => saveIdea?.({ title: `${data.name}·${sl.name}`, sourceKind: 'tracking', supportingContentIds: sl.members.map(m => m.id) })}>提为灵感 →</button>
-            </div>}
-          </div>
-          {/* 主线级来源 */}
-          <details style={{ marginTop: 10 }}>
-            <summary style={{ fontSize: 11.5, color: 'var(--faint)', cursor: 'pointer' }}>来源 · {sl.members.length} 条（点开可审计/踢出）</summary>
-            {sl.members.map((m, mi) => (
-              <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11.5, padding: '3px 0', color: 'var(--sub)' }}>
-                <span style={{ color: 'var(--accent)', fontWeight: 700, flex: 'none' }}>[{mi + 1}]</span>
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(m.ts || '').slice(5, 10)} {m.title}</span>
-                {m.reason && <span className="wb-pill" style={{ fontSize: 9.5, color: 'var(--sub2)', background: 'var(--line07)' }}>{m.reason}</span>}
-                {m.url && <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--faint)', flex: 'none' }}>原文↗</a>}
-                <button className="wb-note-del" style={{ flex: 'none' }} title="踢出（收错了）" onClick={() => eject(m)}>✕</button>
-              </div>
-            ))}
-          </details>
-        </div>
-      ))}
-
-      {/* 零散动态 */}
+      {/* 零散动态（mock D .scatter） */}
       {scattered?.members?.length > 0 && (
-        <div className="wb-card" style={{ marginBottom: 14, padding: '12px 15px' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>🗂 零散动态（{scattered.members.length} 条）<span style={{ fontSize: 11, color: 'var(--faint)', fontWeight: 400, marginLeft: 6 }}>还串不成因果链，不硬凑叙事</span></div>
+        <div className="tk-scatter">
+          <h3>🗂 零散动态（{scattered.members.length} 条）</h3>
+          <div className="ssub">还串不成因果链，不硬凑叙事</div>
           {scattered.members.map(m => (
-            <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, padding: '3px 0' }}>
-              <span style={{ color: 'var(--faint)', flex: 'none' }}>{(m.ts || '').slice(5, 10)}</span>
-              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
-              {m.url && <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--faint)', flex: 'none' }}>↗</a>}
-              <button className="wb-note-del" style={{ flex: 'none' }} title="踢出" onClick={() => eject(m)}>✕</button>
+            <div key={m.id} className="srow2">
+              <span className="sd">{(m.ts || '').slice(5, 10)}</span>
+              <span className="stt">{m.title}</span>
+              {m.url && <a href={m.url} target="_blank" rel="noreferrer">↗</a>}
+              <button className="tk-mute" title="踢出" onClick={() => eject(m)}>✕</button>
             </div>
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import '../styles/workbench.css'
+import '../styles/tracking.css'
 import { api, streamEphemeralChat, sourceCapability } from '../components/wb/util'
 import {
   IconFeed, IconNotes, IconTopics, IconStudio, IconSources, IconSettings,

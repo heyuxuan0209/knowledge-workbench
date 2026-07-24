@@ -1,0 +1,115 @@
+/* P3 追踪主题 UI（像素级对齐 mock D/E，2026-07-24）。tk- 前缀避免与 workbench.css 冲突；
+   复用 workbench.css 的 :root 变量（--accent/--surface/--serif…）。 */
+
+/* ── mock E：主题库列表 追踪分区 ── */
+.tk-zone{display:flex;align-items:baseline;gap:12px;margin:26px 0 4px}
+.tk-zone h2{font-family:var(--serif);font-size:19px;font-weight:600;color:var(--text)}
+.tk-zone .n{font-size:13px;color:var(--sub2)}
+.tk-zone .what{font-size:12.5px;color:var(--sub2)}
+.tk-zone-note{font-size:12.5px;color:var(--sub);margin-bottom:14px;line-height:1.7}
+.tk-zone-note b{color:var(--body2)}
+.tk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.tk-card{background:var(--surface);border:1px solid var(--line10);border-top:3px solid var(--accent);border-radius:14px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;position:relative}
+.tk-card:hover{box-shadow:0 3px 14px rgba(33,31,26,.08)}
+.tk-card .tt{font-family:var(--serif);font-size:17.5px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+.tk-badge{font-size:10.5px;font-weight:600;color:var(--green);border:1px solid var(--green);border-radius:11px;padding:0 8px;letter-spacing:1px}
+.tk-badge.paused{color:var(--faint);border-color:var(--line14)}
+.tk-card .stats{font-size:12.5px;color:var(--sub);margin-top:7px}
+.tk-card .stats b{color:var(--body2)}
+.tk-card .newdot{position:absolute;top:14px;right:36px;font-size:11px;color:#fff;background:var(--red);border-radius:12px;padding:1px 9px}
+.tk-card .more{position:absolute;top:12px;right:12px;border:none;background:none;color:var(--faint);font-size:16px;cursor:pointer;line-height:1;padding:2px 6px}
+.tk-card .more:hover{color:var(--body2)}
+.tk-card .vd{margin-top:11px;font-size:13px;color:var(--body);line-height:1.65;background:rgba(61,90,128,.05);border-left:2px solid var(--accent);padding:8px 12px;border-radius:0 8px 8px 0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.tk-card .vd .vl{font-size:10.5px;color:var(--accent);letter-spacing:1px;display:block;margin-bottom:2px}
+.tk-card .gathering{margin-top:11px;font-size:12.5px;color:var(--faint);line-height:1.6}
+.tk-card .foot{margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tk-go{font-size:12.5px;color:#fff;background:var(--accent);border:none;border-radius:8px;padding:5px 13px;cursor:pointer}
+.tk-go:hover{background:var(--accent-h)}
+.tk-menu{position:absolute;z-index:40;background:var(--surface);border:1px solid var(--line10);border-radius:8px;box-shadow:0 8px 24px rgba(33,31,26,.14);padding:4px;min-width:150px}
+.tk-menu .mi{padding:7px 11px;font-size:12.5px;cursor:pointer;border-radius:6px;color:var(--body)}
+.tk-menu .mi:hover{background:rgba(61,90,128,.06)}
+.tk-menu .mi.del{color:var(--red)}
+/* 新建卡 + AI 提议卡 */
+.tk-card.new{border:1px dashed var(--line14);border-top:1px dashed var(--line14);background:none;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.tk-card.new:hover{border-color:var(--accent);box-shadow:none}
+.tk-propose{background:var(--surface);border:1px dashed rgba(61,90,128,.4);border-radius:14px;padding:14px 18px;margin-bottom:14px}
+.tk-propose .pt{font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px}
+.tk-propose .prow{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px}
+.tk-propose .prow b{flex:none;color:var(--body2)}
+.tk-propose .prow .why{flex:1;min-width:0;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-propose .yes{font-size:12px;color:#fff;background:var(--amber);border:none;border-radius:8px;padding:4px 12px;cursor:pointer}
+.tk-propose .no{font-size:12px;color:var(--sub);background:none;border:1px solid var(--line14);border-radius:8px;padding:4px 10px;cursor:pointer}
+
+/* ── mock D：详情页 ── */
+.tk-hd{border-bottom:1px solid var(--line14);padding-bottom:16px;margin-bottom:18px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.tk-hd h1{font-family:var(--serif);font-size:26px;font-weight:600;color:var(--text)}
+.tk-hd h1 .type{display:inline-block;vertical-align:5px;font-size:11px;font-weight:600;color:var(--green);border:1px solid var(--green);border-radius:12px;padding:1px 9px;margin-left:10px;letter-spacing:1px}
+.tk-hd .meta{font-size:12.5px;color:var(--sub);margin-top:5px}
+.tk-hd .meta b{color:var(--body2)}
+.tk-hd .acts{display:flex;gap:8px}
+.tk-hd .acts button{font-size:12px;color:var(--sub);background:none;border:1px solid var(--line14);border-radius:8px;padding:5px 11px;cursor:pointer}
+.tk-hd .acts button:hover{border-color:var(--accent);color:var(--accent)}
+.tk-hd .acts button.del:hover{border-color:var(--red);color:var(--red)}
+.tk-scope{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:12px 0 0;font-size:12px}
+.tk-scope .slab{color:var(--sub2);letter-spacing:1px}
+.tk-chip{background:var(--surface);border:1px solid var(--line14);border-radius:14px;padding:2px 11px;color:var(--body2)}
+.tk-scope .hint{color:var(--faint);font-size:11.5px;margin:6px 0 0;width:100%}
+.tk-explain{border:1px solid var(--line10);border-radius:12px;background:var(--surface);margin:14px 0 16px;overflow:hidden}
+.tk-explain .ehead{display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--accent);cursor:pointer;user-select:none}
+.tk-explain .ebody{border-top:1px solid var(--line08);padding:12px 18px 15px}
+.tk-explain .rule{display:flex;gap:10px;padding:6px 0;font-size:13px;color:var(--body);line-height:1.7}
+.tk-explain .rule b{color:var(--text);flex-shrink:0}
+.tk-delta{background:rgba(169,121,31,.08);border:1px solid rgba(169,121,31,.28);border-radius:11px;padding:12px 17px;margin-bottom:16px}
+.tk-delta h3{font-size:13.5px;font-weight:600;color:var(--amber);margin-bottom:7px}
+.tk-delta .drow{display:flex;gap:10px;align-items:center;font-size:12.5px;padding:3px 0}
+.tk-delta .drow .dd{color:var(--sub2);font-size:11.5px;flex:none;width:38px}
+.tk-delta .drow .dt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--body)}
+.tk-delta .drow .dl{font-size:9.5px;color:#3d5a80;background:rgba(61,90,128,.1);border-radius:5px;padding:1px 6px;flex:none}
+.tk-delta .dnote{font-size:11px;color:var(--sub2);margin-top:6px}
+.tk-firstbar{background:rgba(63,115,80,.08);border:1px solid rgba(63,115,80,.25);border-radius:11px;padding:11px 17px;font-size:13px;color:var(--green);margin-bottom:16px}
+.tk-lede{background:var(--surface);border:1px solid var(--line10);border-radius:13px;padding:17px 22px;margin-bottom:22px}
+.tk-lede .lab{font-size:11px;letter-spacing:2px;color:var(--sub2);display:block;margin-bottom:6px}
+.tk-lede p{font-family:var(--serif);font-size:16.5px;line-height:1.85;color:var(--body)}
+.tk-lede b{color:var(--text)}
+.tk-seclab{font-size:12px;letter-spacing:2.5px;color:var(--sub2);margin:0 0 10px}
+.tk-seg{display:inline-flex;border:1px solid var(--line10);border-radius:8px;overflow:hidden}
+.tk-seg button{border:none;background:none;font-size:12px;padding:5px 13px;color:var(--sub);cursor:pointer}
+.tk-seg button.on{background:var(--accent);color:#fff}
+/* 主线折叠卡 */
+.tk-acc{background:var(--surface);border:1px solid var(--line10);border-radius:13px;margin-bottom:10px;overflow:hidden}
+.tk-acc .head{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;user-select:none}
+.tk-acc .head:hover{background:rgba(61,90,128,.04)}
+.tk-acc .head .n{color:var(--accent);font-weight:700;font-size:13.5px;flex-shrink:0}
+.tk-acc .head .t{font-family:var(--serif);font-size:17px;font-weight:600;flex:1;line-height:1.45;color:var(--text)}
+.tk-acc .head .mini{font-size:12px;color:var(--sub2);flex-shrink:0}
+.tk-acc .head .chev{color:var(--faint);font-size:12px;transition:transform .2s;flex-shrink:0}
+.tk-acc.open .head .chev{transform:rotate(90deg)}
+.tk-acc .teaser{padding:0 18px 13px 43px;font-size:13.5px;color:var(--sub);line-height:1.7}
+.tk-acc .body{padding:2px 22px 18px 43px;border-top:1px solid var(--line08)}
+.tk-acc .path{padding-top:12px;font-size:14.5px;color:var(--body);line-height:1.9}
+.tk-cite{display:inline-block;vertical-align:3px;font-size:10.5px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:6px;padding:0 5px;margin-left:2px;cursor:pointer;line-height:1.5;text-decoration:none}
+.tk-cite:hover{background:var(--accent);color:#fff}
+.tk-verdict{margin-top:13px;background:rgba(61,90,128,.06);border-left:3px solid var(--accent);border-radius:0 9px 9px 0;padding:11px 16px}
+.tk-verdict .vlab{font-size:11px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;font-weight:600}
+.tk-verdict p{font-size:14.5px;color:var(--text);line-height:1.7}
+.tk-watch{margin-top:10px;font-size:13px;color:var(--amber)}
+.tk-hook{margin-top:10px;background:rgba(33,31,26,.03);border-radius:10px;padding:11px 15px;display:flex;gap:14px;align-items:center;font-size:13.5px;color:var(--body);line-height:1.6}
+.tk-hook .t{flex:1}
+.tk-hook button{flex-shrink:0;font-size:12px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:8px;padding:4px 11px;cursor:pointer}
+.tk-hook button:hover{background:var(--accent);color:#fff}
+.tk-srcbox{margin-top:14px;border:1px dashed var(--line14);border-radius:10px;overflow:hidden}
+.tk-srcbox summary{padding:9px 14px;font-size:12.5px;color:var(--sub);cursor:pointer;user-select:none}
+.tk-srcbox summary:hover{color:var(--accent)}
+.tk-srcbox .srow{display:flex;gap:8px;align-items:center;font-size:11.5px;padding:3px 14px;color:var(--sub)}
+.tk-srcbox .srow .sn{color:var(--accent);font-weight:700;flex:none}
+.tk-srcbox .srow .st{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-scatter{background:var(--surface);border:1px dashed var(--line14);border-radius:13px;padding:16px 20px;margin-top:14px}
+.tk-scatter h3{font-family:var(--serif);font-size:15.5px;color:var(--body2);margin-bottom:3px}
+.tk-scatter .ssub{font-size:12px;color:var(--sub2);margin-bottom:9px}
+.tk-scatter .srow2{display:flex;gap:10px;padding:6px 0;border-bottom:1px dotted var(--line08);font-size:13px;color:var(--body);align-items:baseline}
+.tk-scatter .srow2:last-child{border:none}
+.tk-scatter .srow2 .sd{color:var(--sub2);font-size:11.5px;flex-shrink:0;width:38px}
+.tk-scatter .srow2 .stt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-scatter .srow2 a{color:var(--faint);flex:none}
+.tk-mute{border:none;background:none;color:var(--faint);cursor:pointer;font-size:12px;flex:none;padding:0 2px}
+.tk-mute:hover{color:var(--red)}

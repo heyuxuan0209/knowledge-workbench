@@ -119,65 +119,58 @@ export default function TopicsView({ topics, loadTopics, topicView, setTopicView
       <div className="wb-page-title">我的主题库</div>
       <div className="wb-page-sub">上面是<b>替你盯着外面</b>的追踪主题（AI 每天把资讯里「以它为主角」的内容归进来，织成脉络综述）；下面是<b>你亲手沉淀</b>的创作主题。追踪主题都是你建的，AI 不会自己偷偷建。</div>
 
-      {/* 🛰 追踪中（mock E 上分区） */}
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 700 }}>🛰 追踪中（{tracking.length}）</span>
-          <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>替你盯着外面的话题</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            <input value={newTrack} onChange={e => setNewTrack(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) createTracking() }}
-              placeholder="追踪一个话题（如 Claude、loop engineering）…"
-              style={{ fontSize: 12.5, padding: '6px 10px', width: 240, border: '1px solid var(--line10)', borderRadius: 7, background: 'var(--surface)', color: 'var(--body)' }} />
-            <button className="wb-btn-primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => createTracking()}>＋ 追踪</button>
-          </div>
+      {/* 🛰 追踪中（mock E 上分区，像素级 tk-）*/}
+      <div className="tk-zone">
+        <h2>🛰 追踪中</h2>
+        <span className="n">{tracking.length}</span>
+        <span className="what">替你盯着外面的话题</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <input value={newTrack} onChange={e => setNewTrack(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) createTracking() }}
+            placeholder="追踪一个话题（如 Claude、loop engineering）…"
+            style={{ fontSize: 12.5, padding: '6px 11px', width: 250, border: '1px solid var(--line10)', borderRadius: 8, background: 'var(--surface)', color: 'var(--body)' }} />
+          <button className="tk-go" onClick={() => createTracking()}>＋ 追踪</button>
         </div>
+      </div>
+      <div className="tk-zone-note">AI 每天把资讯里「以它为主角」的内容归进来，织成脉络综述。<b>追踪主题都是你建的，AI 不会自己偷偷建。</b></div>
 
-        {/* AI 提议 · 供你裁决（收尾④）：依据你的星标/精读行为，AI 绝不自动建 */}
-        {candidates.length > 0 && (
-          <div style={{ border: '1px dashed rgba(61,90,128,.4)', borderRadius: 9, padding: '9px 12px', marginBottom: 10, background: 'rgba(61,90,128,.04)' }}>
-            <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>💡 AI 提议 · 供你裁决<span style={{ color: 'var(--faint)' }}>（看你近期在关注的，要不要长期追？拒绝后不再提）</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {candidates.map(c => (
-                <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                  <b style={{ flex: 'none' }}>{c.name}</b>
-                  <span style={{ flex: 1, minWidth: 0, color: 'var(--sub2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.why}</span>
-                  <button className="wb-btn-outline" style={{ padding: '3px 10px', fontSize: 11, flex: 'none' }} onClick={() => adoptCandidate(c)}>＋ 追踪</button>
-                  <button className="wb-note-del" style={{ flex: 'none' }} title="不追，别再提" onClick={() => dismissCandidate(c)}>✕</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tracking.length === 0 && candidates.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '6px 2px' }}>还没有追踪主题——建一个，AI 每天把「以它为主角」的资讯归进来、织成脉络综述。</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
-          {tracking.map(t => (
-            <div key={t.id} className="wb-card" style={{ padding: '12px 14px', cursor: 'pointer', position: 'relative' }} onClick={() => gotoTracking?.(t.id)}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                <span style={{ fontFamily: 'var(--serif)', fontSize: 15, fontWeight: 600 }}>{t.name}</span>
-                {t.weekNew > 0 && <span className="wb-pill" style={{ fontSize: 10, color: '#8a6a1a', background: 'rgba(169,121,31,.12)' }}>本周 +{t.weekNew}</span>}
-                {t.status === 'paused' && <span className="wb-pill" style={{ fontSize: 10, color: 'var(--faint)', background: 'var(--line07)' }}>已暂停</span>}
-                <button className="wb-note-del" style={{ marginLeft: 'auto', flex: 'none' }} title="更多" onClick={(e) => { e.stopPropagation(); setTrackMenu(trackMenu === t.id ? null : t.id) }}>⋯</button>
-              </div>
-              {trackMenu === t.id && (<>
-                <div onClick={(e) => { e.stopPropagation(); setTrackMenu(null) }} style={{ position: 'fixed', inset: 0, zIndex: 30 }} />
-                <div style={{ position: 'absolute', right: 10, top: 32, zIndex: 40, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 8, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 4, minWidth: 140 }} onClick={e => e.stopPropagation()}>
-                  <div className="wb-menu-item" style={{ padding: '7px 10px', fontSize: 12.5, cursor: 'pointer', borderRadius: 6 }} onClick={() => archiveTracking(t)}>📥 归档（可恢复）</div>
-                  <div className="wb-menu-item" style={{ padding: '7px 10px', fontSize: 12.5, cursor: 'pointer', borderRadius: 6, color: 'var(--red)' }} onClick={() => deleteTracking(t)}>🗑 删除</div>
-                </div>
-              </>)}
-              <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 6 }}>{t.spanDays || 0} 天 · 收录 {t.memberCount} 条 · {t.storylineCount} 条主线</div>
-              {t.gathering
-                ? <div style={{ fontSize: 12, color: 'var(--faint)', lineHeight: 1.5 }}>攒料中——条目够了（≥8）且串得成因果链，综述才会出现，不硬写。</div>
-                : <div style={{ fontSize: 12.5, color: 'var(--body2)', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}><span style={{ color: 'var(--accent)', fontSize: 10.5 }}>本月一句话 · AI 判断　</span>{t.overview || '综述生成中…'}</div>}
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--accent)' }}>看综述 →</div>
+      {candidates.length > 0 && (
+        <div className="tk-propose">
+          <div className="pt">💡 AI 提议 · 供你裁决<span style={{ color: 'var(--faint)', fontWeight: 400 }}>（看你近期在关注的，要不要长期追？拒绝后不再提）</span></div>
+          {candidates.map(c => (
+            <div key={c.name} className="prow">
+              <b>{c.name}</b><span className="why">{c.why}</span>
+              <button className="yes" onClick={() => adoptCandidate(c)}>要，开始追踪</button>
+              <button className="no" onClick={() => dismissCandidate(c)}>不要</button>
             </div>
           ))}
         </div>
+      )}
+
+      {tracking.length === 0 && candidates.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '2px 2px 8px' }}>还没有追踪主题——建一个，AI 每天把「以它为主角」的资讯归进来、织成脉络综述。</div>}
+      <div className="tk-grid">
+        {tracking.map(t => (
+          <div key={t.id} className="tk-card" onClick={() => gotoTracking?.(t.id)}>
+            {t.weekNew > 0 && <span className="newdot">本周 +{t.weekNew}</span>}
+            <button className="more" title="更多" onClick={(e) => { e.stopPropagation(); setTrackMenu(trackMenu === t.id ? null : t.id) }}>⋯</button>
+            {trackMenu === t.id && (<>
+              <div onClick={(e) => { e.stopPropagation(); setTrackMenu(null) }} style={{ position: 'fixed', inset: 0, zIndex: 30 }} />
+              <div className="tk-menu" style={{ right: 12, top: 34 }} onClick={e => e.stopPropagation()}>
+                <div className="mi" onClick={() => archiveTracking(t)}>📥 归档（可恢复）</div>
+                <div className="mi del" onClick={() => deleteTracking(t)}>🗑 删除</div>
+              </div>
+            </>)}
+            <div className="tt">{t.name}{t.status === 'paused' && <span className="tk-badge paused">已暂停</span>}</div>
+            <div className="stats">{t.spanDays || 0} 天 · 收录 <b>{t.memberCount}</b> 条 · <b>{t.storylineCount}</b> 条主线</div>
+            {t.gathering
+              ? <div className="gathering">攒料中——条目够了（≥8）且串得成因果链，综述才会出现，不硬写。</div>
+              : <div className="vd"><span className="vl">本月一句话 · AI 判断</span>{t.overview || '综述生成中…'}</div>}
+            <div className="foot"><button className="tk-go" onClick={(e) => { e.stopPropagation(); gotoTracking?.(t.id) }}>看综述 →</button></div>
+          </div>
+        ))}
       </div>
 
-      <div style={{ fontSize: 13.5, fontWeight: 700, margin: '20px 0 2px' }}>✍️ 创作主题（{topics.length}）<span style={{ fontSize: 11.5, fontWeight: 400, color: 'var(--faint)', marginLeft: 8 }}>你亲手沉淀、为写作服务</span></div>
+      <div className="tk-zone" style={{ marginTop: 28 }}><h2>✍️ 创作主题</h2><span className="n">{topics.length}</span><span className="what">你亲手沉淀、为写作服务</span></div>
 
       <div className="wb-acquire" style={{ marginTop: 16 }}>
         <input placeholder="搜索已有主题，或输入新主题名建立主题页…" value={query}
