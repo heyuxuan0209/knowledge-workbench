@@ -1,6 +1,6 @@
 import { getDatabase } from './init.js';
 import { randomUUID } from 'crypto';
-import { classifyTrustTier } from '../services/trust-tier.js';
+import { classifyTrustTier, effectiveTier } from '../services/trust-tier.js';
 
 // 找到或创建 Source（按 platform+handle 判重，同一个人重复出现时复用已有记录）。
 // sourceInfo 为空（无法识别作者，如 RSS 媒体源）时返回 null，content.source_id 留空。
@@ -135,7 +135,9 @@ export function getContents(limit = 20, offset = 0, { q = null, starred = false,
 
   const rows = db.prepare(`
     SELECT c.*, s.display_name as source_display_name, s.registered_by_user as source_registered,
-           sp.platform as source_platform, sp.handle as source_handle
+           s.trust_tier as source_trust_tier,
+           sp.platform as source_platform, sp.handle as source_handle,
+           (SELECT st.source_count FROM stories st WHERE st.primary_content_id = c.id) as story_source_count
     FROM contents c
     LEFT JOIN sources s ON c.source_id = s.id
     LEFT JOIN source_platforms sp ON sp.source_id = s.id
@@ -145,7 +147,8 @@ export function getContents(limit = 20, offset = 0, { q = null, starred = false,
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
   db.close();
-  return rows.map(r => ({ ...r, heat: normalizeHeat(r.source_app, r.external_score) }));
+  // trust_tier 用**有效档**（ADR-045②）：官方 RSS 大量无 source_id，只 join 会漏光官网条 → URL 域名白名单兜底
+  return rows.map(r => ({ ...r, trust_tier: effectiveTier(r.source_trust_tier, r.url), heat: normalizeHeat(r.source_app, r.external_score) }));
 }
 
 // 星标切换（M7）：返回新状态；内容不存在返回 null

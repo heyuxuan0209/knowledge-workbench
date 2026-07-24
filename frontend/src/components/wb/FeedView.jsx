@@ -159,13 +159,27 @@ export default function FeedView({
   // 与素材库同款：有筛选时走后端 SQL（不是只筛已加载的 30 条），无筛选回全局列表
   const [feedTab, setFeedTab] = useState('all') // 'all' | 'starred'
   const [feedQuery, setFeedQuery] = useState('')
-  const [sortMode, setSortMode] = useState('latest') // 'latest' 最新 | 'hot' 最热 | 'followed' 关注优先
+  // ADR-045：一手优先(新默认，记住) / 最新 / 最热；「关注优先」退役（被组2吸收）
+  const [sortMode, setSortMode] = useState(() => localStorage.getItem('wb-feed-sort') || 'firsthand')
+  const setSort = (m) => { localStorage.setItem('wb-feed-sort', m); setSortMode(m) }
   const timeOf = (c) => new Date(`${(c.published_at || c.created_at || '').replace(' ', 'T')}Z`).getTime() || 0
   const sortContents = (list) => {
     const arr = [...(list || [])]
     if (sortMode === 'hot') return arr.sort((a, b) => (b.heat ?? b.external_score ?? 0) - (a.heat ?? a.external_score ?? 0) || timeOf(b) - timeOf(a))
-    if (sortMode === 'followed') return arr.sort((a, b) => (Number(!!b.source_registered) - Number(!!a.source_registered)) || timeOf(b) - timeOf(a))
-    return arr.sort((a, b) => timeOf(b) - timeOf(a)) // 最新：纯发布时间倒序（明确、可预期）
+    return arr.sort((a, b) => timeOf(b) - timeOf(a)) // 最新/一手优先(扁平回退)：时间倒序
+  }
+  // 一手优先分组（ADR-045①）：桶互斥级联——官方一手 > 关注 > 精选/热点主条 > 其他
+  const bucketOf = (c) => {
+    if (c.trust_tier === 'T1' || c.trust_tier === 'T1.5') return 1      // 官方 blog + 官方号/员工号（即使被关注也进组1）
+    if (c.source_registered) return 2                                    // 你关注的人
+    if (c.story_source_count || c.source_app === 'aihot') return 3       // 事件簇主条 + AI HOT 精选
+    return 4
+  }
+  const groupContents = (list) => {
+    const g = { 1: [], 2: [], 3: [], 4: [] }
+    for (const c of (list || [])) g[bucketOf(c)].push(c)
+    for (const k of [1, 2, 3, 4]) g[k].sort((a, b) => timeOf(b) - timeOf(a)) // 组内纯时间倒序
+    return g
   }
   const [filtered, setFiltered] = useState(null)
   const [artCat, setArtCat] = useState(null)   // 文章分类 chip（2b）
@@ -188,9 +202,8 @@ export default function FeedView({
     } catch { /* 静默 */ }
   }
   const hasFilter = feedTab === 'starred' || feedTab === 'followed' || Boolean(feedQuery.trim()) || Boolean(artCat)
-  // 卡片密度：舒适（分诊卡）/ 紧凑（列表），记本地
-  const [density, setDensity] = useState(() => localStorage.getItem('wb-feed-density') || 'cozy')
-  const setDens = (d) => { localStorage.setItem('wb-feed-density', d); setDensity(d) }
+  const [urgentOnly, setUrgentOnly] = useState(false) // 催办：只看组1/2 未读且搁置的（ADR-045⑤）
+  const [otherOpen, setOtherOpen] = useState(false)   // 组4「其他」默认折叠
   // 同步状态可感知（P0-7）：自动同步能力早已在，此前 UI 上没提过。undefined=加载中，null=从未同步
   const [lastSyncAt, setLastSyncAt] = useState(undefined)
   useEffect(() => {
@@ -243,6 +256,42 @@ export default function FeedView({
   // 项目分类（客户端，只 10 条）：计数 + 按 chip 筛选
   const projCounts = (ghTrending.repos || []).reduce((a, r) => { const k = r.category || '其他'; a[k] = (a[k] || 0) + 1; return a }, {})
   const shownRepos = projCat ? (ghTrending.repos || []).filter(r => (r.category || '其他') === projCat) : (ghTrending.repos || [])
+
+  // 统一紧凑行（ADR-045④，像素级 .fg-row）：time | 来源 | 标题(hover 全摘要) | 徽章 | 动作(hover)。点标题=站内精读。
+  const hmOf = (c) => {
+    const raw = (c.published_at || c.created_at || '').replace(' ', 'T')
+    const d = new Date(/[zZ+]/.test(raw) ? raw : raw + 'Z'); if (isNaN(d)) return ''
+    const now = new Date()
+    return d.toDateString() === now.toDateString() ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : `${d.getMonth() + 1}/${d.getDate()}`
+  }
+  const renderRow = (c) => {
+    const checked = selIds.has(c.id)
+    const followed = c.source_registered === 1 || c.source_registered === true
+    const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
+    const author = c.source_display_name || (c.source_app === 'github_trending' ? (c.en_title || '').split('/')[0] : null) || channel
+    const title = c.zh_title || c.en_title || '（无标题）'
+    const canRead = Boolean(c.permalink) || (c.url && c.content_type !== 'tweet')
+    const openRead = () => { dismissAirHint(); if (c.permalink) window.open(c.permalink, '_blank', 'noopener'); else setReaderContent(c) }
+    const unread = c.user_read_status !== 'read'
+    const badge = c.story_source_count > 1 ? { t: `${c.story_source_count} 源同报`, cls: 'cl' } : ((c.trust_tier === 'T1' || c.trust_tier === 'T1.5') ? { t: '官方一手', cls: 'of' } : null)
+    return (
+      <div key={c.id} className={`fg-row ${unread ? 'unread' : 'read'}${checked ? ' sel' : ''}`}>
+        <span className="tm">{hmOf(c)}</span>
+        <span className="src" title={author}>{author}</span>
+        <span className="tt" onClick={openRead} title={c.zh_summary ? `${title}\n\n${c.zh_summary}` : title}>{title}</span>
+        {badge && <span className={`fg-badge ${badge.cls}`}>{badge.t}</span>}
+        <div className="fg-acts">
+          {canRead && <button className="read" onClick={openRead} title="站内精读（读中文）">精读</button>}
+          <button className="a" title={checked ? '已选中' : '选中解读'} onClick={() => toggleSelect(c)}>{checked ? '✓' : '⊕'}</button>
+          <button className="a" title="💡 收进灵感" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
+          <button className="a" title="🛰 追踪这个话题" onClick={() => trackFromContent(c)}>🛰</button>
+          <button className="a" title={c.starred ? '取消收藏' : '★ 收藏'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
+          {c.url && <a className="a" href={c.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ display: 'inline-flex', alignItems: 'center' }}><IconExternal /></a>}
+          {!followed && c.source_id !== undefined && <button className="a" disabled={followingIds?.has(c.id)} title="关注这个来源，以后自动追更" onClick={() => followSource(c.id)}>{followingIds?.has(c.id) ? '…' : '＋关注'}</button>}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -393,16 +442,12 @@ export default function FeedView({
           </div>
           <input className="wb-feed-search" placeholder="搜索资讯（空格分隔多关键词）…"
             value={feedQuery} onChange={(e) => setFeedQuery(e.target.value)} />
-          <select className="wb-filter-chip" style={{ flexShrink: 0 }} value={sortMode} onChange={(e) => setSortMode(e.target.value)}
-            title="最新=按发布时间；最热=按热度分；关注优先=你关注的源排前面">
+          <select className="wb-filter-chip" style={{ flexShrink: 0 }} value={sortMode} onChange={(e) => setSort(e.target.value)}
+            title="一手优先=按原料价值分组（官方一手→你关注的人→精选热点→其他）；最新=按发布时间；最热=按热度分">
+            <option value="firsthand">排序：一手优先</option>
             <option value="latest">排序：最新</option>
             <option value="hot">排序：最热</option>
-            <option value="followed">排序：关注优先</option>
           </select>
-          <div className="wb-seg-toggle" style={{ flexShrink: 0 }} title="舒适=分诊卡；紧凑=列表，一屏扫更多">
-            <button className={density === 'cozy' ? 'active' : ''} onClick={() => setDens('cozy')}>舒适</button>
-            <button className={density === 'compact' ? 'active' : ''} onClick={() => setDens('compact')}>紧凑</button>
-          </div>
           <span className="wb-feedbar-count">共 {(filtered ?? contents).length} 条{hasFilter ? '（筛选中）' : ''}</span>
           <button className="wb-brief-link" disabled={syncing} onClick={syncAllSources}
             title="同步全部信源：AI HOT + RSS 抓取 + B站/YouTube/GitHub 主动查询">
@@ -443,54 +488,50 @@ export default function FeedView({
           <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有收藏。在卡片右上角点 ☆ 一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
         )}
 
-        <div className={density === 'compact' ? 'wb-feed-list' : 'wb-feed-grid'}>
-          {sortContents(filtered ?? contents).map(c => {
-            const checked = selIds.has(c.id)
-            const followed = c.source_registered === 1 || c.source_registered === true
-            const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
-            const repoOwner = c.source_app === 'github_trending' ? (c.en_title || '').split('/')[0] : null
-            const author = c.source_display_name || repoOwner || channel
-            const canRead = Boolean(c.permalink) || (c.url && c.content_type !== 'tweet')
-            const openRead = () => { dismissAirHint(); if (c.permalink) window.open(c.permalink, '_blank', 'noopener'); else setReaderContent(c) }
-            const title = c.zh_title || c.en_title || '（无标题）'
-            // 关注状态 → 小圆点（绿=已关注/灰=未关注），不再用满色 pill；分类降成尾巴小灰字
-            const dot = <span className={`wb-fdot${followed ? ' f' : ''}`} title={followed ? '来自你关注的源' : '来自你没关注的源'} />
-            const plat = platformLabel({ platform: c.source_platform, contentType: c.content_type, sourceApp: c.source_app }) // 来源类型标
-            const meta = `${plat ? plat + ' · ' : ''}${author} · ${timeAgo(c.published_at)}${c.category ? ' · ' + c.category : ''}`
-            const actions = (
-              <div className="wb-fcard-act">
-                {canRead && <button className="wb-btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} title="AI 帮你读懂这篇，出精读稿" onClick={openRead}>AI 精读</button>}
-                <button className="wb-fcard-a" title="送入右侧一起解读/对话" onClick={() => toggleSelect(c)}>{checked ? '✓ 已选中' : '选中解读'}</button>
-                <button className="wb-fcard-a" title="💡 收进灵感：以后能写（区别于 ★ 收藏＝以后再看）" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
-                <button className="wb-fcard-a" title="🛰 追踪这个话题：AI 每天把以它为主角的资讯归进来、织成脉络综述" onClick={() => trackFromContent(c)}>🛰</button>
-                <button className={`wb-fcard-a${c.starred ? ' on' : ''}`} title={c.starred ? '取消收藏' : '★ 收藏：以后再看（区别于 💡 收进灵感＝以后能写）'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
-                {c.url && <a className="wb-fcard-a" href={c.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ display: 'inline-flex', alignItems: 'center' }}><IconExternal /></a>}
-                {!followed && c.source_id !== undefined && (
-                  <button className="wb-fcard-a" disabled={followingIds?.has(c.id)} onClick={() => followSource(c.id)} title="关注这个作者/来源，以后自动追更">
-                    {followingIds?.has(c.id) ? '识别中…' : '＋关注'}
-                  </button>
-                )}
+        {/* ADR-045：一手优先=四组分层视图；最新/最热=扁平紧凑行。统一紧凑行（密度开关退役）。 */}
+        {sortMode === 'firsthand' && !hasFilter ? (() => {
+          const groups = groupContents(filtered ?? contents)
+          const isUnread = (c) => c.user_read_status !== 'read'
+          const stale = [...groups[1], ...groups[2]].filter(c => isUnread(c) && (Date.now() - timeOf(c)) > 3 * 864e5)
+          const staleDays = stale.length ? Math.floor((Date.now() - Math.min(...stale.map(timeOf))) / 864e5) : 0
+          const GH = {
+            1: { t: '📌 官方一手', cls: 'g1', what: '官方 blog + 官方号/员工号（T1·T1.5）' },
+            2: { t: '🎯 你关注的人', cls: 'g2', what: 'X builders · YouTube · 播客（你标了关注的）' },
+            3: { t: '🔥 精选与热点', cls: 'g3', what: 'AI HOT 精选 + 事件簇主条（同事件已去重）' },
+          }
+          if (urgentOnly) return (
+            <div className="fg-grp">
+              <div className="fg-ghead" style={{ borderBottomColor: 'var(--amber)' }}><span className="gt" style={{ color: 'var(--amber)' }}>🕐 一手原料 · 还没读的</span><span className="gn">{stale.length} 条 · 搁置越久越靠前</span><span className="gwhat" style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => setUrgentOnly(false)}>← 返回全部</span></div>
+              {stale.sort((a, b) => timeOf(a) - timeOf(b)).map(renderRow)}
+            </div>
+          )
+          return <>
+            {stale.length > 0 && (
+              <div className="fg-urgent" onClick={() => setUrgentOnly(true)}>
+                🕐 本周一手信源还没读的 <b>{stale.length}</b> 条 · 最早搁置 <b>{staleDays}</b> 天 —— 原料别放凉<span className="x">点这里只看这批 →</span>
               </div>
-            )
-            if (density === 'compact') return (
-              <div key={c.id} className={`wb-frow${checked ? ' selected' : ''}`}>
-                {dot}
-                <span className="wb-frow-title" onClick={openRead} title={c.zh_summary ? `${title}\n\n${c.zh_summary}` : title}>{title}</span>
-                {c.zh_summary && <span className="wb-frow-gist" title={c.zh_summary}>{c.zh_summary}</span>}
-                <span className="wb-frow-meta">{meta}</span>
-                {actions}
+            )}
+            {[1, 2, 3].map(k => groups[k].length > 0 && (
+              <div key={k} className={`fg-grp ${GH[k].cls}`}>
+                <div className="fg-ghead">
+                  <span className="gt">{GH[k].t}</span>
+                  <span className="gn">{groups[k].length} 条</span>
+                  {groups[k].filter(isUnread).length > 0 && <span className="gnew">{groups[k].filter(isUnread).length} 未读</span>}
+                  <span className="gwhat">{GH[k].what}</span>
+                </div>
+                {groups[k].map(renderRow)}
               </div>
-            )
-            return (
-              <div key={c.id} className={`wb-fcard${checked ? ' selected' : ''}`}>
-                <div className="wb-fcard-title" onClick={openRead} title="点击 AI 精读">{title}</div>
-                {c.zh_summary && <div className="wb-fcard-gist">{c.zh_summary}</div>}
-                <div className="wb-fcard-meta">{dot}<span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</span></div>
-                {actions}
+            ))}
+            {groups[4].length > 0 && (
+              <div className="fg-grp">
+                <div className="fg-foldhead" onClick={() => setOtherOpen(o => !o)}>{otherOpen ? '▾' : '▸'} 其他（{groups[4].length} 条{otherOpen ? '' : '，默认折叠'}）</div>
+                {otherOpen && groups[4].map(renderRow)}
               </div>
-            )
-          })}
-        </div>
+            )}
+          </>
+        })() : (
+          <div className="wb-feed-list">{sortContents(filtered ?? contents).map(renderRow)}</div>
+        )}
       </>)}
 
       {mainTab === 'projects' && (

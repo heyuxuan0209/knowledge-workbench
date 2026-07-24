@@ -1,0 +1,38 @@
+/* ADR-045 一手优先分组视图（像素级对齐 feed-firsthand-mock.html）。fg- 前缀，复用 :root 变量。 */
+.fg-sortbar{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.fg-sortbar .lab{font-size:12px;color:var(--sub2);letter-spacing:1px}
+.fg-sortbar .why{font-size:11.5px;color:var(--faint);margin-left:2px}
+.fg-urgent{display:flex;align-items:center;gap:8px;background:rgba(169,121,31,.08);border:1px solid rgba(169,121,31,.28);border-radius:9px;padding:8px 13px;margin-bottom:14px;font-size:12.5px;color:var(--amber);cursor:pointer}
+.fg-urgent:hover{background:rgba(169,121,31,.13)}
+.fg-urgent b{font-weight:700}
+.fg-urgent .x{margin-left:auto;font-size:11px;color:var(--faint)}
+.fg-grp{margin-bottom:20px}
+.fg-ghead{display:flex;align-items:baseline;gap:10px;padding:8px 2px;border-bottom:2px solid var(--line14);margin-bottom:8px}
+.fg-ghead .gt{font-family:var(--serif);font-size:16.5px;font-weight:600;color:var(--text)}
+.fg-ghead .gn{font-size:12px;color:var(--sub2)}
+.fg-ghead .gnew{font-size:11.5px;color:#fff;background:var(--red);border-radius:10px;padding:0 8px}
+.fg-ghead .gwhat{font-size:11.5px;color:var(--faint);margin-left:auto;text-align:right}
+.fg-grp.g1 .fg-ghead{border-bottom-color:var(--accent)}
+.fg-grp.g2 .fg-ghead{border-bottom-color:var(--green)}
+.fg-grp.g3 .fg-ghead{border-bottom-color:var(--amber)}
+.fg-foldhead{cursor:pointer;color:var(--sub);font-size:13px;padding:6px 2px;border-top:1px solid var(--line08);display:flex;align-items:center;gap:8px}
+.fg-foldhead:hover{color:var(--accent)}
+.fg-row{display:flex;align-items:baseline;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer}
+.fg-row:hover{background:var(--surface)}
+.fg-row.sel{background:rgba(61,90,128,.08)}
+.fg-row .tm{font-size:11px;color:var(--faint);flex-shrink:0;width:38px}
+.fg-row .src{font-size:11.5px;color:var(--sub);flex-shrink:0;width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fg-row .tt{flex:1;font-size:14px;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fg-row:hover .tt{color:var(--accent)}
+.fg-row.unread .tt{font-weight:600}
+.fg-row.read .tt{color:var(--sub)}
+.fg-row .gist{font-size:11.5px;color:var(--sub2);flex-shrink:0;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;transition:opacity .1s}
+.fg-badge{flex-shrink:0;font-size:10.5px;color:var(--sub2);border:1px solid var(--line14);border-radius:9px;padding:0 7px}
+.fg-badge.of{color:var(--accent);border-color:var(--accent)}
+.fg-badge.cl{color:var(--amber);border-color:var(--amber)}
+.fg-acts{flex-shrink:0;display:flex;gap:4px;align-items:center;opacity:0;transition:opacity .12s}
+.fg-row:hover .fg-acts{opacity:1}
+.fg-acts .a{font-size:12px;color:var(--sub);background:none;border:none;cursor:pointer;padding:2px 4px}
+.fg-acts .a:hover{color:var(--accent)}
+.fg-acts .read{font-size:12px;color:#fff;background:var(--accent);border:none;border-radius:7px;padding:3px 11px;cursor:pointer}
+.fg-acts .read:hover{background:var(--accent-h)}
