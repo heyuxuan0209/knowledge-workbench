@@ -758,6 +758,31 @@ app.post('/api/studio/variants', async (req, res) => {
   }
 });
 
+// ADR-046 P2a 视频渲染器（内容预览层）：口播稿 → 竖版分镜稿（供站内竖版播放器预览节奏）。
+// 只用 DeepSeek 切分镜（产品常规成本），**不碰任何 TTS/付费语音 API**——配音是产品里另一步、
+// 用户单独触发才花钱（ADR-038 半自动：工作台出播放器+分镜稿，剪映收尾）。dur 由字数估算，无音频。
+app.post('/api/studio/storyboard', async (req, res) => {
+  try {
+    const { draft } = req.body || {};
+    if (!draft?.trim()) return res.status(400).json({ success: false, error: '口播稿为空——先在③出片把口播适配稿备好' });
+    const { chat } = await import('./services/llm.js');
+    const { loadPrompt, render } = await import('./services/creation-prompts.js');
+    const result = await chat([{ role: 'user', content: render(loadPrompt('storyboard.md'), { draft: draft.slice(0, 6000) }) }]);
+    if (!result.success) throw new Error(result.error);
+    const parsed = parseLlmJson(result.content);
+    // 无音频 → 按字幕阅读节奏估每镜时长（单条 ≈ len*0.16+1.1s，最短 1.5s）
+    const scenes = (Array.isArray(parsed.scenes) ? parsed.scenes : []).slice(0, 9).map((s, i) => {
+      const phrases = (Array.isArray(s.phrases) ? s.phrases : []).map(String).filter(Boolean);
+      const dur = Math.max(2.4, phrases.reduce((t, p) => t + Math.max(1.5, p.length * 0.16 + 1.1), 0));
+      return { id: `s${i + 1}`, keyword: String(s.keyword || '').slice(0, 12), sub: String(s.sub || '').slice(0, 26), phrases, kind: s.kind || 'point', dur: Math.round(dur * 10) / 10 };
+    }).filter(s => s.phrases.length);
+    if (!scenes.length) throw new Error('没能切出分镜，试试把口播稿写长一点');
+    res.json({ success: true, data: { title: String(parsed.title || '').slice(0, 24), scenes, cost: result.cost } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== M2 洞察层：日报与选题（ADR-008） ==========
 
 // 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）

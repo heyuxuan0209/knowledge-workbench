@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>竖版分镜播放器</title>
+<style>
+  /* ADR-046 P2a：竖版 9:16 分镜播放器（内容预览层，纯预览、零 TTS/零 API 花费）。
+     配音是产品里另一步、用户单独触发才花钱（ADR-038 半自动：这里出播放器+分镜稿，剪映收尾）。 */
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#f2ede2;--ink:#2b2924;--sub:#6b6459;--accent:#c9784e;--line:rgba(43,41,36,.14);--panel:#faf8f2}
+  body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;background:#e9e4da;color:var(--ink);height:100vh;overflow:hidden}
+  .wrap{display:flex;gap:20px;height:100vh;padding:18px 20px;align-items:stretch}
+  /* 9:16 舞台，高度撑满、宽度按比例 */
+  .stagebox{height:100%;aspect-ratio:9/16;flex:none;border-radius:22px;overflow:hidden;box-shadow:0 14px 40px rgba(33,31,26,.22);position:relative;background:var(--bg)}
+  .stage{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:9% 8%;text-align:center;transition:background .4s}
+  .kicker{font-size:2.4vh;letter-spacing:.14em;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:3vh;opacity:0}
+  .kw{font-size:8.4vh;font-weight:800;line-height:1.12;color:var(--ink);opacity:0}
+  .kw .hl{color:var(--accent)}
+  .sub{font-size:3.1vh;color:var(--sub);margin-top:3.4vh;line-height:1.5;opacity:0}
+  /* 烧进画面的字幕（抖音静音刷） */
+  .captrack{position:absolute;left:6%;right:6%;bottom:8%;display:flex;justify-content:center}
+  .capline{font-size:3.4vh;font-weight:600;line-height:1.5;color:var(--ink);background:rgba(255,255,255,.66);backdrop-filter:blur(3px);border-radius:14px;padding:1.4vh 2.6vh;max-width:100%;opacity:0}
+  .badge{position:absolute;top:3.2%;left:5%;font-size:2vh;color:var(--accent);background:rgba(0,0,0,.05);border-radius:8px;padding:.5vh 1.4vh;font-weight:700;opacity:.9}
+  .brand{position:absolute;bottom:3%;right:5%;font-size:2vh;color:var(--sub);opacity:.75}
+  .rv-in{animation:rvin .5s cubic-bezier(.2,.7,.3,1) forwards}
+  @keyframes rvin{from{opacity:0;transform:translateY(2.2vh)}to{opacity:1;transform:none}}
+  .progress{position:absolute;top:0;left:0;height:4px;background:var(--accent);width:0;transition:width .12s linear}
+  /* 右侧控制列 */
+  .panel{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px;overflow:auto}
+  .panel h2{font-size:16px;font-weight:700;margin-bottom:3px}
+  .panel .hint{font-size:12px;color:var(--sub);line-height:1.55;margin-bottom:14px}
+  .ctl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .lbl{font-size:11px;color:var(--sub);font-weight:600;margin:12px 0 7px}
+  .themes{display:flex;gap:8px;flex-wrap:wrap}
+  .th{width:52px;height:34px;border-radius:8px;border:2px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+  .th.on{border-color:var(--accent)}
+  .scenes{margin-top:6px}
+  .sc{border:1px solid var(--line);border-radius:9px;padding:8px 11px;margin-bottom:7px;font-size:12.5px;cursor:pointer;background:#fff}
+  .sc.cur{border-color:var(--accent);background:rgba(201,120,78,.06)}
+  .sc .k{font-weight:700}.sc .p{color:var(--sub);margin-top:3px;line-height:1.5}
+  .sc .n{font-size:10.5px;color:var(--accent);float:right}
+  .aud{margin-top:16px;padding:12px 13px;border:1px dashed var(--line);border-radius:11px;background:rgba(0,0,0,.02)}
+  .aud .t{font-size:12.5px;font-weight:700}.aud .d{font-size:11.5px;color:var(--sub);margin:4px 0 9px;line-height:1.5}
+  .empty{color:var(--sub);font-size:13px;padding:30px 10px;text-align:center}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="stagebox">
+    <div class="progress" id="prog"></div>
+    <div class="stage" id="stage">
+      <div class="empty" id="empty">分镜生成后在这里竖版播放…</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>竖版分镜播放器 <span style="font-size:11px;color:var(--sub);font-weight:400">· 9:16 预览</span></h2>
+    <div class="hint">先看节奏／字幕对不对——这是<b>预览</b>，不渲染 MP4、不配音。满意后下载分镜稿，拿去剪映加配音/BGM/节奏收尾。</div>
+    <div class="ctl">
+      <button class="btn pri" id="play">▶ 播放</button>
+      <button class="btn" id="replay">↻ 重播</button>
+      <button class="btn" id="dl">⬇ 下载分镜稿</button>
+    </div>
+    <div class="lbl">视觉主题</div>
+    <div class="themes" id="themes"></div>
+    <div class="lbl">分镜（<span id="scount">0</span>）· 点跳转</div>
+    <div class="scenes" id="scenes"></div>
+    <div class="aud">
+      <div class="t">🎙 加配音（单独一步）</div>
+      <div class="d">配音会调用 TTS 语音合成（<b>另计费</b>）。预览属于免费的内容层，配音和它<b>在产品上分开</b>——确定分镜没问题了，再单独触发配音。</div>
+      <button class="btn" id="tts" disabled title="配音接入后在这里触发（edge-tts 免费 / 火山付费，二选一，届时另定）">🎙 加配音（下一步接入）</button>
+    </div>
+  </div>
+</div>
+<script>
+  const THEMES = {
+    warm:{bg:'#f2ede2',ink:'#2b2924',sub:'#6b6459',accent:'#c9784e',label:'暖'},
+    mono:{bg:'#111111',ink:'#f5f5f5',sub:'#a8a8a8',accent:'#7fd1c0',label:'黑'},
+    mag:{bg:'#f6f1e7',ink:'#211f1a',sub:'#6b6459',accent:'#a24b3f',label:'志'},
+    macaron:{bg:'#fbeef2',ink:'#33262b',sub:'#7a6b70',accent:'#d98aa6',label:'糖'},
+  };
+  let STORY = { title:'', scenes:[] };
+  let theme = 'warm';
+  // 播放时钟
+  let steps = [];      // 扁平化：每条字幕一格 {si, keyword, sub, kind, phrase, at, end}
+  let total = 0, t = 0, playing = false, raf = null, lastTs = 0;
+
+  const $ = id => document.getElementById(id);
+  function applyTheme(k){
+    theme = k; const c = THEMES[k];
+    document.documentElement.style.setProperty('--bg', c.bg);
+    document.documentElement.style.setProperty('--ink', c.ink);
+    document.documentElement.style.setProperty('--sub', c.sub);
+    document.documentElement.style.setProperty('--accent', c.accent);
+    $('stage').style.background = c.bg;
+    [...document.querySelectorAll('.th')].forEach(el=>el.classList.toggle('on', el.dataset.k===k));
+  }
+  function renderThemes(){
+    $('themes').innerHTML = '';
+    Object.entries(THEMES).forEach(([k,c])=>{
+      const d = document.createElement('div');
+      d.className = 'th'+(k===theme?' on':''); d.dataset.k=k;
+      d.style.background=c.bg; d.style.color=c.accent; d.textContent=c.label;
+      d.onclick=()=>applyTheme(k);
+      $('themes').appendChild(d);
+    });
+  }
+  function buildSteps(){
+    steps = []; let at = 0;
+    STORY.scenes.forEach((sc, si)=>{
+      const ph = sc.phrases.length?sc.phrases:[''];
+      const per = (sc.dur||ph.length*2)/ph.length;
+      ph.forEach(p=>{ steps.push({si, keyword:sc.keyword, sub:sc.sub, kind:sc.kind, phrase:p, at, end:at+per}); at += per; });
+    });
+    total = at || 0.1;
+  }
+  function highlightKw(kw){
+    // 简易高亮：整个关键词着色（已由 CSS .kw 控制），保留换行
+    return (kw||'').replace(/</g,'&lt;');
+  }
+  let lastStepKey = null;
+  function renderAt(time){
+    let idx = steps.findIndex(s=> time>=s.at && time<s.end);
+    if(idx<0) idx = steps.length-1;
+    const step = steps[idx];
+    if(!step){ return; }
+    $('prog').style.width = Math.min(100, time/total*100)+'%';
+    if(idx===lastStepKey) return;   // 同一格不重建 DOM——否则 fade-in 动画每帧重启，字永远停在透明
+    lastStepKey = idx;
+    const sc = STORY.scenes[step.si];
+    const kicker = STORY.title ? `<div class="kicker rv-in">${(STORY.title).replace(/</g,'&lt;')}</div>` : '';
+    const sub = step.sub ? `<div class="sub rv-in">${step.sub.replace(/</g,'&lt;')}</div>` : '';
+    $('stage').innerHTML =
+      `<div class="badge">镜 ${step.si+1}/${STORY.scenes.length}</div>`+
+      kicker+
+      `<div class="kw rv-in" style="font-size:${step.keyword.length>6?6.4:8.4}vh">${highlightKw(step.keyword)}</div>`+
+      sub+
+      `<div class="captrack"><div class="capline rv-in">${(step.phrase||'').replace(/</g,'&lt;')}</div></div>`+
+      `<div class="brand">杰西卡聊AI</div>`;
+    [...document.querySelectorAll('#scenes .sc')].forEach((el,i)=>el.classList.toggle('cur', i===step.si));
+  }
+  function tick(ts){
+    if(!playing){ return; }
+    if(!lastTs) lastTs = ts;
+    t += (ts-lastTs)/1000; lastTs = ts;
+    if(t>=total){ t=total; renderAt(t); stop(); return; }
+    renderAt(t);
+    raf = requestAnimationFrame(tick);
+  }
+  function play(){ if(!steps.length) return; if(t>=total) t=0; playing=true; lastTs=0; $('play').textContent='⏸ 暂停'; raf=requestAnimationFrame(tick); }
+  function pause(){ playing=false; if(raf) cancelAnimationFrame(raf); $('play').textContent='▶ 播放'; }
+  function stop(){ playing=false; if(raf) cancelAnimationFrame(raf); $('play').textContent='▶ 播放'; }
+  function toggle(){ playing?pause():play(); }
+  function seekScene(si){ const st=steps.find(s=>s.si===si); if(st){ t=st.at; renderAt(t); if(!playing){} } }
+
+  function renderSceneList(){
+    $('scount').textContent = STORY.scenes.length;
+    $('scenes').innerHTML = STORY.scenes.map((sc,i)=>
+      `<div class="sc" data-i="${i}"><span class="n">${(sc.dur||0).toFixed(1)}s · ${sc.kind||''}</span>`+
+      `<div class="k">${(sc.keyword||'').replace(/</g,'&lt;')}</div>`+
+      `<div class="p">${sc.phrases.map(p=>p.replace(/</g,'&lt;')).join(' / ')}</div></div>`
+    ).join('');
+    [...document.querySelectorAll('#scenes .sc')].forEach(el=>el.onclick=()=>seekScene(+el.dataset.i));
+  }
+  function download(){
+    let txt = (STORY.title?`《${STORY.title}》\n\n`:'');
+    STORY.scenes.forEach((sc,i)=>{
+      txt += `【镜 ${i+1}·${sc.kind||''}｜${(sc.dur||0).toFixed(1)}s】${sc.keyword||''}${sc.sub?(' — '+sc.sub):''}\n`;
+      sc.phrases.forEach(p=> txt += '  口播：'+p+'\n');
+      txt += '\n';
+    });
+    txt += '—— 竖版分镜稿（工作台预览生成）· 拿去剪映加配音/BGM/字幕收尾\n';
+    const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download = `分镜稿-${(STORY.title||'video').slice(0,12)}.txt`; a.click(); URL.revokeObjectURL(a.href);
+  }
+  function load(data){
+    STORY = { title:data.title||'', scenes:(data.scenes||[]).map(s=>({keyword:s.keyword||'',sub:s.sub||'',phrases:(s.phrases||[]).map(String),kind:s.kind||'',dur:s.dur||0})) };
+    if(data.theme && THEMES[data.theme]) theme = data.theme;
+    buildSteps(); renderThemes(); applyTheme(theme); renderSceneList();
+    t=0; lastStepKey=null; if(steps.length){ renderAt(0); setTimeout(play, 250); } else { $('stage').innerHTML='<div class="empty">没有分镜</div>'; }
+  }
+  $('play').onclick=toggle; $('replay').onclick=()=>{ t=0; play(); }; $('dl').onclick=download;
+  renderThemes(); applyTheme('warm');
+  window.addEventListener('message',(e)=>{
+    const d = e.data;
+    if(d && d.type==='kw-storyboard' && Array.isArray(d.scenes)) load(d);
+  });
+  try{ if(window.parent!==window) window.parent.postMessage({type:'kw-player-ready'},'*'); }catch(_){}
+</script>
+</body></html>

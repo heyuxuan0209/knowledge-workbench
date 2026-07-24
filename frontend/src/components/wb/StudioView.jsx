@@ -281,6 +281,30 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     try { await navigator.clipboard.writeText(stripRefs(text)) } catch { /* 剪贴板受限时忽略 */ }
     showToast('已复制适配稿（自动去掉 [素材N] 标记）')
   }
+  // ADR-046 P2a 视频渲染器·内容预览层：口播适配稿 → 竖版分镜播放器（站内预览，纯预览、零 TTS/零花费）。
+  // 配音是产品里另一步（ADR-038 半自动：这里出播放器+分镜稿，剪映收尾）。
+  const [videoMode, setVideoMode] = useState(false)
+  const [videoBusy, setVideoBusy] = useState(false)
+  const videoFrame = useRef(null)
+  const storyboardRef = useRef(null)   // 存最新分镜稿，避免 onLoad/setTimeout 闭包读到旧 state（导致 post 空 scenes）
+  const postStoryboard = () => {
+    const sb = storyboardRef.current
+    if (!sb) return
+    try { videoFrame.current?.contentWindow?.postMessage({ type: 'kw-storyboard', title: sb.title, scenes: sb.scenes || [], theme: filmTheme }, '*') } catch { /* 跨窗口受限时忽略 */ }
+  }
+  const openVideoFor = async (formKey) => {
+    const body = adapted[formKey]?.body
+    if (!body?.trim()) { showToast('先展开这篇口播适配稿再生成分镜'); return }
+    setVideoBusy(true)
+    showToast('正在切分镜（约 20 秒 · 纯预览、不配音、不花钱）…')
+    try {
+      const j = await api('/api/studio/storyboard', { method: 'POST', body: { draft: body } })
+      storyboardRef.current = j.data; setVideoMode(true)
+      setTimeout(postStoryboard, 350)
+      showToast(`已切 ${j.data.scenes?.length || 0} 个分镜（¥${j.data.cost?.toFixed(3)}）· 预览节奏，满意再拿去剪映配音`)
+    } catch (err) { showToast('分镜生成失败：' + err.message) }
+    setVideoBusy(false)
+  }
   const [draftsOpen, setDraftsOpen] = useState(false)   // 草稿箱面板
   const [selDrafts, setSelDrafts] = useState(new Set()) // 勾选待删的草稿
   const cardFrame = useRef(null)
@@ -379,7 +403,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       </div>
       <div className="wb-page-sub">选素材 → ②定文体起母稿 → ③出片裂变各平台 · 每段可溯源、发布前一键去标记</div>
 
-      {v2Mode && !cardsMode && (
+      {v2Mode && !cardsMode && !videoMode && (
         <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '236px 1fr', border: '1px solid var(--line10)', borderRadius: 12, margin: '10px 0', background: 'var(--surface)', minHeight: 300 }}>
           {/* 左：素材台（贯穿到底 + 改稿说明） */}
           <aside style={{ borderRight: '1px solid var(--line08)', padding: 14, display: 'flex', flexDirection: 'column' }}>
@@ -557,6 +581,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 draftEmpty={isEmpty} pforms={pforms} filmForms={filmForms} toggleFilmForm={toggleFilmForm}
                 adapted={adapted} setAdapted={setAdapted} adaptBusy={adaptBusy} adaptBatch={adaptBatch}
                 CARD_FORMS={CARD_FORMS} VIDEO_FORMS={VIDEO_FORMS} openCardsFor={openCardsFor} copyText={copyText}
+                openVideoFor={openVideoFor} videoBusy={videoBusy}
                 THEMES={THEMES} filmTheme={filmTheme} setFilmTheme={setFilmTheme} setStudioTab={setStudioTab}
                 filmActiveForm={filmActiveForm} setFilmActiveForm={setFilmActiveForm} showToast={showToast} />
             )}
@@ -589,6 +614,21 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         <iframe ref={cardFrame} src="/xhs-card-studio.html" title="卡片图工作台"
           onLoad={postDraftToCards}
           style={{ width: '100%', height: '78vh', border: '1px solid var(--line10)', borderRadius: 10, marginTop: 8, background: 'var(--surface)' }} />
+      )}
+
+      {/* ADR-046 P2a：竖版分镜播放器（内容预览层，纯预览、零 TTS/零花费；配音是产品另一步） */}
+      {videoMode && (
+        <div style={{ display: 'flex', gap: 8, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="wb-btn-ghost" onClick={() => setVideoMode(false)}>← 返回文稿</button>
+          <span style={{ fontSize: 12, color: 'var(--sub2)' }}>竖版分镜预览 · 只看节奏/字幕，不渲染 MP4、不配音；下载分镜稿拿去剪映收尾</span>
+          <button className="wb-btn-ghost" style={{ marginLeft: 'auto' }} disabled={videoBusy}
+            onClick={() => filmActiveForm && openVideoFor(filmActiveForm)} title="按当前口播适配稿重切分镜">↻ 重切分镜</button>
+        </div>
+      )}
+      {videoMode && (
+        <iframe ref={videoFrame} src="/vertical-player.html" title="竖版分镜播放器"
+          onLoad={postStoryboard}
+          style={{ width: '100%', height: '80vh', border: '1px solid var(--line10)', borderRadius: 10, marginTop: 8, background: 'var(--surface)' }} />
       )}
 
       {critique && (
@@ -661,10 +701,10 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 // ADR-046 ③ 出片：母稿 → 选平台形态（多选）→ 适配稿(看/改) → 主题占位 → 各平台出片。
 // P1 渲染只接：图卡渲染器（小红书/抖音卡片）+ 公众号长文直用；视频渲染器(hyperframes)是 P2 占位。
 function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setAdapted, adaptBusy, adaptBatch,
-  CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, THEMES, filmTheme, setFilmTheme, setStudioTab,
+  CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, openVideoFor, videoBusy, THEMES, filmTheme, setFilmTheme, setStudioTab,
   filmActiveForm, setFilmActiveForm, showToast }) {
   const pf = k => pforms.find(p => p.key === k) || { key: k, label: k, icon: '📝', note: '' }
-  const rendHint = k => k === 'gzh-long' ? '长文体 · 直用母稿' : CARD_FORMS.has(k) ? '卡片体 · 图卡渲染器' : VIDEO_FORMS.has(k) ? '口播体 · 视频渲染器 (P2)' : '文案 · 复制发布'
+  const rendHint = k => k === 'gzh-long' ? '长文体 · 直用母稿' : CARD_FORMS.has(k) ? '卡片体 · 图卡渲染器' : VIDEO_FORMS.has(k) ? '口播体 · 竖版分镜播放器' : '文案 · 复制发布'
   const editBody = (k, v) => setAdapted(a => ({ ...a, [k]: { ...a[k], body: v } }))
   // 展开/进编辑即把「右栏助手改的对象」切到这篇适配稿（passthrough=母稿本身不作为助手目标）
   const focusAssist = k => { if (!adapted[k]?.passthrough && !adapted[k]?.error) setFilmActiveForm?.(k) }
@@ -721,7 +761,7 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
             ? <button className="wb-btn-outline" onClick={() => copyText(a.body)}>复制长文</button>
             : a.error ? <span style={{ fontSize: 11, color: 'var(--red)' }}>适配失败</span>
             : CARD_FORMS.has(k) ? <button className="wb-btn-primary" onClick={() => openCardsFor(k)}>生成图文卡片 →</button>
-            : VIDEO_FORMS.has(k) ? <button className="wb-btn-ghost" disabled title="视频渲染器 hyperframes 为 P2">▶ 出片（视频 P2）</button>
+            : VIDEO_FORMS.has(k) ? <button className="wb-btn-primary" disabled={videoBusy} title="口播稿→竖版分镜播放器，站内预览节奏（不配音、不渲染 MP4，剪映收尾）" onClick={() => openVideoFor(k)}>{videoBusy ? '切分镜中…' : '🎬 生成分镜播放器 →'}</button>
             : <button className="wb-btn-outline" onClick={() => copyText(a.body)}>复制文案</button>
           return (
             <div key={k} style={{ border: '1px solid var(--line10)', borderRadius: 9, marginTop: 9, overflow: 'hidden', background: 'var(--surface)' }}>
