@@ -46,6 +46,19 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
   const [keep, setKeep] = useState(() => new Set())      // 勾选保留关注的 source id
   const [createSel, setCreateSel] = useState(() => new Set()) // 勾选新建的 B 组 handle
   const [auditBusy, setAuditBusy] = useState(false)
+  // 第4件 自助添加 X 账号 → 入 sync-x 采集名单
+  const [xHandle, setXHandle] = useState('')
+  const addX = async () => {
+    const h = xHandle.trim(); if (!h) return
+    setXHandle('')
+    try {
+      const j = await api('/api/sources/x-account', { method: 'POST', body: { handle: h } })
+      const d = j.data
+      if (d.overLimit) showToast?.(`X 采集名单已满（${d.current}/${d.cap}）——先在「关注盘点」里取舍掉几个再加`)
+      else if (d.existed && !d.addedToRoster) showToast?.(`@${d.handle} 已在采集名单`)
+      else { showToast?.(`已加 @${d.handle} 进 X 直连采集（下次同步开始拉取；未配 cookies 前先备着）`); loadSources?.() }
+    } catch (e) { showToast?.('添加失败：' + e.message) }
+  }
   const openAudit = async () => {
     setAuditOpen(true); setAudit(null)
     try {
@@ -144,7 +157,13 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
     <>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <div className="wb-page-title">信息源</div>
-        <button className="wb-btn-ghost" style={{ marginLeft: 'auto' }} title="重设关注名单：勾选真正想关注的作者，其余取消（喂 feed 组2「你关注的人」）" onClick={openAudit}>🧭 关注盘点</button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input value={xHandle} onChange={e => setXHandle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addX() }}
+            placeholder="加 X 账号采集（@handle）…" title="输入 X handle → 建作者源 → 纳入每日 X 直连采集（≤35）"
+            style={{ fontSize: 12, padding: '5px 9px', width: 180, border: '1px solid var(--line10)', borderRadius: 7, background: 'var(--surface)', color: 'var(--body)' }} />
+          <button className="wb-btn-ghost" onClick={addX}>＋ X</button>
+          <button className="wb-btn-ghost" title="重设关注名单：勾选真正想关注的作者，其余取消（喂 feed 组2「你关注的 Builder」）" onClick={openAudit}>🧭 关注盘点</button>
+        </div>
       </div>
       <div className="wb-page-sub">登记优质源：内容进 资讯流 并高权重排序 · 不是订阅系统</div>
 

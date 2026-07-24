@@ -1636,6 +1636,15 @@ app.post('/api/sources/follow-audit/apply', async (req, res) => {
   try { const { applyFollowAudit } = await import('./services/follow-audit.js'); res.json({ success: true, data: applyFollowAudit(req.body || {}) }); }
   catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
+// 自助添加 X 账号（第4件）：建作者源 → 入 sync-x 采集名单；超 35 上限返回提示
+app.post('/api/sources/x-account', async (req, res) => {
+  try { const { addXAccount } = await import('./services/sync-x.js'); res.json({ success: true, data: addXAccount(req.body || {}) }); }
+  catch (error) { res.status(400).json({ success: false, error: error.message }); }
+});
+app.get('/api/sync-x/roster', async (req, res) => {
+  try { const { getXRoster } = await import('./services/sync-x.js'); res.json({ success: true, data: getXRoster() }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
 
 // 取消登记（只摘标记，不删 source 记录，内容引用不受影响）
 app.delete('/api/sources/:id/register', async (req, res) => {
@@ -1759,6 +1768,7 @@ async function syncAllChannels() {
   await run('aihot', async () => (await import('./services/sync-aihot.js')).syncAIHotData());
   await run('rss', async () => (await import('./services/sync-rss.js')).syncRSSData());
   await run('activeQuery', async () => (await import('./services/sync-active-query.js')).syncActiveQuery());
+  await run('x', async () => (await import('./services/sync-x.js')).syncX());  // 第4件：X 直连（未配 cookies 时优雅跳过）
 
   // 记录同步时间（漏跑补偿的判断依据，见下方 catchUpSyncIfStale）
   try {
