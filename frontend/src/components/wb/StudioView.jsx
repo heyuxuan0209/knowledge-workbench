@@ -12,7 +12,7 @@ import FeishuPicker from './FeishuPicker'
 
 const RETURN_LABEL = { feed: '资讯', notes: '素材库', topics: '主题库', reports: '周报', inspirations: '灵感库' }
 
-export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, gotoTopic, returnPage, goBack, removeRef }) {
+export default function StudioView({ studio, setStudio, platforms, genDraft, exportMd, setPage, showToast, drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, gotoTopic, returnPage, goBack, removeRef, studioTab, setStudioTab, adapted, setAdapted, filmActiveForm, setFilmActiveForm }) {
   const platformIcon = (key) => platforms.find(p => p.key === key)?.icon || '📝'
 
   // ── ADR-026 试新版：文体(genre) × 平台形态(platform-form)，与老平台行完全并存 ──
@@ -245,9 +245,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [v2Cards, setV2Cards] = useState(false)   // 阶段4：v2 卡片平台打开图卡工具
   const [cardFeedText, setCardFeedText] = useState(null)  // 出片渲染图卡时喂给 iframe 的适配稿（非空则优先于母稿）
   // ── ADR-046 出片：中栏「② 定稿 ｜ ③ 出片」tab + 母稿→多平台适配稿 ──
-  const [studioTab, setStudioTab] = useState('edit')      // 'edit' 定稿(母稿) | 'film' 出片
+  // studioTab / adapted / filmActiveForm 提到 WorkbenchPage（与右栏创作助手共享，出片模式改当前适配稿）
   const [filmForms, setFilmForms] = useState(new Set(['gzh-long', 'xhs-card']))  // 出片选中的平台形态
-  const [adapted, setAdapted] = useState({})              // { formKey: {body,title,genre,formLabel,passthrough?,error?,editing?,open?} }
   const [adaptBusy, setAdaptBusy] = useState(false)
   const [filmTheme, setFilmTheme] = useState('warm')      // 视觉主题（P1 占位，喂图卡渲染器）
   const CARD_FORMS = new Set(['xhs-card', 'douyin-card'])  // 走图卡渲染器
@@ -265,7 +264,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       for (const r of (json.data || [])) map[r.platformForm] = { ...r, open: false }
       // 第一个非透传的默认展开，方便直接看
       const firstReal = (json.data || []).find(r => !r.passthrough && !r.error)
-      if (firstReal) map[firstReal.platformForm].open = true
+      if (firstReal) { map[firstReal.platformForm].open = true; setFilmActiveForm?.(firstReal.platformForm) }
       setAdapted(map)
       const okCost = (json.data || []).reduce((s, r) => s + (r.cost || 0), 0)
       showToast(`已适配 ${Object.keys(map).length} 个平台（¥${okCost.toFixed(3)}）`)
@@ -558,7 +557,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 draftEmpty={isEmpty} pforms={pforms} filmForms={filmForms} toggleFilmForm={toggleFilmForm}
                 adapted={adapted} setAdapted={setAdapted} adaptBusy={adaptBusy} adaptBatch={adaptBatch}
                 CARD_FORMS={CARD_FORMS} VIDEO_FORMS={VIDEO_FORMS} openCardsFor={openCardsFor} copyText={copyText}
-                THEMES={THEMES} filmTheme={filmTheme} setFilmTheme={setFilmTheme} setStudioTab={setStudioTab} />
+                THEMES={THEMES} filmTheme={filmTheme} setFilmTheme={setFilmTheme} setStudioTab={setStudioTab}
+                filmActiveForm={filmActiveForm} setFilmActiveForm={setFilmActiveForm} showToast={showToast} />
             )}
           </section>
 
@@ -661,12 +661,15 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 // ADR-046 ③ 出片：母稿 → 选平台形态（多选）→ 适配稿(看/改) → 主题占位 → 各平台出片。
 // P1 渲染只接：图卡渲染器（小红书/抖音卡片）+ 公众号长文直用；视频渲染器(hyperframes)是 P2 占位。
 function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setAdapted, adaptBusy, adaptBatch,
-  CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, THEMES, filmTheme, setFilmTheme, setStudioTab }) {
+  CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, THEMES, filmTheme, setFilmTheme, setStudioTab,
+  filmActiveForm, setFilmActiveForm, showToast }) {
   const pf = k => pforms.find(p => p.key === k) || { key: k, label: k, icon: '📝', note: '' }
   const rendHint = k => k === 'gzh-long' ? '长文体 · 直用母稿' : CARD_FORMS.has(k) ? '卡片体 · 图卡渲染器' : VIDEO_FORMS.has(k) ? '口播体 · 视频渲染器 (P2)' : '文案 · 复制发布'
   const editBody = (k, v) => setAdapted(a => ({ ...a, [k]: { ...a[k], body: v } }))
-  const toggleOpen = k => setAdapted(a => a[k] ? ({ ...a, [k]: { ...a[k], open: !a[k].open } }) : a)
-  const toggleEdit = k => setAdapted(a => ({ ...a, [k]: { ...a[k], editing: !a[k].editing, open: true } }))
+  // 展开/进编辑即把「右栏助手改的对象」切到这篇适配稿（passthrough=母稿本身不作为助手目标）
+  const focusAssist = k => { if (!adapted[k]?.passthrough && !adapted[k]?.error) setFilmActiveForm?.(k) }
+  const toggleOpen = k => { setAdapted(a => a[k] ? ({ ...a, [k]: { ...a[k], open: !a[k].open } }) : a); if (!adapted[k]?.open) focusAssist(k) }
+  const toggleEdit = k => { setAdapted(a => ({ ...a, [k]: { ...a[k], editing: !a[k].editing, open: true } })); focusAssist(k) }
   const selected = [...filmForms]
 
   if (draftEmpty) {
@@ -728,6 +731,9 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
                 {a.error
                   ? <span style={{ fontSize: 10.5, color: 'var(--red)' }}>✕ {a.error.slice(0, 20)}</span>
                   : <span style={{ fontSize: 10.5, color: a.passthrough ? 'var(--sub2)' : 'var(--green)' }}>{a.passthrough ? '= 母稿本身' : '✓ 已适配'}</span>}
+                {filmActiveForm === k && !a.passthrough && !a.error && (
+                  <span title="右栏「创作助手」当前改的就是这篇" style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(61,90,128,.11)', borderRadius: 4, padding: '1px 6px' }}>🤖 助手改这篇</span>
+                )}
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--accent)' }}>{a.open ? '收起 ▴' : '看 / 改 ▾'}</span>
               </div>
               {a.open && !a.error && (
@@ -740,7 +746,8 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
                   )}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
                     <button className={a.editing ? 'wb-btn-primary' : 'wb-btn-ghost'} onClick={() => toggleEdit(k)}>{a.editing ? '✓ 改完' : '✎ 直接改文字'}</button>
-                    <button className="wb-btn-ghost" title="到右侧「创作助手」用大白话改（如「钩子再狠点」「压到 60 秒」）" onClick={() => copyText(a.body)}>📋 复制</button>
+                    <button className="wb-btn-ghost" title="切到右栏「创作助手」改这篇——用大白话说「钩子再狠点」「压到 60 秒」" onClick={() => { focusAssist(k); showToast?.('右栏「创作助手」现在改这篇适配稿——说「钩子再狠点」试试') }}>🤖 让助手改这篇</button>
+                    <button className="wb-btn-ghost" title="复制该适配稿（去 [素材N] 标记）" onClick={() => copyText(a.body)}>📋 复制</button>
                     <span style={{ marginLeft: 'auto' }}>{render}</span>
                   </div>
                 </div>

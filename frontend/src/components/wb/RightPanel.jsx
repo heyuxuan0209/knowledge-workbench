@@ -227,20 +227,31 @@ function MsgBubble({ msg, onSave, onSaveIdea = null, hideSave = false }) {
 }
 
 /* ---------- 创作助手 ---------- */
-function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, rankedNotes, insertMaterial, removeRef, gotoNote, rewriteDraft, showToast }) {
+// ADR-046 出片模式：出片 tab 且有当前适配稿时，助手改的是「当前适配稿」（不是母稿）——
+// context 提示当前在改哪篇 + chips 换成出片语汇（钩子再狠点/压到 60 秒），改写走 rewriteAdapted。
+function StudioAssistant({ onToggle, onToggleWide, wide, studio, rewriteDraft, showToast,
+  studioTab, adapted, filmActiveForm, rewriteAdapted }) {
   const [input, setInput] = useState('')
   const [chat, setChat] = useState([]) // {role, text, pending?}
   const endRef = useRef(null)
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat])
 
+  const active = filmActiveForm && adapted?.[filmActiveForm]
+  const filmMode = studioTab === 'film' && active && !active.passthrough && !active.error
+  const chips = filmMode
+    ? ['钩子再狠点', '压到 60 秒', '换个 CTA', '去掉说教']
+    : ['开头更犀利', '压到 5 条', '加一个反方观点', '改成口语']
+
   const send = async (textArg) => {
     const t = (textArg ?? input).trim()
     if (!t) return
-    if (!studio.draft.trim()) { showToast('先生成或写一段草稿，再让 AI 改'); return }
+    if (filmMode) {
+      if (!active.body?.trim()) { showToast('这篇适配稿是空的'); return }
+    } else if (!studio.draft.trim()) { showToast('先生成或写一段草稿，再让 AI 改'); return }
     setInput('')
     setChat(prev => [...prev, { role: 'user', text: t }, { role: 'ai', text: '', pending: true }])
     try {
-      const note = await rewriteDraft(t)
+      const note = filmMode ? await rewriteAdapted(t) : await rewriteDraft(t)
       setChat(prev => patchLast(prev, { text: note, pending: false }))
     } catch (err) {
       setChat(prev => patchLast(prev, { text: `改写失败：${err.message}`, pending: false, error: true }))
@@ -249,10 +260,24 @@ function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, rankedNo
 
   return (
     <>
-      <PanelHeader icon={<IconStudio />} title="创作助手" sub="指令改写，直接改左侧草稿（素材/引用都在左栏）" onToggle={onToggle} onToggleWide={onToggleWide} wide={wide} />
+      <PanelHeader icon={<IconStudio />} title="创作助手"
+        sub={filmMode ? '指令改写 · 改当前适配稿（不是母稿）' : '指令改写，直接改左侧母稿（素材/引用都在左栏）'}
+        onToggle={onToggle} onToggleWide={onToggleWide} wide={wide} />
       <div className="wb-panel-body">
+        {filmMode && (
+          <div className="wb-panel-hint" style={{ marginBottom: 8, color: 'var(--accent)', background: 'rgba(61,90,128,.07)', border: '1px solid rgba(61,90,128,.2)', borderRadius: 7, padding: '7px 9px' }}>
+            当前在改：{active.formLabel || filmActiveForm} 适配稿（不是母稿）。想改别篇，去中间「③ 出片」展开那篇。
+          </div>
+        )}
         <div className="wb-panel-hint" style={{ paddingTop: 2 }}>
-          让 AI 按你的意思改：例如「开头更犀利」「压到 5 条」「加一个反方观点」「改成口语」——它会直接改写左侧草稿。
+          {filmMode
+            ? '按你的意思改这篇适配稿：例如「钩子再狠点」「压到 60 秒」「换个 CTA」——直接改写、母稿不动。'
+            : '让 AI 按你的意思改母稿：例如「开头更犀利」「压到 5 条」「加一个反方观点」「改成口语」——直接改写左侧母稿。'}
+        </div>
+        <div className="wb-quick-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {chips.map(c => (
+            <button key={c} className="wb-quick-chip" style={{ margin: 0 }} onClick={() => send(c)}>{c}</button>
+          ))}
         </div>
         <div className="wb-chat" style={{ flex: 'none', marginTop: 8 }}>
           {chat.map((m, i) => <MsgBubble key={i} msg={m} hideSave onSave={() => {}} />)}
@@ -263,8 +288,8 @@ function StudioAssistant({ onToggle, onToggleWide, wide, studio, notes, rankedNo
         <textarea
           className="wb-chat-input" rows={1} value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-          placeholder="告诉 AI 怎么改…"
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }}
+          placeholder={filmMode ? '告诉 AI 怎么改这篇适配稿…' : '告诉 AI 怎么改母稿…'}
         />
         <button className="wb-send" disabled={!input.trim()} onClick={() => send()}><IconSend /></button>
       </div>

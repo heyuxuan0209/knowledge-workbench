@@ -116,6 +116,11 @@ export default function WorkbenchPage() {
     // M4：草稿落库 + 活页起稿 + 段落级溯源持久化 + 观点入口（作者立场）
     draftId: null, title: null, sourceTopicId: null, paragraphRefs: [], viewpoint: '',
   })
+  // ADR-046 出片：中栏 tab / 适配稿 map / 当前助手改的适配稿——提到 WorkbenchPage 共享，
+  // 让右栏「创作助手」出片模式能改「当前适配稿」（而非母稿），写回同一份 adapted。
+  const [studioTab, setStudioTab] = useState('edit')     // 'edit' 定稿 | 'film' 出片
+  const [adapted, setAdapted] = useState({})             // { formKey: {body,title,formLabel,passthrough?,error?,open?,editing?} }
+  const [filmActiveForm, setFilmActiveForm] = useState(null) // 右栏助手当前改的适配稿 formKey
   const [drafts, setDrafts] = useState([]) // 草稿箱
   const loadDrafts = useCallback(async () => {
     try { setDrafts((await api('/api/drafts')).data || []) } catch (err) { console.error(err) }
@@ -769,6 +774,17 @@ export default function WorkbenchPage() {
     return json.data.note || `已按要求改写草稿：${instruction}`
   }
 
+  // ADR-046 出片模式：右栏助手改「当前适配稿」（不是母稿）。写回 adapted[当前形态].body，
+  // platform 传 platform-form key（rewrite.md 里 getPlatform 找不到会静默跳过，不阻塞改写）。
+  const rewriteAdapted = async (instruction) => {
+    const key = filmActiveForm
+    const cur = key && adapted[key]
+    if (!cur || cur.passthrough || cur.error) throw new Error('先在「③ 出片」展开一篇适配稿，再让助手改它')
+    const json = await api('/api/studio/rewrite', { method: 'POST', body: { draft: cur.body, instruction, platform: key } })
+    setAdapted(a => ({ ...a, [key]: { ...a[key], body: json.data.draft, open: true } }))
+    return `已按「${instruction}」改写「${cur.formLabel || key}」适配稿（¥${(json.data.cost || 0).toFixed(4)}）· 母稿未动`
+  }
+
   // 导出发布版：剥掉 [素材N] 行内标记（对读者是噪音），文末附参考来源列表。
   // 草稿原文不动——工作台里保留溯源标记，导出物才做清洗
   const exportMd = () => {
@@ -807,6 +823,7 @@ export default function WorkbenchPage() {
     notesTab, setNotesTab, toggleSelectNote,
     topicView, setTopicView, activeTopic, setActiveTopic, gotoTracking,
     studio, setStudio, platforms, genDraft: (...a) => genDraftRef.current(...a), exportMd,
+    studioTab, setStudioTab, adapted, setAdapted, filmActiveForm, setFilmActiveForm,
     drafts, saveDraft, openDraft, humanizeDraft, undoRewrite, deleteCurrentDraft, deleteDrafts, suggestTitles, removeRef,
     highlightNoteId, setHighlightNoteId, gotoNote, gotoTopic, returnPage, goBack, setReturnPage,
   }
@@ -856,6 +873,7 @@ export default function WorkbenchPage() {
           askLibrary={askLibrary} askKnowledge={askKnowledge} libraryHits={libraryHits} chatKind={chatKind}
           topicView={topicView} activeTopic={activeTopic}
           studio={studio} notes={notes} rankedNotes={rankedNotes} insertMaterial={insertMaterial} removeRef={removeRef} gotoNote={gotoNote} rewriteDraft={rewriteDraft}
+          studioTab={studioTab} adapted={adapted} filmActiveForm={filmActiveForm} rewriteAdapted={rewriteAdapted}
           showToast={showToast}
         />
       </div>
