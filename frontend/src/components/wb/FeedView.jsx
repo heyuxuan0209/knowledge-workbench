@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { timeAgo, TYPE_LABEL, api, platformLabel } from './util'
-import { IconExternal, IconPin, IconTarget, IconFlame, IconMedal, IconStar, IconCheck, IconPlusTrack, IconBookOpen, IconBulb } from './Icons'
+import { IconExternal, IconPin, IconTarget, IconFlame, IconMedal, IconStar, IconCheck, IconPlusTrack, IconBookOpen, IconBulb, IconChevronRight } from './Icons'
 import '../../styles/feed-final.css'
 import { renderMarkdown } from './markdown'
 
@@ -154,6 +154,9 @@ export default function FeedView({
   const [ghStar, setGhStar] = useState({}) // GitHub 区块星标的本地覆盖（数据源在 ghTrending，父级不重载）
   const [mainTab, setMainTab] = useState('articles') // 'articles' | 'projects'（UI 改造：文章/AI项目分开）
   const [airHint, setAirHint] = useState(() => !localStorage.getItem('wb-seen-airead-hint')) // 「AI 精读」首次说明气泡
+  // 今日概览可收起（用户反馈：别占着首页屏幕）——默认收起、只留一句话总结，展开态记住
+  const [briefOpen, setBriefOpen] = useState(() => localStorage.getItem('wb-brief-open') === '1')
+  const toggleBrief = () => setBriefOpen(o => { const n = !o; localStorage.setItem('wb-brief-open', n ? '1' : '0'); return n })
   const dismissAirHint = () => { localStorage.setItem('wb-seen-airead-hint', '1'); setAirHint(false) }
 
   // Feed 搜索 + 星标过滤（2026-07-16 反馈 #2：被新内容推下去的条目要找得回来）。
@@ -362,24 +365,28 @@ export default function FeedView({
     <>
       <div className="wb-brief">
         <div className="wb-brief-head">
-          <div className="wb-brief-title">
+          <div className="wb-brief-title" onClick={toggleBrief} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }} title={briefOpen ? '收起今日概览' : '展开今日概览（必看/热点/选题）'}>
+            <IconChevronRight size={13} style={{ transform: briefOpen ? 'rotate(90deg)' : 'none', transition: 'transform .12s', flexShrink: 0 }} />
             今日概览 · {report ? formatDate(report.period_key) : dateLabel}
+            {!briefOpen && report && <span style={{ fontSize: 11, color: 'var(--faint)', fontWeight: 400 }}>· 点开看必看/热点/选题</span>}
             {staleReport && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--amber)', fontWeight: 500 }}>· 显示的是 {formatDate(report.period_key)} 的，点刷新出今天的</span>}
           </div>
           <div className="wb-brief-links">
-            {report && (
+            {report && briefOpen && (
               <button className="wb-brief-link" disabled={generating} onClick={generateReport}
                 title="用最新同步的数据重新生成当天日报（Deepseek，约 ¥0.002）">
                 {generating ? '刷新中…' : '↻ 刷新'}
               </button>
             )}
-            <button className="wb-brief-link" onClick={() => setPage('reports')}>查看周报</button>
-            <button className="wb-brief-link" onClick={() => setPage('reports')}>查看月报</button>
+            {briefOpen && <><button className="wb-brief-link" onClick={() => setPage('reports')}>查看周报</button>
+            <button className="wb-brief-link" onClick={() => setPage('reports')}>查看月报</button></>}
           </div>
         </div>
 
-        {/* 一句话总结（露出日报导语，此前藏着；UI 改造 2a） */}
-        {report?.summary && <div className="wb-lead">一句话总结：<b>{report.summary}</b></div>}
+        {/* 一句话总结（露出日报导语；收起态也保留，作为概览的精华一行） */}
+        {report?.summary && <div className="wb-lead" style={briefOpen ? undefined : { marginBottom: 0 }}>一句话总结：<b>{report.summary}</b></div>}
+
+        {briefOpen && <>{/* 展开区：必看 / 热点 / 选题入口 */}
 
         {/* 层1 今日必看：双通道配额制（行业大事 + 个人相关），各带一句人话理由 · P1层4 */}
         {mustRead.length > 0 && (
@@ -488,6 +495,7 @@ export default function FeedView({
             <span style={{ fontSize: 12, color: 'var(--sub2)' }}>基于聚类与你关注的信息源提炼焦点与选题（Deepseek，约 ¥0.002）</span>
           </div>
         )}
+        </>}
       </div>
 
       {/* 列表工具条：文章/AI项目 + （文章时）全部/收藏/搜索/计数/同步 合并成一条，贴住网格 */}
