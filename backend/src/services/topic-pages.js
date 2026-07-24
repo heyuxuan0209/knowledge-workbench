@@ -1,6 +1,13 @@
 import { getDatabase } from '../db/init.js';
 import { randomUUID } from 'crypto';
 import { tokenize } from './story-clustering.js';
+import { embedText, cosine as vecCosine, MODEL_NAME } from './embeddings.js';
+
+// P2：语义自动归类阈值（bge-m3，与关联重算同口径 0.45）+ 每素材 top-3 封顶——
+// 替代旧的词面 TF（乱挂、每素材归 6 个主题的元凶）。见 cleanup-associations.js。
+const SEM_MATCH_THRESHOLD = 0.45;
+const SEM_TOP_K = 3;
+const _parseVec = (j) => { try { const v = JSON.parse(j); return Array.isArray(v) && v.length ? v : null; } catch { return null; } };
 
 // Topic 活页（M3 知识层，ADR-009）：Topic = AI 维护的活文档，不是文件夹。
 // 本模块负责活页的建立/读取/素材匹配（全部零 LLM 成本）；
@@ -241,28 +248,34 @@ export function deleteTopic(topicId) {
 
 // 素材保存后调用：与所有活跃主题算相似度，达标的挂 pending 待并入。
 // 返回命中的主题名（前端 toast 提示）。
-export function matchNoteToTopics(noteId) {
+export async function matchNoteToTopics(noteId) {
   const db = getDatabase();
-  const note = db.prepare('SELECT id, excerpt, source_title FROM notes WHERE id = ?').get(noteId);
+  const note = db.prepare('SELECT id, title, excerpt, source_title, embedding, embedding_model FROM notes WHERE id = ?').get(noteId);
   if (!note) { db.close(); return []; }
-
-  const noteTokens = tokenize(`${note.source_title || ''} ${note.excerpt}`);
-  const topics = db.prepare("SELECT id, name, description, body FROM topics WHERE status = 'active'").all();
-
-  const matched = [];
-  const link = db.prepare(`
-    INSERT OR IGNORE INTO note_topics (note_id, topic_id, status, relevance, matched_terms, added_by)
-    VALUES (?, ?, 'pending', ?, ?, 'ai')
-  `);
-  for (const t of topics) {
-    const { score, terms } = cosineTF(noteTokens, topicMatchTokens(t));
-    if (score >= MATCH_THRESHOLD) {
-      link.run(noteId, t.id, Math.round(score * 100) / 100, JSON.stringify(terms));
-      matched.push({ topicId: t.id, name: t.name, relevance: score, matchedTerms: terms });
-    }
-  }
+  const topics = db.prepare("SELECT id, name, centroid_embedding FROM topics WHERE status = 'active'").all();
   db.close();
-  return matched;
+
+  // note 向量：优先用已存的，没有就即时嵌一次（保存时 embedding 常还没算好）
+  let nv = _parseVec(note.embedding);
+  if (!nv || note.embedding_model !== MODEL_NAME) {
+    try { nv = await embedText(`${note.title || note.source_title || ''} ${note.excerpt || ''}`); }
+    catch { return []; }
+  }
+  // 与各主题 centroid 算 bge-m3 余弦；无 centroid 的主题跳过（cleanup/cron 会补齐）
+  const scored = [];
+  for (const t of topics) {
+    const cv = _parseVec(t.centroid_embedding); if (!cv) continue;
+    const s = vecCosine(nv, cv);
+    if (s >= SEM_MATCH_THRESHOLD) scored.push({ topicId: t.id, name: t.name, relevance: Math.round(s * 1000) / 1000 });
+  }
+  scored.sort((a, b) => b.relevance - a.relevance);
+  const top = scored.slice(0, SEM_TOP_K); // top-3 封顶，不再乱挂一堆
+
+  const db2 = getDatabase();
+  const link = db2.prepare(`INSERT OR IGNORE INTO note_topics (note_id, topic_id, status, relevance, added_by) VALUES (?, ?, 'pending', ?, 'ai')`);
+  for (const m of top) link.run(noteId, m.topicId, m.relevance);
+  db2.close();
+  return top;
 }
 
 // 用户手动把素材归入主题（相关度 1.0，仍走 pending → 并入流程，保持同化入口唯一）

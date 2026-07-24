@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { timeAgo, STANCE_COLORS, STANCE_CN, api, platformLabel } from './util'
 import { IconClip, IconExternal, IconTrash } from './Icons'
 import { renderMarkdown } from './markdown'
+import CleanupPanel from './CleanupPanel'
 
 // 素材库（2026-07-16 反馈改版）：双 Tab——
 // 「我的素材」：聚合建议条（AI 提议哪些放一起+为什么）→ 未归类收件箱 → 按主题分组；
@@ -34,6 +35,7 @@ export default function NotesView({
   const [ovOpen, setOvOpen] = useState(() => localStorage.getItem('wb-notes-ov-collapsed') !== '1') // 素材概览默认展开
   const [topicSug, setTopicSug] = useState({}) // 语义补归类：noteId -> [{topicId,name,score}]（贴合但没标的主题）
   const [pendingOnly, setPendingOnly] = useState(false)
+  const [cleanupOpen, setCleanupOpen] = useState(false) // P2 大扫除面板
   const highlightRef = useRef(null)
   const toggleExpand = (id) => setExpandedNotes(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   const toggleOv = () => setOvOpen(o => { localStorage.setItem('wb-notes-ov-collapsed', o ? '1' : '0'); return !o })
@@ -358,7 +360,10 @@ export default function NotesView({
               <div className="wb-ov-head" onClick={toggleOv}>
                 <span className="wb-ov-title">素材概览</span>
                 <span className="wb-ov-metaline">{notes.length} 条素材 · 聚在 {mainTopics.length} 个主要主题{scatterCount > 0 ? ` (+${scatterCount} 个零散)` : ''}</span>
-                <span className="wb-ov-toggle">{ovOpen ? '收起 ▴' : '展开 ▾'}</span>
+                <button className="wb-btn-ghost" style={{ padding: '3px 9px', fontSize: 11.5, marginLeft: 'auto' }}
+                  title="重算 AI 乱挂的主题关联 + 收编碎片/泛词主题（提议，你裁决；归档不删）"
+                  onClick={(e) => { e.stopPropagation(); setCleanupOpen(true) }}>🧹 大扫除</button>
+                <span className="wb-ov-toggle" style={{ marginLeft: 8 }}>{ovOpen ? '收起 ▴' : '展开 ▾'}</span>
               </div>
               {ovOpen && (
                 <div className="wb-ov-inner">
@@ -555,6 +560,7 @@ export default function NotesView({
             ))}
         </>
       )}
+      {cleanupOpen && <CleanupPanel onClose={() => setCleanupOpen(false)} showToast={showToast} reload={() => { loadNotes(); loadTopics?.() }} />}
     </>
   )
 

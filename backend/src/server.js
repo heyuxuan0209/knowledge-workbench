@@ -1343,6 +1343,43 @@ app.get('/api/notes/duplicates', async (req, res) => {
   }
 });
 
+// ========== P2 大扫除（HANDOFF §P2）：关联重算 / 主题收编 / 素材归档，全是"提议→用户裁决" ==========
+app.get('/api/cleanup/associations', async (req, res) => {
+  try {
+    const { proposeAssociationCleanup } = await import('./services/cleanup-associations.js');
+    res.json({ success: true, data: await proposeAssociationCleanup() });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/cleanup/associations/apply', async (req, res) => {
+  try {
+    const { applyAssociationCleanup } = await import('./services/cleanup-associations.js');
+    res.json({ success: true, data: applyAssociationCleanup(req.body?.pairs || []) });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.get('/api/cleanup/topics', async (req, res) => {
+  try {
+    const { proposeTopicCleanup } = await import('./services/cleanup-topics.js');
+    res.json({ success: true, data: await proposeTopicCleanup() });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/cleanup/topics/apply', async (req, res) => {
+  try {
+    const { applyTopicCleanup } = await import('./services/cleanup-topics.js');
+    res.json({ success: true, data: applyTopicCleanup(req.body?.actions || []) });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+// 素材归档（不删、进冷区可恢复）
+app.post('/api/notes/:id/archive', async (req, res) => {
+  try {
+    const { getDatabase } = await import('./db/init.js');
+    const db = getDatabase();
+    const archived = req.body?.archived === false ? 0 : 1;
+    const r = db.prepare("UPDATE notes SET archived = ?, updated_at = datetime('now') WHERE id = ?").run(archived, req.params.id);
+    db.close();
+    res.json({ success: true, data: { archived: !!archived, changed: r.changes } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 // 语义索引状态（前端提示"还有 N 条未建索引"）
 app.get('/api/notes/index-status', async (req, res) => {
   try {
@@ -1398,12 +1435,12 @@ app.post('/api/notes', async (req, res) => {
     let matchedTopics = [];
     try {
       const { matchNoteToTopics } = await import('./services/topic-pages.js');
-      matchedTopics = matchNoteToTopics(note.id);
+      matchedTopics = await matchNoteToTopics(note.id);
       if (matchedTopics.length) {
         import('./services/assimilation.js').then(({ assimilate }) => {
-          // 只有高置信匹配（≥0.15）自动并入；弱匹配留在主题页"待并入"等用户确认
-          for (const m of matchedTopics.filter(x => x.relevance >= 0.15)) {
-            assimilate(m.topicId, [note.id], 0.15).then(r => {
+          // 只有高置信匹配（bge-m3 ≥0.55）自动并入；弱匹配留在主题页"待并入"等用户确认
+          for (const m of matchedTopics.filter(x => x.relevance >= 0.55)) {
+            assimilate(m.topicId, [note.id], 0.55).then(r => {
               if (r.success) console.log(`[Notes] 已自动并入「${m.name}」: ${r.data.changelog}`);
               else console.error(`[Notes] 自动并入「${m.name}」失败: ${r.error}`);
             }).catch(err => console.error(`[Notes] 自动并入「${m.name}」异常:`, err.message));

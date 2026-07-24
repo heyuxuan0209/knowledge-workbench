@@ -62,10 +62,11 @@ const SOURCE_LABEL_SQL = `COALESCE(s.display_name,
 
 // 素材库筛选/搜索（2026-07-16 反馈 #8）：全部在 SQL 层过滤（此前前端只能内存过滤已加载页，
 // 老素材搜不到）。q 支持空格分隔多关键词模糊匹配（AND 语义），范围：标题/摘录/来源标题/原文标题。
-export function getNotes({ limit = 50, offset = 0, q = null, topicId = null, source = null, ctype = null } = {}) {
+export function getNotes({ limit = 50, offset = 0, q = null, topicId = null, source = null, ctype = null, includeArchived = false } = {}) {
   const db = getDatabase();
   const where = [];
   const params = [];
+  if (!includeArchived) where.push('n.archived = 0'); // 归档冷区默认不进主视图（P2 规则3）
 
   if (q?.trim()) {
     // keywords（M7）：AI 提取的标签也参与匹配——LIKE 只认字面，标签补上近义表述的召回
@@ -100,10 +101,10 @@ export function getNotes({ limit = 50, offset = 0, q = null, topicId = null, sou
     SELECT n.*, c.zh_title AS content_zh_title, c.url AS content_url,
       c.content_type AS content_content_type, c.source_app AS content_source_app,
       (SELECT sp.platform FROM source_platforms sp WHERE sp.source_id = c.source_id LIMIT 1) AS content_source_platform,
-      (SELECT group_concat(nt.topic_id) FROM note_topics nt WHERE nt.note_id = n.id) AS topic_ids,
-      (SELECT group_concat(t.name, ' / ') FROM note_topics nt2 JOIN topics t ON t.id = nt2.topic_id WHERE nt2.note_id = n.id) AS topic_names,
+      (SELECT group_concat(nt.topic_id) FROM note_topics nt JOIN topics t0 ON t0.id = nt.topic_id WHERE nt.note_id = n.id AND t0.status != 'archived') AS topic_ids,
+      (SELECT group_concat(t.name, ' / ') FROM note_topics nt2 JOIN topics t ON t.id = nt2.topic_id WHERE nt2.note_id = n.id AND t.status != 'archived') AS topic_names,
       (SELECT json_group_array(json_object('id', nt3.topic_id, 'name', t3.name, 'status', nt3.status, 'addedBy', nt3.added_by))
-         FROM note_topics nt3 JOIN topics t3 ON t3.id = nt3.topic_id WHERE nt3.note_id = n.id) AS topics_json,
+         FROM note_topics nt3 JOIN topics t3 ON t3.id = nt3.topic_id WHERE nt3.note_id = n.id AND t3.status != 'archived') AS topics_json,
       EXISTS (SELECT 1 FROM drafts d WHERE d.paragraph_refs LIKE '%"noteId":"' || n.id || '"%') AS used_in_draft
     FROM notes n
     LEFT JOIN contents c ON n.content_id = c.id
