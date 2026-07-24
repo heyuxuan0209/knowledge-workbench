@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { timeAgo, TYPE_LABEL, api, platformLabel } from './util'
-import { IconExternal } from './Icons'
+import { IconExternal, IconPin, IconTarget, IconFlame, IconMedal, IconStar, IconCheck, IconPlusTrack, IconBookOpen, IconBulb } from './Icons'
+import '../../styles/feed-final.css'
 import { renderMarkdown } from './markdown'
 
 // 站内阅读器（2026-07-16 用户反馈改版）：默认「精读稿」——与即时分析同模板的
@@ -202,14 +203,30 @@ export default function FeedView({
     } catch { /* 静默 */ }
   }
   const hasFilter = feedTab === 'starred' || feedTab === 'followed' || Boolean(feedQuery.trim()) || Boolean(artCat)
-  const [urgentOnly, setUrgentOnly] = useState(false) // 催办：只看组1/2 未读且搁置的（ADR-045⑤）
   const [otherOpen, setOtherOpen] = useState(false)   // 组4「其他」默认折叠
+  // ADR-045 终版：新到分界（last_visit 落库）+ ★挂账催办 + 逐组「之前的」折叠 + 动作留痕
+  const [lastVisit, setLastVisit] = useState(undefined) // 上次来的时间（进页面时取 prevVisit，同时把 now 落库）
+  const [openOld, setOpenOld] = useState({})            // 各组「之前的 ▸」展开态
+  const [feedMarks, setFeedMarks] = useState({})        // 行内动作留痕小标：id→'read'|'star'|'idea'
+  const [iouStars, setIouStars] = useState([])          // ★挂账（「以后再看」）待清单，按挂账时间升序
   // 同步状态可感知（P0-7）：自动同步能力早已在，此前 UI 上没提过。undefined=加载中，null=从未同步
   const [lastSyncAt, setLastSyncAt] = useState(undefined)
   useEffect(() => {
     api('/api/contents/categories').then(j => setArtCatCounts(j.data || {})).catch(() => {})
     api('/api/must-read').then(j => setMustRead(j.data || [])).catch(() => {})
+    // 进页面：把这次来访落库，返回的 prevVisit 就是「上次来」的分界线（新到=晚于它）
+    api('/api/feed/visit', { method: 'POST' }).then(j => setLastVisit(j.data?.prevVisit ?? null)).catch(() => setLastVisit(null))
+    loadIouStars()
   }, [])
+  // ★挂账清单：全库星标（不止已加载的），按挂账时间升序（挂得越久越靠前催办）
+  const loadIouStars = () => api('/api/contents?starred=1&limit=100')
+    .then(j => setIouStars((j.data || []).filter(c => c.starred).sort((a, b) => (a.starred_at || '').localeCompare(b.starred_at || ''))))
+    .catch(() => {})
+  const daysSince = (iso) => {
+    if (!iso) return 0
+    const t = new Date(/[zZ+]/.test(iso) ? iso : iso.replace(' ', 'T') + 'Z').getTime()
+    return Math.max(0, Math.floor((Date.now() - t) / 864e5))
+  }
   // 上次同步时间：进页面拉一次；每次同步完成（syncing true→false）再拉一次刷新
   useEffect(() => {
     if (syncing) return
@@ -289,6 +306,54 @@ export default function FeedView({
           {c.url && <a className="a" href={c.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ display: 'inline-flex', alignItems: 'center' }}><IconExternal /></a>}
           {!followed && c.source_id !== undefined && <button className="a" disabled={followingIds?.has(c.id)} title="关注这个来源，以后自动追更" onClick={() => followSource(c.id)}>{followingIds?.has(c.id) ? '…' : '＋关注'}</button>}
         </div>
+      </div>
+    )
+  }
+
+  // 新到分界：上次来访之后的算「新到」，之前的算「来过=已读」自动划线（ADR-045①）
+  const lvTime = lastVisit ? (new Date(/[zZ+]/.test(lastVisit) ? lastVisit : lastVisit.replace(' ', 'T') + 'Z').getTime() || 0) : 0
+  const isSeen = (c) => lvTime > 0 && timeOf(c) <= lvTime
+  const visitLabel = (iso) => {
+    const d = new Date(/[zZ+]/.test(iso) ? iso : iso.replace(' ', 'T') + 'Z'); if (isNaN(d)) return ''
+    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    const now = new Date(); const dd = new Date(now); dd.setDate(now.getDate() - 1)
+    if (d.toDateString() === now.toDateString()) return `今天 ${hm}`
+    if (d.toDateString() === dd.toDateString()) return `昨天 ${hm}`
+    return `${d.getMonth() + 1}/${d.getDate()} ${hm}`
+  }
+  const dropStar = async (s) => { await toggleStar(s.id); loadIouStars(); showToast?.('好，放它走了（已取消收藏）') }
+
+  // ADR-045 终版紧凑行：time | 来源 | 标题(hover 行下展开摘要) | 徽章 | 留痕小标 | hover 四动作。
+  // 四动作：精读 / 以后再看(★挂账) / 提灵感 / 发起追踪；动作后留痕小标。零点击零打勾。
+  const ffRenderRow = (c) => {
+    const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
+    const author = c.source_display_name || (c.source_app === 'github_trending' ? (c.en_title || '').split('/')[0] : null) || channel
+    const title = c.zh_title || c.en_title || '（无标题）'
+    const summary = c.zh_summary || c.en_summary || ''
+    const mark = feedMarks[c.id]
+    const struck = mark === 'read' || (isSeen(c) && !mark)
+    const badge = c.story_source_count > 1 ? `${c.story_source_count} 源同报` : ((c.trust_tier === 'T1' || c.trust_tier === 'T1.5') ? '官方一手' : null)
+    const openRead = () => { dismissAirHint(); if (c.permalink) window.open(c.permalink, '_blank', 'noopener'); else setReaderContent(c); setFeedMarks(m => ({ ...m, [c.id]: 'read' })) }
+    const laterRead = async () => { if (!c.starred) await toggleStar(c.id); setFeedMarks(m => ({ ...m, [c.id]: 'star' })); loadIouStars(); showToast?.('挂进「以后再看」，回头会催你') }
+    const toIdea = () => { saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] }); setFeedMarks(m => ({ ...m, [c.id]: 'idea' })) }
+    return (
+      <div key={c.id} className={`ff-row${struck ? ' read' : ''}`}>
+        <div className="l1">
+          <span className="tm">{hmOf(c)}</span>
+          <span className="src" title={author}>{author}</span>
+          <span className="tt" onClick={openRead} title="点开站内精读（读中文）">{title}</span>
+          {badge && <span className="cbadge">{badge}</span>}
+          {mark === 'read' && <span className="ff-mark read"><IconCheck size={11} /> 精读过</span>}
+          {mark === 'star' && <span className="ff-mark star"><IconStar size={11} /> 以后再看</span>}
+          {mark === 'idea' && <span className="ff-mark idea"><IconBulb size={11} /> 已提灵感</span>}
+          <div className="acts">
+            <button className="ff-abtn pri" onClick={openRead} title="站内精读（读中文，原文在阅读器里）"><IconBookOpen size={12} /> 精读</button>
+            <button className="ff-abtn" onClick={laterRead} title="挂进「以后再看」，回头催你读"><IconStar size={12} /> 以后再看</button>
+            <button className="ff-abtn" onClick={toIdea} title="收进灵感库"><IconBulb size={12} /> 提灵感</button>
+            <button className="ff-abtn" onClick={() => trackFromContent(c)} title="以它为主角起一个追踪主题"><IconPlusTrack size={12} /> 发起追踪</button>
+          </div>
+        </div>
+        {summary && <div className="sum">{summary.slice(0, 160)}</div>}
       </div>
     )
   }
@@ -488,46 +553,66 @@ export default function FeedView({
           <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有收藏。在卡片右上角点 ☆ 一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
         )}
 
-        {/* ADR-045：一手优先=四组分层视图；最新/最热=扁平紧凑行。统一紧凑行（密度开关退役）。 */}
+        {/* ADR-045 终版：一手优先=四组分层 + 新到分界 + ★挂账催办；最新/最热=扁平紧凑行。像素级复刻 feed-final-mock。 */}
         {sortMode === 'firsthand' && !hasFilter ? (() => {
-          const groups = groupContents(filtered ?? contents)
-          const isUnread = (c) => c.user_read_status !== 'read'
-          const stale = [...groups[1], ...groups[2]].filter(c => isUnread(c) && (Date.now() - timeOf(c)) > 3 * 864e5)
-          const staleDays = stale.length ? Math.floor((Date.now() - Math.min(...stale.map(timeOf))) / 864e5) : 0
+          const src = filtered ?? contents
+          const groups = groupContents(src)
           const GH = {
-            1: { t: '📌 官方一手', cls: 'g1', what: '官方 blog + 官方号/员工号（T1·T1.5）' },
-            2: { t: '🎯 你关注的 Builder · 一手', cls: 'g2', what: 'X builders · YouTube · 播客（你标了关注的）' },
-            3: { t: '🔥 精选与热点', cls: 'g3', what: 'AI HOT 精选 + 事件簇主条（同事件已去重）' },
+            1: { icon: <IconPin />, t: '官方一手', cls: 'g1', what: '官方 blog + 官方号/员工号' },
+            2: { icon: <IconTarget />, t: '你关注的 Builder · 一手', cls: 'g2', what: 'X builders · YouTube · 播客' },
+            3: { icon: <IconFlame />, t: '精选与热点', cls: 'g3', what: 'AI HOT 精选 + 事件簇主条（已去重）' },
           }
-          if (urgentOnly) return (
-            <div className="fg-grp">
-              <div className="fg-ghead" style={{ borderBottomColor: 'var(--amber)' }}><span className="gt" style={{ color: 'var(--amber)' }}>🕐 一手原料 · 还没读的</span><span className="gn">{stale.length} 条 · 搁置越久越靠前</span><span className="gwhat" style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => setUrgentOnly(false)}>← 返回全部</span></div>
-              {stale.sort((a, b) => timeOf(a) - timeOf(b)).map(renderRow)}
-            </div>
-          )
+          const newOf = (k) => groups[k].filter(c => !isSeen(c)).length
+          const totalNew = newOf(1) + newOf(2) + newOf(3) + groups[4].filter(c => !isSeen(c)).length
           return <>
-            {stale.length > 0 && (
-              <div className="fg-urgent" onClick={() => setUrgentOnly(true)}>
-                🕐 本周一手信源还没读的 <b>{stale.length}</b> 条 · 最早搁置 <b>{staleDays}</b> 天 —— 原料别放凉<span className="x">点这里只看这批 →</span>
+            {/* 状态行：上次来 X · 之后新到 N 条 */}
+            <div className="ff-status">
+              {lastVisit
+                ? <><span>上次来 <b>{visitLabel(lastVisit)}</b> · 之后新到 <b>{totalNew}</b> 条</span><span className="dim">一手 {newOf(1)} · 关注 {newOf(2)} · 精选 {newOf(3)}</span></>
+                : <span>首次到访 · 共 <b>{src.length}</b> 条，先从「官方一手」开始</span>}
+            </div>
+            {/* ★挂账催办（只做「以后再看」，含挂账天数 + 现在读/放它走；原≥3天催办已作废） */}
+            {iouStars.length > 0 && (
+              <div className="ff-iou">
+                <IconStar fill size={13} />
+                <span>你挂的「以后再看」还有 <b>{iouStars.length} 条</b>：
+                  {iouStars.slice(0, 3).map((s, i) => { const d = daysSince(s.starred_at); return (
+                    <span key={s.id}>{i > 0 && ' · '}<a className={d >= 7 ? 'late' : ''} onClick={() => openReaderById(s.id)} title="现在就读这条">「{(s.zh_title || s.en_title || '').slice(0, 14)}」{d >= 7 ? '已挂' : '挂'} {d} 天</a></span>
+                  ) })}
+                  {iouStars.length > 3 && ` 等 ${iouStars.length} 条`}
+                  {' —— '}<a onClick={() => openReaderById(iouStars[0].id)}>现在读</a>{' 或 '}<a onClick={() => dropStar(iouStars[0])}>放它走</a>
+                </span>
               </div>
             )}
-            {[1, 2, 3].map(k => groups[k].length > 0 && (
-              <div key={k} className={`fg-grp ${GH[k].cls}`}>
-                <div className="fg-ghead">
-                  <span className="gt">{GH[k].t}</span>
-                  <span className="gn">{groups[k].length} 条</span>
-                  {groups[k].filter(isUnread).length > 0 && <span className="gnew">{groups[k].filter(isUnread).length} 未读</span>}
-                  <span className="gwhat">{GH[k].what}</span>
+            {/* 三组分层：每组新到在前，「之前的」折叠 */}
+            {[1, 2, 3].map(k => {
+              if (!groups[k].length) return null
+              const news = groups[k].filter(c => !isSeen(c))
+              const olds = groups[k].filter(isSeen)
+              const g = GH[k]
+              return (
+                <div key={k} className={`ff-grp ${g.cls}`}>
+                  <div className="ff-ghead">
+                    <span className="gt">{g.icon}{g.t}</span>
+                    {news.length ? <span className="gnew">新 {news.length}</span> : <span className="gnone">无新</span>}
+                    <span className="gwhat">{g.what}</span>
+                  </div>
+                  {news.map(ffRenderRow)}
+                  {olds.length > 0 && <>
+                    <div className="ff-oldbar" onClick={() => setOpenOld(o => ({ ...o, [k]: !o[k] }))}>{openOld[k] ? '▾' : '▸'} 之前的 {olds.length} 条{openOld[k] ? '' : '（来过的，已划掉）'}</div>
+                    {openOld[k] && <div className="ff-oldlist">{olds.map(ffRenderRow)}</div>}
+                  </>}
                 </div>
-                {groups[k].map(renderRow)}
-              </div>
-            ))}
+              )
+            })}
+            {/* 组4 其他：默认折叠 */}
             {groups[4].length > 0 && (
-              <div className="fg-grp">
-                <div className="fg-foldhead" onClick={() => setOtherOpen(o => !o)}>{otherOpen ? '▾' : '▸'} 其他（{groups[4].length} 条{otherOpen ? '' : '，默认折叠'}）</div>
-                {otherOpen && groups[4].map(renderRow)}
+              <div className="ff-g4head" onClick={() => setOtherOpen(o => !o)}>
+                {otherOpen ? '▾' : '▶'} 其他 · {groups[4].length} 条（GitHub trending / 二手报道）—— 想逛再点开
               </div>
             )}
+            {otherOpen && groups[4].length > 0 && <div className="ff-grp" style={{ marginTop: 4 }}>{groups[4].map(ffRenderRow)}</div>}
+            <div className="ff-note">按「原料价值」分层：官方一手 › 你关注的人 › 精选热点 › 其他 · 来过的自动划掉，新到的排在每组最前</div>
           </>
         })() : (
           <div className="wb-feed-list">{sortContents(filtered ?? contents).map(renderRow)}</div>

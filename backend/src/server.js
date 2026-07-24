@@ -1811,6 +1811,28 @@ app.post('/api/sync-all', async (req, res) => {
   res.json({ success: true, data: await syncAllChannels() });
 });
 
+// 资讯"上次来"（ADR-045 补充·新到分界）：读旧值→用于算"之后新到 N 条 + 划线已读"，再更新为现在。
+app.get('/api/feed/last-visit', async (req, res) => {
+  try {
+    const { getDatabase } = await import('./db/init.js');
+    const db = getDatabase();
+    const row = db.prepare("SELECT value FROM app_meta WHERE key='feed_last_visit'").get();
+    db.close();
+    res.json({ success: true, data: { lastVisit: row?.value || null } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/feed/visit', async (req, res) => {
+  try {
+    const { getDatabase } = await import('./db/init.js');
+    const db = getDatabase();
+    const row = db.prepare("SELECT value FROM app_meta WHERE key='feed_last_visit'").get();
+    const prev = row?.value || null;
+    db.prepare("INSERT OR REPLACE INTO app_meta(key,value) VALUES('feed_last_visit', datetime('now'))").run();
+    db.close();
+    res.json({ success: true, data: { prevVisit: prev } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 // 同步状态（P0-7 可感知性）：暴露上次同步时间，让资讯页显示"上次同步 x 小时前 · 自动"。
 // 自动同步能力早已在（cron 8:10/20:10 + 离线超 12h 补跑 + 每小时兜底），此前 UI 上一个字都没提。
 app.get('/api/sync-status', async (req, res) => {

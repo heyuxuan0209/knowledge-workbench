@@ -157,7 +157,8 @@ export function toggleStar(id) {
   const row = db.prepare('SELECT starred FROM contents WHERE id = ?').get(id);
   if (!row) { db.close(); return null; }
   const next = row.starred ? 0 : 1;
-  db.prepare("UPDATE contents SET starred = ?, updated_at = datetime('now') WHERE id = ?").run(next, id);
+  // starred_at：挂账时刻——星标时落库、取消时清空，供「以后再看」催办算挂账天数（ADR-045②）
+  db.prepare(`UPDATE contents SET starred = ?, starred_at = ${next ? "datetime('now')" : 'NULL'}, updated_at = datetime('now') WHERE id = ?`).run(next, id);
   db.close();
   return next;
 }

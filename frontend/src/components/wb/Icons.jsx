@@ -80,3 +80,29 @@ export const IconDoc = ({ size = 13 }) => (
 export const IconBulb = ({ size = 13 }) => (
   <S size={size}><path d="M8 2.2a3.8 3.8 0 0 1 2.2 6.9c-.5.4-.7.9-.7 1.4H6.5c0-.5-.2-1-.7-1.4A3.8 3.8 0 0 1 8 2.2z" /><line x1="6.6" y1="12.4" x2="9.4" y2="12.4" /><line x1="7" y1="14" x2="9" y2="14" /></S>
 )
+
+// ── ADR-045 终版信息流：组头/动作/状态图标（对齐全站 16px 描边风，替代 emoji）──
+export const IconPin = ({ size = 15 }) => ( // 📌 官方一手
+  <S size={size}><path d="M6 2h4l-.5 4 2 2v1.5H4.5V8l2-2z" /><line x1="8" y1="9.5" x2="8" y2="14" /></S>
+)
+export const IconTarget = ({ size = 15 }) => ( // 🎯 你关注的 Builder
+  <S size={size}><circle cx="8" cy="8" r="5.5" /><circle cx="8" cy="8" r="2.5" /><circle cx="8" cy="8" r="0.4" fill="currentColor" /></S>
+)
+export const IconFlame = ({ size = 15 }) => ( // 🔥 精选与热点
+  <S size={size}><path d="M8 2.5c2 2 3.2 3.6 3.2 5.8A3.2 3.2 0 0 1 8 13.5a3.2 3.2 0 0 1-3.2-5.2c.4 1 .8 1.5 1.5 1.8-.3-1.6.3-3.1 1.7-4.4z" /></S>
+)
+export const IconMedal = ({ size = 14 }) => ( // 🥇 一手优先
+  <S size={size}><circle cx="8" cy="10" r="3.4" /><path d="M6 6.8 4.4 2.2M10 6.8l1.6-4.6M8 8.4l.5 1 1.1.1-.8.8.2 1.1-1-.5-1 .5.2-1.1-.8-.8 1.1-.1z" /></S>
+)
+export const IconStar = ({ size = 13, fill = false }) => (
+  <S size={size}><path d="M8 2.3l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 11l-3.2 1.7.6-3.6L2.8 6.6l3.6-.5z" fill={fill ? 'currentColor' : 'none'} /></S>
+)
+export const IconCheck = ({ size = 13 }) => (
+  <S size={size}><path d="M3 8.5l3 3 7-7.5" /></S>
+)
+export const IconPlusTrack = ({ size = 13 }) => ( // ＋追踪（卫星/雷达小图）
+  <S size={size}><circle cx="8" cy="8" r="1.4" /><path d="M8 3.2v1.6M8 11.2v1.6M3.2 8h1.6M11.2 8h1.6" /></S>
+)
+export const IconBookOpen = ({ size = 13 }) => ( // 精读
+  <S size={size}><path d="M8 4C6.7 3.2 4.9 3.2 3 3.6v8c1.9-.4 3.7-.4 5 .4 1.3-.8 3.1-.8 5-.4v-8C11.1 3.2 9.3 3.2 8 4z" /><line x1="8" y1="4" x2="8" y2="12" /></S>
+)

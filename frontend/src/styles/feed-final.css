@@ -1,0 +1,46 @@
+/* ADR-045 终版信息流（像素级复刻 feed-final-mock.html）：新到分界 + ★挂账 + hover 展开。ff- 前缀。 */
+.ff-status{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:10px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--body)}
+.ff-status b{color:var(--text)}
+.ff-status .dim{color:var(--sub2);font-size:12px}
+.ff-iou{display:flex;align-items:center;gap:8px;background:rgba(169,121,31,.07);border:1px solid rgba(169,121,31,.3);border-radius:10px;padding:9px 15px;font-size:13px;color:var(--amber);margin-bottom:16px;line-height:1.6}
+.ff-iou b{font-weight:600}
+.ff-iou .late{color:var(--red)}
+.ff-iou a{color:var(--amber);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.ff-grp{margin-bottom:16px}
+.ff-ghead{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:2px solid var(--line14);margin-bottom:4px}
+.ff-grp.g1 .ff-ghead{border-bottom-color:var(--accent)}
+.ff-grp.g2 .ff-ghead{border-bottom-color:var(--green)}
+.ff-grp.g3 .ff-ghead{border-bottom-color:var(--amber)}
+.ff-ghead .gt{font-family:var(--serif);font-size:16px;font-weight:600;display:flex;align-items:center;gap:6px}
+.ff-grp.g1 .gt{color:var(--accent)}.ff-grp.g2 .gt{color:var(--green)}.ff-grp.g3 .gt{color:var(--amber)}
+.ff-ghead .gnew{font-size:11.5px;color:#fff;background:var(--red);border-radius:10px;padding:0 8px}
+.ff-ghead .gnone{font-size:12px;color:var(--sub2)}
+.ff-ghead .gwhat{font-size:11.5px;color:var(--faint);margin-left:auto}
+.ff-row{padding:7px 10px;border-radius:8px;cursor:pointer}
+.ff-row:hover{background:var(--surface)}
+.ff-row .l1{display:flex;align-items:center;gap:10px}
+.ff-row .tm{font-size:11px;color:var(--faint);flex-shrink:0;width:40px}
+.ff-row .src{font-size:11.5px;flex-shrink:0;width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.ff-grp.g1 .src{color:var(--accent)}.ff-grp.g2 .src{color:var(--green)}.ff-grp.g3 .src{color:var(--amber)}
+.ff-row .tt{flex:1;font-size:14px;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ff-row.read .tt{color:var(--sub2);text-decoration:line-through;text-decoration-color:var(--line14)}
+.ff-row .cbadge{font-size:10.5px;color:var(--amber);flex-shrink:0}
+.ff-row .acts{flex-shrink:0;display:flex;gap:6px;opacity:0;transition:opacity .12s}
+.ff-row:hover .acts{opacity:1}
+.ff-abtn{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;border:1px solid var(--line14);background:var(--surface);border-radius:7px;padding:2px 9px;cursor:pointer;color:var(--sub)}
+.ff-abtn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.ff-abtn:hover{border-color:var(--accent);color:var(--accent)}
+.ff-abtn.pri:hover{color:#fff;opacity:.85}
+.ff-abtn.on{border-color:var(--amber);color:var(--amber)}
+.ff-row .sum{display:none;font-size:12.5px;color:var(--sub);line-height:1.7;padding:5px 0 2px 50px}
+.ff-row:hover .sum{display:block}
+.ff-mark{flex-shrink:0;font-size:11px;border-radius:8px;padding:1px 8px;display:inline-flex;align-items:center;gap:3px}
+.ff-mark.read{color:var(--accent);border:1px solid var(--accent)}
+.ff-mark.star{color:var(--amber);border:1px solid var(--amber)}
+.ff-mark.idea{color:var(--green);border:1px solid var(--green)}
+.ff-oldbar{font-size:12px;color:var(--sub2);padding:5px 10px;cursor:pointer;user-select:none}
+.ff-oldbar:hover{color:var(--accent)}
+.ff-oldlist .ff-row{opacity:.55}
+.ff-g4head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line10);border-radius:10px;cursor:pointer;font-size:13.5px;color:var(--sub);user-select:none;margin-top:4px}
+.ff-g4head:hover{color:var(--accent)}
+.ff-note{font-size:11.5px;color:var(--faint);text-align:center;margin-top:22px;line-height:2}
