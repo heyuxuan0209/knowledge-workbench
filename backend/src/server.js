@@ -783,6 +783,36 @@ app.post('/api/studio/storyboard', async (req, res) => {
   }
 });
 
+// ADR-046 P2b 配音（预览之外的单独一步，用户点「加配音」才触发）：edge-tts 免费出音。
+// 可选音色列表（前端下拉用）
+app.get('/api/studio/tts-voices', async (req, res) => {
+  try {
+    const { TTS_VOICES } = await import('./services/tts.js');
+    res.json({ success: true, data: TTS_VOICES });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+// 单句试听（换音色时先听一句，不必给整支配音）
+app.post('/api/studio/tts-sample', async (req, res) => {
+  try {
+    const { text, voice } = req.body || {};
+    const { synthesize } = await import('./services/tts.js');
+    const a = await synthesize(text || '你好，这是配音试听。', voice);
+    res.json({ success: true, data: a });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+// 整支分镜配音：每镜一段音频（base64）+ 真实时长；前端喂给竖版播放器带声播放。
+app.post('/api/studio/tts', async (req, res) => {
+  try {
+    const { scenes, voice, rate } = req.body || {};
+    if (!Array.isArray(scenes) || !scenes.length) return res.status(400).json({ success: false, error: '没有分镜——先生成分镜播放器' });
+    const { ttsScenes } = await import('./services/tts.js');
+    const data = await ttsScenes(scenes, voice, rate || '+0%');
+    res.json({ success: true, data: { voice: voice || 'zh-CN-YunxiNeural', scenes: data } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 // ========== M2 洞察层：日报与选题（ADR-008） ==========
 
 // 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）
@@ -1841,12 +1871,17 @@ app.post('/api/sync-all', async (req, res) => {
   res.json({ success: true, data: await syncAllChannels() });
 });
 
-// 资讯"上次来"（ADR-045 补充·新到分界）：读旧值→用于算"之后新到 N 条 + 划线已读"，再更新为现在。
+// 资讯"上次来"分界（ADR-045 补充 · 2026-07-25 修分界坍缩 bug）：
+// 旧实现每次进页面都把分界戳成 now → 反复开/切 tab 会把分界推到"几分钟前"，
+// 于是所有内容都比分界老 → 全被划成"之前的·已读"，新发布（如 Opus 5）永远不显示为新。
+// 修正：分界只在**跨会话（离开一段时间再回来）**时才前移，同一会话内反复开页不动分界。
+// 两个键：feed_last_seen=上次活动时刻；feed_boundary=当前会话的"上次来"线。
+const SESSION_GAP_MIN = 30; // 间隔 >30 分钟算新的一次"来"，才推进分界
 app.get('/api/feed/last-visit', async (req, res) => {
   try {
     const { getDatabase } = await import('./db/init.js');
     const db = getDatabase();
-    const row = db.prepare("SELECT value FROM app_meta WHERE key='feed_last_visit'").get();
+    const row = db.prepare("SELECT value FROM app_meta WHERE key='feed_boundary'").get();
     db.close();
     res.json({ success: true, data: { lastVisit: row?.value || null } });
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
@@ -1855,11 +1890,23 @@ app.post('/api/feed/visit', async (req, res) => {
   try {
     const { getDatabase } = await import('./db/init.js');
     const db = getDatabase();
-    const row = db.prepare("SELECT value FROM app_meta WHERE key='feed_last_visit'").get();
-    const prev = row?.value || null;
-    db.prepare("INSERT OR REPLACE INTO app_meta(key,value) VALUES('feed_last_visit', datetime('now'))").run();
+    const get = (k) => db.prepare('SELECT value FROM app_meta WHERE key=?').get(k)?.value || null;
+    const set = (k, v) => db.prepare('INSERT OR REPLACE INTO app_meta(key,value) VALUES(?,?)').run(k, v);
+    const lastSeen = get('feed_last_seen');
+    const boundary = get('feed_boundary');
+    // 距上次活动的分钟数（首访/久别 → 无值时视为无穷大 = 新会话）
+    const gapMin = lastSeen
+      ? db.prepare("SELECT (julianday('now') - julianday(?)) * 1440 AS m").get(lastSeen).m
+      : Infinity;
+    let effBoundary = boundary;
+    if (gapMin > SESSION_GAP_MIN) {
+      // 新的一次"来"：分界前移到"上次活动时刻"（不是 now——now 会把刚发布的也算旧）
+      effBoundary = lastSeen; // 首访时为 null → 前端显示"首次到访"、全部算新
+      set('feed_boundary', effBoundary || '');
+    }
+    set('feed_last_seen', db.prepare("SELECT datetime('now') n").get().n); // 每次都更新活动时刻
     db.close();
-    res.json({ success: true, data: { prevVisit: prev } });
+    res.json({ success: true, data: { prevVisit: effBoundary || null } });
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 

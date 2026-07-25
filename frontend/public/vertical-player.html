@@ -65,9 +65,17 @@
     <div class="lbl">分镜（<span id="scount">0</span>）· 点跳转</div>
     <div class="scenes" id="scenes"></div>
     <div class="aud">
-      <div class="t">🎙 加配音（单独一步）</div>
-      <div class="d">配音会调用 TTS 语音合成（<b>另计费</b>）。预览属于免费的内容层，配音和它<b>在产品上分开</b>——确定分镜没问题了，再单独触发配音。</div>
-      <button class="btn" id="tts" disabled title="配音接入后在这里触发（edge-tts 免费 / 火山付费，二选一，届时另定）">🎙 加配音（下一步接入）</button>
+      <div class="t">🎙 加配音（单独一步 · edge-tts 免费）</div>
+      <div class="d">预览不配音、不花钱；配音是<b>你主动点</b>的独立一步，走 edge-tts 免费出音（微软云端）。确定分镜没问题了再配。</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px">
+        <select id="voice" class="btn" style="padding:7px 10px"></select>
+        <button class="btn" id="sample">▶ 试听一句</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn pri" id="tts">🎙 给整支配音</button>
+        <button class="btn" id="mute" style="display:none">🔊 有声</button>
+        <span id="tstat" style="font-size:11.5px;color:var(--sub)"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -83,6 +91,12 @@
   // 播放时钟
   let steps = [];      // 扁平化：每条字幕一格 {si, keyword, sub, kind, phrase, at, end}
   let total = 0, t = 0, playing = false, raf = null, lastTs = 0;
+  // 配音（P2b）：每镜一段 audio，rAF 时钟为主、进镜时触发该镜音频
+  const VOICES = [
+    ['zh-CN-YunxiNeural','云希（男·青年）'],['zh-CN-XiaoxiaoNeural','晓晓（女·温暖）'],
+    ['zh-CN-YunyangNeural','云扬（男·播报）'],['zh-CN-XiaoyiNeural','晓伊（女·活泼）'],
+  ];
+  let audioMap = {}, muted = false, curSceneId = null, sampleAudio = null;
 
   const $ = id => document.getElementById(id);
   function applyTheme(k){
@@ -137,7 +151,12 @@
       `<div class="captrack"><div class="capline rv-in">${(step.phrase||'').replace(/</g,'&lt;')}</div></div>`+
       `<div class="brand">杰西卡聊AI</div>`;
     [...document.querySelectorAll('#scenes .sc')].forEach((el,i)=>el.classList.toggle('cur', i===step.si));
+    // 进入新镜 → 触发该镜配音（若已配、未静音、正在播）
+    const sid = STORY.scenes[step.si] && STORY.scenes[step.si].id;
+    if(sid!==curSceneId){ curSceneId=sid; if(playing) playSceneAudio(sid); }
   }
+  function stopAllAudio(){ Object.values(audioMap).forEach(a=>{ try{a.pause();a.currentTime=0;}catch(_){}}); }
+  function playSceneAudio(sid){ if(muted) return; const a=audioMap[sid]; if(!a) return; Object.entries(audioMap).forEach(([k,el])=>{ if(k!==sid){try{el.pause();el.currentTime=0;}catch(_){}} }); try{a.currentTime=0; a.play().catch(()=>{});}catch(_){} }
   function tick(ts){
     if(!playing){ return; }
     if(!lastTs) lastTs = ts;
@@ -146,11 +165,12 @@
     renderAt(t);
     raf = requestAnimationFrame(tick);
   }
-  function play(){ if(!steps.length) return; if(t>=total) t=0; playing=true; lastTs=0; $('play').textContent='⏸ 暂停'; raf=requestAnimationFrame(tick); }
-  function pause(){ playing=false; if(raf) cancelAnimationFrame(raf); $('play').textContent='▶ 播放'; }
+  function play(){ if(!steps.length) return; if(t>=total){ t=0; curSceneId=null; } playing=true; lastTs=0; $('play').textContent='⏸ 暂停';
+    if(!muted && curSceneId && audioMap[curSceneId]){ try{audioMap[curSceneId].play().catch(()=>{});}catch(_){} } raf=requestAnimationFrame(tick); }
+  function pause(){ playing=false; if(raf) cancelAnimationFrame(raf); $('play').textContent='▶ 播放'; if(curSceneId&&audioMap[curSceneId]){try{audioMap[curSceneId].pause();}catch(_){}} }
   function stop(){ playing=false; if(raf) cancelAnimationFrame(raf); $('play').textContent='▶ 播放'; }
   function toggle(){ playing?pause():play(); }
-  function seekScene(si){ const st=steps.find(s=>s.si===si); if(st){ t=st.at; renderAt(t); if(!playing){} } }
+  function seekScene(si){ const st=steps.find(s=>s.si===si); if(st){ stopAllAudio(); t=st.at; curSceneId=null; lastStepKey=null; renderAt(t); if(playing) playSceneAudio(STORY.scenes[si]&&STORY.scenes[si].id); } }
 
   function renderSceneList(){
     $('scount').textContent = STORY.scenes.length;
@@ -174,16 +194,41 @@
     a.download = `分镜稿-${(STORY.title||'video').slice(0,12)}.txt`; a.click(); URL.revokeObjectURL(a.href);
   }
   function load(data){
-    STORY = { title:data.title||'', scenes:(data.scenes||[]).map(s=>({keyword:s.keyword||'',sub:s.sub||'',phrases:(s.phrases||[]).map(String),kind:s.kind||'',dur:s.dur||0})) };
+    STORY = { title:data.title||'', scenes:(data.scenes||[]).map(s=>({id:s.id||'',keyword:s.keyword||'',sub:s.sub||'',phrases:(s.phrases||[]).map(String),kind:s.kind||'',dur:s.dur||0})) };
     if(data.theme && THEMES[data.theme]) theme = data.theme;
+    // 新分镜稿 → 旧配音作废
+    stopAllAudio(); audioMap={}; curSceneId=null; $('mute').style.display='none'; $('tstat').textContent='';
+    $('tts').disabled=false; $('tts').textContent='🎙 给整支配音';
     buildSteps(); renderThemes(); applyTheme(theme); renderSceneList();
     t=0; lastStepKey=null; if(steps.length){ renderAt(0); setTimeout(play, 250); } else { $('stage').innerHTML='<div class="empty">没有分镜</div>'; }
   }
-  $('play').onclick=toggle; $('replay').onclick=()=>{ t=0; play(); }; $('dl').onclick=download;
-  renderThemes(); applyTheme('warm');
+  // 配音到达 → 每镜挂音频、时长改成真实音频长、重建时间轴、带声重播
+  function applyAudio(scenes){
+    let n=0;
+    (scenes||[]).forEach(r=>{
+      const sc = STORY.scenes.find(s=>s.id===r.id);
+      if(sc && r.audio){ sc.dur = (r.dur||sc.dur)+0.5; audioMap[r.id]=new Audio(r.audio); n++; }
+    });
+    if(!n){ $('tstat').textContent='配音没成功（可能网络受限）'; $('tts').disabled=false; $('tts').textContent='🎙 重试配音'; return; }
+    buildSteps(); renderSceneList();
+    $('mute').style.display=''; muted=false; $('mute').textContent='🔊 有声';
+    $('tstat').textContent=`已配音 ${n} 镜 · 带声重播中`;
+    $('tts').disabled=false; $('tts').textContent='🎙 重新配音';
+    t=0; curSceneId=null; lastStepKey=null; renderAt(0); setTimeout(play, 200);
+  }
+  function fillVoices(){ $('voice').innerHTML = VOICES.map(([k,l])=>`<option value="${k}">${l}</option>`).join(''); }
+  $('play').onclick=toggle; $('replay').onclick=()=>{ t=0; curSceneId=null; play(); }; $('dl').onclick=download;
+  $('mute').onclick=()=>{ muted=!muted; $('mute').textContent=muted?'🔇 静音':'🔊 有声'; if(muted) stopAllAudio(); else if(playing&&curSceneId) playSceneAudio(curSceneId); };
+  $('sample').onclick=()=>{ $('tstat').textContent='试听生成中…'; try{ window.parent.postMessage({type:'kw-tts-sample', voice:$('voice').value}, '*'); }catch(_){} };
+  $('tts').onclick=()=>{ if(!STORY.scenes.length){ $('tstat').textContent='先有分镜'; return; } $('tts').disabled=true; $('tts').textContent='配音生成中…'; $('tstat').textContent='每镜约 1–2 秒，稍等…'; try{ window.parent.postMessage({type:'kw-tts-request', voice:$('voice').value}, '*'); }catch(_){} };
+  fillVoices(); renderThemes(); applyTheme('warm');
   window.addEventListener('message',(e)=>{
-    const d = e.data;
-    if(d && d.type==='kw-storyboard' && Array.isArray(d.scenes)) load(d);
+    const d = e.data; if(!d) return;
+    if(d.type==='kw-storyboard' && Array.isArray(d.scenes)) load(d);
+    else if(d.type==='kw-tts' && Array.isArray(d.scenes)) applyAudio(d.scenes);
+    else if(d.type==='kw-tts-error'){ $('tstat').textContent='配音失败：'+(d.error||''); $('tts').disabled=false; $('tts').textContent='🎙 重试配音'; }
+    else if(d.type==='kw-tts-sample-audio' && d.audio){ try{ if(sampleAudio) sampleAudio.pause(); sampleAudio=new Audio(d.audio); sampleAudio.play().catch(()=>{}); $('tstat').textContent='▶ 试听中'; }catch(_){} }
+    else if(d.type==='kw-tts-sample-error'){ $('tstat').textContent='试听失败：'+(d.error||''); }
   });
   try{ if(window.parent!==window) window.parent.postMessage({type:'kw-player-ready'},'*'); }catch(_){}
 </script>

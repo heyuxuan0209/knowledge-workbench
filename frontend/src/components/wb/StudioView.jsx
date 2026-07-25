@@ -305,6 +305,31 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     } catch (err) { showToast('分镜生成失败：' + err.message) }
     setVideoBusy(false)
   }
+  // 竖版播放器里的「加配音 / 试听」是 iframe 内按钮 → postMessage 请求，父窗口调 edge-tts 后回灌音频。
+  // 配音与预览物理分开：只有用户在播放器里点了才走这里、才出音（免费，但仍是主动一步）。
+  useEffect(() => {
+    const onMsg = async (e) => {
+      const d = e.data
+      const post = (m) => { try { videoFrame.current?.contentWindow?.postMessage(m, '*') } catch { /* 忽略 */ } }
+      if (!d || !videoFrame.current) return
+      if (d.type === 'kw-tts-request') {
+        const sb = storyboardRef.current
+        if (!sb?.scenes?.length) { post({ type: 'kw-tts-error', error: '没有分镜' }); return }
+        try {
+          const j = await api('/api/studio/tts', { method: 'POST', body: { scenes: sb.scenes.map(s => ({ id: s.id, phrases: s.phrases })), voice: d.voice } })
+          post({ type: 'kw-tts', scenes: j.data.scenes })
+          showToast('配音已生成（edge-tts 免费）· 带声重播')
+        } catch (err) { post({ type: 'kw-tts-error', error: err.message }); showToast('配音失败：' + err.message) }
+      } else if (d.type === 'kw-tts-sample') {
+        try {
+          const j = await api('/api/studio/tts-sample', { method: 'POST', body: { voice: d.voice, text: '关键是把需求说清楚，先做出来给你看。' } })
+          post({ type: 'kw-tts-sample-audio', audio: j.data.base64 })
+        } catch (err) { post({ type: 'kw-tts-sample-error', error: err.message }) }
+      }
+    }
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [draftsOpen, setDraftsOpen] = useState(false)   // 草稿箱面板
   const [selDrafts, setSelDrafts] = useState(new Set()) // 勾选待删的草稿
   const cardFrame = useRef(null)
@@ -620,7 +645,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
       {videoMode && (
         <div style={{ display: 'flex', gap: 8, margin: '12px 0 0', alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="wb-btn-ghost" onClick={() => setVideoMode(false)}>← 返回文稿</button>
-          <span style={{ fontSize: 12, color: 'var(--sub2)' }}>竖版分镜预览 · 只看节奏/字幕，不渲染 MP4、不配音；下载分镜稿拿去剪映收尾</span>
+          <span style={{ fontSize: 12, color: 'var(--sub2)' }}>竖版分镜预览 · 看节奏/字幕；可选「加配音」(edge-tts 免费·主动点才出音)；下载分镜稿拿去剪映收尾</span>
           <button className="wb-btn-ghost" style={{ marginLeft: 'auto' }} disabled={videoBusy}
             onClick={() => filmActiveForm && openVideoFor(filmActiveForm)} title="按当前口播适配稿重切分镜">↻ 重切分镜</button>
         </div>
