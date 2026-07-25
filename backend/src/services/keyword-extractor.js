@@ -18,7 +18,7 @@ export async function extractKeywords(title, summary) {
 
   try {
     const response = await deepseekClient.chat.completions.create({
-      model: 'deepseek-chat',
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro', // deepseek-chat 已作废（2026-07 改版）
       messages: [
         {
           role: 'system',

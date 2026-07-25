@@ -14,6 +14,10 @@ function deepseekClient() {
   return _client;
 }
 
+// Deepseek 模型名（2026-07 改版：deepseek-chat 作废，官方只认 deepseek-v4-pro / deepseek-v4-flash）。
+// 默认走 v4-pro（质量优先，对齐内容北极星）；可用 DEEPSEEK_MODEL 覆盖（如批量任务省钱切 v4-flash）。
+export const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
+
 // Claude API 配置（备选）
 // TODO: 后续实现 Anthropic SDK
 
@@ -36,7 +40,7 @@ function estimateTokens(text) {
 // 流式聊天（SSE）
 export async function* streamChat(messages, provider = 'deepseek', model = null) {
   if (provider === 'deepseek') {
-    const modelName = model || 'deepseek-chat';
+    const modelName = model || DEFAULT_MODEL;
 
     try {
       const stream = await deepseekClient().chat.completions.create({
@@ -97,7 +101,7 @@ export async function* streamChat(messages, provider = 'deepseek', model = null)
 // 否则"重新生成"每次内容都变，用户无法信任报告（2026-07-16 反馈 #1）
 export async function chat(messages, provider = 'deepseek', model = null, options = {}) {
   if (provider === 'deepseek') {
-    const modelName = model || 'deepseek-chat';
+    const modelName = model || DEFAULT_MODEL;
 
     try {
       const response = await deepseekClient().chat.completions.create({
