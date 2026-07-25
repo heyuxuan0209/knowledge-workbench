@@ -24,12 +24,16 @@ import { resolve } from 'path';
 // 2. 环境变量 RSS_FEEDS（逗号分隔，保留兼容老配置）
 async function getConfiguredRSSFeeds() {
   const feeds = new Set();
+  // feedUrl → 登记源身份（platform/handle/displayName）：该 feed 的每条内容都归属此源。
+  // 2026-07-25 修：此前 RSS 条目靠 item.creator 解析归属，多数 feed 没 creator → 全部 0 linked；
+  // 且默认 platform='RSS' 与登记的 Blog/Newsletter 不匹配 → 就算有 creator 也 link 不上。
+  const sourceMap = new Map();
 
   try {
     const { getDatabase } = await import('../db/init.js');
     const db = getDatabase();
     const rows = db.prepare(`
-      SELECT sp.handle AS feed_url, sp.platform_metadata
+      SELECT sp.handle AS feed_url, sp.platform, sp.platform_metadata, s.display_name
       FROM source_platforms sp
       JOIN sources s ON sp.source_id = s.id
       WHERE sp.track_mode = 'active-rss' AND s.status = 'active'
@@ -38,7 +42,11 @@ async function getConfiguredRSSFeeds() {
     for (const row of rows) {
       const meta = JSON.parse(row.platform_metadata || '{}');
       const url = meta.feedUrl || row.feed_url;
-      if (url?.startsWith('http')) feeds.add(url);
+      if (url?.startsWith('http')) {
+        feeds.add(url);
+        // handle 用登记时的 row.feed_url（findOrCreateSource 按 platform+handle 精确匹配才 link 得上）
+        sourceMap.set(url, { platform: row.platform, handle: row.feed_url, displayName: row.display_name });
+      }
     }
   } catch (error) {
     console.error('Failed to read RSS feeds from database:', error.message);
@@ -47,14 +55,16 @@ async function getConfiguredRSSFeeds() {
   for (const url of process.env.RSS_FEEDS?.split(',').map(s => s.trim()).filter(Boolean) || []) {
     feeds.add(url);
   }
-  return [...feeds];
+  return { feeds: [...feeds], sourceMap };
 }
 
 export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
   console.log('🔄 Starting RSS data sync...');
 
-  // 如果没有传入 feedUrls，从数据库读取已配置的 RSS 源
-  const feeds = feedUrls || await getConfiguredRSSFeeds();
+  // 如果没有传入 feedUrls，从数据库读取已配置的 RSS 源（带每 feed 的归属源）
+  const { feeds, sourceMap } = feedUrls
+    ? { feeds: feedUrls, sourceMap: new Map() }
+    : await getConfiguredRSSFeeds();
 
   if (feeds.length === 0) {
     console.log('⚠️  No RSS feeds configured. Set RSS_FEEDS in .env or pass feedUrls parameter.');
@@ -73,12 +83,27 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
 
     console.log(`📥 Fetched ${items.length} items from ${feedsInfo.length} feed(s)`);
 
-    // 只取每个 feed 的前 N 条（避免一次性导入过多）
-    const limitedItems = items.slice(0, limitPerFeed * feeds.length);
+    // 每个 feed 取前 N 条（2026-07-25 修：原来是 items.slice(0, N*feeds) 扁平封顶——
+    // 官方大 feed 在前会吃光配额、后面新登记的个人博客 feed 一条都进不来 → 归属永远 0）
+    const perFeedCount = {};
+    const limitedItems = items.filter(item => {
+      const k = item.feedUrl || '';
+      perFeedCount[k] = (perFeedCount[k] || 0) + 1;
+      return perFeedCount[k] <= limitPerFeed;
+    });
 
     // 相关性过滤（2026-07-14 数据质量轮）：AI/软件工程/科技产品与创业才入库
     const { filterRelevant } = await import('./ai-relevance.js');
-    const pretransformed = limitedItems.map(item => transformRSSItem(item, item.feedUrl, item.feedTitle));
+    const pretransformed = limitedItems.map(item => {
+      // 无 link 的条目跳过（部分 Atom feed 的 link 结构不同 → generateStableId 曾 crash 整批）
+      if (!item.link) return null;
+      try {
+        const t = transformRSSItem(item, item.feedUrl, item.feedTitle);
+        // 登记源的 feed → 全部条目归属该源（覆盖默认 creator 解析，platform/handle 对齐登记，才 link 得上）
+        const src = sourceMap.get(item.feedUrl);
+        return src ? { content: t.content, sourceInfo: { displayName: src.displayName, platform: src.platform, handle: src.handle } } : t;
+      } catch { return null; }
+    }).filter(Boolean);
     const kept = await filterRelevant(pretransformed.map(({ content }) => ({ id: content.id, title: content.en_title })));
     const relevantItems = pretransformed.filter(({ content }) => kept.has(content.id));
     console.log(`🧹 relevance filter: ${relevantItems.length}/${pretransformed.length} kept`);
@@ -86,12 +111,19 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
     // 翻译标题 + 摘要（contentSnippet 捡回来用，Feed 不允许光杆标题）
     const transformedItems = await Promise.all(
       relevantItems.map(async ({ content, sourceInfo }) => {
-        if (content.original_lang === 'en') {
-          content.zh_title = content.en_title ? await translateText(content.en_title) : null;
-          content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300)) : null;
-        } else {
-          content.zh_title = content.en_title;
-          content.zh_summary = content.en_summary;
+        try {
+          if (content.original_lang === 'en') {
+            content.zh_title = content.en_title ? await translateText(content.en_title) : null;
+            content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300)) : null;
+          } else {
+            content.zh_title = content.en_title;
+            content.zh_summary = content.en_summary;
+          }
+        } catch (e) {
+          // 翻译失败不丢内容（2026-07-25 修：一次 API 抖动曾废掉整批 431 条 RSS）：
+          // 中文标题/摘要回退英文原文，内容照样入库、照样归属源；下轮同步/摘要兜底再补译
+          content.zh_title = content.zh_title || content.en_title;
+          content.zh_summary = content.zh_summary || content.en_summary;
         }
         return { content, sourceInfo };
       })

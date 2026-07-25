@@ -83,7 +83,12 @@ ${text}
 
 译文：`;
 
-  const result = await chat([{ role: 'user', content: prompt }], 'deepseek');
+  // 单次重试：翻译量大时（一次 RSS 同步几百条）偶发连接抖动，重试一次再抛
+  let result = await chat([{ role: 'user', content: prompt }], 'deepseek');
+  if (!result.success) {
+    await new Promise(r => setTimeout(r, 800));
+    result = await chat([{ role: 'user', content: prompt }], 'deepseek');
+  }
   if (!result.success) {
     throw new Error(`翻译失败: ${result.error}`);
   }
