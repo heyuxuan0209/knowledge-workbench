@@ -33,7 +33,10 @@ export const MODES = {
 
 // 信源真实能力的人话说明（只在需要解释时返回，如 X 借道 / 公众号不抓取）
 export function sourceModeNote(p) {
-  if (p.platform === 'X') return 'X 暂不能直接抓取（需登录态）：该作者被 AI HOT 转载的热门内容会自动归属此源并加权进 Feed'
+  // X 说明按采集档区分（2026-07-25：升成「每日主动查询」后原文案仍说"不能抓取"自相矛盾）：
+  if (p.platform === 'X') return p.track_mode === 'active-query'
+    ? 'X 已排入每日采集队列，但 X 关了免登录抓取——要真拉推文得先配好带登录态的采集通道（X cookies）；没配前，这些作者被 AI HOT 转载的热门内容仍会归属此源、加权进 Feed'
+    : 'X 暂不能直接抓取（需登录态）：该作者被 AI HOT 转载的热门内容会自动归属此源并加权进 Feed'
   if (p.platform === 'WeChat') return '公众号无公开接口：只登记不抓取；其文章被 AI HOT 收录时会进入 Feed'
   if (p.track_mode === 'link-only') return '该网站未发现 RSS：只登记跳转，无法自动追踪更新'
   return null
