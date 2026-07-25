@@ -331,6 +331,34 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // ── ADR-046 P3 多平台产出管理：单篇重出 / 单篇导出 / 全部导出（复用 adapt-batch，无新后端）──
+  const readaptOne = async (formKey) => {
+    if (!studio.draft.trim()) { showToast('母稿为空'); return }
+    setAdapted(a => ({ ...a, [formKey]: { ...a[formKey], reBusy: true } }))
+    try {
+      const j = await api('/api/studio/adapt-batch', { method: 'POST', body: { draft: studio.draft, forms: [formKey], viewpoint: studio.viewpoint || null } })
+      const r = (j.data || [])[0]
+      if (r) setAdapted(a => ({ ...a, [formKey]: { ...r, open: true } }))
+      showToast('已按母稿重出这篇适配稿')
+    } catch (err) { showToast('重出失败：' + err.message); setAdapted(a => ({ ...a, [formKey]: { ...a[formKey], reBusy: false } })) }
+  }
+  const dlText = (name, text, ext) => {
+    const blob = new Blob([stripRefs(text)], { type: 'text/plain;charset=utf-8' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+    a.download = `${String(name).replace(/[\\/:*?"<>|]/g, '_')}.${ext}`; a.click(); URL.revokeObjectURL(a.href)
+  }
+  const exportOne = (k) => {
+    const a = adapted[k]; if (!a?.body) return
+    dlText(a.formLabel || k, a.body, (k === 'gzh-long' || k === 'xhs-long') ? 'md' : 'txt')
+    showToast(`已导出「${a.formLabel || k}」`)
+  }
+  const exportAll = () => {
+    const parts = Object.entries(adapted).filter(([, a]) => a.body && !a.error)
+      .map(([k, a]) => `## ${a.formLabel || k}\n\n${stripRefs(a.body)}`)
+    if (!parts.length) { showToast('还没有可导出的适配稿'); return }
+    dlText(`各平台稿-${(studio.title || '稿').slice(0, 10)}`, parts.join('\n\n---\n\n'), 'md')
+    showToast(`已把 ${parts.length} 个平台的稿导出为一个 md`)
+  }
   const [draftsOpen, setDraftsOpen] = useState(false)   // 草稿箱面板
   const [selDrafts, setSelDrafts] = useState(new Set()) // 勾选待删的草稿
   const cardFrame = useRef(null)
@@ -608,6 +636,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 adapted={adapted} setAdapted={setAdapted} adaptBusy={adaptBusy} adaptBatch={adaptBatch}
                 CARD_FORMS={CARD_FORMS} VIDEO_FORMS={VIDEO_FORMS} openCardsFor={openCardsFor} copyText={copyText}
                 openVideoFor={openVideoFor} videoBusy={videoBusy}
+                readaptOne={readaptOne} exportOne={exportOne} exportAll={exportAll}
                 THEMES={THEMES} filmTheme={filmTheme} setFilmTheme={setFilmTheme} setStudioTab={setStudioTab}
                 filmActiveForm={filmActiveForm} setFilmActiveForm={setFilmActiveForm} showToast={showToast} />
             )}
@@ -727,8 +756,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 // ADR-046 ③ 出片：母稿 → 选平台形态（多选）→ 适配稿(看/改) → 主题占位 → 各平台出片。
 // P1 渲染只接：图卡渲染器（小红书/抖音卡片）+ 公众号长文直用；视频渲染器(hyperframes)是 P2 占位。
 function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setAdapted, adaptBusy, adaptBatch,
-  CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, openVideoFor, videoBusy, THEMES, filmTheme, setFilmTheme, setStudioTab,
-  filmActiveForm, setFilmActiveForm, showToast }) {
+  CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, openVideoFor, videoBusy, readaptOne, exportOne, exportAll,
+  THEMES, filmTheme, setFilmTheme, setStudioTab, filmActiveForm, setFilmActiveForm, showToast }) {
   const pf = k => pforms.find(p => p.key === k) || { key: k, label: k, icon: '📝', note: '' }
   const rendHint = k => k === 'gzh-long' ? '长文体 · 直用母稿' : CARD_FORMS.has(k) ? '卡片体 · 图卡渲染器' : VIDEO_FORMS.has(k) ? '口播体 · 竖版分镜播放器' : '文案 · 复制发布'
   const editBody = (k, v) => setAdapted(a => ({ ...a, [k]: { ...a[k], body: v } }))
@@ -775,9 +804,15 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
         </button>
       </div>
 
-      {/* ② 适配稿·看/改 */}
+      {/* ② 适配稿·看/改 + 产出管理（导出/重出） */}
       <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginBottom: 11, background: 'var(--surface)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>② 适配稿 · 看 / 改 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· 母稿已按各平台适配，渲染前过一眼、可改</span></div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>② 适配稿 · 看 / 改</span>
+          <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)', flex: 1 }}>· 母稿已按各平台适配，渲染前过一眼、可改</span>
+          {selected.filter(k => adapted[k]?.body).length > 0 && (
+            <button className="wb-btn-ghost" title="把各平台适配稿打包导出为一个 Markdown（每平台一节）" onClick={exportAll}>⬇ 全部导出</button>
+          )}
+        </div>
         {selected.filter(k => adapted[k]).length === 0 && (
           <div style={{ fontSize: 12, color: 'var(--faint)', padding: '10px 2px' }}>还没适配——选好平台形态，点上面「一键适配母稿」。</div>
         )}
@@ -812,8 +847,14 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
                   )}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
                     <button className={a.editing ? 'wb-btn-primary' : 'wb-btn-ghost'} onClick={() => toggleEdit(k)}>{a.editing ? '✓ 改完' : '✎ 直接改文字'}</button>
-                    <button className="wb-btn-ghost" title="切到右栏「创作助手」改这篇——用大白话说「钩子再狠点」「压到 60 秒」" onClick={() => { focusAssist(k); showToast?.('右栏「创作助手」现在改这篇适配稿——说「钩子再狠点」试试') }}>🤖 让助手改这篇</button>
+                    {!a.passthrough && (
+                      <button className="wb-btn-ghost" title="切到右栏「创作助手」改这篇——用大白话说「钩子再狠点」「压到 60 秒」" onClick={() => { focusAssist(k); showToast?.('右栏「创作助手」现在改这篇适配稿——说「钩子再狠点」试试') }}>🤖 让助手改这篇</button>
+                    )}
                     <button className="wb-btn-ghost" title="复制该适配稿（去 [素材N] 标记）" onClick={() => copyText(a.body)}>📋 复制</button>
+                    <button className="wb-btn-ghost" title="导出这篇为文件（长文=.md，其余=.txt）" onClick={() => exportOne(k)}>⬇ 导出</button>
+                    {!a.passthrough && (
+                      <button className="wb-btn-ghost" disabled={a.reBusy} title="丢弃这篇、按母稿重新适配一版（改坏了想回滚用）" onClick={() => readaptOne(k)}>{a.reBusy ? '重出中…' : '↻ 重出'}</button>
+                    )}
                     <span style={{ marginLeft: 'auto' }}>{render}</span>
                   </div>
                 </div>
