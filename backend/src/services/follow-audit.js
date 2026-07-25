@@ -51,6 +51,44 @@ const matchedSet = new Set(Object.keys(MATCHED).map(norm));
 const matchedNames = new Set(Object.values(MATCHED).map(norm));
 const excludedSet = new Set(Object.keys(EXCLUDED).map(norm));
 
+// 收拾灰色「X · 借道推送」（passive X 源，用户盘点后手动请求）：
+// ① 是你 X 关注的真作者（matched∪suggest）→ 升成「每日主动查询」并置 followed（替你关注、去灰）；
+// ② 有同名 active-query 源的重复借道项 → 归档并把内容并入 active 源（去重）；
+// ③ 其余灰色借道（AI HOT 顺带带来、非你关注）→ 归档（从信源页消失、内容保留，可恢复）。
+export function cleanupPassiveX() {
+  const wanted = new Set([...Object.keys(MATCHED), ...Object.keys(SUGGEST_NEW)].map(norm));
+  const db = getDatabase();
+  const activeQ = new Set(db.prepare("SELECT sp.handle FROM sources s JOIN source_platforms sp ON sp.source_id=s.id WHERE sp.platform='X' AND sp.track_mode='active-query' AND s.status='active'").all().map(r => norm(r.handle)));
+  const rows = db.prepare("SELECT s.id, sp.handle FROM sources s JOIN source_platforms sp ON sp.source_id=s.id WHERE sp.platform='X' AND sp.track_mode='passive' AND s.status='active'").all();
+  const findActiveQ = db.prepare("SELECT sp.source_id FROM source_platforms sp JOIN sources s ON s.id=sp.source_id WHERE sp.platform='X' AND sp.handle=? COLLATE NOCASE AND sp.track_mode='active-query' AND s.status='active'");
+  let followed = 0, deduped = 0, archived = 0;
+  db.exec('BEGIN');
+  try {
+    for (const r of rows) {
+      const h = norm(r.handle);
+      if (activeQ.has(h)) { // ② 重复借道 → 内容并入 active 源、本源归档
+        const tgt = findActiveQ.get(r.handle);
+        if (tgt && tgt.source_id !== r.id) {
+          db.prepare("UPDATE contents SET source_id=? WHERE source_id=?").run(tgt.source_id, r.id);
+          db.prepare("UPDATE sources SET status='archived', registered_by_user=0, updated_at=datetime('now') WHERE id=?").run(r.id);
+          deduped++; continue;
+        }
+      }
+      if (wanted.has(h)) { // ① 你的真作者 → 升采集 + 关注（去灰）
+        db.prepare("UPDATE source_platforms SET track_mode='active-query' WHERE source_id=? AND platform='X'").run(r.id);
+        db.prepare("UPDATE sources SET registered_by_user=1, updated_at=datetime('now') WHERE id=?").run(r.id);
+        followed++;
+      } else { // ③ 其余灰色借道 → 归档
+        db.prepare("UPDATE sources SET status='archived', registered_by_user=0, updated_at=datetime('now') WHERE id=?").run(r.id);
+        archived++;
+      }
+    }
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); db.close(); throw e; }
+  db.close();
+  return { followed, deduped, archived };
+}
+
 // 盘点数据（面板直接吃）：库内源分档 + 待新建两档 + N/35 采集计数基线。
 export function getFollowAudit() {
   const db = getDatabase();

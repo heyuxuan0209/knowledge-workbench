@@ -1661,6 +1661,11 @@ app.post('/api/sources/follow-audit/apply', async (req, res) => {
   try { const { applyFollowAudit } = await import('./services/follow-audit.js'); res.json({ success: true, data: applyFollowAudit(req.body || {}) }); }
   catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
+// 收拾灰色「X · 借道推送」：真作者升采集+关注、重复并入、其余归档（用户盘点后请求；归档可恢复）
+app.post('/api/sources/cleanup-passive-x', async (req, res) => {
+  try { const { cleanupPassiveX } = await import('./services/follow-audit.js'); res.json({ success: true, data: cleanupPassiveX() }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
 // 自助添加 X 账号（第4件）：建作者源 → 入 sync-x 采集名单；超 35 上限返回提示
 app.post('/api/sources/x-account', async (req, res) => {
   try { const { addXAccount } = await import('./services/sync-x.js'); res.json({ success: true, data: addXAccount(req.body || {}) }); }

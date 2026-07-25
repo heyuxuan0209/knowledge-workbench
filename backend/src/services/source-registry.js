@@ -457,7 +457,7 @@ export function listSources({ registeredOnly = false } = {}) {
            COUNT(c.id) AS content_count
     FROM sources s
     LEFT JOIN contents c ON c.source_id = s.id
-    ${registeredOnly ? 'WHERE s.registered_by_user = 1' : ''}
+    WHERE s.status != 'archived'${registeredOnly ? ' AND s.registered_by_user = 1' : ''}
     GROUP BY s.id
     ORDER BY s.registered_by_user DESC, content_count DESC, s.followed_since DESC
   `).all();
