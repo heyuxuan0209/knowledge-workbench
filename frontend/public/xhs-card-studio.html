@@ -85,6 +85,15 @@
   .brut.content .rule{display:none}
   .brut.content .body{font-weight:500;line-height:1.55;margin-top:40px;border-left:10px solid #C7F000;padding-left:28px}
 
+  /* ⑤ 暖刊（ADR-046 P3 主题统一：与竖版播放器同一套）：奶油底+赭石+衬线大字 */
+  .warm{--bg:#F2ECE0;--ink:#2C2820;--sub:#9A9488;--sub2:#7A7264;--accent:#C1633A;--line:#D8CDBA}
+  .warm.cover .big{font-family:'Newsreader',"Songti SC",serif;font-weight:700}
+  .warm.content .title{font-family:'Newsreader',"Songti SC",serif;font-weight:700}
+  /* ⑥ 午夜霓虹（发布会大屏）：蓝紫电光深底 */
+  .neon{--bg:#0E1016;--ink:#EEF1FB;--sub:#7078A0;--sub2:#AAB2CE;--accent:#8EA2FF;--line:#2A2F3A}
+  .neon.cover .big{color:#fff;font-weight:900;text-shadow:0 0 40px rgba(142,162,255,.4)}
+  .neon.content .num{font-weight:800}
+
   /* 9:16 抖音：放大字号+间距，填满竖版、去掉上下大留白（覆写所有风格，放最后靠源序生效） */
   .card.tall{padding:160px 100px}
   .card.tall.cover .mark{width:76px;height:76px;margin-bottom:64px}
@@ -120,13 +129,16 @@
 </div>
 
 <script>
+// ADR-046 P3：与竖版播放器统一为同一套主题（暖刊/午夜霓虹/Aesop/新粗野排前）；画廊/深色科技留作图卡额外可选
 const STYLES=[
-  {key:'gallery',name:'画廊深色'},
+  {key:'warm',name:'暖刊'},
+  {key:'neon',name:'午夜霓虹'},
   {key:'aesop',name:'Aesop 药房'},
-  {key:'dark',name:'深色科技'},
   {key:'brut',name:'新粗野'},
+  {key:'gallery',name:'画廊深色'},
+  {key:'dark',name:'深色科技'},
 ];
-let curStyle='gallery';
+let curStyle='warm';
 
 const DEMO=`【封面卡】大字：AI安全的「开关」来了／小字：不用重新训练，一次训练切出多个安全等级｜写给 AI 产品经理与开发者
 

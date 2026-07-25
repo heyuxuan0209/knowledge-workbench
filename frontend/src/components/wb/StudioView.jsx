@@ -251,7 +251,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [filmTheme, setFilmTheme] = useState('warm')      // 视觉主题（P1 占位，喂图卡渲染器）
   const CARD_FORMS = new Set(['xhs-card', 'douyin-card'])  // 走图卡渲染器
   const VIDEO_FORMS = new Set(['douyin-koubo', 'bilibili']) // 视频渲染器（P2，出片先占位）
-  const THEMES = [['warm', '暖莫兰迪', '#f2ede2', '#c9784e'], ['mono', '极简黑白', '#111', '#7fd1c0'], ['mag', '杂志编辑', '#f6f1e7', '#a24b3f'], ['macaron', '马卡龙', '#fbeef2', '#d98aa6']]
+  // ADR-046 P3 主题集（用户选定 4 版，与竖版播放器 vertical-player.html 的 th-* 一一对应）
+  const THEMES = [['warm', '暖刊', '#f2ece0', '#c1633a'], ['neon', '午夜霓虹', '#141833', '#8ea2ff'], ['aesop', 'Aesop 药房', '#E7E2D8', '#5A6247'], ['brut', '新粗野', '#FFFDF5', '#0A0A0A']]
   const toggleFilmForm = k => setFilmForms(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const adaptBatch = async () => {
     if (!studio.draft.trim()) { showToast('先在②定稿把母稿写好，再来出片'); return }

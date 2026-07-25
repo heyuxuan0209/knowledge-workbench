@@ -2,8 +2,10 @@
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>竖版分镜播放器</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&display=swap');
   /* ADR-046 P2a：竖版 9:16 分镜播放器（内容预览层，纯预览、零 TTS/零 API 花费）。
-     配音是产品里另一步、用户单独触发才花钱（ADR-038 半自动：这里出播放器+分镜稿，剪映收尾）。 */
+     配音是产品里另一步、用户单独触发才花钱（ADR-038 半自动：这里出播放器+分镜稿，剪映收尾）。
+     主题（ADR-046 P3，用户选定 4 版）：暖刊/午夜霓虹(发布会)/Aesop药房/新粗野——皮肤按 .stage.th-* 覆写。 */
   *{box-sizing:border-box;margin:0;padding:0}
   :root{--bg:#f2ede2;--ink:#2b2924;--sub:#6b6459;--accent:#c9784e;--line:rgba(43,41,36,.14);--panel:#faf8f2}
   body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;background:#e9e4da;color:var(--ink);height:100vh;overflow:hidden}
@@ -20,6 +22,39 @@
   .capline{font-size:3.4vh;font-weight:600;line-height:1.5;color:var(--ink);background:rgba(255,255,255,.66);backdrop-filter:blur(3px);border-radius:14px;padding:1.4vh 2.6vh;max-width:100%;opacity:0}
   .badge{position:absolute;top:3.2%;left:5%;font-size:2vh;color:var(--accent);background:rgba(0,0,0,.05);border-radius:8px;padding:.5vh 1.4vh;font-weight:700;opacity:.9}
   .brand{position:absolute;bottom:3%;right:5%;font-size:2vh;color:var(--sub);opacity:.75}
+  /* ===== 4 主题皮肤（.stage.th-*；只覆写颜色/字体/装饰，布局不变） ===== */
+  /* 1 暖刊：奶油底 + 赭石 + 衬线 */
+  .stage.th-warm{background:#f2ece0}
+  .th-warm .kicker{color:#b06a3c}
+  .th-warm .kw{color:#2c2820;font-family:'Newsreader',"Songti SC",serif;font-weight:700}
+  .th-warm .sub{color:#7a7264}
+  .th-warm .capline{background:rgba(255,255,255,.72);color:#3a352c}
+  .th-warm .badge{color:#b06a3c;background:rgba(0,0,0,.05)}
+  .th-warm .brand{color:#9a9488}
+  /* 2 午夜霓虹（发布会大屏）：蓝紫电光 + 辉光 + 玻璃字幕 */
+  .stage.th-neon{background:radial-gradient(130% 80% at 50% -8%,#1a1f3a 0%,#0a0b12 62%)}
+  .th-neon .kicker{color:#8ea2ff;letter-spacing:.3em}
+  .th-neon .kw{color:#eef1fb;font-weight:900;text-shadow:0 0 26px rgba(142,162,255,.34)}
+  .th-neon .sub{color:#aab2ce}
+  .th-neon .capline{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);color:#eef1fb}
+  .th-neon .badge{color:#8ea2ff;background:rgba(255,255,255,.07)}
+  .th-neon .brand{color:#7078a0}
+  /* 3 Aesop 药房：米灰 + 橄榄绿（搬自图卡工具风格） */
+  .stage.th-aesop{background:#E7E2D8}
+  .th-aesop .kicker{color:#5A6247}
+  .th-aesop .kw{color:#1B1A17;font-weight:700}
+  .th-aesop .sub{color:#6B6459}
+  .th-aesop .capline{background:rgba(255,255,255,.6);color:#3d3a33}
+  .th-aesop .badge{color:#5A6247;background:rgba(0,0,0,.05)}
+  .th-aesop .brand{color:#8a8478}
+  /* 4 新粗野：荧光绿块 + 黑硬边字幕（搬自图卡工具风格） */
+  .stage.th-brut{background:#FFFDF5}
+  .th-brut .kicker{background:#0A0A0A;color:#C7F000;padding:.6vh 1.6vh;letter-spacing:.06em;border-radius:0}
+  .th-brut .kw{color:#0A0A0A;font-weight:900;background:#C7F000;padding:.5vh 1.6vh;line-height:1.34}
+  .th-brut .sub{color:#0A0A0A;font-weight:600}
+  .th-brut .capline{background:#fff;color:#0A0A0A;border:3px solid #0A0A0A;border-radius:0;box-shadow:6px 6px 0 #0A0A0A;backdrop-filter:none;font-weight:600}
+  .th-brut .badge{color:#0A0A0A;background:#C7F000;border-radius:0}
+  .th-brut .brand{color:#0A0A0A;opacity:.55}
   .rv-in{animation:rvin .5s cubic-bezier(.2,.7,.3,1) forwards}
   @keyframes rvin{from{opacity:0;transform:translateY(2.2vh)}to{opacity:1;transform:none}}
   .progress{position:absolute;top:0;left:0;height:4px;background:var(--accent);width:0;transition:width .12s linear}
@@ -46,7 +81,7 @@
 </style></head>
 <body>
 <div class="wrap">
-  <div class="stagebox">
+  <div class="stagebox" id="stagebox">
     <div class="progress" id="prog"></div>
     <div class="stage" id="stage">
       <div class="empty" id="empty">分镜生成后在这里竖版播放…</div>
@@ -80,11 +115,12 @@
   </div>
 </div>
 <script>
+  // ADR-046 P3 用户选定 4 版；sw=选色器底色，fg=选色器字色，short=选色器短标，label=全名
   const THEMES = {
-    warm:{bg:'#f2ede2',ink:'#2b2924',sub:'#6b6459',accent:'#c9784e',label:'暖'},
-    mono:{bg:'#111111',ink:'#f5f5f5',sub:'#a8a8a8',accent:'#7fd1c0',label:'黑'},
-    mag:{bg:'#f6f1e7',ink:'#211f1a',sub:'#6b6459',accent:'#a24b3f',label:'志'},
-    macaron:{bg:'#fbeef2',ink:'#33262b',sub:'#7a6b70',accent:'#d98aa6',label:'糖'},
+    warm:{label:'暖刊', short:'暖', sw:'#f2ece0', fg:'#c1633a'},
+    neon:{label:'午夜霓虹', short:'夜', sw:'#141833', fg:'#8ea2ff'},
+    aesop:{label:'Aesop 药房', short:'A', sw:'#E7E2D8', fg:'#5A6247'},
+    brut:{label:'新粗野', short:'野', sw:'#FFFDF5', fg:'#0A0A0A'},
   };
   let STORY = { title:'', scenes:[] };
   let theme = 'warm';
@@ -100,20 +136,18 @@
 
   const $ = id => document.getElementById(id);
   function applyTheme(k){
-    theme = k; const c = THEMES[k];
-    document.documentElement.style.setProperty('--bg', c.bg);
-    document.documentElement.style.setProperty('--ink', c.ink);
-    document.documentElement.style.setProperty('--sub', c.sub);
-    document.documentElement.style.setProperty('--accent', c.accent);
-    $('stage').style.background = c.bg;
+    if(!THEMES[k]) k='warm';
+    theme = k;
+    $('stage').className = 'stage th-'+k;   // 皮肤靠 class 覆写（innerHTML 不动 class，持久）
+    $('stagebox').style.background = THEMES[k].sw;
     [...document.querySelectorAll('.th')].forEach(el=>el.classList.toggle('on', el.dataset.k===k));
   }
   function renderThemes(){
     $('themes').innerHTML = '';
     Object.entries(THEMES).forEach(([k,c])=>{
       const d = document.createElement('div');
-      d.className = 'th'+(k===theme?' on':''); d.dataset.k=k;
-      d.style.background=c.bg; d.style.color=c.accent; d.textContent=c.label;
+      d.className = 'th'+(k===theme?' on':''); d.dataset.k=k; d.title=c.label;
+      d.style.background=c.sw; d.style.color=c.fg; d.textContent=c.short;
       d.onclick=()=>applyTheme(k);
       $('themes').appendChild(d);
     });
