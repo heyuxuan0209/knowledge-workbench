@@ -468,6 +468,16 @@ app.get('/api/studio/platform-forms', async (req, res) => {
   }
 });
 
+// ADR-052 P3 声音层（可选·软层，第四条正交轴）
+app.get('/api/studio/voices', async (req, res) => {
+  try {
+    const { listVoices } = await import('./services/creation-prompts.js');
+    res.json({ success: true, data: listVoices().map(({ key, label, icon, note, when }) => ({ key, label, icon, note, when })) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 某主题的已并入素材列表（供创作台勾选用）
 app.get('/api/topics/:id/materials', async (req, res) => {
   try {
@@ -482,11 +492,11 @@ app.get('/api/topics/:id/materials', async (req, res) => {
 // selectedNoteIds 非空 → 只用勾选的素材（ADR-028 阶段1）
 app.post('/api/topics/:id/draft-v2', async (req, res) => {
   try {
-    const { genre, platformForm, viewpoint, selectedNoteIds } = req.body || {};
+    const { genre, platformForm, viewpoint, selectedNoteIds, voice } = req.body || {};
     if (!genre || !platformForm) return res.status(400).json({ success: false, error: 'genre 和 platformForm 必填' });
     const ids = Array.isArray(selectedNoteIds) && selectedNoteIds.length ? selectedNoteIds : null;
     const { generateFromTopicV2 } = await import('./services/draft-generation.js');
-    const draft = await generateFromTopicV2(req.params.id, genre, platformForm, viewpoint || null, ids);
+    const draft = await generateFromTopicV2(req.params.id, genre, platformForm, viewpoint || null, ids, voice || null);
     res.json({ success: true, data: draft });
   } catch (error) {
     const status = error.message === 'Topic not found' ? 404 : 500;
@@ -519,11 +529,11 @@ app.post('/api/materials/recommend', async (req, res) => {
 // 按选中素材生成（无需主题）
 app.post('/api/materials/draft-v2', async (req, res) => {
   try {
-    const { genre, platformForm, viewpoint, selectedNoteIds } = req.body || {};
+    const { genre, platformForm, viewpoint, selectedNoteIds, voice } = req.body || {};
     if (!genre || !platformForm) return res.status(400).json({ success: false, error: 'genre 和 platformForm 必填' });
     if (!Array.isArray(selectedNoteIds) || !selectedNoteIds.length) return res.status(400).json({ success: false, error: '至少选 1 条素材' });
     const { generateFromMaterials } = await import('./services/draft-generation.js');
-    const draft = await generateFromMaterials(selectedNoteIds, genre, platformForm, viewpoint || null);
+    const draft = await generateFromMaterials(selectedNoteIds, genre, platformForm, viewpoint || null, voice || null);
     res.json({ success: true, data: draft });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -534,11 +544,11 @@ app.post('/api/materials/draft-v2', async (req, res) => {
 // 用于"从灵感带稿去创作"——带过来的是你的原文，选好文体/平台点「用这个生成/重新生成」即走这里。
 app.post('/api/studio/reshape', async (req, res) => {
   try {
-    const { draft, genre, platformForm, viewpoint } = req.body || {};
+    const { draft, genre, platformForm, viewpoint, voice } = req.body || {};
     if (!genre || !platformForm) return res.status(400).json({ success: false, error: 'genre 和 platformForm 必填' });
     if (!draft?.trim()) return res.status(400).json({ success: false, error: '草稿为空——先在编辑器里写/带一段内容' });
     const { generateFromDraft } = await import('./services/draft-generation.js');
-    const result = await generateFromDraft(draft, genre, platformForm, viewpoint || null);
+    const result = await generateFromDraft(draft, genre, platformForm, viewpoint || null, voice || null);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

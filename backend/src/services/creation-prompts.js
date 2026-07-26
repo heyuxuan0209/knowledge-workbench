@@ -97,11 +97,21 @@ function listSpecsIn(subdir) {
 
 export function listGenres() { return listSpecsIn('genres'); }
 export function listPlatformForms() { return listSpecsIn('platform-forms'); }
+// ADR-052 P3：声音层（第四条正交轴，只调口吻；软层可选）。目录空/缺则返回空，不阻塞创作。
+export function listVoices() {
+  try { return listSpecsIn('voices'); } catch { return []; }
+}
 
 export function getGenre(key) {
   const g = listGenres().find(x => x.key === key);
   if (!g) throw new Error(`未知文体「${key}」（可用：${listGenres().map(x => x.key).join('/')}）`);
   return g;
+}
+
+// 声音可空（软层）：key 为空/未知返回 null，调用方不追加声音段，行为回落到"只有文体×平台形态"
+export function getVoice(key) {
+  if (!key) return null;
+  return listVoices().find(x => x.key === key) || null;
 }
 
 export function getPlatformForm(key) {

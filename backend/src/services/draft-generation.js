@@ -1,7 +1,13 @@
 import { getDatabase } from '../db/init.js';
 import { chat } from './llm.js';
 import { createDraft } from '../db/drafts.js';
-import { loadPrompt, render, getPlatform, getGenre, getPlatformForm } from './creation-prompts.js';
+import { loadPrompt, render, getPlatform, getGenre, getPlatformForm, getVoice } from './creation-prompts.js';
+
+// ADR-052 P3 声音层（软层·可选）：选了才追加一段口吻规则；作者身份仍由 draft-frame 全局锚定、不被覆盖。
+function voiceBlock(voiceKey) {
+  const v = getVoice(voiceKey);
+  return v ? `\n\n---\n\n【声音·可选】\n${v.spec}` : '';
+}
 
 // M4 创作层生成引擎：同一素材集（活页 + 已并入素材卡），按平台分化输出。
 // 平台规格 / 起稿框架 / 立场块的全部语言规范在 reference/prompts/creation/
@@ -204,7 +210,7 @@ function buildPromptV2(topic, body, notes, composedSpec, viewpoint, skipOverview
   });
 }
 
-export async function generateFromTopicV2(topicId, genreKey, platformFormKey, viewpoint = null, selectedNoteIds = null) {
+export async function generateFromTopicV2(topicId, genreKey, platformFormKey, viewpoint = null, selectedNoteIds = null, voiceKey = null) {
   const genre = getGenre(genreKey);           // 未知文体在此抛错（附可用清单）
   const pform = getPlatformForm(platformFormKey);
   const firstPerson = FIRST_PERSON_GENRES.includes(genreKey);
@@ -216,7 +222,7 @@ export async function generateFromTopicV2(topicId, genreKey, platformFormKey, vi
   if (materialsPicked) exemption += `【只用选中素材·ADR-028】本篇只基于下方勾选的 ${selectedNoteIds.length} 条素材创作；**不要引入主题页综述、也不要引入任何未勾选的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】本篇是第一人称亲历文体：[素材N] 溯源只在"引用外部信息/数据"时标，不对你自己的经历强制标注。底线不变：用到外部信息照样必须标、不许编。\n\n`;
   const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
-  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}`;
 
   const { topic, body, notes } = gatherTopicMaterials(topicId, selectedNoteIds);
   console.log(`  ↳ 生成用素材：${materialsPicked ? `选中 ${notes.length} 条（跳过主题综述）` : `主题全部 ${notes.length} 条`}`);
@@ -284,7 +290,7 @@ export async function adaptDraftToForm(draftText, platformFormKey, viewpoint = n
 
 // ── ADR-028 阶段1·B：不依赖主题，直接按一组素材 id 生成 ──
 // 从整个素材库挑的素材集 → 生成，永远只用这些、无主题综述。
-export async function generateFromMaterials(noteIds, genreKey, platformFormKey, viewpoint = null) {
+export async function generateFromMaterials(noteIds, genreKey, platformFormKey, viewpoint = null, voiceKey = null) {
   if (!Array.isArray(noteIds) || !noteIds.length) throw new Error('至少选 1 条素材');
   const genre = getGenre(genreKey);
   const pform = getPlatformForm(platformFormKey);
@@ -299,7 +305,7 @@ export async function generateFromMaterials(noteIds, genreKey, platformFormKey, 
   let exemption = `【只用选中素材·ADR-028】本篇只基于下方 ${notes.length} 条素材创作；**不要引入任何未提供的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】第一人称亲历文体：[素材N] 只在引用外部信息时标。底线不变：用到外部信息照样标、不许编。\n\n`;
   const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
-  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}`;
 
   // 无主题：造一个最小 topic + 空 body，skipOverview=true（不塞综述）
   const result = await chat([{ role: 'user', content: buildPromptV2({ name: '自选素材', description: '' }, {}, notes, composedSpec, viewpoint, true) }]);
@@ -321,7 +327,7 @@ export async function generateFromMaterials(noteIds, genreKey, platformFormKey, 
 // ── ADR-035 带稿去创作：把用户自己写的草稿按 文体×平台形态 重塑 ──
 // 与 generateFromMaterials 分工：那条从素材"写新的"，这条把"你已有的原文"重塑成目标形态——
 // 不需要素材、不强制 [素材N] 溯源（是你自己的字），保留原意与事实、不新增不编造。
-export async function generateFromDraft(draftText, genreKey, platformFormKey, viewpoint = null) {
+export async function generateFromDraft(draftText, genreKey, platformFormKey, viewpoint = null, voiceKey = null) {
   const src = String(draftText || '').trim();
   if (src.length < 10) throw new Error('草稿太短——先在编辑器里写/带一段内容再重塑');
   const genre = getGenre(genreKey);           // 未知文体在此抛错（附可用清单）
@@ -332,7 +338,7 @@ export async function generateFromDraft(draftText, genreKey, platformFormKey, vi
   const stanceBlock = viewpoint?.trim()
     ? render(loadPrompt('stance-with.md'), { viewpoint: viewpoint.trim() })
     : loadPrompt('stance-without.md');
-  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}`;
 
   const prompt = `${composedSpec}\n\n---\n\n${stanceBlock}\n\n---\n\n【作者的草稿】\n${src.slice(0, 8000)}\n\n---\n\n现在按上面的「文体骨架 × 平台形态」，把「作者的草稿」重塑成一篇干净、可直接发布的成稿。\n**只输出成稿本身**：不要复述文体名/平台名、不要加「XX体 · XX版」这类规格性小标题、不要任何前言或解释。第一行直接是成稿的开头（标题或正文首句）。`;
 

@@ -21,6 +21,9 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [pforms, setPforms] = useState([])
   const [v2Genre, setV2Genre] = useState('读书精读体')   // 默认=推荐
   const [v2Pform, setV2Pform] = useState('gzh-long')
+  const [voices, setVoices] = useState([])              // ADR-052 P3 声音层（可选）
+  const [v2Voice, setV2Voice] = useState('')            // '' = 无声音（默认，行为不变）
+  const vLabel = k => voices.find(v => v.key === k)?.label || k
   const [openDD, setOpenDD] = useState(null)            // 'genre' | 'platform' | null
   const [combosOpen, setCombosOpen] = useState(false)
   const [recReason, setRecReason] = useState('')        // 推荐理由（基于素材）
@@ -40,8 +43,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     if (!v2Mode || genres.length) return
     ;(async () => {
       try {
-        const [g, p] = await Promise.all([api('/api/studio/genres'), api('/api/studio/platform-forms')])
-        setGenres(g.data || []); setPforms(p.data || [])
+        const [g, p, v] = await Promise.all([api('/api/studio/genres'), api('/api/studio/platform-forms'), api('/api/studio/voices')])
+        setGenres(g.data || []); setPforms(p.data || []); setVoices(v.data || [])
       } catch (err) { showToast('文体/平台形态加载失败：' + err.message) }
     })()
   }, [v2Mode])
@@ -146,13 +149,13 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setStudio(s => ({ ...s, busy: true, draft: s.draft || '正在按 文体×平台 起稿（约 30 秒）…' }))
     try {
       if (draftReshape) {
-        const json = await api('/api/studio/reshape', { method: 'POST', body: { draft: studio.draft, genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null } })
+        const json = await api('/api/studio/reshape', { method: 'POST', body: { draft: studio.draft, genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null, voice: v2Voice || null } })
         const d = json.data
         setStudio(s => ({ ...s, busy: false, draft: d.body, title: d.title, draftId: d.id, platform: d.platform, paragraphRefs: [], refs: [] }))
         showToast(`已按「${gl}」重塑成母稿（¥${d.cost_yuan?.toFixed(3)}）`)
         return
       }
-      const json = await api('/api/materials/draft-v2', { method: 'POST', body: { genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null, selectedNoteIds: [...selMat] } })
+      const json = await api('/api/materials/draft-v2', { method: 'POST', body: { genre: v2Genre, platformForm: v2Pform, viewpoint: studio.viewpoint || null, selectedNoteIds: [...selMat], voice: v2Voice || null } })
       const d = json.data
       setStudio(s => ({
         ...s, busy: false, draft: d.body, title: d.title, draftId: d.id, platform: d.platform,
@@ -564,6 +567,21 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                   </div>
                 )}
               </div>
+              {voices.length > 0 && (
+                <div style={{ position: 'relative' }}>
+                  <span style={{ cursor: 'pointer' }} onClick={() => { setCombosOpen(false); setOpenDD(openDD === 'voice' ? null : 'voice') }}>声音：{v2Voice ? vLabel(v2Voice) : '无'} ▾</span>
+                  {openDD === 'voice' && (
+                    <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line10)', borderRadius: 10, boxShadow: '0 8px 24px rgba(33,31,26,.14)', padding: 5, minWidth: 200 }}>
+                      <div onClick={() => { setV2Voice(''); setOpenDD(null) }}
+                        style={{ padding: '8px 10px', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: !v2Voice ? 'var(--accent)' : 'var(--body)', background: !v2Voice ? 'rgba(61,90,128,.07)' : 'transparent' }}>无（默认·跟文体走）</div>
+                      {voices.map(v => (
+                        <div key={v.key} onClick={() => { setV2Voice(v.key); setOpenDD(null) }} title={v.note}
+                          style={{ padding: '8px 10px', borderRadius: 7, fontSize: 13, cursor: 'pointer', color: v2Voice === v.key ? 'var(--accent)' : 'var(--body)', background: v2Voice === v.key ? 'rgba(61,90,128,.07)' : 'transparent' }}>{v.label}<span style={{ fontSize: 10.5, color: 'var(--faint)', marginLeft: 6 }}>{v.note}</span></div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <span style={{ cursor: 'pointer' }} onClick={() => { setOpenDD(null); setCombosOpen(o => !o) }}>更多文体 ▾</span>
             </div>
 
