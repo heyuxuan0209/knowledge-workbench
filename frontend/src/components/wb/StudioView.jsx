@@ -24,6 +24,16 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [voices, setVoices] = useState([])              // ADR-052 P3 声音层（可选）
   const [v2Voice, setV2Voice] = useState('')            // '' = 无声音（默认，行为不变）
   const vLabel = k => voices.find(v => v.key === k)?.label || k
+  // ADR-052 P4 联动：一次「系列风格」→ 头图皮肤 + 排版主题 + 默认声音（声音仍可覆盖=软绑定）
+  const [seriesPresets, setSeriesPresets] = useState([])
+  const [seriesPreset, setSeriesPreset] = useState('')  // '' = 无（各自手选）
+  const curPreset = seriesPresets.find(p => p.id === seriesPreset) || null
+  const pickSeries = (id) => {
+    setSeriesPreset(id)
+    const p = seriesPresets.find(x => x.id === id)
+    if (p) { setV2Voice(p.default_voice || ''); showToast(`已按「${p.name}」联动：头图皮肤 + 排版主题 + 声音（声音可再改）`) }
+    else showToast('已取消系列风格联动')
+  }
   const [openDD, setOpenDD] = useState(null)            // 'genre' | 'platform' | null
   const [combosOpen, setCombosOpen] = useState(false)
   const [recReason, setRecReason] = useState('')        // 推荐理由（基于素材）
@@ -43,8 +53,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     if (!v2Mode || genres.length) return
     ;(async () => {
       try {
-        const [g, p, v] = await Promise.all([api('/api/studio/genres'), api('/api/studio/platform-forms'), api('/api/studio/voices')])
-        setGenres(g.data || []); setPforms(p.data || []); setVoices(v.data || [])
+        const [g, p, v, sp] = await Promise.all([api('/api/studio/genres'), api('/api/studio/platform-forms'), api('/api/studio/voices'), api('/api/studio/series-presets')])
+        setGenres(g.data || []); setPforms(p.data || []); setVoices(v.data || []); setSeriesPresets(sp.data || [])
       } catch (err) { showToast('文体/平台形态加载失败：' + err.message) }
     })()
   }, [v2Mode])
@@ -538,6 +548,18 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             </div>
 
             {studioTab === 'edit' && (<>
+            {seriesPresets.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10, padding: '9px 11px', background: 'rgba(61,90,128,.05)', border: '1px solid rgba(61,90,128,.18)', borderRadius: 9 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>🎨 系列风格</span>
+                <span style={{ fontSize: 11, color: 'var(--sub2)' }}>选一次联动 头图皮肤 + 排版主题 + 声音</span>
+                <span style={{ flex: 1 }} />
+                <span onClick={() => pickSeries('')} style={{ cursor: 'pointer', fontSize: 12, border: '1px solid var(--line10)', background: !seriesPreset ? 'var(--accent)' : 'var(--surface)', color: !seriesPreset ? '#fff' : 'var(--body)', borderRadius: 14, padding: '4px 11px' }}>无</span>
+                {seriesPresets.map(p => (
+                  <span key={p.id} onClick={() => pickSeries(p.id)} title={`头图 ${p.cover_skin} · 排版 ${p.article_theme} · 声音 ${p.default_voice}`}
+                    style={{ cursor: 'pointer', fontSize: 12, border: '1px solid var(--line10)', background: seriesPreset === p.id ? 'var(--accent)' : 'var(--surface)', color: seriesPreset === p.id ? '#fff' : 'var(--body)', borderRadius: 14, padding: '4px 11px' }}>{p.name}</span>
+                ))}
+              </div>
+            )}
             <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 9 }}>
               {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议文体：` : reshapeMode ? '你带来的稿在下面——选好文体，点「用这个生成母稿」重塑：' : '勾选左侧素材，或直接在下面编辑器写/带一段草稿，选文体生成母稿：'}
             </div>
@@ -657,7 +679,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 readaptOne={readaptOne} exportOne={exportOne} exportAll={exportAll}
                 THEMES={THEMES} filmTheme={filmTheme} setFilmTheme={setFilmTheme} setStudioTab={setStudioTab}
                 filmActiveForm={filmActiveForm} setFilmActiveForm={setFilmActiveForm} showToast={showToast}
-                defaultTitle={studio.title || ''} />
+                defaultTitle={studio.title || ''}
+                boundPreset={seriesPreset} boundTheme={curPreset?.article_theme || ''} seriesName={curPreset?.name || ''} />
             )}
           </section>
 
@@ -776,7 +799,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 // P1 渲染只接：图卡渲染器（小红书/抖音卡片）+ 公众号长文直用；视频渲染器(hyperframes)是 P2 占位。
 function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setAdapted, adaptBusy, adaptBatch,
   CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, openVideoFor, videoBusy, readaptOne, exportOne, exportAll,
-  THEMES, filmTheme, setFilmTheme, setStudioTab, filmActiveForm, setFilmActiveForm, showToast, defaultTitle }) {
+  THEMES, filmTheme, setFilmTheme, setStudioTab, filmActiveForm, setFilmActiveForm, showToast, defaultTitle,
+  boundPreset, boundTheme, seriesName }) {
   const pf = k => pforms.find(p => p.key === k) || { key: k, label: k, icon: '📝', note: '' }
   const rendHint = k => k === 'gzh-long' ? '长文体 · 直用母稿' : CARD_FORMS.has(k) ? '卡片体 · 图卡渲染器' : VIDEO_FORMS.has(k) ? '口播体 · 竖版分镜播放器' : '文案 · 复制发布'
   const editBody = (k, v) => setAdapted(a => ({ ...a, [k]: { ...a[k], body: v } }))
@@ -904,21 +928,23 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
       </div>
 
       {/* ④ 公众号头图（ADR-052 P1 · AI 观察手记系列）：字段 → 双尺寸 PNG */}
-      <CoverPanel showToast={showToast} defaultTitle={defaultTitle} />
+      <CoverPanel showToast={showToast} defaultTitle={defaultTitle} boundPreset={boundPreset} seriesName={seriesName} />
 
       {/* ⑤ 公众号排版（ADR-052 P2 · vendored gzh-design）：定稿 → 合规 HTML */}
-      <TypesetPanel showToast={showToast} articleMd={adapted['gzh-long']?.body || ''} />
+      <TypesetPanel showToast={showToast} articleMd={adapted['gzh-long']?.body || ''} boundTheme={boundTheme} seriesName={seriesName} />
     </>
   )
 }
 
 // ADR-052 P2 排版面板：选主题 → LLM 装配 + 校验兜底 → 合规公众号 HTML；预览 + 复制到公众号 + 下载。
-function TypesetPanel({ showToast, articleMd }) {
+function TypesetPanel({ showToast, articleMd, boundTheme, seriesName }) {
   const [themes, setThemes] = useState([])
   const [theme, setTheme] = useState('olive-journal')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null) // { html, errors, warnings, leaf }
   useEffect(() => { (async () => { try { const j = await api('/api/studio/article-themes'); setThemes(j.data || []) } catch { /* 静默 */ } })() }, [])
+  // P4 联动：定稿选了系列风格 → 排版主题跟随（仍可手改=软绑定）
+  useEffect(() => { if (boundTheme) setTheme(boundTheme) }, [boundTheme])
   const gen = async () => {
     if (!articleMd?.trim()) { showToast('先在②一键适配母稿，把「公众号长文」备好'); return }
     setBusy(true); showToast('正在排版（LLM 装配 + 合规校验，约 40–90 秒）…')
@@ -945,7 +971,7 @@ function TypesetPanel({ showToast, articleMd }) {
     <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginTop: 11, background: 'var(--surface)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>⑤ 公众号排版 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· 定稿 → 可粘贴公众号的合规 HTML（LLM 装配 + 校验兜底）</span></div>
       {!articleMd?.trim() && <div style={{ fontSize: 11.5, color: 'var(--faint)', marginBottom: 8 }}>先在②「一键适配母稿」把公众号长文备好，再来排版。</div>}
-      <div style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, margin: '8px 0 6px' }}>排版主题</div>
+      <div style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, margin: '8px 0 6px' }}>排版主题{boundTheme && seriesName && <span style={{ fontWeight: 400, color: 'var(--accent)', marginLeft: 6 }}>· 已跟随定稿的「{seriesName}」（可改）</span>}</div>
       <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 12 }}>
         {themes.map(t => (
           <span key={t.key} onClick={() => setTheme(t.key)} title={t.hint}
@@ -994,13 +1020,15 @@ function CoverField({ label, k, ph, area, f, set }) {
 
 // ADR-052 P1 头图面板：选系列风格 + 填期刊字段 → 生成双尺寸 PNG（消息大图 1800×766 + 方图 2000×2000）。
 // title_html 只让用户填「主标题 + 点睛词」，UI 自动包一个 <span class="ul">（守 ux-no-raw-numbers，用户零 HTML）。
-function CoverPanel({ showToast, defaultTitle }) {
+function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
   const [presets, setPresets] = useState([])
   const [preset, setPreset] = useState('ticket-brisk')
   const [f, setF] = useState({ name: 'AI 观察手记', issue_event: '', badge: '', kicker: '', title: defaultTitle || '', keyword: '', author_html: '', tag: '深度精读' })
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)  // { wide:{base64,w,h}, square:{...} }
   useEffect(() => { (async () => { try { const j = await api('/api/studio/series-presets'); setPresets(j.data || []) } catch { /* 静默 */ } })() }, [])
+  // P4 联动：定稿选了系列风格 → 头图预设跟随（仍可在下面手改=软绑定）
+  useEffect(() => { if (boundPreset) setPreset(boundPreset) }, [boundPreset])
   const set = (k, v) => setF(s => ({ ...s, [k]: v }))
   const BADGES = [['', '无（默认隐藏）'], ['▶ YouTube', '▶ YouTube'], ['𝕏', '𝕏 Twitter'], ['✎ Blog', '✎ Blog'], ['🎧 播客', '🎧 播客'], ['🎤 现场', '🎤 现场'], ['⚡ 黑客松', '⚡ 黑客松']]
   const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1025,7 +1053,7 @@ function CoverPanel({ showToast, defaultTitle }) {
     <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginTop: 11, background: 'var(--surface)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>④ 公众号头图 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· AI 观察手记系列 · 字段 → 双尺寸 PNG</span></div>
       <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 10 }}>选系列风格 + 填期刊字段，出「消息大图 1800×766 + 方图 2000×2000」。</div>
-      <div style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginBottom: 6 }}>系列风格</div>
+      <div style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginBottom: 6 }}>系列风格{boundPreset && seriesName && <span style={{ fontWeight: 400, color: 'var(--accent)', marginLeft: 6 }}>· 已跟随定稿的「{seriesName}」（可改）</span>}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         {presets.map(p => (
           <span key={p.id} onClick={() => setPreset(p.id)}
