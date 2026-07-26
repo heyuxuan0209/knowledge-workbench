@@ -24,8 +24,14 @@ export async function filterRelevant(items) {
   const list = items.map((it, i) => `${i}. ${it.title}`).join('\n');
   const result = await chat([{
     role: 'user',
-    content: `逐条判断以下标题是否与「AI / 软件工程 / 科技产品与创业」相关。
-纯社会新闻、慈善捐赠、健康生活、政治等无关内容判 false。
+    content: `这是给 AI 从业者看的情报流。逐条判断标题是否**以 AI 为核心**、或直接的软件工程 / 科技产品与创业。
+
+判 true：AI 模型/产品/Agent/研究/应用/工具、软件工程与开发、科技产品、科技创业与投资。
+判 false（即使作者是技术人写的、即使沾一点边也算 false）：
+  心理学/哲学/认知科学、健康与生活方式、消费硬件评测（睡眠/穿戴等）、政治/社会/时事、
+  慈善捐赠、体育娱乐、旅行美食、纯个人随笔、非科技的社会评论。
+拿不准或明显跑题的一律判 false——宁缺毋滥，别让非 AI 噪音灌进来。
+
 必须回带每条的序号 i（就是下面给的编号，别改、别合并、别漏）。
 只输出 JSON（不要代码块）：{"results": [{"i": 0, "relevant": true}, {"i": 1, "relevant": false}, ...]}
 

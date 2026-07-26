@@ -120,6 +120,8 @@ export function getContents(limit = 20, offset = 0, { q = null, starred = false,
   // q/starred（2026-07-16 反馈 #2）：Feed 搜索与星标过滤，与素材库同款多关键词 AND 语义。
   // 星标视图不排除 GitHub 项目——星标是用户主动选择，不受"不混入资讯流"规则限制
   const where = [];
+  // feed 默认隐藏归档内容（陈旧/非AI，m25）；star 视图不隐藏——你 star 过的资产随时能翻到
+  if (!starred) where.push('c.archived = 0');
   if (!starred) where.push("c.source_app != 'github_trending'");
   const params = [];
   if (q?.trim()) {

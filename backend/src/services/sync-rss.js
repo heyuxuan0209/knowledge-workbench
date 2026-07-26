@@ -33,7 +33,7 @@ async function getConfiguredRSSFeeds() {
     const { getDatabase } = await import('../db/init.js');
     const db = getDatabase();
     const rows = db.prepare(`
-      SELECT sp.handle AS feed_url, sp.platform, sp.platform_metadata, s.display_name
+      SELECT sp.handle AS feed_url, sp.platform, sp.platform_metadata, s.display_name, s.registered_by_user
       FROM source_platforms sp
       JOIN sources s ON sp.source_id = s.id
       WHERE sp.track_mode = 'active-rss' AND s.status = 'active'
@@ -45,7 +45,8 @@ async function getConfiguredRSSFeeds() {
       if (url?.startsWith('http')) {
         feeds.add(url);
         // handle 用登记时的 row.feed_url（findOrCreateSource 按 platform+handle 精确匹配才 link 得上）
-        sourceMap.set(url, { platform: row.platform, handle: row.feed_url, displayName: row.display_name });
+        // registered：你主动登记的优质源——时间窗豁免（更新慢也留），只按 AI 相关性过滤
+        sourceMap.set(url, { platform: row.platform, handle: row.feed_url, displayName: row.display_name, registered: !!row.registered_by_user });
       }
     }
   } catch (error) {
@@ -101,6 +102,10 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
         const t = transformRSSItem(item, item.feedUrl, item.feedTitle);
         // 登记源的 feed → 全部条目归属该源（覆盖默认 creator 解析，platform/handle 对齐登记，才 link 得上）
         const src = sourceMap.get(item.feedUrl);
+        // 近 30 天窗口：只砍**未登记杂源**的陈旧存量；你登记的优质源豁免（更新慢也留，只按 AI 相关性过滤）。
+        // 无 pubDate 解析不出来的保留，宁可留。
+        const pub = new Date(t.content.published_at).getTime();
+        if (pub && pub < Date.now() - 30 * 864e5 && !src?.registered) return null;
         return src ? { content: t.content, sourceInfo: { displayName: src.displayName, platform: src.platform, handle: src.handle } } : t;
       } catch { return null; }
     }).filter(Boolean);
