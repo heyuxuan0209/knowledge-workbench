@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { timeAgo, TYPE_LABEL, api, platformLabel } from './util'
-import { IconExternal, IconPin, IconTarget, IconFlame, IconMedal, IconStar, IconCheck, IconPlusTrack, IconBookOpen, IconBulb, IconChevronRight } from './Icons'
+import { IconExternal, IconPin, IconTarget, IconFlame, IconMedal, IconStar, IconCheck, IconPlusTrack, IconBookOpen, IconBulb, IconChevronRight, IconWarn, IconMegaphone, IconSparkle, IconRefresh, IconX, IconCirclePlus } from './Icons'
 import '../../styles/feed-final.css'
 import { renderMarkdown } from './markdown'
 
@@ -95,7 +95,7 @@ function ReaderModal({ content, onClose, showToast, loadNotes }) {
                 </div>
               ) : interp.data.truncated ? (
                 <div className="wb-warnbar" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(169,121,31,.1)', borderColor: 'rgba(169,121,31,.3)' }}>
-                  <span style={{ flex: 1 }}>⚠️ {interp.data.note || '这个视频没读全——精读只覆盖了前段'}</span>
+                  <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconWarn size={13} /> {interp.data.note || '这个视频没读全——精读只覆盖了前段'}</span>
                   <button className="wb-btn-primary" style={{ padding: '6px 13px', fontSize: 12, flex: 'none' }} onClick={transcribeFull}>转写全程 →</button>
                 </div>
               ) : interp.data.note ? (
@@ -302,10 +302,10 @@ export default function FeedView({
         {badge && <span className={`fg-badge ${badge.cls}`}>{badge.t}</span>}
         <div className="fg-acts">
           {canRead && <button className="read" onClick={openRead} title="站内精读（读中文）">精读</button>}
-          <button className="a" title={checked ? '已选中' : '选中解读'} onClick={() => toggleSelect(c)}>{checked ? '✓' : '⊕'}</button>
-          <button className="a" title="💡 收进灵感" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}>💡</button>
-          <button className="a" title="🛰 追踪这个话题" onClick={() => trackFromContent(c)}>🛰</button>
-          <button className="a" title={c.starred ? '取消收藏' : '★ 收藏'} onClick={() => onStar(c)}>{c.starred ? '★' : '☆'}</button>
+          <button className="a" title={checked ? '已选中' : '选中解读'} onClick={() => toggleSelect(c)}>{checked ? <IconCheck size={13} /> : <IconCirclePlus size={13} />}</button>
+          <button className="a" title="收进灵感" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] })}><IconBulb size={13} /></button>
+          <button className="a" title="追踪这个话题" onClick={() => trackFromContent(c)}><IconPlusTrack size={13} /></button>
+          <button className="a" title={c.starred ? '取消收藏' : '收藏'} onClick={() => onStar(c)}><IconStar size={13} fill={!!c.starred} /></button>
           {c.url && <a className="a" href={c.url} target="_blank" rel="noreferrer" title="跳转原文" style={{ display: 'inline-flex', alignItems: 'center' }}><IconExternal /></a>}
           {!followed && c.source_id !== undefined && <button className="a" disabled={followingIds?.has(c.id)} title="关注这个来源，以后自动追更" onClick={() => followSource(c.id)}>{followingIds?.has(c.id) ? '…' : '＋关注'}</button>}
         </div>
@@ -315,7 +315,13 @@ export default function FeedView({
 
   // 新到分界：上次来访之后的算「新到」，之前的算「来过=已读」自动划线（ADR-045①）
   const lvTime = lastVisit ? (new Date(/[zZ+]/.test(lastVisit) ? lastVisit : lastVisit.replace(' ', 'T') + 'Z').getTime() || 0) : 0
-  const isSeen = (c) => lvTime > 0 && timeOf(c) <= lvTime
+  // 交接单 Fix1：用「入库时间 created_at」判来过，不用发布时间——新登记的博客历史文章发布日期很老，
+  // 但刚入库、用户从没见过，按发布时间会被误判「已读」划掉。created_at<=上次来=真来过；> 就是这次才入库=真新到。
+  // 注意 created_at 有两种格式：DB datetime('now') 的 "YYYY-MM-DD HH:MM:SS" 和 RSS 的 ISO(带 Z)——
+  // 必须都能解析（早前版本对 ISO 又补一个 Z → 双 Z → Invalid Date → 0 → 全被判已读）。
+  const parseTs = (s) => { s = s || ''; return new Date(/[zZ+]/.test(s) ? s : s.replace(' ', 'T') + 'Z').getTime() || 0 }
+  const ingestOf = (c) => parseTs(c.created_at || c.published_at)
+  const isSeen = (c) => lvTime > 0 && ingestOf(c) <= lvTime
   const visitLabel = (iso) => {
     const d = new Date(/[zZ+]/.test(iso) ? iso : iso.replace(' ', 'T') + 'Z'); if (isNaN(d)) return ''
     const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -401,15 +407,15 @@ export default function FeedView({
                       <span onClick={() => openReaderById(m.id)} title="点开站内精读（读中文，原文在阅读器里）"
                         style={{ fontFamily: 'var(--serif)', fontWeight: 600, fontSize: 13.5, color: 'var(--body)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
                         onMouseOver={e => e.currentTarget.style.color = 'var(--accent)'} onMouseOut={e => e.currentTarget.style.color = 'var(--body)'}>{m.title}</span>
-                      <div style={{ fontSize: 11.5, color: industry ? '#8a6a1a' : 'var(--accent)', marginTop: 2 }}>
-                        {industry ? '📢 ' : '✨ '}
+                      <div style={{ fontSize: 11.5, color: industry ? '#8a6a1a' : 'var(--accent)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ display: 'inline-flex', flexShrink: 0 }}>{industry ? <IconMegaphone size={12} /> : <IconSparkle size={12} />}</span>
                         {m.anchor
                           ? <>贴合你近期在看的<span onClick={() => openAnchor(m.anchor)} title={m.anchor.kind === 'note' ? '打开这条素材卡' : '打开这条的站内精读'} style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}>《{(m.anchor.title || '').slice(0, 16)}》</span></>
                           : m.reason}
                       </div>
                     </div>
                     <button title="不感兴趣：以后少推这个来源/这条（只过滤，不会拿去自动调权重）" onClick={() => muteMustRead(m)}
-                      style={{ flex: 'none', border: 'none', background: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 12, padding: '2px 4px', lineHeight: 1 }}>✕</button>
+                      style={{ flex: 'none', border: 'none', background: 'none', color: 'var(--faint)', cursor: 'pointer', padding: '2px 4px', lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}><IconX size={12} /></button>
                   </div>
                 )
               })}
@@ -511,7 +517,7 @@ export default function FeedView({
           <div className="wb-seg-toggle" style={{ flexShrink: 0 }}>
             <button className={feedTab === 'all' ? 'active' : ''} onClick={() => setFeedTab('all')}>全部</button>
             <button className={feedTab === 'followed' ? 'active' : ''} onClick={() => setFeedTab('followed')} title="只看你关注的信源">关注</button>
-            <button className={feedTab === 'starred' ? 'active' : ''} onClick={() => setFeedTab('starred')}>★ 收藏</button>
+            <button className={feedTab === 'starred' ? 'active' : ''} onClick={() => setFeedTab('starred')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconStar size={12} /> 收藏</button>
           </div>
           <input className="wb-feed-search" placeholder="搜索资讯（空格分隔多关键词）…"
             value={feedQuery} onChange={(e) => setFeedQuery(e.target.value)} />
@@ -531,7 +537,7 @@ export default function FeedView({
 
       {/* 同步状态一行（P0-7）：让"每天自动同步一直在跑"这件事被看见——不再让用户误以为要手动同步 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '0 2px 12px', fontSize: 11.5, color: 'var(--faint)', lineHeight: 1.5 }}>
-        <span aria-hidden="true">🔄</span>
+        <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}><IconRefresh size={12} /></span>
         <span style={{ minWidth: 0 }}>
           {lastSyncAt === undefined
             ? '同步状态加载中…'
@@ -558,7 +564,7 @@ export default function FeedView({
         )}
 
         {hasFilter && filtered?.length === 0 && (
-          <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有收藏。在卡片右上角点 ☆ 一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
+          <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有收藏。在卡片右上角点收藏一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
         )}
 
         {/* ADR-045 终版：一手优先=四组分层 + 新到分界 + ★挂账催办；最新/最热=扁平紧凑行。像素级复刻 feed-final-mock。 */}
@@ -567,7 +573,7 @@ export default function FeedView({
           const groups = groupContents(src)
           const GH = {
             1: { icon: <IconPin />, t: '官方一手', cls: 'g1', what: '官方 blog + 官方号/员工号' },
-            2: { icon: <IconTarget />, t: '你关注的 Builder · 一手', cls: 'g2', what: 'X builders · YouTube · 播客' },
+            2: { icon: <IconTarget />, t: '你登记的一手信源', cls: 'g2', what: '你主动登记关注的博客 / X / YouTube / 播客' },
             3: { icon: <IconFlame />, t: '精选与热点', cls: 'g3', what: 'AI HOT 精选 + 事件簇主条（已去重）' },
           }
           const newOf = (k) => groups[k].filter(c => !isSeen(c)).length
@@ -642,10 +648,10 @@ export default function FeedView({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
                     <span style={{ color: 'var(--amber)', fontWeight: 600 }}>今日 +{Math.round(r.external_score)} 星</span>
                     {r.category && <span className="wb-cat">{r.category}</span>}
-                    <button className={`wb-star${(ghStar[r.id] ?? r.starred) ? ' on' : ''}`} style={{ marginLeft: 'auto' }}
-                      title="收藏（收藏后进「文章 › ★ 收藏」）"
+                    <button className={`wb-star${(ghStar[r.id] ?? r.starred) ? ' on' : ''}`} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center' }}
+                      title="收藏（收藏后进「文章 › 收藏」）"
                       onClick={async () => { const s = await toggleStar(r.id); if (s !== null) setGhStar(prev => ({ ...prev, [r.id]: s })) }}>
-                      {(ghStar[r.id] ?? r.starred) ? '★' : '☆'}
+                      <IconStar size={14} fill={!!(ghStar[r.id] ?? r.starred)} />
                     </button>
                   </div>
                   <div className="wb-gcard-title">

@@ -106,3 +106,20 @@ export const IconPlusTrack = ({ size = 13 }) => ( // ＋追踪（卫星/雷达�
 export const IconBookOpen = ({ size = 13 }) => ( // 精读
   <S size={size}><path d="M8 4C6.7 3.2 4.9 3.2 3 3.6v8c1.9-.4 3.7-.4 5 .4 1.3-.8 3.1-.8 5-.4v-8C11.1 3.2 9.3 3.2 8 4z" /><line x1="8" y1="4" x2="8" y2="12" /></S>
 )
+
+// ── 交接单 Fix3（ADR-003）：feed 里替换 emoji 的 SVG（📢✨🔄✕⊕）──
+export const IconMegaphone = ({ size = 13 }) => ( // 📢 行业大事
+  <S size={size}><path d="M3 6.5v3l7 3V3.5l-7 3z" /><path d="M3 6.5H2.2v3H3M5.5 10.5v2l2 .6v-2" /></S>
+)
+export const IconSparkle = ({ size = 13 }) => ( // ✨ 个人相关
+  <S size={size}><path d="M8 2.5l1 3.5 3.5 1-3.5 1-1 3.5-1-3.5L3.5 7l3.5-1z" /></S>
+)
+export const IconRefresh = ({ size = 13 }) => ( // 🔄 同步
+  <S size={size}><path d="M12.5 8a4.5 4.5 0 1 1-1.3-3.2" /><path d="M13 2.5V5h-2.5" /></S>
+)
+export const IconX = ({ size = 12 }) => ( // ✕ 关闭/移除
+  <S size={size}><path d="M4 4l8 8M12 4l-8 8" /></S>
+)
+export const IconCirclePlus = ({ size = 13 }) => ( // ⊕ 选中解读
+  <S size={size}><circle cx="8" cy="8" r="5.5" /><path d="M8 5.4v5.2M5.4 8h5.2" /></S>
+)

@@ -142,7 +142,10 @@ export function getContents(limit = 20, offset = 0, { q = null, starred = false,
     LEFT JOIN sources s ON c.source_id = s.id
     LEFT JOIN source_platforms sp ON sp.source_id = s.id
     WHERE ${where.join(' AND ')}
-    ORDER BY julianday(COALESCE(c.published_at, c.created_at))
+    -- 按入库时间排（2026-07-26 交接单 Fix1 配套）：新登记的博客历史文章发布日期很老，
+    -- 但刚入库、用户没见过——按发布时间会被埋在几百条之后加载不到。按 created_at 排让"刚到的"浮上来；
+    -- 前端各 sortMode 会在加载集上再排（最新=发布时间、一手优先=分组），所以这里只决定"加载哪些"。
+    ORDER BY julianday(c.created_at)
              + CASE WHEN s.registered_by_user = 1 THEN 0.5 ELSE 0 END DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);

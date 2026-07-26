@@ -148,7 +148,7 @@ export default function WorkbenchPage() {
   // ---- 数据加载 ----
   const loadContents = useCallback(async () => {
     try {
-      const json = await api('/api/contents?limit=30')
+      const json = await api('/api/contents?limit=60')
       setContents((json.data || []).map(c => ({ ...c, tags: safeParse(c.tags) })))
     } catch (err) { console.error('contents:', err) }
   }, [])
