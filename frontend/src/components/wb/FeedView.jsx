@@ -207,6 +207,20 @@ export default function FeedView({
   }
   const hasFilter = feedTab === 'starred' || feedTab === 'followed' || Boolean(feedQuery.trim()) || Boolean(artCat)
   const [otherOpen, setOtherOpen] = useState(false)   // 组4「其他」默认折叠
+  // 第三刀·精选优先（「全部」视图顶部）：可解释信号排序 + 显式 mute，每条带「为什么入选」
+  const [curated, setCurated] = useState([])
+  const [showAll, setShowAll] = useState(false)         // 「查看全部」展开完整分组列表
+  const [curMenu, setCurMenu] = useState(null)          // 哪条打开 × 反馈细选菜单
+  const loadCurated = () => api('/api/feed/curated?limit=12').then(j => setCurated(j.data || [])).catch(() => {})
+  // × 负反馈（不看这条 / 少推源 / 这类主题少推）：本地移除 + 落库 mute（显式过滤、可撤销、不调权重）
+  const curateMute = async (body, msg) => {
+    setCurMenu(null)
+    setCurated(prev => prev.filter(x => x.id !== body.contentId
+      && !(body.sourceId && x.sourceId === body.sourceId)
+      && !(body.category && x.category === body.category)))
+    try { await api('/api/feed/curate-mute', { method: 'POST', body }); showToast?.(msg) } catch { /* 静默 */ }
+  }
+  const starCurated = async (id) => { try { await api(`/api/contents/${id}/star`, { method: 'POST' }); showToast?.('已收藏') } catch { /* */ } }
   // ADR-045 终版：新到分界（last_visit 落库）+ ★挂账催办 + 逐组「之前的」折叠 + 动作留痕
   const [lastVisit, setLastVisit] = useState(undefined) // 上次来的时间（进页面时取 prevVisit，同时把 now 落库）
   const [openOld, setOpenOld] = useState({})            // 各组「之前的 ▸」展开态
@@ -220,6 +234,7 @@ export default function FeedView({
     // 进页面：把这次来访落库，返回的 prevVisit 就是「上次来」的分界线（新到=晚于它）
     api('/api/feed/visit', { method: 'POST' }).then(j => setLastVisit(j.data?.prevVisit ?? null)).catch(() => setLastVisit(null))
     loadIouStars()
+    loadCurated()
   }, [])
   // ★挂账清单：全库星标（不止已加载的），按挂账时间升序（挂得越久越靠前催办）
   const loadIouStars = () => api('/api/contents?starred=1&limit=100')
@@ -568,8 +583,40 @@ export default function FeedView({
           <div className="wb-empty">{feedTab === 'starred' && !feedQuery.trim() ? '还没有收藏。在卡片右上角点收藏一键钉住，事后有用再升级为素材。' : '没有匹配的内容'}</div>
         )}
 
+        {/* 第三刀·精选优先：只在「全部」视图（无筛选无分类）顶部；分类 tab 点进去=纯完整列表（方案甲） */}
+        {!hasFilter && curated.length > 0 && (<>
+          <div className="cf-recipe">
+            <span>本轮精选：<b>你登记的一手源新作</b> · <b>今日多源大事</b> · 官方发布 —— 逻辑透明、每条标了为什么入选，随时可调</span>
+            <button className="gear" onClick={() => showToast?.('「调精选」面板下一步上线：源/主题白黑名单管理')}>⚙ 调精选</button>
+          </div>
+          <div className="cf-secttl">本轮 AI 精选 <span className="cf-n">{curated.length}</span></div>
+          {curated.map(c => (
+            <div key={c.id} className="cf-card">
+              <button className="cf-x" title="不感兴趣" onClick={() => setCurMenu(curMenu === c.id ? null : c.id)}><IconX size={14} /></button>
+              {curMenu === c.id && (
+                <div className="cf-menu">
+                  <div className="cf-mt">这条不太对？告诉我不要什么：</div>
+                  <button onClick={() => curateMute({ contentId: c.id }, '好，不看这条了')}>✕ 不看这条</button>
+                  {c.sourceId && <button onClick={() => curateMute({ sourceId: c.sourceId }, `以后少推「${c.src}」`)}>↓ 少推「{c.src}」</button>}
+                  {c.category && <button onClick={() => curateMute({ category: c.category }, `以后少推「${c.category}」类`)}>⊘ 少推「{c.category}」这类</button>}
+                </div>
+              )}
+              <div className="cf-m"><span className="cf-src">{c.src}</span>·<span>{c.pub}</span></div>
+              <div className="cf-t" onClick={() => openReaderById(c.id)}>{c.title}</div>
+              {c.summary && <div className="cf-s">{c.summary}</div>}
+              <div className="cf-f">
+                {c.badge && <span className={`fg-badge ${c.badge.cls}`}>{c.badge.t}</span>}
+                <span className="cf-why">入选：{c.why}</span>
+                <span className="cf-star" title="收藏" onClick={() => starCurated(c.id)}><IconStar size={14} /></span>
+              </div>
+            </div>
+          ))}
+          <div className="cf-seeall" onClick={() => setShowAll(s => !s)}>{showAll ? '▲ 收起，回到精选' : '▽ 查看全部（完整分组：官方一手 / 你登记的源 / 精选热点）'}</div>
+        </>)}
+
         {/* ADR-045 终版：一手优先=四组分层 + 新到分界 + ★挂账催办；最新/最热=扁平紧凑行。像素级复刻 feed-final-mock。 */}
-        {sortMode === 'firsthand' && !hasFilter ? (() => {
+        {/* 精选优先（方案甲）：「全部」视图默认只给精选，点「查看全部」才展开完整列表；有筛选/分类直接列表 */}
+        {(!hasFilter && !showAll) ? null : (sortMode === 'firsthand' && !hasFilter ? (() => {
           const src = filtered ?? contents
           const groups = groupContents(src)
           const GH = {
@@ -631,7 +678,7 @@ export default function FeedView({
           </>
         })() : (
           <div className="wb-feed-list">{sortContents(filtered ?? contents).map(renderRow)}</div>
-        )}
+        ))}
       </>)}
 
       {mainTab === 'projects' && (

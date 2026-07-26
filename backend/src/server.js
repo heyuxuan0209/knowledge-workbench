@@ -1924,6 +1924,20 @@ app.post('/api/sync-all', async (req, res) => {
 // 于是所有内容都比分界老 → 全被划成"之前的·已读"，新发布（如 Opus 5）永远不显示为新。
 // 修正：分界只在**跨会话（离开一段时间再回来）**时才前移，同一会话内反复开页不动分界。
 // 两个键：feed_last_seen=上次活动时刻；feed_boundary=当前会话的"上次来"线。
+// 精选（第三刀·「全部」视图顶部）：可解释信号排序 + 显式 mute 过滤，每条带「为什么入选」。
+app.get('/api/feed/curated', async (req, res) => {
+  try { const { getCurated } = await import('./services/curated.js'); res.json({ success: true, data: getCurated(Number(req.query.limit) || 12) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.get('/api/feed/curate-config', async (req, res) => {
+  try { const { getCurateConfig } = await import('./services/curated.js'); res.json({ success: true, data: getCurateConfig() }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/feed/curate-mute', async (req, res) => {
+  try { const { setCurateMute } = await import('./services/curated.js'); res.json({ success: true, data: setCurateMute(req.body || {}) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 const SESSION_GAP_MIN = 30; // 间隔 >30 分钟算新的一次"来"，才推进分界
 app.get('/api/feed/last-visit', async (req, res) => {
   try {

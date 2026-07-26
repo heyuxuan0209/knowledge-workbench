@@ -44,3 +44,27 @@
 .ff-g4head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line10);border-radius:10px;cursor:pointer;font-size:13.5px;color:var(--sub);user-select:none;margin-top:4px}
 .ff-g4head:hover{color:var(--accent)}
 .ff-note{font-size:11.5px;color:var(--faint);text-align:center;margin-top:22px;line-height:2}
+
+/* 第三刀·精选卡片流（cf-）：「全部」视图顶部，可解释信号 + × 反馈 + ★ */
+.cf-recipe{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:9px 13px;font-size:12px;color:var(--sub);display:flex;align-items:center;gap:8px;margin-bottom:14px;line-height:1.6}
+.cf-recipe b{color:var(--accent);font-weight:600}
+.cf-recipe .gear{margin-left:auto;flex-shrink:0;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:3px 10px;cursor:pointer;font-size:11.5px;background:none}
+.cf-secttl{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin:2px 0 10px}
+.cf-secttl .cf-n{font-size:11px;color:#fff;background:var(--red);border-radius:9px;padding:1px 7px}
+.cf-card{position:relative;background:#fff;border:1px solid var(--line08);border-radius:12px;padding:12px 15px;margin-bottom:10px}
+.cf-card .cf-m{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--sub2);margin-bottom:5px}
+.cf-card .cf-src{font-weight:600;color:var(--accent)}
+.cf-card .cf-t{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--text);line-height:1.45;margin-bottom:5px;padding-right:24px;cursor:pointer}
+.cf-card .cf-t:hover{color:var(--accent)}
+.cf-card .cf-s{font-size:12.5px;color:var(--sub);line-height:1.6}
+.cf-card .cf-f{display:flex;align-items:center;gap:8px;margin-top:9px}
+.cf-why{font-size:11px;color:var(--faint)}
+.cf-star{margin-left:auto;cursor:pointer;color:var(--faint);display:inline-flex}.cf-star:hover{color:var(--amber)}
+.cf-x{position:absolute;top:10px;right:11px;width:22px;height:22px;border:none;background:none;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--faint);cursor:pointer;opacity:0;transition:opacity .12s}
+.cf-card:hover .cf-x{opacity:1}.cf-x:hover{background:var(--surface);color:var(--red)}
+.cf-menu{position:absolute;top:34px;right:11px;background:#fff;border:1px solid var(--line14);border-radius:10px;box-shadow:0 6px 20px rgba(33,31,26,.13);padding:5px;z-index:9;width:206px}
+.cf-menu .cf-mt{font-size:11px;color:var(--faint);padding:4px 9px 5px}
+.cf-menu button{display:block;width:100%;text-align:left;border:none;background:none;padding:7px 9px;border-radius:7px;font-size:12.5px;color:var(--body);cursor:pointer}
+.cf-menu button:hover{background:var(--surface);color:var(--accent)}
+.cf-seeall{margin:14px 0;padding:11px 14px;background:var(--surface);border:1px solid var(--line14);border-radius:10px;color:var(--sub);font-size:13px;text-align:center;cursor:pointer}
+.cf-seeall:hover{color:var(--accent)}
