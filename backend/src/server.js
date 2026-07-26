@@ -813,6 +813,25 @@ app.post('/api/studio/tts', async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
+// ADR-052 P1 头图（AI 观察手记系列）：系列风格预设 + 字段→双尺寸 PNG（确定性引擎）。
+app.get('/api/studio/series-presets', async (req, res) => {
+  try {
+    const { SERIES_PRESETS } = await import('./services/cover.js');
+    res.json({ success: true, data: SERIES_PRESETS });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/studio/cover', async (req, res) => {
+  try {
+    const { skin, content } = req.body || {};
+    if (!skin) return res.status(400).json({ success: false, error: '缺少头图皮肤（先选系列风格）' });
+    if (!content?.title_html?.trim()) return res.status(400).json({ success: false, error: '缺少标题' });
+    const { renderCover } = await import('./services/cover.js');
+    const shapes = await renderCover(skin, content);
+    res.json({ success: true, data: { skin, shapes } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 // ========== M2 洞察层：日报与选题（ADR-008） ==========
 
 // 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）

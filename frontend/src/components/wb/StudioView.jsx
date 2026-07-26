@@ -638,7 +638,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 openVideoFor={openVideoFor} videoBusy={videoBusy}
                 readaptOne={readaptOne} exportOne={exportOne} exportAll={exportAll}
                 THEMES={THEMES} filmTheme={filmTheme} setFilmTheme={setFilmTheme} setStudioTab={setStudioTab}
-                filmActiveForm={filmActiveForm} setFilmActiveForm={setFilmActiveForm} showToast={showToast} />
+                filmActiveForm={filmActiveForm} setFilmActiveForm={setFilmActiveForm} showToast={showToast}
+                defaultTitle={studio.title || ''} />
             )}
           </section>
 
@@ -757,7 +758,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 // P1 渲染只接：图卡渲染器（小红书/抖音卡片）+ 公众号长文直用；视频渲染器(hyperframes)是 P2 占位。
 function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setAdapted, adaptBusy, adaptBatch,
   CARD_FORMS, VIDEO_FORMS, openCardsFor, copyText, openVideoFor, videoBusy, readaptOne, exportOne, exportAll,
-  THEMES, filmTheme, setFilmTheme, setStudioTab, filmActiveForm, setFilmActiveForm, showToast }) {
+  THEMES, filmTheme, setFilmTheme, setStudioTab, filmActiveForm, setFilmActiveForm, showToast, defaultTitle }) {
   const pf = k => pforms.find(p => p.key === k) || { key: k, label: k, icon: '📝', note: '' }
   const rendHint = k => k === 'gzh-long' ? '长文体 · 直用母稿' : CARD_FORMS.has(k) ? '卡片体 · 图卡渲染器' : VIDEO_FORMS.has(k) ? '口播体 · 竖版分镜播放器' : '文案 · 复制发布'
   const editBody = (k, v) => setAdapted(a => ({ ...a, [k]: { ...a[k], body: v } }))
@@ -881,8 +882,99 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
             )
           })}
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 11 }}>🎙 配音 · 音色试听 · 背景乐 —— 随视频渲染器 P2 上线</div>
+        <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginTop: 11 }}>🎙 配音在竖版播放器里（edge-tts 免费·单独触发）· 背景乐随后</div>
       </div>
+
+      {/* ④ 公众号头图（ADR-052 P1 · AI 观察手记系列）：字段 → 双尺寸 PNG */}
+      <CoverPanel showToast={showToast} defaultTitle={defaultTitle} />
     </>
+  )
+}
+
+// 头图字段（模块级组件，稳定 identity——定义在 CoverPanel 内会每次输入就重挂、丢焦点）
+function CoverField({ label, k, ph, area, f, set }) {
+  const st = { width: '100%', marginTop: 3, padding: '6px 9px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)', boxSizing: 'border-box' }
+  return (
+    <label style={{ display: 'block', marginBottom: 8 }}>
+      <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600 }}>{label}</span>
+      {area
+        ? <textarea value={f[k]} onChange={e => set(k, e.target.value)} placeholder={ph} style={{ ...st, minHeight: 42, resize: 'vertical', fontFamily: 'inherit' }} />
+        : <input value={f[k]} onChange={e => set(k, e.target.value)} placeholder={ph} style={st} />}
+    </label>
+  )
+}
+
+// ADR-052 P1 头图面板：选系列风格 + 填期刊字段 → 生成双尺寸 PNG（消息大图 1800×766 + 方图 2000×2000）。
+// title_html 只让用户填「主标题 + 点睛词」，UI 自动包一个 <span class="ul">（守 ux-no-raw-numbers，用户零 HTML）。
+function CoverPanel({ showToast, defaultTitle }) {
+  const [presets, setPresets] = useState([])
+  const [preset, setPreset] = useState('ticket-brisk')
+  const [f, setF] = useState({ name: 'AI 观察手记', issue_event: '', badge: '', kicker: '', title: defaultTitle || '', keyword: '', author_html: '', tag: '深度精读' })
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)  // { wide:{base64,w,h}, square:{...} }
+  useEffect(() => { (async () => { try { const j = await api('/api/studio/series-presets'); setPresets(j.data || []) } catch { /* 静默 */ } })() }, [])
+  const set = (k, v) => setF(s => ({ ...s, [k]: v }))
+  const BADGES = [['', '无（默认隐藏）'], ['▶ YouTube', '▶ YouTube'], ['𝕏', '𝕏 Twitter'], ['✎ Blog', '✎ Blog'], ['🎧 播客', '🎧 播客'], ['🎤 现场', '🎤 现场'], ['⚡ 黑客松', '⚡ 黑客松']]
+  const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const buildTitleHtml = () => {
+    let e = esc(f.title); const ek = esc(f.keyword.trim())
+    if (ek && e.includes(ek)) e = e.replace(ek, `<span class="ul">${ek}</span>`)  // 只包第一处 → 恰好一个 .ul
+    return e.replace(/\n/g, '<br>')
+  }
+  const gen = async () => {
+    if (!f.title.trim()) { showToast('先填主标题'); return }
+    const kw = f.keyword.trim()
+    if (!kw || !f.title.includes(kw)) { showToast('「点睛词」必填，且要在主标题里出现（会自动加下划线点睛）'); return }
+    const skin = presets.find(p => p.id === preset)?.cover_skin || 'moyu-green'
+    const content = { name: f.name, issue_event: f.issue_event.replace(/\n/g, '<br>'), badge: f.badge, kicker: f.kicker, title_html: buildTitleHtml(), author_html: f.author_html, tag: f.tag }
+    setBusy(true); showToast('正在渲染头图（双尺寸，约 3–5 秒）…')
+    try { const j = await api('/api/studio/cover', { method: 'POST', body: { skin, content } }); setResult(j.data.shapes); showToast('头图已生成（消息大图 + 方图）') }
+    catch (err) { showToast('头图生成失败：' + err.message) }
+    setBusy(false)
+  }
+  const dl = (shape) => { const v = result?.[shape]; if (!v) return; const a = document.createElement('a'); a.href = v.base64; a.download = `头图-${shape === 'wide' ? '消息大图1800x766' : '方图2000x2000'}.png`; a.click() }
+  return (
+    <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginTop: 11, background: 'var(--surface)' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>④ 公众号头图 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· AI 观察手记系列 · 字段 → 双尺寸 PNG</span></div>
+      <div style={{ fontSize: 11.5, color: 'var(--sub2)', marginBottom: 10 }}>选系列风格 + 填期刊字段，出「消息大图 1800×766 + 方图 2000×2000」。</div>
+      <div style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginBottom: 6 }}>系列风格</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        {presets.map(p => (
+          <span key={p.id} onClick={() => setPreset(p.id)}
+            style={{ border: '1px solid var(--line10)', background: preset === p.id ? 'var(--accent)' : 'var(--surface)', color: preset === p.id ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 12px', fontSize: 12.5, cursor: 'pointer' }}>{p.name}</span>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+        <CoverField f={f} set={set} label="刊名（报头左上）" k="name" ph="AI 观察手记" />
+        <CoverField f={f} set={set} label="期号 + 场合（报头右上·可两行）" k="issue_event" ph="NO.01 · 视频演讲精读&#10;Compile 26 · Cursor 社区" area />
+        <label style={{ display: 'block', marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600 }}>来源徽章（可留空隐藏）</span>
+          <select value={f.badge} onChange={e => set('badge', e.target.value)} style={{ width: '100%', marginTop: 3, padding: '6px 9px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)' }}>
+            {BADGES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </label>
+        <CoverField f={f} set={set} label="副标（kicker）" k="kicker" ph="一句话副标题" />
+        <CoverField f={f} set={set} label="主标题（可换行）" k="title" ph="当造东西不再稀缺，产品人还剩下什么？" area />
+        <CoverField f={f} set={set} label="点睛词（必填·标题里一个词，自动加下划线）" k="keyword" ph="造东西" />
+        <CoverField f={f} set={set} label="作者行（可用 <b>身份</b> 上色）" k="author_html" ph="杰西卡　<b>独立开发者</b> · AI 产品人" />
+        <CoverField f={f} set={set} label="类型标签" k="tag" ph="深度精读" />
+      </div>
+      <button className="wb-btn-primary" style={{ marginTop: 6 }} disabled={busy} onClick={gen}>{busy ? '渲染中…' : (result ? '↻ 重新生成头图' : '🖼 生成头图（双尺寸）')}</button>
+
+      {result && (
+        <div style={{ marginTop: 14, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 5 }}>消息列表大图 · 1800×766</div>
+            <img src={result.wide.base64} alt="wide" style={{ width: 340, borderRadius: 8, border: '1px solid var(--line10)', display: 'block' }} />
+            <button className="wb-btn-ghost" style={{ marginTop: 6 }} onClick={() => dl('wide')}>⬇ 下载大图 PNG</button>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 5 }}>转发卡片方图 · 2000×2000</div>
+            <img src={result.square.base64} alt="square" style={{ width: 180, borderRadius: 8, border: '1px solid var(--line10)', display: 'block' }} />
+            <button className="wb-btn-ghost" style={{ marginTop: 6 }} onClick={() => dl('square')}>⬇ 下载方图 PNG</button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
