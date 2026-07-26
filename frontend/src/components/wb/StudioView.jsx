@@ -887,7 +887,77 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
 
       {/* ④ 公众号头图（ADR-052 P1 · AI 观察手记系列）：字段 → 双尺寸 PNG */}
       <CoverPanel showToast={showToast} defaultTitle={defaultTitle} />
+
+      {/* ⑤ 公众号排版（ADR-052 P2 · vendored gzh-design）：定稿 → 合规 HTML */}
+      <TypesetPanel showToast={showToast} articleMd={adapted['gzh-long']?.body || ''} />
     </>
+  )
+}
+
+// ADR-052 P2 排版面板：选主题 → LLM 装配 + 校验兜底 → 合规公众号 HTML；预览 + 复制到公众号 + 下载。
+function TypesetPanel({ showToast, articleMd }) {
+  const [themes, setThemes] = useState([])
+  const [theme, setTheme] = useState('olive-journal')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null) // { html, errors, warnings, leaf }
+  useEffect(() => { (async () => { try { const j = await api('/api/studio/article-themes'); setThemes(j.data || []) } catch { /* 静默 */ } })() }, [])
+  const gen = async () => {
+    if (!articleMd?.trim()) { showToast('先在②一键适配母稿，把「公众号长文」备好'); return }
+    setBusy(true); showToast('正在排版（LLM 装配 + 合规校验，约 40–90 秒）…')
+    try {
+      const j = await api('/api/studio/typeset', { method: 'POST', body: { article_md: articleMd, theme } })
+      setResult(j.data)
+      const clean = j.data.errors.length === 0 && j.data.warnings.length === 0
+      showToast(clean ? `排版完成 · ✅ 合规 0/0（¥${j.data.cost.toFixed(3)}）` : `排版完成 · ⚠️ 还剩 ${j.data.errors.length} ERROR/${j.data.warnings.length} WARN`)
+    } catch (err) { showToast('排版失败：' + err.message) }
+    setBusy(false)
+  }
+  const copy = async () => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([result.html], { type: 'text/html' }),
+        'text/plain': new Blob([result.html], { type: 'text/plain' }),
+      })])
+      showToast('已复制富文本 → 到公众号编辑器 Ctrl/⌘+V 粘贴（样式保留）')
+    } catch { showToast('浏览器限制复制——用「下载 HTML」，浏览器打开后全选复制兜底') }
+  }
+  const dl = () => { const blob = new Blob([result.html], { type: 'text/html;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '公众号排版.html'; a.click(); URL.revokeObjectURL(a.href) }
+  const clean = result && result.errors.length === 0 && result.warnings.length === 0
+  return (
+    <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginTop: 11, background: 'var(--surface)' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>⑤ 公众号排版 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· 定稿 → 可粘贴公众号的合规 HTML（LLM 装配 + 校验兜底）</span></div>
+      {!articleMd?.trim() && <div style={{ fontSize: 11.5, color: 'var(--faint)', marginBottom: 8 }}>先在②「一键适配母稿」把公众号长文备好，再来排版。</div>}
+      <div style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, margin: '8px 0 6px' }}>排版主题</div>
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 12 }}>
+        {themes.map(t => (
+          <span key={t.key} onClick={() => setTheme(t.key)} title={t.hint}
+            style={{ border: '1px solid var(--line10)', background: theme === t.key ? 'var(--accent)' : 'var(--surface)', color: theme === t.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{t.name}</span>
+        ))}
+      </div>
+      <button className="wb-btn-primary" disabled={busy || !articleMd?.trim()} onClick={gen}>{busy ? '排版中（约 1 分钟）…' : (result ? '↻ 重新排版' : '📰 排版成公众号 HTML')}</button>
+
+      {result && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: clean ? 'var(--green)' : 'var(--amber)' }}>
+              {clean ? '✅ 合规校验 0 ERROR / 0 WARNING' : `⚠️ 剩 ${result.errors.length} ERROR / ${result.warnings.length} WARNING`}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--faint)' }}>· {result.leaf} 处 span leaf</span>
+            <span style={{ marginLeft: 'auto' }} />
+            <button className="wb-btn-primary" onClick={copy}>📋 复制到公众号</button>
+            <button className="wb-btn-ghost" onClick={dl}>⬇ 下载 HTML</button>
+          </div>
+          {!clean && (
+            <div style={{ fontSize: 11, color: 'var(--amber)', marginBottom: 8, lineHeight: 1.5 }}>
+              {[...result.errors, ...result.warnings].slice(0, 3).map((m, i) => <div key={i}>· {m}</div>)}
+            </div>
+          )}
+          <iframe title="公众号排版预览" srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff">${result.html}</body>`}
+            style={{ width: '100%', height: 460, border: '1px solid var(--line10)', borderRadius: 8, background: '#fff' }} />
+          <div style={{ fontSize: 11, color: 'var(--sub2)', marginTop: 6 }}>预览即最终效果 · 点「复制到公众号」→ 公众号编辑器 Ctrl/⌘+V 粘贴，样式保留。</div>
+        </div>
+      )}
+    </div>
   )
 }
 

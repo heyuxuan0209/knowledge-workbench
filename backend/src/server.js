@@ -832,6 +832,25 @@ app.post('/api/studio/cover', async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
+// ADR-052 P2 排版（vendored gzh-design）：可选主题 + 定稿 md → 合规公众号 section HTML（校验 0/0 兜底）。
+app.get('/api/studio/article-themes', async (req, res) => {
+  try {
+    const { ARTICLE_THEMES } = await import('./services/typeset.js');
+    res.json({ success: true, data: ARTICLE_THEMES });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/studio/typeset', async (req, res) => {
+  try {
+    const { article_md, theme } = req.body || {};
+    if (!article_md?.trim()) return res.status(400).json({ success: false, error: '定稿为空——先在②适配稿备好公众号长文' });
+    if (!theme) return res.status(400).json({ success: false, error: '先选排版主题' });
+    const { typeset } = await import('./services/typeset.js');
+    const data = await typeset(article_md, theme);
+    res.json({ success: true, data });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 // ========== M2 洞察层：日报与选题（ADR-008） ==========
 
 // 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）
