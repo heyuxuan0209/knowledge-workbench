@@ -68,3 +68,14 @@
 .cf-menu button:hover{background:var(--surface);color:var(--accent)}
 .cf-seeall{margin:14px 0;padding:11px 14px;background:var(--surface);border:1px solid var(--line14);border-radius:10px;color:var(--sub);font-size:13px;text-align:center;cursor:pointer}
 .cf-seeall:hover{color:var(--accent)}
+
+/* 统一动作条（版B·图标+文字 chip）：精选卡片 + 列表卡片共用，风格一致 */
+.abar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
+.abtn2{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--sub);border:1px solid var(--line14);border-radius:7px;padding:3px 9px;cursor:pointer;background:#fff;white-space:nowrap;text-decoration:none}
+.abtn2 svg{flex-shrink:0}
+.abtn2:hover{border-color:var(--accent);color:var(--accent)}
+.abtn2.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.abtn2.pri:hover{opacity:.88;color:#fff}
+.abtn2.on{border-color:var(--amber);color:var(--amber)}
+.abar .ax{margin-left:auto;color:var(--faint);border:none;background:none;cursor:pointer;display:inline-flex;padding:4px;border-radius:6px}
+.abar .ax:hover{color:var(--red);background:var(--surface)}

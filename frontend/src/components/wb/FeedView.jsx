@@ -299,6 +299,26 @@ export default function FeedView({
     const now = new Date()
     return d.toDateString() === now.toDateString() ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : `${d.getMonth() + 1}/${d.getDate()}`
   }
+
+  // 统一动作条（版B·图标+文字 chip）：精选卡片 + 列表卡片共用，风格一致。
+  // c 兼容两种形态——完整 content（有 zh_title/permalink）和精选 item（有 title），字段兜底取。
+  const actionBar = (c, extra = null) => {
+    const cc = { ...c, id: c.id, zh_title: c.zh_title || c.en_title || c.title || '', url: c.url }
+    const title = cc.zh_title
+    const checked = selIds.has(c.id)
+    const openRead = () => { dismissAirHint(); if (c.permalink) window.open(c.permalink, '_blank', 'noopener'); else openReaderById(c.id) }
+    return (
+      <div className="abar">
+        <button className="abtn2 pri" onClick={openRead} title="站内精读（读中文）"><IconBookOpen size={12} /> 精读</button>
+        <button className={`abtn2${checked ? ' on' : ''}`} onClick={() => toggleSelect(cc)} title="加入批量解读"><IconCirclePlus size={12} /> {checked ? '已选中' : '选中解读'}</button>
+        <button className="abtn2" onClick={async () => { const s = await toggleStar(c.id); showToast?.(s ? '已收藏' : '已取消收藏') }} title="收藏"><IconStar size={12} /> 收藏</button>
+        <button className="abtn2" onClick={() => saveIdea?.({ title, sourceKind: 'feed', sourceRef: cc.url || null, supportingContentIds: [c.id] })} title="收进灵感库"><IconBulb size={12} /> 提灵感</button>
+        <button className="abtn2" onClick={() => trackFromContent(cc)} title="发起追踪"><IconPlusTrack size={12} /> 追踪</button>
+        {cc.url && <a className="abtn2" href={cc.url} target="_blank" rel="noreferrer" title="跳转原文"><IconExternal size={12} /> 原文</a>}
+        {extra}
+      </div>
+    )
+  }
   const renderRow = (c) => {
     const checked = selIds.has(c.id)
     const followed = c.source_registered === 1 || c.source_registered === true
@@ -349,6 +369,23 @@ export default function FeedView({
 
   // ADR-045 终版紧凑行：time | 来源 | 标题(hover 行下展开摘要) | 徽章 | 留痕小标 | hover 四动作。
   // 四动作：精读 / 以后再看(★挂账) / 提灵感 / 发起追踪；动作后留痕小标。零点击零打勾。
+  // 列表卡片（分类 tab / 最新 / 最热用）：与精选卡片同款卡片式 + 统一动作条（版B），风格一致、清楚
+  const renderCard = (c) => {
+    const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
+    const author = c.source_display_name || (c.source_app === 'github_trending' ? (c.en_title || '').split('/')[0] : null) || channel
+    const title = c.zh_title || c.en_title || '（无标题）'
+    const summary = c.zh_summary || c.en_summary || ''
+    const badge = c.story_source_count > 1 ? { t: `${c.story_source_count} 源同报`, cls: 'cl' } : ((c.trust_tier === 'T1' || c.trust_tier === 'T1.5') ? { t: '官方一手', cls: 'of' } : null)
+    return (
+      <div key={c.id} className="cf-card">
+        <div className="cf-m"><span className="cf-src">{author}</span>·<span>{hmOf(c)}</span>{badge && <span className={`fg-badge ${badge.cls}`} style={{ marginLeft: 6 }}>{badge.t}</span>}</div>
+        <div className="cf-t" onClick={() => openReaderById(c.id)} title="点开站内精读（读中文）">{title}</div>
+        {summary && <div className="cf-s">{summary.slice(0, 120)}</div>}
+        {actionBar(c)}
+      </div>
+    )
+  }
+
   const ffRenderRow = (c) => {
     const channel = { aihot: 'AI HOT', hackernews: 'Hacker News', rss: 'RSS', github_trending: 'GitHub Trending' }[c.source_app] || c.source_app
     const author = c.source_display_name || (c.source_app === 'github_trending' ? (c.en_title || '').split('/')[0] : null) || channel
@@ -607,8 +644,8 @@ export default function FeedView({
               <div className="cf-f">
                 {c.badge && <span className={`fg-badge ${c.badge.cls}`}>{c.badge.t}</span>}
                 <span className="cf-why">入选：{c.why}</span>
-                <span className="cf-star" title="收藏" onClick={() => starCurated(c.id)}><IconStar size={14} /></span>
               </div>
+              {actionBar(c)}
             </div>
           ))}
           <div className="cf-seeall" onClick={() => setShowAll(s => !s)}>{showAll ? '▲ 收起，回到精选' : '▽ 查看全部（完整分组：官方一手 / 你登记的源 / 精选热点）'}</div>
@@ -677,7 +714,7 @@ export default function FeedView({
             <div className="ff-note">按「原料价值」分层：官方一手 › 你关注的人 › 精选热点 › 其他 · 来过的自动划掉，新到的排在每组最前</div>
           </>
         })() : (
-          <div className="wb-feed-list">{sortContents(filtered ?? contents).map(renderRow)}</div>
+          <div className="wb-feed-list">{sortContents(filtered ?? contents).map(renderCard)}</div>
         ))}
       </>)}
 
