@@ -341,7 +341,8 @@ export default function FeedView({
     const summary = c.zh_summary || c.en_summary || ''
     const mark = feedMarks[c.id]
     const struck = mark === 'read' || (isSeen(c) && !mark)
-    const badge = c.story_source_count > 1 ? `${c.story_source_count} 源同报` : ((c.trust_tier === 'T1' || c.trust_tier === 'T1.5') ? '官方一手' : null)
+    // 徽章与扁平 renderRow 保持一致（同一 fg-badge 口径：源同报=amber cl / 官方一手=accent of）
+    const badge = c.story_source_count > 1 ? { t: `${c.story_source_count} 源同报`, cls: 'cl' } : ((c.trust_tier === 'T1' || c.trust_tier === 'T1.5') ? { t: '官方一手', cls: 'of' } : null)
     const openRead = () => { dismissAirHint(); if (c.permalink) window.open(c.permalink, '_blank', 'noopener'); else setReaderContent(c); setFeedMarks(m => ({ ...m, [c.id]: 'read' })) }
     const laterRead = async () => { if (!c.starred) await toggleStar(c.id); setFeedMarks(m => ({ ...m, [c.id]: 'star' })); loadIouStars(); showToast?.('挂进「以后再看」，回头会催你') }
     const toIdea = () => { saveIdea?.({ title, sourceKind: 'feed', sourceRef: c.url || null, supportingContentIds: [c.id] }); setFeedMarks(m => ({ ...m, [c.id]: 'idea' })) }
@@ -350,8 +351,8 @@ export default function FeedView({
         <div className="l1">
           <span className="tm">{hmOf(c)}</span>
           <span className="src" title={author}>{author}</span>
-          <span className="tt" onClick={openRead} title="点开站内精读（读中文）">{title}</span>
-          {badge && <span className="cbadge">{badge}</span>}
+          <span className="tt" onClick={openRead} title={summary ? `${title}\n\n${summary}` : title}>{title}</span>
+          {badge && <span className={`fg-badge ${badge.cls}`}>{badge.t}</span>}
           {mark === 'read' && <span className="ff-mark read"><IconCheck size={11} /> 精读过</span>}
           {mark === 'star' && <span className="ff-mark star"><IconStar size={11} /> 以后再看</span>}
           {mark === 'idea' && <span className="ff-mark idea"><IconBulb size={11} /> 已提灵感</span>}

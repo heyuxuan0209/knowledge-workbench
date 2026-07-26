@@ -108,26 +108,30 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
     const relevantItems = pretransformed.filter(({ content }) => kept.has(content.id));
     console.log(`🧹 relevance filter: ${relevantItems.length}/${pretransformed.length} kept`);
 
-    // 翻译标题 + 摘要（contentSnippet 捡回来用，Feed 不允许光杆标题）
-    const transformedItems = await Promise.all(
-      relevantItems.map(async ({ content, sourceInfo }) => {
-        try {
-          if (content.original_lang === 'en') {
-            content.zh_title = content.en_title ? await translateText(content.en_title) : null;
-            content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300)) : null;
-          } else {
-            content.zh_title = content.en_title;
-            content.zh_summary = content.en_summary;
-          }
-        } catch (e) {
-          // 翻译失败不丢内容（2026-07-25 修：一次 API 抖动曾废掉整批 431 条 RSS）：
-          // 中文标题/摘要回退英文原文，内容照样入库、照样归属源；下轮同步/摘要兜底再补译
-          content.zh_title = content.zh_title || content.en_title;
-          content.zh_summary = content.zh_summary || content.en_summary;
+    // 翻译标题 + 摘要——限并发（2026-07-26 修：原来 Promise.all 把几百条一次性并发翻译，
+    // 打爆代理/API → "Connection error" → 整批回退英文 → feed 全英文标题。改成每次最多 CONC 条）。
+    const translateOne = async ({ content, sourceInfo }) => {
+      try {
+        if (content.original_lang === 'en') {
+          content.zh_title = content.en_title ? await translateText(content.en_title) : null;
+          content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300)) : null;
+        } else {
+          content.zh_title = content.en_title;
+          content.zh_summary = content.en_summary;
         }
-        return { content, sourceInfo };
-      })
-    );
+      } catch (e) {
+        // 翻译失败不丢内容：回退英文原文，内容照样入库/归属源；下轮同步/兜底再补译
+        content.zh_title = content.zh_title || content.en_title;
+        content.zh_summary = content.zh_summary || content.en_summary;
+      }
+      return { content, sourceInfo };
+    };
+    const CONC = 6;
+    const transformedItems = new Array(relevantItems.length);
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(CONC, relevantItems.length) }, async () => {
+      while (cursor < relevantItems.length) { const i = cursor++; transformedItems[i] = await translateOne(relevantItems[i]); }
+    }));
 
     // 批量入库
     const savedCount = upsertContents(transformedItems);
