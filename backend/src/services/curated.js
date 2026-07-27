@@ -55,7 +55,7 @@ export function getCurated(limit = 12) {
   }
 
   return top.map(({ c, why }) => ({
-    id: c.id, title: c.title, summary: (c.summ || '').slice(0, 110), src: c.src || 'AI HOT',
+    id: c.id, title: c.title, summary: (c.summ || '').slice(0, 220), src: c.src || 'AI HOT',
     sourceId: c.source_id, category: c.category, url: c.url, permalink: c.permalink, why,
     badge: c.sc > 1 ? { t: `${c.sc} 源同报`, cls: 'cl' } : (isOff(c.tier) ? { t: '官方一手', cls: 'of' } : (c.reg ? { t: '你登记的源', cls: 'rg' } : null)),
     pub: (c.published_at || c.created_at || '').slice(0, 10),

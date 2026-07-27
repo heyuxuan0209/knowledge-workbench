@@ -408,7 +408,7 @@ export default function FeedView({
       <div key={c.id} className="cf-card">
         <div className="cf-m"><span className="cf-src">{author}</span>·<span>{hmOf(c)}</span>{badge && <span style={{ marginLeft: 6 }}>{badgeEl(c, badge)}</span>}</div>
         <div className="cf-t" onClick={() => openReaderById(c.id)} title="点开站内精读（读中文）">{title}</div>
-        {summary && <div className="cf-s">{summary.slice(0, 120)}</div>}
+        {summary && <div className="cf-s">{summary.slice(0, 220)}</div>}
         {storyExpand(c)}
         {actionBar(c)}
       </div>
@@ -444,7 +444,7 @@ export default function FeedView({
             <button className="ff-abtn" onClick={() => trackFromContent(c)} title="以它为主角起一个追踪主题"><IconPlusTrack size={12} /> 发起追踪</button>
           </div>
         </div>
-        {summary && <div className="sum">{summary.slice(0, 160)}</div>}
+        {summary && <div className="sum">{summary.slice(0, 220)}</div>}
       </div>
     )
   }
