@@ -128,29 +128,56 @@ export async function getTopicCards({ ensure = false } = {}) {
   return cards;
 }
 
-// 「调精选」面板数据：必进精选的源（你登记的）+ 当前被 mute 的源/主题——供白黑名单管理。
+// 源分组（按角色）：官方源 > 播客·视频 > Newsletter·博客 > 个人 Builder
+const SRC_GROUPS = ['官方源', '个人 Builder·研究者', 'Newsletter·博客', '播客·视频'];
+function srcGroup(s) {
+  if (s.tier === 'T1' || s.tier === 'T1.5') return '官方源';
+  if (s.platform === 'Podcast' || s.platform === 'YouTube' || s.stype === 'YouTubeChannel') return '播客·视频';
+  if (s.stype === 'Newsletter' || s.stype === 'Blog') return 'Newsletter·博客';
+  return '个人 Builder·研究者';
+}
+
+// 「调精选」面板数据：登记源**按角色分组 + 组内同名合并**（同一人多平台合一条）+ 主题黑白 + 被少推的源。
 export function getCurateConfig() {
   const db = getDatabase();
   const mutes = readMutes(db);
-  const regSources = db.prepare("SELECT s.id, s.display_name name FROM sources s WHERE s.registered_by_user=1 AND s.status='active' ORDER BY s.display_name").all();
+  const raw = db.prepare(`
+    SELECT s.id, s.display_name name, s.trust_tier tier, s.source_type stype,
+           (SELECT sp.platform FROM source_platforms sp WHERE sp.source_id=s.id LIMIT 1) platform
+    FROM sources s WHERE s.registered_by_user=1 AND s.status='active'`).all();
+  // 组内同名合并：key = group|name → 一条，管该名下所有 source_id
+  const merged = new Map();
+  for (const s of raw) {
+    const group = srcGroup(s);
+    const key = group + '|' + s.name;
+    if (!merged.has(key)) merged.set(key, { name: s.name, group, ids: [], platforms: new Set() });
+    const e = merged.get(key); e.ids.push(s.id); if (s.platform) e.platforms.add(s.platform);
+  }
+  const sources = [...merged.values()].map(e => ({
+    name: e.name, group: e.group, ids: e.ids, platforms: [...e.platforms],
+    muted: e.ids.every(id => mutes.sources.has(id)), // 名下全 mute 才算 muted
+  })).sort((a, b) => SRC_GROUPS.indexOf(a.group) - SRC_GROUPS.indexOf(b.group) || a.name.localeCompare(b.name));
+
   const cats = db.prepare("SELECT DISTINCT category FROM contents WHERE archived=0 AND category IS NOT NULL AND source_app!='github_trending' AND category IN ('模型','产品','行业','观点','其他')").all().map(r => r.category);
   const mutedSrcNames = mutes.sources.size ? db.prepare(`SELECT id, display_name name FROM sources WHERE id IN (${[...mutes.sources].map(() => '?').join(',')})`).all(...mutes.sources) : [];
   db.close();
   return {
-    sources: regSources.map(s => ({ id: s.id, name: s.name, muted: mutes.sources.has(s.id) })),
+    groups: SRC_GROUPS,
+    sources,
     categories: cats.map(c => ({ name: c, muted: mutes.categories.has(c) })),
     mutedSources: mutedSrcNames,
   };
 }
 
 // mute / 取消 mute（源 / 主题category / 内容级）——显式过滤，可撤销，不回喂调权重。
-export function setCurateMute({ sourceId = null, category = null, contentId = null, on = true } = {}) {
+export function setCurateMute({ sourceId = null, sourceIds = null, category = null, contentId = null, on = true } = {}) {
   const db = getDatabase();
   const r = db.prepare('SELECT value FROM app_meta WHERE key = ?').get(MUTE_KEY);
   let m; try { m = JSON.parse(r?.value || '{}'); } catch { m = {}; }
   m.sources = new Set(m.sources || []); m.contents = new Set(m.contents || []); m.categories = new Set(m.categories || []);
   const apply = (set, key) => { if (key == null) return; on ? set.add(key) : set.delete(key); };
   apply(m.sources, sourceId); apply(m.categories, category); apply(m.contents, contentId);
+  for (const id of (sourceIds || [])) apply(m.sources, id); // 合并条：一次 mute/恢复该名下所有 source_id
   db.prepare('INSERT OR REPLACE INTO app_meta(key, value) VALUES(?, ?)').run(MUTE_KEY,
     JSON.stringify({ sources: [...m.sources], contents: [...m.contents], categories: [...m.categories] }));
   db.close();

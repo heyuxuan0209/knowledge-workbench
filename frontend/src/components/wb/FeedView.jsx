@@ -834,8 +834,19 @@ export default function FeedView({
             </div>
             {!cfg ? <div style={{ padding: 20, color: 'var(--sub2)', textAlign: 'center' }}>加载中…</div> : (
               <div style={{ overflowY: 'auto' }}>
-                <div className="cfg-grp">必进精选的源（点掉 = 不必进精选）</div>
-                <div>{cfg.sources.map(s => <span key={s.id} className={`cfg-chip ${s.muted ? 'mute' : 'on'}`} onClick={() => toggleMute({ sourceId: s.id, on: !s.muted })}>{s.name}</span>)}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--faint)', marginBottom: 4 }}>必进精选的源（点掉 = 不必进精选）· 同一人多平台已合并</div>
+                {(cfg.groups || []).map(g => {
+                  const list = cfg.sources.filter(s => s.group === g)
+                  if (!list.length) return null
+                  return (
+                    <div key={g}>
+                      <div className="cfg-sub">{g}<span className="cfg-cnt">{list.length}</span></div>
+                      <div>{list.map(s => <span key={g + s.name} className={`cfg-chip ${s.muted ? 'mute' : 'on'}`}
+                        title={s.platforms.length > 1 ? s.platforms.join(' · ') : undefined}
+                        onClick={() => toggleMute({ sourceIds: s.ids, on: !s.muted })}>{s.name}{s.platforms.length > 1 ? ` ·${s.platforms.length}平台` : ''}</span>)}</div>
+                    </div>
+                  )
+                })}
                 <div className="cfg-grp">重点看 / 屏蔽的主题（划掉 = 少推这类）</div>
                 <div>{cfg.categories.map(c => <span key={c.name} className={`cfg-chip ${c.muted ? 'mute' : 'on'}`} onClick={() => toggleMute({ category: c.name, on: !c.muted })}>{c.name}</span>)}</div>
                 {cfg.mutedSources.filter(m => !cfg.sources.find(s => s.id === m.id)).length > 0 && (<>
