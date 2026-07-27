@@ -212,6 +212,9 @@ export default function FeedView({
   const [showAll, setShowAll] = useState(false)         // 「查看全部」展开完整分组列表
   const [curMenu, setCurMenu] = useState(null)          // 哪条打开 × 反馈细选菜单
   const [storyMem, setStoryMem] = useState({})          // 需求3：contentId → 事件簇成员（点「N 源同报」展开看哪些源）
+  const [topicCards, setTopicCards] = useState([])      // 需求2：真·多源事件簇话题卡（综合总结 + 折叠各源）
+  const [openTopic, setOpenTopic] = useState({})        // 话题卡「N 源报道」展开态
+  const loadTopicCards = () => api('/api/feed/topic-cards').then(j => setTopicCards(j.data || [])).catch(() => {})
   const toggleStoryMem = async (id) => {
     if (storyMem[id]) { setStoryMem(p => { const n = { ...p }; delete n[id]; return n }); return }
     setStoryMem(p => ({ ...p, [id]: 'loading' }))
@@ -263,6 +266,7 @@ export default function FeedView({
     api('/api/feed/visit', { method: 'POST' }).then(j => setLastVisit(j.data?.prevVisit ?? null)).catch(() => setLastVisit(null))
     loadIouStars()
     loadCurated()
+    loadTopicCards()
   }, [])
   // ★挂账清单：全库星标（不止已加载的），按挂账时间升序（挂得越久越靠前催办）
   const loadIouStars = () => api('/api/contents?starred=1&limit=100')
@@ -683,9 +687,36 @@ export default function FeedView({
 
         {/* ADR-045 终版：一手优先=四组分层 + 新到分界 + ★挂账催办；最新/最热=扁平紧凑行。像素级复刻 feed-final-mock。 */}
         {/* 精选优先（方案甲）：「全部」视图默认只给精选，点「查看全部」才展开完整列表；有筛选/分类直接列表 */}
-        {(!hasFilter && !showAll) ? null : (sortMode === 'firsthand' && !hasFilter ? (() => {
-          const src = filtered ?? contents
-          const groups = groupContents(src)
+        {(!hasFilter && !showAll) ? null : (<>
+          {/* 需求2·话题卡：今日多源大事合并 + AI 综合总结（只在全部视图的「查看全部」里） */}
+          {!hasFilter && topicCards.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="tc-secttl">今日多源大事 <span className="cf-n">{topicCards.length}</span><span className="hint">同一件事多源报道·已合并去重</span></div>
+              {topicCards.map(tc => (
+                <div key={tc.id} className="tc-card">
+                  <div className="tc-h" style={{ cursor: 'pointer' }} onClick={() => tc.members[0] && openReaderById(tc.members[0].id)}>{tc.headline}</div>
+                  {tc.digest && <div className="tc-d">{tc.digest}</div>}
+                  <span className="tc-src" onClick={() => setOpenTopic(o => ({ ...o, [tc.id]: !o[tc.id] }))}>{tc.sourceCount} 个源报道了这件事 {openTopic[tc.id] ? '▴' : '▾'}</span>
+                  {openTopic[tc.id] && (
+                    <div className="tc-members">
+                      {tc.members.map(m => (
+                        <div key={m.id} className="cf-mrow">
+                          <span className="cf-msrc">{(m.tier === 'T1' || m.tier === 'T1.5') ? '★ ' : ''}{m.src}</span>
+                          <span className="cf-mt" onClick={() => openReaderById(m.id)} title="站内精读">{m.title}</span>
+                          {m.url && <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--faint)', flexShrink: 0 }}><IconExternal size={11} /></a>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {tc.members[0] && actionBar(tc.members[0])}
+                </div>
+              ))}
+            </div>
+          )}
+          {sortMode === 'firsthand' && !hasFilter ? (() => {
+            const topicIds = new Set(topicCards.flatMap(tc => tc.members.map(m => m.id)))
+            const src = (filtered ?? contents).filter(c => !topicIds.has(c.id))
+            const groups = groupContents(src)
           const GH = {
             1: { icon: <IconPin />, t: '官方一手', cls: 'g1', what: '官方 blog + 官方号/员工号' },
             2: { icon: <IconTarget />, t: '你登记的一手信源', cls: 'g2', what: '你主动登记关注的博客 / X / YouTube / 播客' },
@@ -743,9 +774,10 @@ export default function FeedView({
             {otherOpen && groups[4].length > 0 && <div className="ff-grp" style={{ marginTop: 4 }}>{groups[4].map(ffRenderRow)}</div>}
             <div className="ff-note">按「原料价值」分层：官方一手 › 你关注的人 › 精选热点 › 其他 · 来过的自动划掉，新到的排在每组最前</div>
           </>
-        })() : (
-          <div className="wb-feed-list">{sortContents(filtered ?? contents).map(renderCard)}</div>
-        ))}
+          })() : (
+            <div className="wb-feed-list">{sortContents(filtered ?? contents).map(renderCard)}</div>
+          )}
+        </>)}
       </>)}
 
       {mainTab === 'projects' && (

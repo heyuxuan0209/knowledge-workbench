@@ -139,7 +139,9 @@ export function getContents(limit = 20, offset = 0, { q = null, starred = false,
     SELECT c.*, s.display_name as source_display_name, s.registered_by_user as source_registered,
            s.trust_tier as source_trust_tier,
            sp.platform as source_platform, sp.handle as source_handle,
-           (SELECT st.source_count FROM stories st WHERE st.primary_content_id = c.id) as story_source_count
+           (SELECT COUNT(DISTINCT c2.source_id) FROM stories st JOIN story_contents sc2 ON sc2.story_id = st.id
+              JOIN contents c2 ON c2.id = sc2.content_id
+              WHERE st.primary_content_id = c.id AND c2.archived = 0 AND c2.source_id IS NOT NULL) as story_source_count
     FROM contents c
     LEFT JOIN sources s ON c.source_id = s.id
     LEFT JOIN source_platforms sp ON sp.source_id = s.id

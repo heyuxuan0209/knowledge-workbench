@@ -1942,6 +1942,11 @@ app.get('/api/feed/story-members', async (req, res) => {
   try { const { getStoryMembers } = await import('./services/curated.js'); res.json({ success: true, data: getStoryMembers(req.query.contentId) }); }
   catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
+// 需求2·话题卡：真·多源事件簇 + AI 综合总结（ensure=1 补生成缺失 digest，慢；默认读缓存秒返回）
+app.get('/api/feed/topic-cards', async (req, res) => {
+  try { const { getTopicCards } = await import('./services/curated.js'); res.json({ success: true, data: await getTopicCards({ ensure: req.query.ensure === '1' }) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
 
 const SESSION_GAP_MIN = 30; // 间隔 >30 分钟算新的一次"来"，才推进分界
 app.get('/api/feed/last-visit', async (req, res) => {
