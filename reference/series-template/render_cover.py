@@ -89,29 +89,30 @@ h1{font-size:44px;line-height:1.3;font-weight:900;color:__INK__;letter-spacing:.
 </div>
 </body></html>"""
 
-# ── 骨架模板 B：1:1 转发卡片/主页方图（1000×1000，竖向重排，非裁切）──────
+# ── 骨架模板 B：1:1 转发卡片/主页方图（1000×1000，全居中重排，非裁切）──────
+# 下段详规（用户 2026-07-27）：全部居中；双线左右留白；大标题放大拆两行；标题下浅橙下划线；
+# 底部居中署名；**不放右下角标签**；所有元素落在方版安全区内。
 TEMPLATE_SQUARE = """<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:1000px;height:1000px}
 .cover{width:1000px;height:1000px;overflow:hidden;background:__BG__;
-  font-family:__SANS__;padding:80px 76px;display:flex;flex-direction:column;position:relative}
+  font-family:__SANS__;padding:70px 64px;display:flex;flex-direction:column;position:relative;text-align:center}
 .mono{font-family:'SF Mono',Consolas,Menlo,monospace}
-.mh{border-bottom:__RULE__;padding-bottom:22px}
-.name{font-size:46px;font-weight:900;color:__NAME_INK__;letter-spacing:5px;font-family:__TITLE_FONT__}
+.mh{border-bottom:__RULE__;padding-bottom:20px;margin:0 44px}
+.name{font-size:48px;font-weight:900;color:__NAME_INK__;letter-spacing:5px;font-family:__TITLE_FONT__}
 .name .en{font-size:16px;font-weight:700;color:__ACCENT__;letter-spacing:6px;margin-left:12px;font-family:Georgia,serif}
-.mh-r{font-size:17px;color:__SUB__;letter-spacing:1.5px;line-height:1.6;margin-top:14px}
-.body{flex:1;display:flex;flex-direction:column;justify-content:center;padding:8px 0}
-.kicker{font-size:20px;color:__ACCENT__;font-weight:700;letter-spacing:1px;margin-bottom:26px;
-  display:flex;align-items:center;gap:14px}
+.mh-r{font-size:17px;color:__SUB__;letter-spacing:1.5px;line-height:1.6;margin-top:12px}
+.body{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:8px 0}
+.kicker{font-size:20px;color:__ACCENT__;font-weight:700;letter-spacing:1px;margin-bottom:30px;
+  display:flex;align-items:center;justify-content:center;gap:14px}
 .badge{background:__ACCENT__;color:__ACCENT_TEXT__;font-size:16px;font-weight:700;
   padding:5px 16px;border-radius:999px;letter-spacing:1px}
-h1{font-size:74px;line-height:1.34;font-weight:900;color:__INK__;letter-spacing:1px;font-family:__TITLE_FONT__}
+h1{font-size:118px;line-height:1.28;font-weight:900;color:__INK__;letter-spacing:1px;font-family:__TITLE_FONT__}
 .ul{border-bottom:10px solid __ULINE__;padding-bottom:3px}
 .foot{border-top:1px solid __FOOT_BORDER__;padding-top:22px;
-  display:flex;justify-content:space-between;align-items:center}
+  display:flex;justify-content:center;align-items:center;margin:0 44px}
 .src{font-size:19px;color:__SUB__;letter-spacing:.3px}
 .src b{color:__ACCENT__;font-weight:700}
-.tag{font-size:16px;color:__TAG_TEXT__;background:__TAG_BG__;padding:6px 16px;border-radius:6px;letter-spacing:1px}
 </style></head><body>
 <div class="cover">
   <div class="mh">
@@ -124,7 +125,6 @@ h1{font-size:74px;line-height:1.34;font-weight:900;color:__INK__;letter-spacing:
   </div>
   <div class="foot">
     <div class="src">__AUTHOR_HTML__</div>
-    <div class="tag">__TAG__</div>
   </div>
 </div>
 </body></html>"""
