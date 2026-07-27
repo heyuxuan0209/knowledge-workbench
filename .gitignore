@@ -73,3 +73,8 @@ reference/opinions.md
 reference/platform-playbooks/
 templates/
 published/
+
+# 系列交接契约/规范（handoff，只留本地——ADR-052 / github-publish-policy）
+reference/series-template/INTEGRATION-SPEC.md
+reference/series-template/SERIES-SPEC.md
+reference/series-template/vendor/VENDOR.md
