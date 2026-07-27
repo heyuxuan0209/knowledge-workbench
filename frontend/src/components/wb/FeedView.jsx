@@ -215,6 +215,14 @@ export default function FeedView({
   const [topicCards, setTopicCards] = useState([])      // 需求2：真·多源事件簇话题卡（综合总结 + 折叠各源）
   const [openTopic, setOpenTopic] = useState({})        // 话题卡「N 源报道」展开态
   const loadTopicCards = () => api('/api/feed/topic-cards').then(j => setTopicCards(j.data || [])).catch(() => {})
+  // ⚙调精选面板：源/主题白黑名单管理（显式过滤、可撤销、不猜口味）
+  const [cfgOpen, setCfgOpen] = useState(false)
+  const [cfg, setCfg] = useState(null)
+  const loadCfg = () => api('/api/feed/curate-config').then(j => setCfg(j.data)).catch(() => {})
+  const openConfig = () => { setCfgOpen(true); loadCfg() }
+  const toggleMute = async (body) => {
+    try { await api('/api/feed/curate-mute', { method: 'POST', body }); loadCfg(); loadCurated() } catch { /* */ }
+  }
   const toggleStoryMem = async (id) => {
     if (storyMem[id]) { setStoryMem(p => { const n = { ...p }; delete n[id]; return n }); return }
     setStoryMem(p => ({ ...p, [id]: 'loading' }))
@@ -657,7 +665,7 @@ export default function FeedView({
         {!hasFilter && curated.length > 0 && (<>
           <div className="cf-recipe">
             <span>本轮精选：<b>你登记的一手源新作</b> · <b>今日多源大事</b> · 官方发布 —— 逻辑透明、每条标了为什么入选，随时可调</span>
-            <button className="gear" onClick={() => showToast?.('「调精选」面板下一步上线：源/主题白黑名单管理')}>⚙ 调精选</button>
+            <button className="gear" onClick={openConfig}>⚙ 调精选</button>
           </div>
           <div className="cf-secttl">本轮 AI 精选 <span className="cf-n">{curated.length}</span></div>
           {curated.map(c => (
@@ -817,6 +825,29 @@ export default function FeedView({
           </>
       )}
 
+      {cfgOpen && (
+        <div className="wb-modal-mask" onClick={(e) => { if (e.target === e.currentTarget) setCfgOpen(false) }}>
+          <div className="wb-modal" style={{ maxWidth: 480 }}>
+            <div className="wb-modal-head">
+              <div className="wb-modal-title">⚙ 调精选 · 你说了算</div>
+              <button className="wb-modal-close" style={{ marginLeft: 'auto' }} onClick={() => setCfgOpen(false)}>×</button>
+            </div>
+            {!cfg ? <div style={{ padding: 20, color: 'var(--sub2)', textAlign: 'center' }}>加载中…</div> : (
+              <div style={{ overflowY: 'auto' }}>
+                <div className="cfg-grp">必进精选的源（点掉 = 不必进精选）</div>
+                <div>{cfg.sources.map(s => <span key={s.id} className={`cfg-chip ${s.muted ? 'mute' : 'on'}`} onClick={() => toggleMute({ sourceId: s.id, on: !s.muted })}>{s.name}</span>)}</div>
+                <div className="cfg-grp">重点看 / 屏蔽的主题（划掉 = 少推这类）</div>
+                <div>{cfg.categories.map(c => <span key={c.name} className={`cfg-chip ${c.muted ? 'mute' : 'on'}`} onClick={() => toggleMute({ category: c.name, on: !c.muted })}>{c.name}</span>)}</div>
+                {cfg.mutedSources.filter(m => !cfg.sources.find(s => s.id === m.id)).length > 0 && (<>
+                  <div className="cfg-grp">被你少推的其他源（点 = 恢复）</div>
+                  <div>{cfg.mutedSources.filter(m => !cfg.sources.find(s => s.id === m.id)).map(m => <span key={m.id} className="cfg-chip mute" onClick={() => toggleMute({ sourceId: m.id, on: false })}>{m.name}</span>)}</div>
+                </>)}
+                <div className="cfg-note">点亮 = 进精选，划掉 = 少推。所有反馈可撤销——精选是你的过滤器，不是猜你口味的算法。改完精选即时更新。</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {readerContent && <ReaderModal content={readerContent} onClose={() => setReaderContent(null)} showToast={showToast} loadNotes={loadNotes} />}
     </>
   )

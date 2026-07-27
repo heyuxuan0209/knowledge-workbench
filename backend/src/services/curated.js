@@ -133,7 +133,7 @@ export function getCurateConfig() {
   const db = getDatabase();
   const mutes = readMutes(db);
   const regSources = db.prepare("SELECT s.id, s.display_name name FROM sources s WHERE s.registered_by_user=1 AND s.status='active' ORDER BY s.display_name").all();
-  const cats = db.prepare("SELECT DISTINCT category FROM contents WHERE archived=0 AND category IS NOT NULL").all().map(r => r.category);
+  const cats = db.prepare("SELECT DISTINCT category FROM contents WHERE archived=0 AND category IS NOT NULL AND source_app!='github_trending' AND category IN ('模型','产品','行业','观点','其他')").all().map(r => r.category);
   const mutedSrcNames = mutes.sources.size ? db.prepare(`SELECT id, display_name name FROM sources WHERE id IN (${[...mutes.sources].map(() => '?').join(',')})`).all(...mutes.sources) : [];
   db.close();
   return {
