@@ -561,7 +561,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               </div>
             )}
             <div style={{ fontSize: 12.5, color: 'var(--sub2)', marginBottom: 9 }}>
-              {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议文体：` : reshapeMode ? '你带来的稿在下面——选好文体，点「用这个生成母稿」重塑：' : '勾选左侧素材，或直接在下面编辑器写/带一段草稿，选文体生成母稿：'}
+              {selMat.size > 0 ? `基于你选的 ${selMat.size} 条素材，建议文体：` : reshapeMode ? '你带来的稿在下面——想让 AI 按文体重塑就点「用这个生成母稿」；已是成稿就直接去「③ 出片」，不必生成。' : '勾选左侧素材让 AI 起草；或已有成稿直接粘/写进下面编辑器 →「③ 出片」（不必生成母稿）。'}
             </div>
             <div style={{ border: '1px solid rgba(61,90,128,.35)', borderRadius: 11, padding: '12px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
@@ -639,7 +639,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             ) : (
               <textarea ref={draftRef} className="wb-draft" style={{ marginTop: 4 }} value={studio.draft}
                 onChange={(e) => setStudio(s => ({ ...s, draft: e.target.value }))}
-                placeholder="点上方「用这个生成母稿」起稿，或直接在这里手写；改稿见下方或右侧「创作助手」…" />
+                placeholder="① 从素材让 AI 起草 → 点上方「用这个生成母稿」；② 已有成稿 → 直接粘/写在这里，不必点生成，去「③ 出片」即可。改稿见下方或右侧「创作助手」…" />
             )}
             {noRefs && (
               <div className="wb-warnbar" style={{ marginTop: 10 }}><IconWarn />草稿中没有素材引用，创作前请补充引用（每段可溯源）</div>
@@ -1040,7 +1040,7 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
   const gen = async () => {
     if (!f.title.trim()) { showToast('先填主标题'); return }
     const kw = f.keyword.trim()
-    if (!kw || !f.title.includes(kw)) { showToast('「点睛词」必填，且要在主标题里出现（会自动加下划线点睛）'); return }
+    if (kw && !f.title.includes(kw)) showToast('点睛词不在主标题里，这次先不加下划线（可改标题或点睛词）')  // 提示但不拦
     const skin = presets.find(p => p.id === preset)?.cover_skin || 'moyu-green'
     const content = { name: f.name, issue_event: f.issue_event.replace(/\n/g, '<br>'), badge: f.badge, kicker: f.kicker, title_html: buildTitleHtml(), author_html: f.author_html, tag: f.tag }
     setBusy(true); showToast('正在渲染头图（双尺寸，约 3–5 秒）…')
@@ -1048,7 +1048,8 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
     catch (err) { showToast('头图生成失败：' + err.message) }
     setBusy(false)
   }
-  const dl = (shape) => { const v = result?.[shape]; if (!v) return; const a = document.createElement('a'); a.href = v.base64; a.download = `头图-${shape === 'wide' ? '消息大图1800x766' : '方图2000x2000'}.png`; a.click() }
+  const DL_NAME = { combined: '头图母图1800x1986', wide: '公众号封面1800x766', square: '转发方图2000x2000' }
+  const dl = (shape) => { const v = result?.[shape]; if (!v) return; const a = document.createElement('a'); a.href = v.base64; a.download = `${DL_NAME[shape] || shape}.png`; a.click() }
   return (
     <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginTop: 11, background: 'var(--surface)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>④ 公众号头图 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· AI 观察手记系列 · 字段 → 双尺寸 PNG</span></div>
@@ -1071,23 +1072,24 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
         </label>
         <CoverField f={f} set={set} label="副标（kicker）" k="kicker" ph="一句话副标题" />
         <CoverField f={f} set={set} label="主标题（可换行）" k="title" ph="当造东西不再稀缺，产品人还剩下什么？" area />
-        <CoverField f={f} set={set} label="点睛词（必填·标题里一个词，自动加下划线）" k="keyword" ph="造东西" />
+        <CoverField f={f} set={set} label="点睛词（选填·标题里一个词，自动加下划线）" k="keyword" ph="造东西" />
         <CoverField f={f} set={set} label="作者行（可用 <b>身份</b> 上色）" k="author_html" ph="杰西卡　<b>独立开发者</b> · AI 产品人" />
         <CoverField f={f} set={set} label="类型标签" k="tag" ph="深度精读" />
       </div>
       <button className="wb-btn-primary" style={{ marginTop: 6 }} disabled={busy} onClick={gen}>{busy ? '渲染中…' : (result ? '↻ 重新生成头图' : '🖼 生成头图（双尺寸）')}</button>
 
-      {result && (
-        <div style={{ marginTop: 14, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      {result && result.combined && (
+        <div style={{ marginTop: 14, display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 5 }}>消息列表大图 · 1800×766</div>
-            <img src={result.wide.base64} alt="wide" style={{ width: 340, borderRadius: 8, border: '1px solid var(--line10)', display: 'block' }} />
-            <button className="wb-btn-ghost" style={{ marginTop: 6 }} onClick={() => dl('wide')}>⬇ 下载大图 PNG</button>
+            <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 5 }}>母图 · 1800×1986（上段裁公众号封面 2.35:1、下段裁转发方图 1:1）</div>
+            <img src={result.combined.base64} alt="combined" style={{ width: 300, borderRadius: 8, border: '1px solid var(--line10)', display: 'block' }} />
+            <button className="wb-btn-primary" style={{ marginTop: 8 }} onClick={() => dl('combined')}>⬇ 下载母图 PNG</button>
           </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--sub2)', marginBottom: 5 }}>转发卡片方图 · 2000×2000</div>
-            <img src={result.square.base64} alt="square" style={{ width: 180, borderRadius: 8, border: '1px solid var(--line10)', display: 'block' }} />
-            <button className="wb-btn-ghost" style={{ marginTop: 6 }} onClick={() => dl('square')}>⬇ 下载方图 PNG</button>
+          <div style={{ fontSize: 11.5, color: 'var(--sub2)', lineHeight: 1.7, maxWidth: 220 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>也可单独下载：</div>
+            <button className="wb-btn-ghost" style={{ marginBottom: 6 }} onClick={() => dl('wide')}>⬇ 上段·公众号封面 1800×766</button><br />
+            <button className="wb-btn-ghost" onClick={() => dl('square')}>⬇ 下段·转发方图 2000×2000</button>
+            <div style={{ marginTop: 10, color: 'var(--faint)' }}>上下段同一套设计、内容相同、互相独立——按平台各裁一段用。</div>
           </div>
         </div>
       )}
