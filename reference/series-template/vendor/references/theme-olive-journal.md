@@ -60,9 +60,9 @@
 
 ## 组件 2 头图卡 hero-card
 
-**用途**：文章开篇头图区，内刊风格：顶部标签+日期条，主标题+强调词，侧边配一枚手绘风占位插画，底部深色摘要条收尾。整篇文章唯一一处、放在最前面，不设 `margin-top`。
+**用途**：文章开篇头图区，内刊风格：顶部标签+日期条，主标题+强调词，底部深色摘要条收尾。整篇文章唯一一处、放在最前面，不设 `margin-top`。
 
-**可替换字段**：`{{内刊标签}}` `{{日期}}` `{{旧标题占位}}`（可选，删除线小字，无需要时整行删除）`{{主标题}}` `{{强调词}}` `{{副标题说明}}` `{{底部摘要}}` `{{标签1}}` `{{标签2}}`
+**可替换字段**：`{{内刊标签}}` `{{日期}}` `{{旧标题占位}}`（可选，删除线小字，无需要时整行删除）`{{主标题}}` `{{强调词}}` `{{副标题说明}}` `{{底部摘要}}` `{{标签1}}` `{{标签2}}`（右侧默认无模块；系列文章可选 `{{期号}}` `{{期号标签}}` 期号块，见组件末）
 
 ```html
 <section style="background:#fdfdf8;border:1px solid #bfc1b7;border-radius:6px;overflow:hidden;font-family:'IBM Plex Sans',-apple-system,system-ui,sans-serif;">
@@ -85,16 +85,6 @@
         </section>
         <p style="font-size:13px;color:#65675e;margin:0;line-height:1.7;"><span leaf="">{{副标题说明}}</span></p>
       </section>
-      <section style="flex-shrink:0;width:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#eeefe9;border:1px dashed #bfc1b7;border-radius:6px;padding:8px;">
-        <svg width="72" height="72" viewBox="0 0 64 64" aria-hidden="true" style="display:block;">
-          <ellipse cx="32" cy="36" rx="22" ry="18" fill="none" stroke="#4d4f46" stroke-width="2"></ellipse>
-          <circle cx="26" cy="30" r="3" fill="#4d4f46"></circle>
-          <circle cx="38" cy="30" r="3" fill="#4d4f46"></circle>
-          <path d="M28 40 Q32 44 36 40" fill="none" stroke="#4d4f46" stroke-width="1.5"></path>
-          <path d="M12 34 L8 28 M52 34 L56 28" stroke="#bfc1b7" stroke-width="2" stroke-linecap="round"></path>
-        </svg>
-        <span style="font-size:8px;font-weight:700;color:#9ea096;letter-spacing:1px;margin-top:4px;"><span leaf="">DOODLE</span></span>
-      </section>
     </section>
   </section>
   <section style="background:#1e1f23;padding:11px 24px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
@@ -108,6 +98,19 @@
 ```
 
 （`{{旧标题占位}}` 那一行没有真实"旧标题"内容时整行 `<p>` 删除，不留占位删除线空行。）
+
+**右侧模块（默认无，可选）**：默认头图卡右侧不放任何框、标题占满，适用任何单篇长文。**仅系列文章**才加期号块——把标题区包一层 `<section style="flex:1;min-width:0;">`，外层改用 `<section style="display:flex;align-items:stretch;gap:18px;">`，右侧加下面这块（`{{期号}}` 如 `01`，`{{期号标签}}` 如 `现场手记`）：
+
+```html
+<section style="flex-shrink:0;width:112px;background:#1e1f23;border-radius:6px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+  <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:2px;color:#ed7b2f;"><span leaf="">NO.</span></p>
+  <p style="margin:2px 0 0;font-size:44px;font-weight:900;color:#ffffff;line-height:0.9;letter-spacing:-1px;"><span leaf="">{{期号}}</span></p>
+  <p style="margin:8px 0 0;font-size:10px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.7);"><span leaf="">{{期号标签}}</span></p>
+</section>
+```
+
+非系列但想要一个标记时，可把 `{{期号}}` 换成类别词（现场/评测/专访），或整块不加。
+
 
 ---
 
