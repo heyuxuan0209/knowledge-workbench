@@ -211,6 +211,34 @@ export default function FeedView({
   const [curated, setCurated] = useState([])
   const [showAll, setShowAll] = useState(false)         // 「查看全部」展开完整分组列表
   const [curMenu, setCurMenu] = useState(null)          // 哪条打开 × 反馈细选菜单
+  const [storyMem, setStoryMem] = useState({})          // 需求3：contentId → 事件簇成员（点「N 源同报」展开看哪些源）
+  const toggleStoryMem = async (id) => {
+    if (storyMem[id]) { setStoryMem(p => { const n = { ...p }; delete n[id]; return n }); return }
+    setStoryMem(p => ({ ...p, [id]: 'loading' }))
+    try { const j = await api(`/api/feed/story-members?contentId=${id}`); setStoryMem(p => ({ ...p, [id]: j.data || [] })) }
+    catch { setStoryMem(p => { const n = { ...p }; delete n[id]; return n }) }
+  }
+  // 可点徽章（「N 源同报」才可点开看源；「官方一手」不可点）
+  const badgeEl = (c, badge) => !badge ? null : (badge.cls === 'cl'
+    ? <span className={`fg-badge ${badge.cls}`} style={{ cursor: 'pointer' }} title="点看是哪几个源" onClick={() => toggleStoryMem(c.id)}>{badge.t} {storyMem[c.id] ? '▴' : '▾'}</span>
+    : <span className={`fg-badge ${badge.cls}`}>{badge.t}</span>)
+  // 事件簇成员展开区（点徽章后卡内列出各源+标题+原文）
+  const storyExpand = (c) => {
+    const m = storyMem[c.id]; if (!m) return null
+    if (m === 'loading') return <div className="cf-members"><span style={{ color: 'var(--faint)' }}>加载中…</span></div>
+    return (
+      <div className="cf-members">
+        <div className="cf-mh">这件事 {m.length} 个源在报：</div>
+        {m.map(x => (
+          <div key={x.id} className="cf-mrow">
+            <span className="cf-msrc">{(x.tier === 'T1' || x.tier === 'T1.5') ? '★ ' : ''}{x.src}</span>
+            <span className="cf-mt" onClick={() => openReaderById(x.id)} title="站内精读">{x.title}</span>
+            {x.url && <a href={x.url} target="_blank" rel="noreferrer" title="原文" style={{ color: 'var(--faint)', flexShrink: 0 }}><IconExternal size={11} /></a>}
+          </div>
+        ))}
+      </div>
+    )
+  }
   const loadCurated = () => api('/api/feed/curated?limit=12').then(j => setCurated(j.data || [])).catch(() => {})
   // × 负反馈（不看这条 / 少推源 / 这类主题少推）：本地移除 + 落库 mute（显式过滤、可撤销、不调权重）
   const curateMute = async (body, msg) => {
@@ -378,9 +406,10 @@ export default function FeedView({
     const badge = c.story_source_count > 1 ? { t: `${c.story_source_count} 源同报`, cls: 'cl' } : ((c.trust_tier === 'T1' || c.trust_tier === 'T1.5') ? { t: '官方一手', cls: 'of' } : null)
     return (
       <div key={c.id} className="cf-card">
-        <div className="cf-m"><span className="cf-src">{author}</span>·<span>{hmOf(c)}</span>{badge && <span className={`fg-badge ${badge.cls}`} style={{ marginLeft: 6 }}>{badge.t}</span>}</div>
+        <div className="cf-m"><span className="cf-src">{author}</span>·<span>{hmOf(c)}</span>{badge && <span style={{ marginLeft: 6 }}>{badgeEl(c, badge)}</span>}</div>
         <div className="cf-t" onClick={() => openReaderById(c.id)} title="点开站内精读（读中文）">{title}</div>
         {summary && <div className="cf-s">{summary.slice(0, 120)}</div>}
+        {storyExpand(c)}
         {actionBar(c)}
       </div>
     )
@@ -642,9 +671,10 @@ export default function FeedView({
               <div className="cf-t" onClick={() => openReaderById(c.id)}>{c.title}</div>
               {c.summary && <div className="cf-s">{c.summary}</div>}
               <div className="cf-f">
-                {c.badge && <span className={`fg-badge ${c.badge.cls}`}>{c.badge.t}</span>}
+                {badgeEl(c, c.badge)}
                 <span className="cf-why">入选：{c.why}</span>
               </div>
+              {storyExpand(c)}
               {actionBar(c)}
             </div>
           ))}

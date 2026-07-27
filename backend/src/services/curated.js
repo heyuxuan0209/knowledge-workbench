@@ -62,6 +62,22 @@ export function getCurated(limit = 12) {
   }));
 }
 
+// 需求3·「N 源同报」可点看是哪些源：给 content_id（事件簇主条）→ 返回该事件全部成员（源+标题+链接）。
+export function getStoryMembers(contentId) {
+  const db = getDatabase();
+  const row = db.prepare('SELECT story_id FROM story_contents WHERE content_id=?').get(contentId)
+    || db.prepare('SELECT id AS story_id FROM stories WHERE primary_content_id=?').get(contentId);
+  if (!row) { db.close(); return []; }
+  const mem = db.prepare(`
+    SELECT c.id, COALESCE(s.display_name, c.source_app, '未知源') src, s.trust_tier tier,
+           COALESCE(c.zh_title, c.en_title) title, c.url, c.permalink
+    FROM story_contents sc JOIN contents c ON c.id = sc.content_id LEFT JOIN sources s ON s.id = c.source_id
+    WHERE sc.story_id = ?
+    ORDER BY CASE s.trust_tier WHEN 'T1' THEN 0 WHEN 'T1.5' THEN 1 ELSE 2 END, c.id`).all(row.story_id);
+  db.close();
+  return mem.map(m => ({ id: m.id, src: m.src, tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink }));
+}
+
 // 「调精选」面板数据：必进精选的源（你登记的）+ 当前被 mute 的源/主题——供白黑名单管理。
 export function getCurateConfig() {
   const db = getDatabase();

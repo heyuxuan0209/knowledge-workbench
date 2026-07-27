@@ -1937,6 +1937,11 @@ app.post('/api/feed/curate-mute', async (req, res) => {
   try { const { setCurateMute } = await import('./services/curated.js'); res.json({ success: true, data: setCurateMute(req.body || {}) }); }
   catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
+// 需求3·「N 源同报」点开看哪些源
+app.get('/api/feed/story-members', async (req, res) => {
+  try { const { getStoryMembers } = await import('./services/curated.js'); res.json({ success: true, data: getStoryMembers(req.query.contentId) }); }
+  catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
 
 const SESSION_GAP_MIN = 30; // 间隔 >30 分钟算新的一次"来"，才推进分界
 app.get('/api/feed/last-visit', async (req, res) => {
