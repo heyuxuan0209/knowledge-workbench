@@ -87,4 +87,28 @@
 
 ---
 
+## 🔗 关注我 · learn in public, build in public
+
+这个工作台怎么长大、我做 AI 产品踩过的坑、把「读到的」变成「写出来、发出去」的方法、AI 落地的一手经验与思考——**都在这些平台上边做边分享**。想一起 learn / build in public，或认识做内容、做 AI 产品的朋友，欢迎关注、来聊：
+
+<table>
+  <tr>
+    <td align="center"><b>小红书</b></td>
+    <td align="center"><b>微信公众号</b></td>
+    <td align="center"><b>抖音 / 视频号</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/qr-xiaohongshu.jpg" width="210" alt="小红书 杰西卡"></td>
+    <td align="center"><img src="assets/qr-wechat.jpg" width="180" alt="微信公众号 杰西卡聊AI"></td>
+    <td align="center"><img src="assets/qr-douyin.jpg" width="210" alt="抖音 杰西卡"></td>
+  </tr>
+  <tr>
+    <td align="center">杰西卡 · 小红书号 <code>111013749</code></td>
+    <td align="center">搜「<b>杰西卡聊AI</b>」关注</td>
+    <td align="center">@杰西卡 · 抖音号 <code>2179932674</code></td>
+  </tr>
+</table>
+
+---
+
 **版本**：V1 · **最后更新**：2026-07-27
