@@ -25,7 +25,7 @@
 ## 文件放哪（2026-07-28 整理后的边界，别再乱回去）
 
 - **UI mock / 选型 HTML**：一律进 `prototype/`（单文件放 `prototype/mock-pages/`），**禁止再往 `frontend/public/` 塞**——那里只放正式前端资源。mock 选完型、决策进了 ADR 后，及时在 `prototype/README.md` 索引里标记状态。
-- **交接文档**：只进 `handoff/`（docs/ 里不再放 HANDOFF-*）；被新交接取代或超过 7 天未更新的旧交接，移入 `archive/handoffs/`。
+- **交接文档＝工单**：只进 `handoff/`（docs/ 里不再放 HANDOFF-*），**谁干完活谁当场把工单移入 `archive/handoffs/`**——handoff/ 只放未完工单，空着=没有未完事项。禁止放"项目现状"类快照（会烂、烂了会骗新 agent）；新 agent 接手走 `handoff/README.md` 的五步协议。
 - **创作类文件**（草稿/成品/发布模板/灵感）：**本仓不收**，一律去独立工作区 `~/Documents/项目/writing/`（纯本地私有仓）。本仓的 process-log/DECISIONS 是它的选题燃料源，只读引用。
 - **实验输出**（cluster dump 之类一次性数据）：进 `archive/experiments/`。
 - 每轮开发收尾跑 `/tidy-closeout`（残留巡检 + 留痕检查 + git 边界检查）。

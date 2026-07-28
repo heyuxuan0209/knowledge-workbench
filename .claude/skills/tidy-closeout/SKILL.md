@@ -25,10 +25,12 @@ description: >-
 ```bash
 git status --porcelain          # 游离新文件
 ls frontend/public/ | grep -i mock   # 不该在这的 mock（规则：mock 只进 prototype/）
-ls -lt handoff/                 # 超 7 天未更新且被更新交接取代的 → archive/handoffs/ 候选
+ls handoff/                     # 除 README 外的每个工单：对着 git log 验证活干完没
 find . -maxdepth 1 -type d -empty    # 空目录
 find . -name __pycache__ -o -name .DS_Store | grep -v node_modules | head
 ```
+
+**handoff 工单逐个验收**：对 `handoff/` 里每个工单，用 `git log`/代码实证"活干完没"（别只看日期新旧——上次就是只按日期归档，漏了一张已完工的工单）。干完 → 移入 `archive/handoffs/`；没干完 → 留着并在汇报里点名。**本轮会话自己干完的工单，当场归档，这是收尾的义务动作。**
 
 对照 CLAUDE.md「文件放哪」逐项判断归属：mock→`prototype/mock-pages/`（并更新 `prototype/README.md` 索引状态）、交接→`handoff/`、实验输出→`archive/experiments/`、创作类→`~/Documents/项目/writing/`（提醒用户或直接搬）。
 
