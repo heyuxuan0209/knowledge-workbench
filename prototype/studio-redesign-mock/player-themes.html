@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>竖版分镜 · 主题选型（真数据）</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;background:#e7e3da;color:#26241f;padding:26px 30px 60px}
+  h1{font-size:21px;font-weight:700}
+  .lead{font-size:13.5px;color:#6b6559;margin:7px 0 22px;line-height:1.6;max-width:900px}
+  .lead b{color:#a8552e}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:26px}
+  .cell{}
+  .cap{display:flex;align-items:baseline;gap:8px;margin:0 2px 9px}
+  .cap .nm{font-size:14px;font-weight:700}
+  .cap .no{font-size:11px;color:#8a8478}
+  .cap .desc{font-size:11.5px;color:#6b6559}
+  /* 9:16 舞台 */
+  .stage{aspect-ratio:9/16;border-radius:20px;overflow:hidden;position:relative;box-shadow:0 12px 34px rgba(33,31,26,.2);display:flex;flex-direction:column;justify-content:center;align-items:center;padding:11% 9%;text-align:center}
+  .badge{position:absolute;top:4%;left:6%;font-size:12px;font-weight:700;opacity:.85}
+  .brand{position:absolute;bottom:3.5%;right:6%;font-size:12px;opacity:.7}
+  .kicker{font-size:13px;letter-spacing:.13em;font-weight:700;text-transform:uppercase;margin-bottom:20px}
+  .kw{line-height:1.1;font-weight:800}
+  .sub{margin-top:20px;line-height:1.5}
+  .capbar{position:absolute;left:7%;right:7%;bottom:9%}
+  .capline{display:inline-block;line-height:1.5;font-weight:600}
+
+  /* 1 · 暖刊 Warm Editorial */
+  .t1{background:#f2ece0}
+  .t1 .badge{color:#b06a3c}.t1 .brand{color:#9a9488}
+  .t1 .kicker{color:#b06a3c}
+  .t1 .kw{font-family:'Newsreader',"Songti SC",serif;font-size:62px;color:#2c2820;font-weight:700}
+  .t1 .kw em{font-style:normal;color:#c1633a;box-shadow:inset 0 -14px 0 rgba(193,99,58,.16)}
+  .t1 .sub{font-size:19px;color:#7a7264}
+  .t1 .brand{color:#9a9488}
+  .t1 .capline{background:rgba(255,255,255,.7);border-radius:13px;padding:11px 17px;font-size:19px;color:#3a352c}
+
+  /* 2 · 午夜霓虹 Midnight Neon */
+  .t2{background:radial-gradient(120% 90% at 50% 0%,#181b24 0%,#0c0d12 70%)}
+  .t2 .badge{color:#5de3c4}.t2 .brand{color:#6a7080}
+  .t2 .kicker{color:#5de3c4}
+  .t2 .kw{font-size:66px;color:#f4f6fa;font-weight:900;letter-spacing:-.01em}
+  .t2 .kw em{font-style:normal;color:#5de3c4;text-shadow:0 0 22px rgba(93,227,196,.5)}
+  .t2 .sub{font-size:19px;color:#aab2c2}
+  .t2 .capline{background:rgba(255,255,255,.08);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.14);border-radius:13px;padding:11px 17px;font-size:19px;color:#eef1f6}
+
+  /* 3 · 杂志拼贴 Magazine */
+  .t3{background:#f4efe6;align-items:flex-start;text-align:left}
+  .t3 .badge{color:#c0392b;left:auto;right:6%;font-size:44px;font-weight:900;top:6%;opacity:.14}
+  .t3 .kicker{color:#c0392b;align-self:flex-start}
+  .t3 .kw{font-size:64px;color:#211d18;font-weight:900;letter-spacing:-.02em}
+  .t3 .kw em{font-style:normal;background:#e8b23a;color:#211d18;padding:0 8px;box-decoration-break:clone}
+  .t3 .sub{font-size:19px;color:#6f6656;align-self:flex-start}
+  .t3 .capbar{text-align:left}
+  .t3 .capline{border-left:4px solid #c0392b;padding:3px 0 3px 13px;font-size:19px;color:#3a352c}
+  .t3 .brand{color:#9a9488}
+
+  /* 4 · 牛皮手账 Kraft Notebook */
+  .t4{background:#d8c6a4;background-image:radial-gradient(rgba(120,95,55,.08) 1px,transparent 1px);background-size:16px 16px}
+  .t4 .badge{color:#6d4f2a}.t4 .brand{color:#7a5f37}
+  .t4 .kicker{color:#8a5a2b}
+  .t4 .kw{font-family:"Songti SC",serif;font-size:60px;color:#3d2c17;font-weight:800}
+  .t4 .kw em{font-style:normal;position:relative}
+  .t4 .kw em::after{content:"";position:absolute;left:-2px;right:-2px;bottom:6px;height:14px;background:rgba(214,120,60,.4);transform:rotate(-1.2deg);z-index:-1}
+  .t4 .sub{font-size:19px;color:#6b543a}
+  .t4 .capline{background:#fbf6ea;border:1px dashed #b79a68;border-radius:11px;padding:10px 16px;font-size:19px;color:#4a3a26}
+
+  /* 5 · 糖果玻璃 Candy Glass */
+  .t5{background:linear-gradient(160deg,#ffe3ee 0%,#e9ddff 55%,#dcefff 100%)}
+  .t5 .badge{color:#d1568f}.t5 .brand{color:#a98ab8}
+  .t5 .kicker{color:#d1568f}
+  .t5 .kw{font-size:62px;color:#3a2b36;font-weight:800}
+  .t5 .kw em{font-style:normal;color:#e0568f}
+  .t5 .sub{font-size:19px;color:#7c6b78}
+  .t5 .capline{background:rgba(255,255,255,.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:11px 18px;font-size:19px;color:#4a3a45}
+
+  /* 6 · 极简禅 Zen Minimal */
+  .t6{background:#f7f6f3}
+  .t6 .badge{color:#b8b3a8}.t6 .brand{color:#c0bbb0}
+  .t6 .kicker{color:#a8a293;font-weight:600;letter-spacing:.22em}
+  .t6 .kw{font-size:58px;color:#26241f;font-weight:700}
+  .t6 .kw em{font-style:normal;color:#26241f;border-bottom:3px solid #c98a4e;padding-bottom:2px}
+  .t6 .sub{font-size:18px;color:#9a9488}
+  .t6 .capline{font-size:18px;color:#6b6559;border-top:1px solid #ddd8cd;padding-top:11px}
+
+  /* 7 · 报刊黑白 Broadsheet */
+  .t7{background:#f6f4ee;align-items:flex-start;text-align:left}
+  .t7 .badge{color:#211d18;border:1px solid #211d18;padding:1px 7px;font-size:10px;letter-spacing:.1em}
+  .t7 .kicker{color:#211d18;border-bottom:2px solid #211d18;border-top:2px solid #211d18;padding:6px 0;width:100%;align-self:stretch;text-align:center;font-size:11px}
+  .t7 .kw{font-family:'Newsreader',"Songti SC",serif;font-size:62px;color:#16130f;font-weight:700}
+  .t7 .kw em{font-style:italic;color:#16130f}
+  .t7 .sub{font-size:18px;color:#4a453c;font-family:'Newsreader',serif}
+  .t7 .capbar{text-align:left}
+  .t7 .capline{font-family:'Newsreader',serif;font-size:19px;color:#2a251d;column-rule:1px solid #ccc}
+  .t7 .brand{color:#8a8478;font-family:'Newsreader',serif;font-style:italic}
+
+  /* 8 · 科技终端 Terminal */
+  .t8{background:#0d1117}
+  .t8 .badge{color:#3fb950;font-family:ui-monospace,Menlo,monospace}
+  .t8 .kicker{color:#3fb950;font-family:ui-monospace,monospace;letter-spacing:.05em}
+  .t8 .kw{font-size:58px;color:#e6edf3;font-weight:800;font-family:ui-monospace,Menlo,monospace}
+  .t8 .kw em{font-style:normal;color:#e3b341}
+  .t8 .sub{font-size:18px;color:#8b949e;font-family:ui-monospace,monospace}
+  .t8 .capline{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 15px;font-size:17px;color:#c9d1d9;font-family:ui-monospace,monospace}
+  .t8 .capline::before{content:"› ";color:#3fb950}
+  .t8 .brand{color:#8b949e;font-family:ui-monospace,monospace}
+</style></head>
+<body>
+  <h1>竖版分镜 · 主题选型</h1>
+  <div class="lead">同一条真分镜（关键词「改七八轮」+ kicker + 小字 + 烧字幕），套 8 种主题看手感。<b>点你喜欢的告诉我编号</b>（可多选/可说"某版的配色 + 某版的字体"），我把选中的落进播放器、其余的删。当前播放器里那 4 个（暖/黑/志/糖）就是没打磨的雏形。</div>
+  <div class="grid" id="grid"></div>
+<script>
+  const SCENE = { kicker:'AI协作反常识', kwHtml:'改<em>七八版</em><br>都不对', sub:'用文字指挥AI做UI，一天全白费', cap:'一个按钮，我改了七八轮还是不对。' };
+  const THEMES = [
+    ['t1','暖刊','衬线大字 + 莫兰迪 + 高亮块，克制高级（改良"暖"）'],
+    ['t2','午夜霓虹','近黑 + 霓虹关键词 + 毛玻璃字幕，抖音电影感（改良"黑"）'],
+    ['t3','杂志拼贴','压缩黑体 + 色块 + 大号镜号，强编辑感（改良"志"）'],
+    ['t4','牛皮手账','牛皮纸 + 马克笔高亮 + 虚线贴纸，个人手作感'],
+    ['t5','糖果玻璃','粉紫渐变 + 玻璃拟态字幕，小红书甜系（改良"糖"）'],
+    ['t6','极简禅','大量留白 + 一根强调线，极简高级'],
+    ['t7','报刊黑白','衬线 + 黑白栏线 + 斜体，旧报刊质感'],
+    ['t8','科技终端','等宽字 + 终端绿/琥珀，硬核技术流'],
+  ];
+  document.getElementById('grid').innerHTML = THEMES.map(([cls,nm,desc],i)=>
+    `<div class="cell">
+      <div class="cap"><span class="no">${i+1}</span><span class="nm">${nm}</span><span class="desc">${desc}</span></div>
+      <div class="stage ${cls}">
+        <div class="badge">镜 1/8</div>
+        <div class="kicker">${SCENE.kicker}</div>
+        <div class="kw">${SCENE.kwHtml}</div>
+        <div class="sub">${SCENE.sub}</div>
+        <div class="capbar"><span class="capline">${SCENE.cap}</span></div>
+        <div class="brand">杰西卡聊AI</div>
+      </div>
+    </div>`).join('');
+</script>
+</body></html>

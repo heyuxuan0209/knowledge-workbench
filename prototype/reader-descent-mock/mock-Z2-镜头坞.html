@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Z2 · 精读稿（你的真稿）＋ 只加它没有的思辨层</title>
+<style>
+:root{--bg:#efece4;--card:#faf8f3;--ink:#211f1a;--body2:#3a382f;--sub2:#8a8478;
+--line08:rgba(33,31,26,.08);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-soft:rgba(61,90,128,.08);
+--persona:#8a5a3c;--persona-soft:rgba(138,90,60,.09);--warn:#a9791f;--warn-soft:rgba(169,121,31,.1);
+--serif:"Songti SC","Noto Serif SC",Georgia,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.85 -apple-system,"PingFang SC",sans-serif;color:var(--ink)}
+.mask{position:fixed;inset:0;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
+.modal{width:740px;max-width:95vw;height:92vh;background:var(--card);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.head{display:flex;align-items:center;gap:10px;padding:13px 20px;border-bottom:1px solid var(--line08)}
+.title{font-family:var(--serif);font-size:16.5px;font-weight:600;flex:1;line-height:1.35}
+.badge-v{font-size:10px;background:rgba(61,90,128,.1);color:var(--accent);padding:2px 7px;border-radius:10px;font-weight:600;white-space:nowrap}
+.seg{display:inline-flex;background:rgba(33,31,26,.05);border-radius:9px;padding:3px}
+.seg button{border:0;background:transparent;padding:5px 11px;font-size:12.5px;color:var(--sub2);cursor:pointer;border-radius:7px;font-weight:600}
+.seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.close{border:0;background:none;font-size:22px;color:var(--sub2);cursor:pointer}
+.body{flex:1;overflow-y:auto;padding:16px 26px}
+.srcbar{background:rgba(61,90,128,.05);border:1px solid var(--line08);border-radius:9px;padding:8px 12px;font-size:12px;color:var(--sub2);margin-bottom:14px;line-height:1.6}
+.srcbar b{color:var(--body2)}
+.core{font-size:15.5px;line-height:1.75;background:var(--accent-soft);border-radius:11px;padding:14px 16px}
+.core .lbl{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.5px;display:block;margin-bottom:5px}
+.core .k{color:var(--accent);font-weight:600}
+.h2{font-family:var(--serif);font-size:18px;font-weight:700;margin:24px 0 4px;padding-bottom:5px;border-bottom:2px solid rgba(61,90,128,.15)}
+.h3{font-family:var(--serif);font-size:15.5px;font-weight:600;margin:16px 0 5px;color:var(--body2)}
+.para{margin:9px 0}
+.hl{background:#fff2cf;border-radius:2px;padding:0 1px;cursor:pointer}
+.quote{background:#fff;border-left:3px solid var(--accent);border-radius:0 9px 9px 0;padding:10px 14px;margin:10px 0;font-size:13.5px}
+.quote .en{font-family:var(--serif);color:var(--sub2);font-style:italic;display:block;margin-bottom:4px}
+.limit{background:var(--warn-soft);border-radius:9px;padding:11px 14px;font-size:13px;line-height:1.7}
+.idea{background:var(--persona-soft);border:1px solid rgba(138,90,60,.18);border-radius:10px;padding:6px 8px;margin:8px 0;display:flex;gap:8px;align-items:flex-start}
+.idea .txt{flex:1;font-size:13.5px}.idea .txt b{color:var(--persona)}
+.idea .go{border:1px solid var(--persona);background:#fff;color:var(--persona);border-radius:7px;padding:4px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;flex:none}
+.idea .go:hover{background:var(--persona);color:#fff}
+.tk-cite{display:inline-block;vertical-align:2px;font-size:10px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:6px;padding:0 5px;margin-left:3px;cursor:help;position:relative}
+.tk-cite:hover .pop{display:block}.pop{display:none;position:absolute;bottom:150%;left:0;width:280px;background:#2b2820;color:#f2efe6;font-size:11.5px;line-height:1.6;padding:9px 11px;border-radius:8px;z-index:30;cursor:auto}
+.kept{font-size:11px;color:var(--sub2);border:1px dashed var(--line14);border-radius:20px;padding:2px 9px;display:inline-block;margin-bottom:10px}
+/* 分析层输出 */
+.outcard{margin:11px 0;border-radius:12px;padding:13px 15px;font-size:13.5px;line-height:1.72;animation:rise .25s}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+.outcard.deep{background:#fff;border:1px solid var(--line08)}
+.outcard .tag{font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)}
+.adopt{margin-top:8px;border:1px solid var(--line14);background:#fff;border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer;color:var(--accent)}
+.adopt:hover{background:var(--accent);color:#fff}
+.shift{margin:12px 0;background:var(--warn-soft);border:1px solid rgba(169,121,31,.28);border-radius:14px;padding:15px 17px}
+.shift .st{font-size:11px;font-weight:700;color:var(--warn);margin-bottom:8px;display:flex;justify-content:space-between}
+.shift .big{font-size:14px;line-height:1.7}.shift b{color:var(--ink)}
+.shift .judge{display:flex;gap:7px;margin-top:11px}
+.shift .judge button{flex:1;border:1px solid var(--line14);background:#fff;border-radius:8px;padding:7px;font-size:12px;cursor:pointer}
+.shift .judge button.y:hover{background:var(--warn);color:#fff;border-color:var(--warn)}
+.note-sm{color:var(--sub2);font-size:11.5px;margin-top:5px}
+.dock{border-top:1px solid var(--line08);background:rgba(33,31,26,.02);padding:10px 20px 12px}
+.dl{font-size:10.5px;font-weight:700;color:var(--sub2);display:flex;align-items:center;gap:5px;margin:7px 0 5px}
+.dl .dot{width:6px;height:6px;border-radius:50%}
+.dockrow{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid var(--line14);background:#fff;border-radius:16px;padding:5px 11px;font-size:12.5px;cursor:pointer;color:var(--body2)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.deep{border-color:rgba(169,121,31,.4);color:var(--warn);font-weight:600}
+.foot{display:flex;gap:8px;padding:10px 20px;border-top:1px solid var(--line08)}
+.bo{border:1px solid var(--line14);background:#fff;border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;color:var(--body2)}
+.bp{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:7px 13px;font-size:12.5px;cursor:pointer}
+.hlmenu{position:fixed;display:none;background:#2b2820;border-radius:10px;padding:6px;gap:2px;z-index:60}
+.hlmenu.on{display:flex}.hlmenu button{border:0;background:transparent;color:#f2efe6;font-size:12px;padding:5px 9px;border-radius:6px;cursor:pointer}.hlmenu button:hover{background:rgba(255,255,255,.15)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2820;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;transition:.3s;z-index:70}
+</style></head>
+<body>
+<div class="mask"><div class="modal">
+  <div class="head"><div class="title">别急着怪模型不好：把公司变成"agent 可读"的系统</div><span class="badge-v">妙记·两段</span>
+    <div class="seg"><button class="on" onclick="dv(0,this)">精读稿</button><button onclick="dv(1,this)">逐字稿</button></div>
+    <button class="close">×</button></div>
+
+  <div class="body" id="body">
+   <!-- 精读稿 = 你现有产品的真实输出，原样保留 -->
+   <div class="view on" id="v0">
+    <span class="kept">✓ 精读稿＝你现有产品的输出 · 原样保留、不重写 · 下方"深挖"才是加在它之上的层</span>
+    <div class="srcbar">原题：张Zara分享0725.txt（+ 晶晶 agent 入会演示）｜演讲者：Zara（身份存疑，推测为飞书生态内的 AI 实践者与布道者）｜场合：内部分享会｜链接：无</div>
+
+    <div class="core"><span class="lbl">一句话核心</span>AI 智能体在企业落地的瓶颈不是模型不够强，而是<span class="k">组织内部的上下文没有对 AI 开放</span>；打造 AI 原生组织的本质，是把会议室、聊天记录、文档这些"暗数据"变成 <span class="k">agent readable</span>，让沟通成为 prompt，让执行在沟通中自然发生。</div>
+
+    <div class="h2">讲述脉络</div>
+    <div class="h3">开场定调：表现不好，大概率不是模型的问题</div>
+    <p class="para">Zara 开场点出一个她在创业者、CEO 和开发者中间反复观察到的现象：今天海外的模型、中国的模型都已经非常强了，强到足以完成企业日常办公场景下的大部分任务。如果一个 AI 智能体落地效果不好，<span class="hl">"大概率不是它的问题，是你的问题"</span>——是上下文没有给够。这个判断把她整场分享的基调定在了一个反常识的位置上：先别急着换模型，先从自己身上找原因，你给它的信息够不够全、够不够多。</p>
+
+    <div class="h3">核心定义：AI 原生 = agent readable</div>
+    <p class="para">接下来的论述围绕一个可操作的等价替换展开。她说，说到"AI 原生组织"的时候，你可以把它替换成另一个词——<span class="hl">agent readable</span>。意思是，企业里各种信息对于智能体是不是可见的、可读的。会议记录、沟通痕迹、决策流程这些东西如果智能体看不到，它就缺少上下文，表现一定差。因此，她要讲的五个落地实践——AI 原生会议、数据分析、招聘、团队级别智能体、组织内 AI 学习氛围——本质上都在回答同一个问题：怎么把整个公司变成 agent readable 的系统？</p>
+
+    <div class="h3">五个落地实践，逐层展开</div>
+    <p class="para"><b>第一个实践是 AI 原生会议</b>，三个递进等级。<b>Level 1</b> 是多数人已在做的：开会用 AI 做纪要、提炼待办，已普及但只是基础。<b>Level 2</b> 是会后智能体不仅总结，还自己把待办办了——会议的结束变成工作的开始（销售开完会 CRM 自动更新，产研开完会项目系统自动下发、bug 自动修）。她用自己的工作流举例：开完会智能体自动获取会议记录，先生成个性化摘要，再提炼"我需要做的待办"和"你可以干的待办"两个清单，她点名"你做一、你做二"，对方就去执行。<b>Level 3</b> 更激进——智能体直接入会、边听边干（当时正在灰度，她称"非常神奇"）。真实客户拜访场景：客户在会上分享反馈，以前要等会后再总结分发，<span class="hl">现在她在会上直接说"刚才客户对这个产品有什么反馈，你总结一下"，智能体根据实时逐字稿马上在飞书消息里完成</span>。还能会上现场拉数、参与 brainstorm。她把价值提炼为一句：<span class="hl">压缩沟通和执行之间的距离</span>，做到"沟通即执行"。由此引出工作方式三次演化：打字式→口喷式→聊天式。</p>
+    <p class="para">在这个推进中她插入了对 prompt 的根本反思：过去觉得 prompt 是一段精心撰写的长文字，现在可以重想——把智能体拉进群，聊天记录就是它的 PRD；拉进会议，逐字稿就是它的 prompt；它甚至读到日历里明天的客户拜访，主动去 CRM 查信息、备材料。前提是你把这些信息都对它变成可读的。<span class="tk-cite">原话<span class="pop">"那个会议里的逐字稿就是他的 prompt…当 agent 感知到了你在飞书里的各种信息，它就可以主动地去完成各种事情"</span></span></p>
+    <p class="para"><b>第二个实践是 AI 原生数据分析</b>，重音落在"归因"的突破。先建议把 Excel 发给智能体做成可交互 HTML（可拖参数的沙盘/报价器，右边实时联动），不是静态图表。更本质的是归因——为什么涨跌需要大量业务上下文，而这些往往不在任何看板里。数据分析师的解法：让智能体每天扫飞书消息/文档/会议更新一张"业务动作表"，分析时参照它。<span class="hl">比如某天数据突然跌了，智能体能追溯到"投放停了"——而这条信息只在某个群的某条消息里</span>。当所有信息 agent readable，点就连成了线。</p>
+    <p class="para"><b>第三个实践是招聘</b>。用 AI 筛人：让智能体扫你和下属的一对一/会议记录，提炼你常用的反馈类型、倒推人才画像、自动生成 JD/筛选标准/面试题。筛 AI native 的人：<span class="hl">两轮面试法</span>——第一轮禁用 AI 看基础素质，第二轮只能用 AI 给一个"不用 AI 完不成"的任务并保留全部聊天记录，重点看人与 AI 互动的过程，判断他是否真会驾驭 AI。</p>
+    <p class="para"><b>第四个实践是团队级别智能体</b>，从"个人助理"走向"共享同事"。她把用 AI 分三段位：人跟人（无 AI）→ 每人跟自己的 AI（割裂、彼此不知道对方在用 AI 做什么）→ AI 无缝融入人与人协作。多数人卡在第二段。她以 Anthropic 的 Claude Tag 为例说明趋势。团队智能体能做而个人做不到的：<span class="hl">工作接力</span>（同一界面里下游直接接着做、纠偏）、<span class="hl">潜移默化培训</span>（看同事怎么用、"原来还能这么用"）、<span class="hl">参与 brainstorm</span>（一起产出 prompt）、<span class="hl">全局视角</span>（跨群跨文档写周报/推进项目）。她还点出：组织低效常来自上下游依赖等待，团队智能体服务上下游能让跨部门需求内部闭环。</p>
+    <p class="para"><b>最后一个实践是学习氛围</b>，几条反传统建议：<span class="hl">干中学、玩中学</span>（先干后学，做出来再问智能体原理，让学 AI 变轻松）；利用团队智能体的潜移默化（引 Shopify——智能体只在群聊工作、不私聊，形成"渗透式学习"，所有人向所有人学）；刻意创造懂 AI 与懂业务两类人的互动场域（内部活动、内部 FDE 驻扎业务部门）；特别推荐<span class="hl">全员装机活动</span>——很多非技术部门的最大障碍不是不会用，而是装不上，现场一两小时装好，后面就是聊天的事。</p>
+
+    <div class="h3">现场演示（晶晶）：把 Level 3 演成活的</div>
+    <p class="para">紧接 Zara 的框架，飞书产品经理晶晶做了一场 live demo——不带 PPT，只把自己的智能体拉进会议。她和 Zara 就"要招一个 AI native 运营"正常地聊，智能体在背后边听边把五件事干了：<span class="hl">口头聊完岗位画像后一句"帮我写份标准 JD 发会议弹幕"，一分钟出稿、"改改就能用"</span>；现场查华东 7 月销售总额、全国销量最高单品；把全国销售数据做成 HTML 数据看板；围绕"为什么要团队级 agent"边听讨论边实时画 HTML slide；最后用瑞幸 CLI 买了杯抹茶拿铁送到会场。她顺带分享自己团队的团队智能体"CC 王"——进所有项目群和会议、有全部上下文，会主动 at 那个"说要上线却忘了同步"的研发。落地两条路：aily 的"团队智能伙伴"，或走 Claude Code / Codex Bridge 团队模式把海外最强模型拉进群；她个人做法是<span class="hl">让智能体每天扫各群前一天的聊天/文档/会议自更新知识库，"每天都比前一天更懂我们"</span>。收尾金句：<span class="hl">你和同事喝着咖啡聊着天，活 agent 在背后干完了——人应该 focus 在创意的沟通、表达和 brainstorm，执行交给 agent</span>。</p>
+
+    <div class="h3">结尾的感想：没有标准答案，让结果自己长出来</div>
+    <p class="para">收束时她给出三个带规劝意味的感想。第一，AI 原生组织<b>没有标准答案</b>，硅谷最领先的组织也没有，方向太新、每个组织业态与文化各异，指望抄模板不现实，只能自己大胆实验。第二，AI 落地的场景<b>不是规划出来的，是长出来的</b>——变化太快没法从终局倒推，只能在敢探索的文化里让它自然生长。第三，<b>不能急于求成</b>：她引用生产力 J 型曲线——每次技术革命短期反而带来一定效率下降（学习、磨合、改造流程都要成本），但长期一定有巨大提升。"实践是打造 AI 原生组织的唯一方法"，是她最后留下的一句话。</p>
+
+    <div class="h2">关键案例与细节</div>
+    <p class="para">· <b>会议三成熟度模型</b>：L1 纪要+待办；L2 会后自动执行（销售更新 CRM、产研更新项目系统）；L3 入会边聊边办——客户还在说话，反馈总结已发到飞书消息。<br>· <b>可交互 HTML 数据分析</b>：Excel→可拖参数的交互网页（预算沙盘、报价器）。<br>· <b>"业务动作表"归因</b>：智能体每天扫飞书信息生成业务动作日志，解决"跌了因为投放停了、但这事不在任何 Dashboard 里"的信息断层。<br>· <b>两轮面试法</b>：先禁 AI 看素质、再只能用 AI 看"驾驭过程"。<br>· <b>全员装机活动</b> / <b>Shopify 渗透式学习</b>（只群聊不私聊，所有人向所有人学）。</p>
+
+    <div class="h2">值得记住的表述</div>
+    <div class="quote"><span class="en">"Today's models are already very strong. If an agent's performance is poor, most likely it's not the model's problem — it's your problem, it's a context problem."</span>今天的模型都已经非常强了，如果智能体表现不好，大概率不是它的问题，是你的问题——是上下文的问题。</div>
+    <div class="quote"><span class="en">"The end of a meeting is the beginning of work."</span>会议的结束是工作的开始。</div>
+    <p class="para" style="color:var(--sub2);font-size:12.5px">（演讲者反复使用"压缩沟通和执行之间的距离""沟通即执行""把点连成线"强化同一主题。）</p>
+
+    <div class="h2">局限与存疑</div>
+    <div class="limit">· <b>身份与立场存疑</b>：多次提到 aily、飞书妙记，很可能是嵌入飞书生态的产品宣讲/用户分享，论证几乎全建立在飞书体系上，普适性需自行剥离。<br>· <b>证据强度属经验叙事</b>：无量化数据/对照实验，Level 3 当时仍在灰度，描述带兴奋滤镜；J 曲线论文未给出处。<br>· <b>字幕辨识不确定</b>：aily / codex / Slack 等拼写为修正推测。<br>· <b>中美语境未区分</b>：横跨湾区与国内，但未区分海内外模型生态、沟通文化对落地难度的影响。</div>
+
+    <div class="h2">给我的 idea 钩子 <span style="font-size:11px;color:var(--persona);font-weight:400">（你的精读稿已按"你=做知识工作台/中英双线创作"校准 · 每条可一键接创作）</span></div>
+    <div class="idea"><div class="txt"><b>暗数据结构化</b>：工作台做一个类"业务动作表"的模块，让 AI 定期扫项目群/纪要/文档更新日志，自动生成时间线版上下文，作为归因与提醒的基础层——"把点连成线"的工程化。</div><button class="go" onclick="toast('已提为选题')">提选题</button></div>
+    <div class="idea"><div class="txt"><b>"沟通即 prompt"用于中英双线</b>：选题讨论/编辑会/反馈全对 AI 开放，沟通过程本身就是 brief，不用专门下游写。可试点"AI 入会+自动执行"的创作工作流。</div><button class="go" onclick="toast('已提为选题')">提选题</button></div>
+    <div class="idea"><div class="txt"><b>装机 vs onboarding</b>：Zara 说很多人卡在"装机"。工作台是否也有一个非技术用户永远跨不过的阻塞点？设计一个极简"上手工坊"，第一次就跑通最小闭环。</div><button class="go" onclick="toast('已提为选题')">提选题</button></div>
+    <div class="idea"><div class="txt"><b>归因当差异化切入</b>：归因是所有 Dashboard 工具回避的难题。建立在"AI 可读所有非结构化沟通数据"之上，可能是工作台和市面 BI 拉开差距的独特切入。</div><button class="go" onclick="toast('已提为选题')">提选题</button></div>
+
+    <div class="h2">简版结构图</div>
+    <p class="para" style="color:var(--body2);font-size:13.5px">以"agent readable"为核心操作定义的落地分享。骨架：问题不在模型、在上下文 → 五个实践（会议三级/数据归因/招聘两轮法/团队智能体四价值/干中学+装机）→ 三条感想（无标准答案/场景长出来/接受 J 曲线低效期）。全篇回响一个判断：让一切信息对 AI 可见，沟通本身就会成为最高效的 prompt。</p>
+
+    <div id="outbox" style="margin-top:8px"></div>
+   </div>
+
+   <!-- 逐字稿 -->
+   <div class="view" id="v1" style="display:none"><div style="color:var(--body2);font-size:13.5px;line-height:1.95;font-family:var(--serif)">
+     <p class="para"><b>说话人 1 · 00:00</b>　哈喽大家好，我是 Zara……如果你发现 agent 落地或者它的表现不好，大概率不是它的问题，是你的问题……是 context 的问题……你要相信只要你的 context 给的足够多、足够全，它基本上大部分事是能完成得非常好的。</p>
+     <p class="para"><b>01:18</b>　当我们说 AI native 组织，其实你可以把它替换成另一个词，叫 agent readable……</p>
+     <p class="para" style="color:var(--sub2)">（本片＝两段：Zara 框架 29 分钟 + 晶晶 agent 入会演示 11 分钟，逐字稿约 1.1 万字；真实产品里为可滚动全文，句子可点角标回跳。）</p>
+   </div></div>
+  </div>
+
+  <div class="dock">
+    <div class="dl"><span class="dot" style="background:var(--warn)"></span>深挖 · 只做精读稿<b style="color:var(--warn)">没有</b>的更深层（它已含"局限存疑""idea钩子"，这里不重复）</div>
+    <div class="dockrow">
+      <button class="chip" onclick="ai('struct')">结构拆解</button><button class="chip" onclick="ai('premise')">前提测试</button>
+      <button class="chip deep" onclick="shift()">✦ 逼出认知位移</button>
+    </div>
+    <div class="dl" style="margin-top:9px"><span class="dot" style="background:var(--accent)"></span>划线 · 读→写直连（划词标类型，直落素材库）</div>
+    <div class="dockrow" style="font-size:12px;color:var(--sub2);padding:2px 0">在精读稿里划词 → 选 💡观点/❓疑问/⚡行动/❝引用/📎资料 → 进素材库（试试划一句）</div>
+  </div>
+  <div class="foot"><button class="bo" onclick="toast('已存入素材库')">存为素材</button><button class="bo" onclick="toast('已提为选题')">提为选题</button><button class="bp" onclick="toast('已带精读稿进创作台')">降维成稿·去发布</button></div>
+</div></div>
+<div class="hlmenu" id="hlmenu"><button onclick="mark('观点')">💡观点</button><button onclick="mark('疑问')">❓疑问</button><button onclick="mark('行动')">⚡行动</button><button onclick="mark('引用')">❝引用</button><button onclick="mark('资料')">📎资料</button></div>
+<div class="toast" id="toast"></div>
+<script>
+function dv(i,el){document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('on'));el.classList.add('on');document.querySelectorAll('.view').forEach((v,k)=>v.style.display=k===i?'block':'none');}
+const AI={
+ struct:['结构拆解 · 论证骨架（精读稿是叙事，这里是骨架）','问题：AI 智能体落地为何不好？<br>结论：不是模型不行，是组织没 agent readable。<br>证据：5 实践 + aily 工作流 + 晶晶现场 demo。<br>隐含假设：① 信息对 agent 全可见=无条件的好事（未处理敏感信息分级）② demo 的标准任务能代表真实生产场景。'],
+ premise:['前提测试 · 哪个前提一倒，结论就垮','① "信息全可见利大于弊"——若合规/隐私成本高于效率收益（金融/医疗），结论不成立。<br>② "agent 能从会议噪音里分出信号"——若不能，"会议即最好 context"垮。<br>③ "demo 的读+生成 ≈ 真实 actionable"——若真实场景要写入系统承担后果，落地难度被系统性低估。<br>三条里任一不成立，"把公司变 agent readable 就能落地"都要打折。']
+};
+function ai(k){const d=AI[k];const box=document.getElementById('outbox');const div=document.createElement('div');div.className='outcard deep';
+ div.innerHTML='<div class="tag">'+d[0]+'</div>'+d[1]+'<button class="adopt" onclick="toast(\'已存为素材\')">采纳→素材</button>';box.prepend(div);box.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function shift(){const box=document.getElementById('outbox');const div=document.createElement('div');div.className='shift';
+ div.innerHTML='<div class="st"><span>认知位移 · 我原本以为→现在意识到（按你=创作者/做工作台 校准）</span><span style="background:var(--warn-soft);color:var(--warn);padding:1px 6px;border-radius:10px;font-size:10px">AI 推演·待验真</span></div><div class="big">① 原本以为我做内容/产品的瓶颈是"AI 工具够不够强"；<b>现在意识到</b>是<b>"我的信息对 AI 可不可读"</b>——agent readable 迁到个人＝素材/灵感/精读/草稿是否都进了 AI 的 context。为你"阅读沉淀成 AI 可读素材库"提供组织级佐证。<br><br>② 看晶晶 demo 后：AI 真正擅长<b>"读+生成"</b>（写稿/做图/做看板），而<b>"承担后果的决定"</b>（JD 发不发给 HR、咖啡付不付款、选哪个题）demo 里<b>始终是人点的</b>。这几乎是你 <b>ADR-044</b> 的活证据：产品自动化"读+生成"，判断与后果留人。<span class="tk-cite">据<span class="pop">"等会他就把支付链接发给我，我来付款就可以了"；JD"我 copy 一下直接发给他"——关键一步都留给人</span></span></div><div class="note-sm">⚠️ AI 从原文逼出的推演，不是结论。据为己有前核对逐字稿。这是精读稿不做的一层。</div><div class="judge"><button class="y" onclick="toast(\'已据为己有→选题池\')">✅ 据为己有</button><button onclick="toast(\'改写成你的话\')">✂️ 改写</button><button onclick="toast(\'已标不认同\')">✗ 不认同</button></div>';
+ box.prepend(div);box.scrollIntoView({behavior:'smooth',block:'nearest'});}
+let sel='';
+document.addEventListener('mouseup',e=>{const t=window.getSelection().toString().trim();const m=document.getElementById('hlmenu');
+ if(t.length>3&&e.target.closest('.body')){sel=t;m.style.left=Math.min(e.clientX,innerWidth-260)+'px';m.style.top=(e.clientY+12)+'px';m.classList.add('on');}else if(!e.target.closest('.hlmenu'))m.classList.remove('on');});
+function mark(type){document.getElementById('hlmenu').classList.remove('on');if(sel)toast('已标「'+type+'」→ 进素材库（这篇的收获 +1）');window.getSelection().removeAllRanges();sel='';}
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2400);}
+</script>
+</body></html>

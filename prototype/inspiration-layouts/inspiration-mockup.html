@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灵感库 · 三个布局方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;
+    --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+    --accent:#3d5a80;--accent-hover:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;
+    --serif:'Newsreader',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:860px;margin:0 auto;padding:26px 22px 80px;}
+  .intro{font-size:13px;color:var(--sub);margin-bottom:18px;line-height:1.7;background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:14px 16px;}
+  .intro b{color:var(--text);}
+  /* 方案切换 */
+  .tabs{display:flex;gap:8px;margin-bottom:20px;position:sticky;top:0;background:var(--bg);padding:12px 0;z-index:5;}
+  .tab{border:1px solid var(--line10);background:var(--surface);color:var(--sub);border-radius:9px;padding:9px 15px;cursor:pointer;font-size:13.5px;font-weight:600;}
+  .tab.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .tab small{display:block;font-weight:400;font-size:11px;opacity:.85;margin-top:2px;}
+  .panel{display:none;}
+  .panel.on{display:block;}
+  .verdict{font-size:12.5px;color:var(--sub);margin:2px 2px 16px;line-height:1.7;}
+  .verdict .good{color:var(--green);font-weight:600;}
+  .verdict .bad{color:var(--red);font-weight:600;}
+
+  /* 页头 */
+  .h-title{font-family:var(--serif);font-size:23px;font-weight:600;}
+  .h-sub{font-size:13px;color:var(--sub2);margin:4px 0 14px;line-height:1.55;}
+  /* 随手记 */
+  .quick{display:flex;gap:8px;margin:12px 0;}
+  .quick input{flex:1;border:1px solid var(--line10);background:var(--surface);border-radius:8px;padding:9px 13px;font-size:13.5px;}
+  .btn-p{border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn-g{border:none;background:none;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;padding:0;}
+  .btn-o{border:1px solid var(--line10);background:var(--surface);color:var(--body);font-size:12px;padding:4px 11px;border-radius:7px;cursor:pointer;}
+
+  /* 卡片 */
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:13px 15px;margin-bottom:11px;}
+  .card.dim{opacity:.5;}
+  .card-top{display:flex;align-items:center;gap:7px;margin-bottom:7px;}
+  .pill{font-size:11px;padding:1.5px 8px;border-radius:20px;font-weight:600;white-space:nowrap;}
+  .p-user{color:var(--green);background:rgba(63,115,80,.12);}
+  .p-feed{color:#b5762a;background:rgba(181,118,42,.13);}
+  .p-ai{color:#7a5cc4;background:rgba(122,92,196,.12);}
+  .p-status{color:var(--sub2);background:rgba(33,31,26,.06);}
+  .p-stale{color:var(--amber);background:rgba(169,121,31,.13);}
+  .ago{color:var(--faint);font-size:11px;margin-left:auto;}
+  .c-title{font-family:var(--serif);font-size:16px;font-weight:600;line-height:1.42;}
+  .c-title.sm{font-size:14.5px;}
+  .c-angle{font-size:12.5px;color:var(--sub);margin-top:5px;line-height:1.5;}
+  .c-supp{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:9px;}
+  .chip{font-size:11.5px;color:var(--body);background:rgba(33,31,26,.05);border-radius:6px;padding:2px 8px;}
+  .chip.topic{color:var(--accent);background:rgba(61,90,128,.09);}
+  .c-foot{display:flex;align-items:center;gap:12px;margin-top:11px;}
+  .del{margin-left:auto;color:var(--faint);cursor:pointer;font-size:13px;}
+
+  /* 分区标题 */
+  .sec{display:flex;align-items:center;gap:8px;margin:20px 2px 10px;font-size:12.5px;color:var(--sub2);font-weight:600;}
+  .sec .line{flex:1;height:1px;background:var(--line08);}
+  .sec .cnt{color:var(--faint);font-weight:400;}
+
+  /* 折叠区（方案A） */
+  .fold-head{display:flex;align-items:center;gap:8px;background:var(--brief-bg);border:1px solid var(--line08);border-radius:10px;padding:11px 15px;cursor:pointer;font-size:13px;color:var(--sub);margin:8px 0;}
+  .fold-head b{color:var(--text);}
+  .fold-head .arw{margin-left:auto;color:var(--sub2);}
+  .fold-body{display:none;padding-top:4px;}
+  .fold-body.open{display:block;}
+
+  /* 看板（方案B） */
+  .board{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  .col-h{font-size:12.5px;font-weight:600;color:var(--sub);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+  .col-h .dot{width:7px;height:7px;border-radius:50%;}
+  .card.mini{padding:11px 12px;margin-bottom:9px;}
+  .card.mini .c-title{font-size:13.5px;}
+
+  /* 过期分隔（方案C） */
+  .stale-div{display:flex;align-items:center;gap:10px;margin:16px 2px 12px;font-size:11.5px;color:var(--faint);}
+  .stale-div .line{flex:1;border-top:1px dashed var(--line10);}
+  .catchup{background:rgba(169,121,31,.08);border:1px solid rgba(169,121,31,.2);border-radius:9px;padding:9px 13px;font-size:12.5px;color:#8a6a1c;margin-bottom:12px;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;}
+  .seg{display:inline-flex;border:1px solid var(--line10);border-radius:8px;overflow:hidden;}
+  .seg button{border:none;background:var(--surface);color:var(--sub);font-size:12px;padding:5px 11px;cursor:pointer;}
+  .seg button.on{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    这是「灵感库」第二批的 <b>3 个布局方案</b>，用的是接近真实的示例数据（你自己记的 3 条 + 系统攒的一堆 AI 选题，其中几条热点已过期）。
+    上面点方案 A / B / C 切换，看哪种你最想要。核心都在解决同一件事：<b>别让你自己的灵感被一堆 AI 老选题淹没</b>。
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-p="A" onclick="pick('A')">方案 A<small>来源分区折叠</small></button>
+    <button class="tab" data-p="B" onclick="pick('B')">方案 B<small>状态看板</small></button>
+    <button class="tab" data-p="C" onclick="pick('C')">方案 C<small>单流·智能排序</small></button>
+  </div>
+
+  <!-- ============ 方案 A：来源分区折叠 ============ -->
+  <div class="panel on" id="A">
+    <div class="verdict"><span class="good">最直接</span>：你的灵感永远铺在最上面；AI 攒的 22 条折叠成一条，想找灵感时才点开。概念最简单。<span class="bad">代价</span>：AI 老选题被藏起来，可能很少再看（但它们本就价值递减）。</div>
+    <div class="h-title">💡 灵感库</div>
+    <div class="h-sub">要写什么的种子。素材是「料」，灵感是「要写什么」——先收下来，别等忙完就忘。</div>
+    <div class="quick"><input placeholder="随手记一句：一个观点、一个角度、一句以后能写的话…"><button class="btn-p">＋ 记一条</button></div>
+
+    <div class="sec">你的灵感 <span class="cnt">3</span><span class="line"></span></div>
+    <div class="card">
+      <div class="card-top"><span class="pill p-user">我记的</span><span class="ago">2 小时前</span></div>
+      <div class="c-title">AI 工具选型的三个坑：别只盯着 GitHub 榜单</div>
+      <div class="c-angle">角度：从自己踩过的坑讲，比测评更可信</div>
+      <div class="c-supp"><span style="color:var(--faint);font-size:11.5px">🔗 手里的料（3）：</span><span class="chip">读书精读×3</span><span class="chip topic">主题：AI 选型</span></div>
+      <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+    <div class="card">
+      <div class="card-top"><span class="pill p-feed">来自资讯</span><span class="ago">昨天</span></div>
+      <div class="c-title">知识库真正的瓶颈是检索，不是存储</div>
+      <div class="c-supp"><span style="color:var(--faint);font-size:11.5px">🔗 手里的料（1）：</span><span class="chip">向量检索实践</span></div>
+      <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+    <div class="card">
+      <div class="card-top"><span class="pill p-user">我记的</span><span class="ago">3 天前</span></div>
+      <div class="c-title">我把"再建一个收集箱"的冲动摁住了</div>
+      <div class="c-angle">角度：新功能落地前先翻旧表，往往你要的早写好一半</div>
+      <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+
+    <div class="fold-head" onclick="document.getElementById('foldA').classList.toggle('open');this.querySelector('.arw').textContent=document.getElementById('foldA').classList.contains('open')?'收起 ▴':'展开看 ▾'">
+      <b>AI 帮你攒的 22 条选题</b>　<span style="color:var(--sub2)">从你的日报/周报里提炼，跨越单日热点 · 有 6 条热点可能过期</span><span class="arw">展开看 ▾</span>
+    </div>
+    <div class="fold-body" id="foldA">
+      <div class="card">
+        <div class="card-top"><span class="pill p-ai">AI 提议</span><span class="ago">2 小时前</span></div>
+        <div class="c-title">你的 AI Agent 需要"保存按钮"：从 Langfuse 到 ZenML</div>
+        <div class="c-angle">为什么现在：智能体工程实践正在走向成熟</div>
+        <div class="c-supp"><span style="color:var(--faint);font-size:11.5px">🔗 手里的料（2）：</span><span class="chip">Langfuse 解读</span><span class="chip">ZenML 项目</span></div>
+        <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+      </div>
+      <div class="card">
+        <div class="card-top"><span class="pill p-ai">AI 提议</span><span class="pill p-stale">可能过期</span><span class="ago">9 天前</span></div>
+        <div class="c-title">Kimi K3 2.8T 开源了，但你真的需要那么大参数吗？</div>
+        <div class="c-angle" style="color:var(--faint)">为什么现在：开源模型的"准生产时刻"（热点已过 9 天）</div>
+        <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+      </div>
+      <div class="card">
+        <div class="card-top"><span class="pill p-ai">AI 提议</span><span class="pill p-stale">可能过期</span><span class="ago">11 天前</span></div>
+        <div class="c-title">苹果起诉 OpenAI：一场关于 AI 硬件战场的博弈</div>
+        <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 方案 B：状态看板 ============ -->
+  <div class="panel" id="B">
+    <div class="verdict"><span class="good">一眼看推进</span>：把灵感当"任务"，横向三栏看每条走到哪步。<span class="bad">代价</span>：你现在大多是"待写"，看板会很偏（一栏挤满、两栏空）；概念也比分区重。</div>
+    <div class="h-title">💡 灵感库</div>
+    <div class="h-sub">要写什么的种子 · 拖过去或点按钮推进（待写 → 在推进 → 已养成主题）</div>
+    <div class="quick"><input placeholder="随手记一句…"><button class="btn-p">＋ 记一条</button></div>
+    <div class="board">
+      <div>
+        <div class="col-h"><span class="dot" style="background:var(--accent)"></span>待写 <span style="color:var(--faint);font-weight:400">20</span></div>
+        <div class="card mini"><div class="card-top"><span class="pill p-user">我记的</span></div><div class="c-title">AI 工具选型的三个坑</div><div class="c-supp"><span class="chip">🔗料3</span></div></div>
+        <div class="card mini"><div class="card-top"><span class="pill p-feed">来自资讯</span></div><div class="c-title">知识库瓶颈是检索不是存储</div></div>
+        <div class="card mini"><div class="card-top"><span class="pill p-ai">AI</span></div><div class="c-title">AI Agent 需要"保存按钮"</div><div class="c-supp"><span class="chip">🔗料2</span></div></div>
+        <div class="card mini dim"><div class="card-top"><span class="pill p-ai">AI</span><span class="pill p-stale">过期</span></div><div class="c-title">Kimi K3 2.8T 开源</div></div>
+      </div>
+      <div>
+        <div class="col-h"><span class="dot" style="background:var(--amber)"></span>在推进 <span style="color:var(--faint);font-weight:400">2</span></div>
+        <div class="card mini"><div class="card-top"><span class="pill p-user">我记的</span><span class="pill p-status">已起稿</span></div><div class="c-title">我摁住了再建收集箱的冲动</div></div>
+        <div class="card mini"><div class="card-top"><span class="pill p-ai">AI</span><span class="pill p-status">已起稿</span></div><div class="c-title">开源模型的准生产时刻</div></div>
+      </div>
+      <div>
+        <div class="col-h"><span class="dot" style="background:var(--green)"></span>已养成主题 <span style="color:var(--faint);font-weight:400">3</span></div>
+        <div class="card mini"><div class="card-top"><span class="pill p-status">📘 主题</span></div><div class="c-title">AI 原生创作者护城河</div></div>
+        <div class="card mini"><div class="card-top"><span class="pill p-status">📘 主题</span></div><div class="c-title">智能体工程实践</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 方案 C：单流·智能排序 + 过期淡化 ============ -->
+  <div class="panel" id="C">
+    <div class="verdict"><span class="good">零点击、一屏看全</span>：不分区不折叠，你记的/料厚的/新鲜的自动顶上，AI 老的、过期的淡灰下沉并标"可能过期"。<span class="bad">代价</span>：全靠排序和淡化，结构感最弱。</div>
+    <div class="h-title">💡 灵感库</div>
+    <div class="h-sub">要写什么的种子 · 该动手的自动顶上，旧的沉底</div>
+    <div class="quick"><input placeholder="随手记一句…"><button class="btn-p">＋ 记一条</button></div>
+    <div class="toolbar">
+      <div class="seg"><button class="on">全部</button><button>待写</button><button>已起稿</button><button>已养成</button></div>
+      <div class="seg"><button class="on">全部来源</button><button>我记的 2</button><button>AI 提议 22</button><button>来自资讯 1</button></div>
+    </div>
+    <div class="catchup">有 4 条灵感攒了 14 天以上还没动 —— <b>要么写、要么删</b>，别让它压着 →</div>
+
+    <div class="card">
+      <div class="card-top"><span class="pill p-user">我记的</span><span class="ago">2 小时前</span></div>
+      <div class="c-title">AI 工具选型的三个坑：别只盯着 GitHub 榜单</div>
+      <div class="c-angle">角度：从自己踩过的坑讲，比测评更可信</div>
+      <div class="c-supp"><span style="color:var(--faint);font-size:11.5px">🔗 手里的料（3）：</span><span class="chip">读书精读×3</span><span class="chip topic">主题：AI 选型</span></div>
+      <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+    <div class="card">
+      <div class="card-top"><span class="pill p-ai">AI 提议</span><span class="ago">2 小时前</span></div>
+      <div class="c-title">你的 AI Agent 需要"保存按钮"：从 Langfuse 到 ZenML</div>
+      <div class="c-angle">为什么现在：智能体工程实践正在走向成熟</div>
+      <div class="c-supp"><span style="color:var(--faint);font-size:11.5px">🔗 手里的料（2）：</span><span class="chip">Langfuse 解读</span><span class="chip">ZenML 项目</span></div>
+      <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+    <div class="card">
+      <div class="card-top"><span class="pill p-feed">来自资讯</span><span class="ago">昨天</span></div>
+      <div class="c-title">知识库真正的瓶颈是检索，不是存储</div>
+      <div class="c-supp"><span style="color:var(--faint);font-size:11.5px">🔗 手里的料（1）：</span><span class="chip">向量检索实践</span></div>
+      <div class="c-foot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+
+    <div class="stale-div"><span class="line"></span>以下较早 / 热点可能过期<span class="line"></span></div>
+    <div class="card dim">
+      <div class="card-top"><span class="pill p-ai">AI 提议</span><span class="pill p-stale">可能过期</span><span class="ago">9 天前</span></div>
+      <div class="c-title sm">Kimi K3 2.8T 开源了，但你真的需要那么大参数吗？</div>
+      <div class="c-foot"><button class="btn-o">去创作</button><button class="btn-o">养成主题</button><span class="del">🗑</span></div>
+    </div>
+    <div class="card dim">
+      <div class="card-top"><span class="pill p-ai">AI 提议</span><span class="pill p-stale">可能过期</span><span class="ago">11 天前</span></div>
+      <div class="c-title sm">苹果起诉 OpenAI：一场关于 AI 硬件战场的博弈</div>
+      <div class="c-foot"><button class="btn-o">去创作</button><button class="btn-o">养成主题</button><span class="del">🗑</span></div>
+    </div>
+  </div>
+</div>
+<script>
+function pick(p){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
+  document.querySelectorAll('.panel').forEach(el=>el.classList.toggle('on',el.id===p));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

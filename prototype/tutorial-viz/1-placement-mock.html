@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可视化教程 · 放置位选型（决策 1）</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2; --brief-bg:#f4f6f9; --text:#211f1a;
+    --body:#332f27; --body2:#4a463d; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line10:rgba(33,31,26,.1); --line08:rgba(33,31,26,.08); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --accent-hover:#2c456a; --amber:#a9791f; --green:#3f7350; --red:#a24b3f;
+    --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+  /* 选型条 */
+  .picker{position:sticky;top:0;z-index:50;background:#22303f;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .picker h1{font-family:var(--serif);font-size:16px;font-weight:600}
+  .picker .hint{font-size:12px;color:#b8c4d0;margin-right:auto}
+  .picker button{border:1px solid #4a5a6a;background:#2c3d4d;color:#cdd7e0;padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit}
+  .picker button.on{background:#fff;color:#22303f;border-color:#fff;font-weight:600}
+  .vlabel{padding:10px 20px;background:#fbf3e4;border-bottom:1px solid var(--line10);font-size:13px;color:var(--body2)}
+  .vlabel b{color:var(--accent)}
+
+  /* 工作台外壳 */
+  .app{height:calc(100vh - 46px)}
+  .header{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:var(--surface);border-bottom:1px solid var(--line10)}
+  .brand{display:flex;align-items:center;gap:9px}
+  .dot{width:11px;height:11px;border-radius:3px;background:var(--accent)}
+  .bname{font-family:var(--serif);font-size:18px;font-weight:600}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .body{display:flex;height:calc(100% - 52px)}
+  /* 左导航 */
+  .nav{width:150px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--line10);padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+  .navitem{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;color:var(--sub);font-size:13.5px;cursor:default}
+  .navitem.active{background:rgba(61,90,128,.1);color:var(--accent);font-weight:600}
+  .navitem .ic{width:16px;text-align:center}
+  .navspace{margin-top:auto}
+  /* 主区：创作台 */
+  .main{flex:1;overflow:auto;padding:18px 26px}
+  .studiohead{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+  .ptitle{font-family:var(--serif);font-size:23px;font-weight:600}
+  .psub{font-size:12.5px;color:var(--sub)}
+  .cols{display:grid;grid-template-columns:1fr 300px;gap:20px;margin-top:14px;align-items:start}
+  /* 编辑器 */
+  .toolbar{display:flex;flex-wrap:wrap;gap:7px;padding:9px 11px;background:var(--surface);border:1px solid var(--line10);border-bottom:none;border-radius:10px 10px 0 0}
+  .tbtn{border:1px solid var(--line14);background:#fff;color:var(--body2);padding:6px 11px;border-radius:7px;font-size:12.5px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+  .tbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .tbtn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .tbtn.primary:hover{background:var(--accent-hover)}
+  .tbtn.viz{background:linear-gradient(90deg,#3d5a80,#5b7ba0);color:#fff;border:none;font-weight:600;box-shadow:0 1px 4px rgba(61,90,128,.3)}
+  .spacer{margin-left:auto}
+  .editor{border:1px solid var(--line10);border-radius:0 0 10px 10px;background:#fff;padding:22px 26px;min-height:420px}
+  .editor h2{font-family:var(--serif);font-size:22px;margin-bottom:4px}
+  .editor .lead{color:var(--sub);font-size:13px;margin-bottom:16px}
+  .editor p{color:var(--body);margin:0 0 12px;font-size:14px;line-height:1.75}
+  .editor .step{padding:9px 13px;background:var(--brief-bg);border-left:3px solid var(--accent);border-radius:0 7px 7px 0;margin:0 0 9px;font-size:13.5px}
+  .editor .quote{border-left:3px solid var(--amber);padding:6px 13px;color:var(--body2);font-size:13px;background:#fbf6ec;margin:0 0 12px}
+  /* 右栏（引用素材面板占位） */
+  .side{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:14px}
+  .side h3{font-size:13px;font-weight:600;margin-bottom:10px;color:var(--body2)}
+  .refnote{padding:9px 11px;border:1px solid var(--line10);border-radius:8px;margin-bottom:8px;font-size:12px;color:var(--body2);background:#fff}
+  .refnote b{color:var(--text);font-weight:600}
+
+  /* Variant B dropdown */
+  .dd{position:relative;display:inline-block}
+  .ddmenu{position:absolute;top:calc(100% + 5px);right:0;background:#fff;border:1px solid var(--line14);border-radius:9px;box-shadow:0 6px 22px rgba(0,0,0,.14);padding:5px;width:210px;z-index:20}
+  .dditem{padding:8px 10px;border-radius:6px;font-size:13px;color:var(--body);cursor:pointer;display:flex;align-items:center;gap:8px}
+  .dditem:hover{background:var(--brief-bg)}
+  .dditem .tag{margin-left:auto;font-size:10px;color:#fff;background:var(--accent);padding:1px 6px;border-radius:4px}
+
+  /* Variant C 面板 */
+  .vizpanel{margin-top:16px;border:1px dashed var(--accent);border-radius:12px;background:linear-gradient(180deg,#f4f6f9,#faf8f2);padding:16px 18px}
+  .vizpanel .vh{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+  .vizpanel .vh .em{font-size:18px}
+  .vizpanel .vh b{font-family:var(--serif);font-size:16px}
+  .vizpanel .vd{font-size:12.5px;color:var(--sub);margin-bottom:13px;line-height:1.6}
+  .thumbs{display:flex;gap:12px;align-items:center}
+  .thumb{width:132px;height:88px;border-radius:8px;border:1px solid var(--line14);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:11px;position:relative;overflow:hidden}
+  .thumb .mini{transform:scale(.34);transform-origin:center}
+  .genbtn{border:none;background:var(--accent);color:#fff;padding:10px 18px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+  .stylerow{display:flex;gap:7px;margin:11px 0 0;flex-wrap:wrap}
+  .chip{font-size:11.5px;padding:4px 10px;border:1px solid var(--line14);border-radius:20px;color:var(--body2);background:#fff;cursor:pointer}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  .hidden{display:none!important}
+  .note{font-size:11.5px;color:var(--sub);margin-top:6px}
+  /* mini fake infographic (缩略图里的示意) */
+  .fig{width:380px;background:#f7f4ee;border:1px solid var(--line10);border-radius:8px;padding:12px}
+  .fig .ft{font-weight:700;font-size:15px;color:#22303f;margin-bottom:8px}
+  .fig .frow{display:flex;gap:6px}
+  .fig .fc{flex:1;background:#fff;border-radius:6px;padding:8px;text-align:center;font-size:9px;color:var(--sub)}
+  .fig .fc .fi{width:20px;height:20px;border-radius:50%;background:var(--accent);margin:0 auto 5px}
+</style>
+</head>
+<body>
+<div class="picker">
+  <h1>决策 1 · 「可视化教程」放哪</h1>
+  <span class="hint">创作台内新增输出形态 —— 三种入口做法，点上面切换比较</span>
+  <button class="on" onclick="pick('A',this)">A · 工具栏主按钮</button>
+  <button onclick="pick('B',this)">B · 导出下拉里一项</button>
+  <button onclick="pick('C',this)">C · 独立生成面板</button>
+</div>
+<div class="vlabel" id="vlabel"></div>
+
+<div class="app">
+  <div class="header">
+    <div class="brand"><div class="dot"></div><div class="bname">知识工作台</div></div>
+    <div class="avatar">Z</div>
+  </div>
+  <div class="body">
+    <nav class="nav">
+      <div class="navitem"><span class="ic">📰</span>资讯</div>
+      <div class="navitem"><span class="ic">📝</span>素材</div>
+      <div class="navitem"><span class="ic">🗂️</span>主题</div>
+      <div class="navitem"><span class="ic">💡</span>灵感</div>
+      <div class="navitem active"><span class="ic">✍️</span>创作</div>
+      <div class="navspace"></div>
+      <div class="navitem"><span class="ic">📡</span>信源</div>
+      <div class="navitem"><span class="ic">⚙️</span>设置</div>
+    </nav>
+    <div class="main">
+      <div class="studiohead">
+        <div class="ptitle">创作台</div>
+        <div class="psub">决策五问 · 公众号长文 · 已保存</div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <button class="tbtn">↻ 重新起稿</button>
+        <button class="tbtn">✨ 润色</button>
+        <button class="tbtn">🏷 拟标题</button>
+        <button class="tbtn">🔗 引用素材</button>
+        <!-- Variant A: 工具栏里多一个醒目主按钮 -->
+        <button class="tbtn viz vA" onclick="alert('→ 打开「可视化教程」生成流程（见 输出页 mock）')">🎨 生成可视化教程</button>
+        <span class="spacer"></span>
+        <!-- Variant B: 导出变成下拉 -->
+        <div class="dd vB hidden">
+          <button class="tbtn" onclick="toggleDD()">⬇ 导出 ▾</button>
+          <div class="ddmenu hidden" id="ddmenu">
+            <div class="dditem">📄 Markdown（.md）</div>
+            <div class="dditem">🌐 网页（.html）</div>
+            <div class="dditem" onclick="alert('→ 打开「可视化教程」生成流程')">🎨 可视化教程（图）<span class="tag">新</span></div>
+          </div>
+        </div>
+        <button class="tbtn vA vC">⬇ 导出 MD</button>
+      </div>
+
+      <div class="cols">
+        <div>
+          <!-- 编辑器（真内容示意） -->
+          <div class="editor">
+            <h2>高质量决策的关键：用 5 个问题，穿透自己的判断</h2>
+            <div class="lead">来自孟岩老师分享的一个小故事 · 方法教程体</div>
+            <p>朋友大仓位配置了一只股票。孟岩说：正好测试下我的理论——我来问你 5 个问题。问到第 3 个，对方就答不上来了。</p>
+            <p><b>给任何想法/决策，设计一套"5 个问题"，持续追问自己：</b></p>
+            <div class="step">01 · 我到底知道什么？—— 分清一手事实 vs 推测/感觉/听来的</div>
+            <div class="step">02 · 我是怎么得出这个结论的？—— 逻辑链条有没有跳跃</div>
+            <div class="step">03 · 如果我是错的，最强的反方证据是什么？—— 是否选择性忽略</div>
+            <div class="step">04 · 成败最关键的变量是什么？—— 是否真正理解它</div>
+            <div class="step">05 · 我愿意投入多少？代价匹配吗？—— 风险意识与认知边界</div>
+            <div class="quote">核心心法：不是为了证明自己是对的，而是为了接近真相、降低代价，做出更好的决策。</div>
+            <p class="note">↑ 这是创作台里已有的定稿。「可视化教程」把它变成上面那种带插画的信息大图（由 baoyu-infographic 出 PNG）。</p>
+          </div>
+
+          <!-- Variant C: 编辑器下方独立面板 -->
+          <div class="vizpanel vC hidden">
+            <div class="vh"><span class="em">🎨</span><b>可视化教程</b></div>
+            <div class="vd">把这份定稿变成一张（或几张）带插画的信息大图 —— 姚金刚同款画风。挑个风格，AI 出图，工作台内预览 + 导出。</div>
+            <div class="stylerow">
+              <span class="chip on">插画信息大图</span>
+              <span class="chip">极简线框</span>
+              <span class="chip">杂志编辑风</span>
+              <span class="chip">手绘笔记</span>
+            </div>
+            <div class="thumbs" style="margin-top:14px">
+              <button class="genbtn" onclick="alert('→ 打开生成流程 / 见 输出页 mock')">✨ 生成可视化教程</button>
+              <span class="note" style="margin:0">首次约 40–90 秒 · 走本机 codex 出图</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右栏：引用素材（现有） -->
+        <aside class="side">
+          <h3>可插入素材（按相关度）</h3>
+          <div class="refnote"><b>孟岩 · 无人知晓 E35</b><br>「知识的缝隙」——决策测试小故事出处</div>
+          <div class="refnote"><b>姚金刚 · 预测能力训练</b><br>定题→给率→找证→更新→验证</div>
+          <div class="refnote"><b>反方证据清单法</b><br>主动找最强反例，防确认偏误</div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const labels={
+    A:'<b>做法 A · 工具栏主按钮</b>：跟润色/拟标题并列一个醒目的「🎨 生成可视化教程」。最直给、一眼看见——代价是工具栏多一个按钮。',
+    B:'<b>做法 B · 藏进导出下拉</b>：把「导出」收成下拉，里面 Markdown / 网页 / 可视化教程 三选一。最克制、工具栏不变宽——代价是入口深一层、不显眼。',
+    C:'<b>做法 C · 独立生成面板</b>：编辑器下方一块专区，可选画风、看缩略图、一键生成。仪式感最强、最像"一个功能"——代价是占版面高度。'
+  };
+  function pick(v,btn){
+    document.querySelectorAll('.picker button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('vlabel').innerHTML=labels[v];
+    document.querySelectorAll('.vA,.vB,.vC').forEach(el=>el.classList.add('hidden'));
+    document.querySelectorAll('.v'+v).forEach(el=>el.classList.remove('hidden'));
+    document.getElementById('ddmenu').classList.add('hidden');
+  }
+  function toggleDD(){document.getElementById('ddmenu').classList.toggle('hidden')}
+  pick('A',document.querySelector('.picker button'));
+</script>
+</body>
+</html>

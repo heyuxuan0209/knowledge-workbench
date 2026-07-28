@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>溯源 · 点正文即跳（原型）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);--accent:#3d5a80;--serif:'Newsreader',serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 24px 60px}
+h1{font-family:var(--serif);font-size:22px;margin:0 0 4px}
+.lede{color:var(--sub);font-size:13px;margin:0 0 18px}
+.toggle{display:inline-flex;border:1px solid var(--line10);border-radius:9px;overflow:hidden;margin-bottom:14px}
+.toggle button{border:none;background:var(--surface);padding:7px 16px;font-size:13px;color:var(--sub2)}
+.toggle button.on{background:var(--accent);color:#fff;font-weight:600}
+.studio{display:grid;grid-template-columns:236px 1fr;border:1px solid var(--line10);border-radius:12px;background:var(--surface);min-height:440px}
+.side{border-right:1px solid var(--line08);padding:14px;display:flex;flex-direction:column}
+.side h4{font-size:12px;color:var(--sub2);margin:0 0 10px;font-weight:600}
+.mat{display:flex;gap:9px;align-items:flex-start;padding:10px;border:1px solid transparent;border-radius:8px;margin-bottom:4px;transition:background .25s,border-color .25s}
+.mat .num{font-size:11px;font-weight:700;color:var(--accent);background:rgba(61,90,128,.1);border-radius:4px;padding:1px 6px;flex:none;margin-top:1px}
+.mat .t{font-size:12.5px;color:var(--body);line-height:1.45}
+.mat .s{font-size:11px;color:var(--faint);margin-top:2px}
+.mat .lnk{font-size:11px;color:var(--accent);text-decoration:none;display:none;margin-top:4px}
+.mat.hot{background:rgba(61,90,128,.1);border-color:rgba(61,90,128,.4)}
+.mat.hot .lnk{display:inline-block}
+@keyframes flash{0%{background:rgba(61,90,128,.28)}100%{background:rgba(61,90,128,.1)}}
+.mat.flash{animation:flash .6s}
+.main{padding:18px 22px}
+.doc{font-family:var(--serif);font-size:16px;line-height:1.9;color:var(--body)}
+/* 溯源态：[素材N] 是可点高亮 chip */
+.ref{color:var(--accent);background:rgba(61,90,128,.1);border-radius:5px;padding:1px 5px;font-family:system-ui;font-size:12.5px;cursor:pointer;white-space:nowrap;transition:background .15s}
+.ref:hover{background:rgba(61,90,128,.22)}
+.ref.active{background:var(--accent);color:#fff}
+/* 编辑态：纯文本框 */
+textarea{width:100%;min-height:300px;font-family:var(--serif);font-size:16px;line-height:1.9;border:1px solid var(--line10);border-radius:10px;padding:16px 18px;background:var(--surface);color:var(--body);resize:vertical}
+.hint{font-size:12px;color:var(--sub2);margin-top:12px}
+</style></head><body>
+<div class="wrap">
+  <h1>溯源 · 点正文即跳</h1>
+  <p class="lede">切到「溯源态」，点正文里蓝色的 [素材N] → 左边对应素材高亮 + 冒出原文链接。切到「编辑态」就是普通文本框，能改字。</p>
+
+  <div class="toggle">
+    <button id="tRead" class="on">溯源态（点标记即跳）</button>
+    <button id="tEdit">编辑态（改字）</button>
+  </div>
+
+  <div class="studio">
+    <aside class="side">
+      <h4>素材（本文引用 3）</h4>
+      <div class="mat" data-mat="1"><span class="num">素材1</span><div><div class="t">飞书 Demo Day 4 · 上篇</div><div class="s">飞书 · 多人分享</div><a class="lnk" href="#">原文 ↗</a></div></div>
+      <div class="mat" data-mat="2"><span class="num">素材2</span><div><div class="t">飞书 Demo Day 4 · 下篇</div><div class="s">飞书 · 多人分享</div><a class="lnk" href="#">原文 ↗</a></div></div>
+      <div class="mat" data-mat="3"><span class="num">素材3</span><div><div class="t">AI 用户体验五大挑战</div><div class="s">掘金 · 文章</div><a class="lnk" href="#">原文 ↗</a></div></div>
+    </aside>
+
+    <section class="main">
+      <div id="readView">
+        <div class="doc">
+          先说结论：这场 Demo Day 最值得记的，不是谁的产品更炫，而是几个人不约而同踩到了同一个坑 <span class="ref" data-ref="1">[素材1]</span>。<br><br>
+          上篇里，分享者反复提到「智能体自建化」和「自动化」被混为一谈 <span class="ref" data-ref="2">[素材2]</span>——这正是最容易出问题的地方。<br><br>
+          而真正的解法，其实藏在用户体验那条线里：先把失败变成可观测的信号 <span class="ref" data-ref="3">[素材3]</span>，再谈自进化。
+        </div>
+        <div class="hint">↑ 点正文里蓝色的 [素材N] 试试</div>
+      </div>
+      <div id="editView" style="display:none">
+        <textarea>先说结论：这场 Demo Day 最值得记的，不是谁的产品更炫，而是几个人不约而同踩到了同一个坑 [素材1]。
+
+上篇里，分享者反复提到「智能体自建化」和「自动化」被混为一谈 [素材2]——这正是最容易出问题的地方。
+
+而真正的解法，藏在用户体验那条线里：先把失败变成可观测的信号 [素材3]，再谈自进化。</textarea>
+        <div class="hint">编辑态就是普通文本框，[素材N] 是死文字（点不了）。改完切回溯源态就能点。</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+// 模式切换
+function setMode(read){
+  $('#readView').style.display=read?'':'none';
+  $('#editView').style.display=read?'none':'';
+  $('#tRead').classList.toggle('on',read);
+  $('#tEdit').classList.toggle('on',!read);
+}
+$('#tRead').onclick=()=>setMode(true);
+$('#tEdit').onclick=()=>setMode(false);
+
+// 点正文 [素材N] → 左栏对应素材高亮 + 滚入视野
+$$('.ref').forEach(r=>r.onclick=()=>{
+  const id=r.dataset.ref;
+  $$('.ref').forEach(x=>x.classList.toggle('active',x===r));
+  $$('.mat').forEach(m=>m.classList.remove('hot','flash'));
+  const mat=$(`.mat[data-mat="${id}"]`);
+  mat.classList.add('hot');
+  void mat.offsetWidth; mat.classList.add('flash');
+  mat.scrollIntoView({block:'nearest',behavior:'smooth'});
+});
+</script>
+</body></html>

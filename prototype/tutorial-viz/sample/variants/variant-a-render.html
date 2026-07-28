@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>variant-a</title>
+  <style>
+    :root{
+      --bg:#f5f0e6;
+      --ink:#2f2a25;
+      --blue:#3d5a80;
+      --green:#7f9c7d;
+      --orange:#c97b4e;
+      --dark:#32261f;
+      --card:#fffaf0;
+      --line:#d9cdbb;
+      --shadow:rgba(59,46,34,.08);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;background:var(--bg);font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}
+    .canvas{
+      width:1024px;height:1536px;margin:0 auto;position:relative;overflow:hidden;
+      background:
+        radial-gradient(circle at 10% 6%, rgba(255,255,255,.55) 0 1px, transparent 1.3px) 0 0/28px 28px,
+        radial-gradient(circle at 90% 12%, rgba(255,255,255,.45) 0 1px, transparent 1.3px) 0 0/36px 36px,
+        linear-gradient(180deg, #f7f2e8 0%, #f5f0e6 100%);
+    }
+    .ink-scribble{position:absolute;border:2px solid rgba(61,90,128,.16);border-radius:26px;transform:rotate(-1deg)}
+    .frame1{left:32px;top:26px;width:960px;height:1480px}
+    .frame2{left:44px;top:40px;width:936px;height:1452px;border-style:dashed}
+    .top{
+      position:absolute;left:74px;top:72px;width:876px;height:238px;
+      display:grid;grid-template-columns:1.1fr 1fr;gap:28px;align-items:center;
+    }
+    .title h1{
+      margin:0;font-size:52px;line-height:1.15;letter-spacing:0;font-weight:800;color:var(--dark)
+    }
+    .title p{margin:14px 0 0;font-size:23px;line-height:1.5;color:#6c5b4d;font-weight:600}
+    .story{
+      position:relative;height:200px;border-radius:28px;background:rgba(255,255,255,.48);
+      border:2px solid rgba(61,90,128,.16);box-shadow:0 10px 24px var(--shadow);
+    }
+    .car{
+      position:absolute;left:62px;top:84px;width:248px;height:74px;border:6px solid var(--blue);border-radius:42px 42px 20px 20px;background:#fffdf7;
+    }
+    .car:before{content:"";position:absolute;left:18px;top:-34px;width:118px;height:52px;border:6px solid var(--blue);border-bottom:none;border-radius:26px 26px 0 0;background:#fffdf7;transform:skewX(-8deg)}
+    .wheel,.wheel2{position:absolute;bottom:-28px;width:42px;height:42px;border:6px solid var(--blue);border-radius:50%;background:var(--bg)}
+    .wheel{left:28px}.wheel2{right:30px}
+    .person{position:absolute;width:64px;height:104px}
+    .p1{left:128px;top:30px}.p2{left:210px;top:24px}
+    .head{width:38px;height:38px;border:5px solid var(--ink);border-radius:50%;background:#ffe8cf;margin:0 auto}
+    .body{width:18px;height:44px;background:var(--ink);margin:4px auto 0;border-radius:9px}
+    .arm{position:absolute;width:48px;height:8px;background:var(--ink);top:52px;border-radius:4px}
+    .p1 .arm{left:34px;transform:rotate(18deg)} .p2 .arm{left:-16px;transform:rotate(-18deg)}
+    .bubble{position:absolute;top:18px;left:2px;background:#fff;border:2px solid var(--orange);border-radius:20px;padding:10px 14px;font-size:18px;font-weight:700;color:var(--orange)}
+    .bubble:after{content:"";position:absolute;bottom:-10px;left:26px;border:10px solid transparent;border-top-color:var(--orange);border-bottom:none}
+    .bubble2{left:138px;top:8px;color:var(--blue);border-color:var(--blue)}
+    .bubble2:after{left:42px;border-top-color:var(--blue)}
+    .cards{position:absolute;left:74px;top:336px;width:876px;height:1018px;display:flex;flex-direction:column;gap:18px}
+    .card{
+      display:grid;grid-template-columns:86px 1fr;gap:16px;align-items:start;
+      min-height:182px;padding:18px 22px;border-radius:26px;background:rgba(255,255,255,.74);
+      border:2px solid rgba(84,68,55,.13);box-shadow:0 8px 16px var(--shadow)
+    }
+    .n{
+      width:86px;height:86px;border-radius:24px;background:linear-gradient(180deg,rgba(61,90,128,.14),rgba(61,90,128,.06));
+      display:flex;flex-direction:column;justify-content:center;align-items:center;border:2px solid rgba(61,90,128,.18);font-weight:900;color:var(--blue)
+    }
+    .n span{font-size:25px;line-height:1}
+    .n small{font-size:13px;margin-top:2px;letter-spacing:0}
+    .content h3{margin:2px 0 8px;font-size:29px;line-height:1.1;color:var(--dark)}
+    .content p{margin:0;font-size:23px;line-height:1.5;color:#4d4137;font-weight:600}
+    .headrow{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+    .icon{width:38px;height:38px;flex:0 0 38px}
+    .icon svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+    .blue{color:var(--blue)} .green{color:var(--green)} .orange{color:var(--orange)}
+    .card:nth-child(3) .n{background:linear-gradient(180deg,rgba(201,123,78,.16),rgba(201,123,78,.07));color:var(--orange)}
+    .card:nth-child(3){border-color:rgba(201,123,78,.18)}
+    .bottom{
+      position:absolute;left:74px;right:74px;bottom:70px;height:116px;border-radius:22px;background:var(--dark);
+      color:#f6eadb;display:flex;align-items:center;padding:0 26px;font-size:25px;line-height:1.45;font-weight:700;
+      box-shadow:0 10px 20px rgba(0,0,0,.12)
+    }
+    .sign{position:absolute;right:76px;bottom:38px;font-size:22px;color:#6b5a4a;font-weight:800}
+    .doodle{position:absolute;border:2px dotted rgba(61,90,128,.22);border-radius:999px}
+    .d1{left:54px;top:322px;width:46px;height:46px}.d2{right:68px;top:318px;width:34px;height:34px}
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="ink-scribble frame1"></div>
+    <div class="ink-scribble frame2"></div>
+    <div class="doodle d1"></div><div class="doodle d2"></div>
+
+    <section class="top">
+      <div class="title">
+        <h1>用 5 个问题，穿透自己的判断</h1>
+        <p>来自孟岩老师分享的一个小故事 · 方法教程体</p>
+      </div>
+      <div class="story">
+        <div class="bubble">你真的确定吗？</div>
+        <div class="bubble bubble2">我先想想……</div>
+        <div class="car">
+          <div class="person p1">
+            <div class="head"></div><div class="body"></div><div class="arm"></div>
+          </div>
+          <div class="person p2">
+            <div class="head"></div><div class="body"></div><div class="arm"></div>
+          </div>
+          <div class="wheel"></div><div class="wheel2"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cards">
+      <div class="card">
+        <div class="n"><span>01</span><small>事实依据</small></div>
+        <div class="content">
+          <div class="headrow">
+            <div class="icon blue"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg></div>
+            <h3>我到底知道什么？</h3>
+          </div>
+          <p>分清一手事实，还是推测、感觉、听来的。</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="n"><span>02</span><small>推理链条</small></div>
+        <div class="content">
+          <div class="headrow">
+            <div class="icon green"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.1"/><circle cx="18" cy="6" r="2.1"/><circle cx="12" cy="18" r="2.1"/><path d="M7.8 7.8L10.3 10.3"/><path d="M16.2 7.8L13.7 10.3"/><path d="M12 12.1V15.7"/></svg></div>
+            <h3>我是怎么得出这个结论的？</h3>
+          </div>
+          <p>逻辑链条有没有跳跃。</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="n"><span>03</span><small>反方证据</small></div>
+        <div class="content">
+          <div class="headrow">
+            <div class="icon orange"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.6-3 8.6-7 10-4-1.4-7-5.4-7-10V6l7-3z"/><path d="M9 11l6 6"/><path d="M15 11l-6 6"/></svg></div>
+            <h3>如果我是错的，最强反证是什么？</h3>
+          </div>
+          <p>是否选择性忽略。</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="n"><span>04</span><small>关键变量</small></div>
+        <div class="content">
+          <div class="headrow">
+            <div class="icon blue"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M10 8l-2 4 2 4"/><path d="M14 8l2 4-2 4"/><circle cx="17" cy="12" r="1.8"/></svg></div>
+            <h3>决定成败的那个变量，我是否真正理解它。</h3>
+          </div>
+          <p>找到真正影响结果的关键点。</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="n"><span>05</span><small>下注代价</small></div>
+        <div class="content">
+          <div class="headrow">
+            <div class="icon green"><svg viewBox="0 0 24 24"><path d="M4 18h16"/><path d="M12 5v13"/><path d="M7 9h10"/><path d="M5 9l-2 4h6l-2-4"/><path d="M19 9l-2 4h6l-2-4"/></svg></div>
+            <h3>我愿意投入多少？</h3>
+          </div>
+          <p>代价是否匹配我的认知深度。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="bottom">核心心法——不是为了证明自己对，而是接近真相、降低代价，做出更好的决策。</div>
+    <div class="sign">你的知识工作台</div>
+  </div>
+</body>
+</html>

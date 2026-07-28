@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台改版 · 方案A 系统主导·推荐卡</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line:rgba(33,31,26,.1);--line2:rgba(33,31,26,.07);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--serif:'Newsreader',serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.55}
+.wrap{max-width:1000px;margin:0 auto;padding:22px 24px 60px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.back{color:var(--sub);background:none;border:none;font-size:13px;display:inline-flex;gap:6px;align-items:center;padding:0}
+.drafts{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-size:13px;color:var(--sub)}
+h1{font-family:var(--serif);font-size:25px;font-weight:600;margin:0}
+svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sec{font-size:13px;color:var(--sub2);margin:22px 0 10px;font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:7px 13px;font-size:13px;color:var(--body)}
+.chip .x{color:var(--faint);width:13px;height:13px}
+.chip.add{border-style:dashed;color:var(--sub)}
+.rec-row{display:flex;gap:14px;align-items:stretch;margin-top:4px}
+.rec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.rec.primary{flex:1.6;border-color:rgba(61,90,128,.35);box-shadow:0 1px 0 rgba(61,90,128,.06)}
+.rec.alt{flex:1}
+.rec .tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--accent);background:rgba(61,90,128,.09);border-radius:6px;padding:3px 8px;margin-bottom:10px}
+.rec .tag.gray{color:var(--sub2);background:var(--line2)}
+.rec h3{font-family:var(--serif);font-size:19px;margin:0 0 6px;color:var(--text);font-weight:600}
+.rec p{margin:0 0 16px;color:var(--sub);font-size:13px;line-height:1.6}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 16px;font-size:13px;color:var(--body);display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff;border:none;font-weight:500}
+.btn-primary:hover{background:var(--accent-h)}
+.adjust{display:flex;gap:18px;margin:14px 2px 0;font-size:13px;color:var(--sub)}
+.adjust span{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.adjust span:hover{color:var(--accent)}
+.draft{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px 28px;min-height:220px;font-family:var(--serif);font-size:16px;color:var(--faint);line-height:1.75;margin-top:22px}
+.note{font-size:12px;color:var(--sub2);margin-top:9px;display:flex;align-items:center;gap:6px}
+.note svg{width:13px;height:13px;color:var(--green)}
+.banner{font-size:12px;color:#8a5a12;background:rgba(169,121,31,.1);border:1px solid rgba(169,121,31,.2);border-radius:8px;padding:8px 12px;margin-top:10px;display:none}
+</style></head><body>
+<div class="wrap">
+  <div class="top">
+    <button class="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>返回主题库</button>
+    <button class="drafts">草稿箱（3）</button>
+  </div>
+  <h1>创作台</h1>
+
+  <div class="sec">用这些素材创作</div>
+  <div class="chips">
+    <span class="chip"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Demo Day 第4期 · 上篇<svg class="x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></span>
+    <span class="chip"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Demo Day 第4期 · 下篇<svg class="x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></span>
+    <span class="chip add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>加素材</span>
+  </div>
+
+  <div class="sec">基于你选的 2 篇外部文章，建议：</div>
+  <div class="rec-row">
+    <div class="rec primary">
+      <span class="tag"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>推荐</span>
+      <h3>读书精读体 · 公众号长文</h3>
+      <p>你选的是两篇外部文章 —— 适合消化成一篇带你自己判断的深度解读，而不是流水账摘要。</p>
+      <button class="btn-primary">用这个生成</button>
+    </div>
+    <div class="rec alt">
+      <span class="tag gray">备选</span>
+      <h3 style="font-size:17px">读书精读体 · 小红书卡片</h3>
+      <p>同样的两篇，拆成 3 张收藏卡，适合小红书分发。</p>
+      <button class="btn">生成</button>
+    </div>
+  </div>
+  <div class="adjust">
+    <span>换文体 <svg viewBox="0 0 24 24" style="width:13px"><path d="M6 9l6 6 6-6"/></svg></span>
+    <span>换平台 <svg viewBox="0 0 24 24" style="width:13px"><path d="M6 9l6 6 6-6"/></svg></span>
+    <span>更多组合 <svg viewBox="0 0 24 24" style="width:13px"><path d="M6 9l6 6 6-6"/></svg></span>
+  </div>
+  <div class="banner">提示：你选的「实践复盘体」需要你自己的亲历素材，当前是外部文章，建议用「读书精读体」。</div>
+
+  <div class="draft">点上面「用这个生成」，就会只用你选中的 2 篇素材起稿；正文里的 [素材N] 可点，跳到右侧对应来源…</div>
+  <div class="note"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>这次只用你勾选的 2 条素材，不会私自引入主题里其它内容。</div>
+</div>
+</body></html>

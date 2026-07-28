@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>上传岔口 · 在页面里的位置</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;--body2:#4a463d;
+  --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+  --line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-hover:#2c456a;--green:#3f7350;--amber:#a9791f;--red:#a24b3f;--serif:'Newsreader',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding:20px 0 70px}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+.lead{font-family:var(--serif);font-size:20px;font-weight:600}
+.leadsub{font-size:12px;color:var(--sub2);margin:3px 0 16px}
+
+/* app frame */
+.app{display:grid;grid-template-columns:150px 1fr;border:1px solid var(--line10);border-radius:14px;overflow:hidden;background:var(--surface);min-height:520px}
+.nav{background:#e9e5dc;border-right:1px solid var(--line10);padding:16px 10px}
+.brand{display:flex;align-items:center;gap:7px;font-family:var(--serif);font-weight:600;font-size:14px;padding:0 6px 14px}
+.brand .dot{width:10px;height:10px;border-radius:3px;background:var(--accent)}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--sub);cursor:pointer;font-weight:500}
+.nav-item .i{width:15px;text-align:center;font-size:13px}
+.nav-item.active{background:var(--surface);color:var(--accent);font-weight:600;box-shadow:inset 2px 0 0 var(--accent)}
+.main{padding:20px 22px;position:relative;overflow:hidden}
+
+.ptitle{font-family:var(--serif);font-size:19px;font-weight:600}
+.psub{font-size:12px;color:var(--sub2);margin:3px 0 16px;line-height:1.5}
+.layertag{font-size:10.5px;font-weight:700;color:var(--sub2);letter-spacing:.02em;margin:2px 0 8px}
+
+.intake{display:grid;grid-template-columns:1.15fr 1fr;gap:12px}
+@media(max-width:720px){.intake{grid-template-columns:1fr}}
+.deep{border:1px solid rgba(61,90,128,.22);background:rgba(61,90,128,.04);border-radius:11px;padding:13px}
+.quick{border:1px solid rgba(63,115,80,.22);background:rgba(63,115,80,.035);border-radius:11px;padding:13px}
+.lane-ttl{font-family:var(--serif);font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.lab{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px}
+.lab.deep{color:var(--accent);background:rgba(61,90,128,.1)}
+.lab.quick{color:var(--green);background:rgba(63,115,80,.12)}
+.lane-cap{font-size:11px;color:var(--sub2);margin-top:5px;line-height:1.5}
+.deep-row{display:flex;gap:7px;margin-top:10px}
+.deep-row input{flex:1;min-width:0;border:1px solid var(--line10);border-radius:8px;padding:8px 10px;font-size:12px;background:var(--surface);color:var(--text)}
+.updbtn{border:1px solid var(--line10);background:var(--surface);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;white-space:nowrap}
+.updbtn:hover{border-color:var(--accent);background:rgba(61,90,128,.06)}
+.qrow{display:flex;gap:7px;margin-top:9px}
+.qrow input{flex:1;border:1px solid var(--line10);border-radius:8px;padding:8px 10px;font-size:12px;background:var(--surface)}
+.qrow button{border:none;background:var(--accent);color:#fff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600}
+
+/* inline fork panel inside deep card */
+.forkpanel{margin-top:11px;border-top:1px dashed var(--line14);padding-top:11px;display:none}
+.forkpanel.show{display:block;animation:slide .25s ease}
+@keyframes slide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.fp-head{font-size:11.5px;color:var(--sub);margin-bottom:9px}
+.fp-head b{color:var(--body)}
+.fp-head .c{color:var(--accent);font-weight:700}
+.fp-opts{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.fp-opt{border:1px solid var(--line10);border-radius:9px;padding:10px 11px;cursor:pointer;background:var(--surface)}
+.fp-opt:hover{border-color:var(--accent);background:rgba(61,90,128,.05)}
+.fp-opt.primary{border-color:rgba(61,90,128,.45)}
+.fp-opt .nm{font-size:12.5px;font-weight:600}
+.fp-opt.primary .nm{color:var(--accent)}
+.fp-opt .arrow{font-size:10.5px;color:var(--faint);font-weight:600}
+.fp-opt .ds{font-size:11px;color:var(--sub2);line-height:1.5;margin-top:3px}
+.fp-opt .stay{font-size:10px;color:var(--green);font-weight:700}
+
+.cards{margin-top:18px}
+.sec{font-size:12px;font-weight:600;color:var(--sub2);margin-bottom:9px}
+.card{border:1px solid var(--line10);border-radius:11px;background:var(--surface);padding:12px 13px;margin-bottom:9px}
+.card .pill{font-size:10px;font-weight:600;padding:2px 7px;border-radius:12px;color:var(--green);background:rgba(63,115,80,.12)}
+.card .t{font-family:var(--serif);font-size:15px;font-weight:600;margin-top:6px}
+
+/* toast */
+.toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:var(--text);color:#fff;font-size:12px;padding:9px 16px;border-radius:22px;opacity:0;pointer-events:none;transition:.3s;z-index:5}
+.toast.on{opacity:1}
+
+/* studio page */
+.studio{display:none;height:100%}
+.studio.show{display:block;animation:slide .3s ease}
+.back{font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;margin-bottom:12px}
+.st-grid{display:grid;grid-template-columns:180px 1fr;gap:14px}
+@media(max-width:720px){.st-grid{grid-template-columns:1fr}}
+.aside{border:1px solid var(--line10);border-radius:10px;padding:12px;background:var(--brief-bg)}
+.aside .h{font-size:11.5px;font-weight:700;color:var(--sub2);margin-bottom:9px}
+.aside .r{display:flex;gap:6px;margin-bottom:8px}
+.aside .b{flex:1;text-align:center;font-size:11px;font-weight:600;border:1px solid var(--line10);border-radius:7px;padding:7px;color:var(--sub);background:var(--surface)}
+.aside .b.on{border-color:var(--accent);color:var(--accent);background:rgba(61,90,128,.05)}
+.aside .mi{font-size:11px;color:var(--faint);line-height:1.6}
+.editor{border:1px solid var(--line10);border-radius:10px;overflow:hidden;background:var(--surface)}
+.ed-top{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line08);font-size:11px;color:var(--sub2);flex-wrap:wrap}
+.ed-top .lab2{background:rgba(61,90,128,.1);color:var(--accent);font-weight:700;font-size:10px;padding:2px 7px;border-radius:5px}
+.ed-top .sel{border:1px solid var(--line10);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--accent);background:var(--surface);font-weight:600}
+.ed-body{padding:13px;font-size:12.5px;color:var(--body2);line-height:1.75;white-space:pre-wrap;min-height:190px;background:var(--surface)}
+.ed-tools{display:flex;gap:6px;padding:9px 12px;border-top:1px solid var(--line08);flex-wrap:wrap}
+.tool{font-size:11px;border:1px solid var(--line10);border-radius:7px;padding:4px 9px;color:var(--sub);background:var(--surface)}
+.callout{font-size:11.5px;color:var(--sub);background:var(--brief-bg);border-radius:8px;padding:10px 12px;margin-top:12px;line-height:1.6}
+.callout b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lead">上传岔口 · 它在页面里的什么位置、什么时候跳转</div>
+  <div class="leadsub">入口在<b>灵感页「即时分析」卡</b>里。选「当素材」不跳；选「当初稿」→ 跳创作台。点下面 ⬆上传文件 走一遍。</div>
+
+  <div class="app">
+    <!-- 左导航 -->
+    <div class="nav" id="nav">
+      <div class="brand"><span class="dot"></span>知识工作台</div>
+      <div class="nav-item"><span class="i">📰</span>资讯</div>
+      <div class="nav-item"><span class="i">📚</span>素材</div>
+      <div class="nav-item active" id="nav-insp"><span class="i">💡</span>灵感</div>
+      <div class="nav-item" id="nav-studio"><span class="i">✍️</span>创作</div>
+      <div class="nav-item"><span class="i">📖</span>主题</div>
+      <div class="nav-item"><span class="i">🗂</span>周报</div>
+    </div>
+
+    <!-- 右主区 -->
+    <div class="main">
+      <!-- 灵感页 -->
+      <div class="page" id="pageInsp">
+        <div class="ptitle">灵感库</div>
+        <div class="psub">要写什么的种子。刷到能写的、脑里冒出的，先收下来。</div>
+
+        <div class="layertag">主动 · 即时（你此刻丢一个进来）</div>
+        <div class="intake">
+          <!-- 即时分析卡：上传入口在这 -->
+          <div class="deep">
+            <div class="lane-ttl"><span class="lab deep">消化</span>即时分析</div>
+            <div class="lane-cap">丢一个链接、或上传一份文档 → 抽出正文</div>
+            <div class="deep-row">
+              <input placeholder="粘贴链接（网页/播客/视频）…" />
+              <button class="updbtn" onclick="upload()">⬆ 上传文件</button>
+            </div>
+
+            <!-- 岔口就地展开在这张卡里（不弹窗、不跳页） -->
+            <div class="forkpanel" id="fork">
+              <div class="fp-head">已从 <b>产品周报.md</b> 抽出正文 <span class="c">2,140 字</span> —— 拿它做什么？</div>
+              <div class="fp-opts">
+                <div class="fp-opt" onclick="chooseNote()">
+                  <div class="nm">📚 入库当素材 <span class="stay">· 留在本页</span></div>
+                  <div class="ds">进素材库，之后在创作台勾选、被引用。＝现在的行为。</div>
+                </div>
+                <div class="fp-opt primary" onclick="chooseDraft()">
+                  <div class="nm">✍️ 作为初稿 <span class="arrow">→ 跳创作台</span></div>
+                  <div class="ds">正文原样进创作台编辑器，选文体/平台改你的原文。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 随手记 -->
+          <div class="quick">
+            <div class="lane-ttl"><span class="lab quick">闪念</span>随手记</div>
+            <div class="lane-cap">冒出一句话 → 直接成一条灵感</div>
+            <div class="qrow"><input placeholder="随手记一句…" /><button>＋ 记</button></div>
+          </div>
+        </div>
+
+        <div class="cards">
+          <div class="sec">你的灵感</div>
+          <div class="card"><span class="pill">我记的</span><div class="t">AI 产品的信息管道</div></div>
+        </div>
+
+        <div class="toast" id="toast">✓ 已入库为素材，去「素材」页可见（没跳页）</div>
+      </div>
+
+      <!-- 创作台页（选"当初稿"后切到这） -->
+      <div class="studio" id="pageStudio">
+        <button class="back" onclick="goInsp()">← 返回灵感</button>
+        <div class="ptitle" style="margin-bottom:14px">创作台</div>
+        <div class="st-grid">
+          <div class="aside">
+            <div class="h">素材台</div>
+            <div class="r"><div class="b">＋ 新增</div><div class="b on">⬆ 上传</div></div>
+            <div class="mi">从这上传也能选「当初稿/当素材」，在本页不跳。</div>
+          </div>
+          <div class="editor">
+            <div class="ed-top">
+              <span class="lab2">初稿 · 来自 产品周报.md</span>
+              <span>你的原文，未被 AI 重写 ·</span>
+              <span class="sel">换文体 ▾</span><span class="sel">换平台 ▾</span>
+            </div>
+            <div class="ed-body">AI 产品的信息管道
+
+用户每天被信息淹没，真正的痛点不是信息少，是没有一条「替我筛 → 替我读 → 喂给我」的管道。
+
+第一层是筛：从上百个源里挑出今天真正值得看的十条……
+第二层是读：把长文压成一段能扫的要点……
+第三层是喂：按我的关注顺序推给我，而不是让我自己去翻。</div>
+            <div class="ed-tools">
+              <span class="tool">润色</span><span class="tool">按平台改写</span><span class="tool">审稿</span><span class="tool">存草稿</span>
+            </div>
+          </div>
+        </div>
+        <div class="callout"><b>这就是唯一会跳页的路径</b>：灵感页上传 + 选「当初稿」→ 切到创作台（左导航从「灵感」高亮变「创作」）。正文原样进编辑器，AI 只是工具，不先替你重写。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var fork=document.getElementById('fork'),toast=document.getElementById('toast');
+function upload(){ fork.classList.add('show'); fork.scrollIntoView({block:'nearest'}); }
+function chooseNote(){
+  fork.classList.remove('show');
+  toast.classList.add('on');
+  setTimeout(function(){toast.classList.remove('on')},2400);
+}
+function chooseDraft(){
+  document.getElementById('pageInsp').style.display='none';
+  document.getElementById('pageStudio').classList.add('show');
+  document.getElementById('nav-insp').classList.remove('active');
+  document.getElementById('nav-studio').classList.add('active');
+  fork.classList.remove('show');
+}
+function goInsp(){
+  document.getElementById('pageStudio').classList.remove('show');
+  document.getElementById('pageInsp').style.display='block';
+  document.getElementById('nav-studio').classList.remove('active');
+  document.getElementById('nav-insp').classList.add('active');
+}
+</script>
+</body>
+</html>

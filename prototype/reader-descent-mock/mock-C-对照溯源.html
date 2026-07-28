@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mock C · 对照溯源</title>
+<style>
+  :root{--bg:#f5f4f1;--paper:#fff;--ink:#20201d;--sub:#8a8a82;--line:#e9e7e2;
+    --accent:#6f8a86;--accent-soft:#e7efed;--warn:#a9805a;--warn-soft:#f4ece2;--blue:#5f7896;--blue-soft:#eaeef4}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif}
+  .top{height:52px;display:flex;align-items:center;gap:12px;padding:0 22px;background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .tier{background:var(--accent-soft);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+  .sub{color:var(--sub);font-size:13px}
+  .hint{margin-left:auto;font-size:12px;color:var(--sub)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;max-width:1200px;margin:0 auto}
+  .head{padding:20px 30px 4px;position:sticky;top:52px;background:var(--bg);z-index:10}
+  .head .t{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sub)}
+  .pane{padding:6px 30px 40px}
+  .pane.L{border-right:1px solid var(--line)}
+  h1{font-size:21px;line-height:1.4;margin:6px 30px 2px;max-width:1200px}
+  .enh1{font-family:ui-serif,Georgia,serif;font-size:19px;line-height:1.4;color:#33332e;margin:6px 0 2px}
+  /* 对照行：原文段 ↔ 降维段，通过 data-k 高亮联动 */
+  .seg{padding:12px 0;border-bottom:1px dashed var(--line);transition:background .2s;border-radius:6px}
+  .seg.hot{background:var(--accent-soft)}
+  .en{font-family:ui-serif,Georgia,serif;color:#3a3a34;line-height:1.85}
+  .zh .k{color:var(--accent);font-weight:600}
+  .badge{display:inline-block;background:var(--blue-soft);color:var(--blue);font-size:10px;padding:1px 6px;border-radius:20px;margin-right:6px;font-weight:700;vertical-align:middle}
+  .zh .note{color:#6a6a62;font-size:13px;background:#f1f0ea;border-radius:8px;padding:8px 11px;margin-top:6px;display:block}
+  .zh .lead{font-size:16px;font-weight:500}
+  .zh .act{background:var(--warn-soft);border-radius:9px;padding:10px 12px}
+  .zh .act b{color:var(--warn)}
+  /* 底部：这篇能长出什么 */
+  .grow{background:var(--paper);border-top:1px solid var(--line);padding:24px 30px 40px}
+  .grow .in{max-width:1140px;margin:0 auto}
+  .grow h2{font-size:15px;margin:0 0 4px}
+  .grow p.s{color:var(--sub);font-size:13px;margin:0 0 16px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+  .tcard{border:1px solid var(--line);border-radius:12px;padding:14px 15px;background:#fbfaf8;cursor:pointer;transition:.15s}
+  .tcard:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.06)}
+  .tcard .tag{font-size:11px;color:var(--accent);font-weight:700}
+  .tcard b{display:block;margin:4px 0 3px;font-size:14.5px;line-height:1.4}
+  .tcard span{font-size:12px;color:var(--sub)}
+  .exits{display:flex;gap:9px}
+  .exit{flex:1;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 14px;cursor:pointer;transition:.15s;text-align:left}
+  .exit:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .exit b{display:block;font-size:13px}.exit span{font-size:11px;color:var(--sub)}
+  .exit.pub{border-color:var(--accent);background:var(--accent-soft)}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2b2e;color:#fff;padding:11px 20px;border-radius:24px;font-size:13.5px;transition:.3s;z-index:70}
+</style>
+</head>
+<body>
+  <div class="top">
+    <b>工作台 · 精读器</b><span class="sub">Simon Willison's Weblog</span><span class="tier">一手 T2</span>
+    <span class="sub">· 英文源</span>
+    <span class="hint">← 左原文 · 右降维，逐段对照 · 悬停任一段高亮对应原文 →</span>
+  </div>
+
+  <h1>Claude Opus 5 发布：价格不变，"会自己补位"是最大变化</h1>
+
+  <div class="cols">
+    <div class="head t" style="grid-column:1">原文 · Simon Willison（可核查）</div>
+    <div class="head t" style="grid-column:2">中文降维 · 每段对齐原文</div>
+
+    <!-- 左原文 -->
+    <div class="pane L">
+      <div class="seg" data-k="1"><div class="en">The buzz is positive, and Anthropic's description of it as "thoughtful and proactive... close to the frontier intelligence of Claude Fable 5 at half the price". It's currently leading the Artificial Analysis leaderboard, in front of even Fable 5. Priced the same as Opus 4.8, with a "fast mode" at twice the cost.</div></div>
+      <div class="seg" data-k="2"><div class="en">On one Frontier-Bench task, Opus 5 was given a drawing of a machine part... intentionally given no way to directly view the drawing. Opus 5 responded by writing its own computer vision pipeline to pull the geometry from the raw pixels, then reconstructed the full machine part.</div></div>
+      <div class="seg" data-k="3"><div class="en">As with Opus 4.8, we've intentionally avoided training Opus 5 on cyber tasks... it comes close to Mythos 5 at finding cybersecurity vulnerabilities. However, it remains substantially behind Mythos 5 on the exploitation of those vulnerabilities.</div></div>
+      <div class="seg" data-k="4"><div class="en">Anthropic have published a prompting guide for Claude Opus 5. Thariq Shihipar has also written The new rules of context engineering for Claude 5 generation models.</div></div>
+    </div>
+
+    <!-- 右降维 -->
+    <div class="pane R">
+      <div class="seg" data-k="1"><div class="zh"><span class="badge">对应 ①</span><span class="lead">Opus 5 <span class="k">价格和 4.8 一样</span>（含 2× 的"快速模式"），却登顶了 Artificial Analysis 榜、排在 Fable 5 之前。官方定位是"半价接近 Fable 5"。</span></div></div>
+      <div class="seg" data-k="2"><div class="zh"><span class="badge">对应 ②</span>一个实例最能说明它的"主动性"：任务给了零件图纸<b>但故意不让它看图</b>，Opus 5 <span class="k">自己写了套计算机视觉流程</span>，从像素里提几何、重建了整个零件。<span class="note">说人话：你没要求的、它判断该做也会自己动手。这是双刃——能少写指令，也可能在你没盯着时自作主张。（原作者只摆了事实，没喊"惊人"，降维如实保留这份克制）</span></div></div>
+      <div class="seg" data-k="3"><div class="zh"><span class="badge">对应 ③</span>安全上有个<b>矛盾信号</b>：它<span class="k">发现</span>漏洞的能力接近顶尖，但把漏洞<span class="k">变成实际攻击</span>明显更弱。<span class="note" style="color:var(--warn);background:var(--warn-soft)">⚠️ 待验证：这是刻意设的能力边界还是训练副产物？原文没说死——判断留你，别当结论收下。</span></div></div>
+      <div class="seg" data-k="4"><div class="zh act"><span class="badge">对应 ④</span><b>对你有用：</b>在用 Claude 做开发/研究就去读那两份提示词/上下文工程指南——旧 prompt 模板可能过时；关键任务记得给它设边界和确认步骤。</div></div>
+    </div>
+  </div>
+
+  <div class="grow"><div class="in">
+    <h2>这篇能长出什么</h2>
+    <p class="s">降维只是第一步。下面是它能接的三条出路——喂料、攒题、或直接降维成稿发出去。</p>
+    <div class="cards">
+      <div class="tcard" onclick="toast('已提为选题')"><span class="tag">选题 · 观点</span><b>AI 的"主动性"，是效率还是失控？</b><span>用这篇 CV 重建的例子当引子，谈创作/开发工作流该怎么给 AI 设边界</span></div>
+      <div class="tcard" onclick="toast('已提为选题')"><span class="tag">选题 · 横向</span><b>模型"会自己补位"这一年</b><span>把 Opus 5 这条串进追踪主题，看"主动性"这条线怎么演进</span></div>
+      <div class="tcard" onclick="toast('已存为素材')"><span class="tag">素材 · 金句</span><b>"发现漏洞 ≠ 会利用漏洞"</b><span>安全能力被拆成两半——留作以后聊 AI 安全的论据</span></div>
+    </div>
+    <div class="exits">
+      <button class="exit" onclick="toast('已存入素材库')"><b>＋ 存为素材</b><span>当原料，喂日后创作</span></button>
+      <button class="exit" onclick="toast('已提为选题')"><b>💡 提为选题</b><span>攒成你要写的题</span></button>
+      <button class="exit pub" onclick="toast('已带降维稿进创作台')"><b>✍️ 降维成稿 · 去发布</b><span>润色/加你的视角 → 直接发（你也常这么干）</span></button>
+    </div>
+  </div></div>
+
+  <div class="toast" id="toast"></div>
+<script>
+  document.querySelectorAll('.seg').forEach(s=>{
+    s.addEventListener('mouseenter',()=>{const k=s.dataset.k;document.querySelectorAll('.seg[data-k="'+k+'"]').forEach(x=>x.classList.add('hot'))});
+    s.addEventListener('mouseleave',()=>document.querySelectorAll('.seg').forEach(x=>x.classList.remove('hot')));
+  });
+  let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2200);}
+</script>
+</body>
+</html>

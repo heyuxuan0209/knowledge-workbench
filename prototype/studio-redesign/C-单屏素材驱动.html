@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台改版 · 方案C 单屏素材驱动</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line:rgba(33,31,26,.1);--line2:rgba(33,31,26,.07);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--serif:'Newsreader',serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 24px 40px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.back{color:var(--sub);background:none;border:none;font-size:13px;display:inline-flex;gap:6px;align-items:center;padding:0}
+.drafts{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-size:13px;color:var(--sub)}
+h1{font-family:var(--serif);font-size:23px;font-weight:600;margin:0}
+svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.grid{display:grid;grid-template-columns:240px 1fr;gap:18px;margin-top:14px}
+.side{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.side h4{font-size:12px;color:var(--sub2);margin:0 0 10px;font-weight:600;letter-spacing:.3px}
+.mat{display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line2)}
+.box{width:15px;height:15px;border:1.5px solid var(--accent);border-radius:4px;margin-top:1px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent)}
+.box svg{width:10px;height:10px;color:#fff;stroke-width:2.5}
+.mat .t{font-size:13px;color:var(--body);line-height:1.45}
+.mat .s{font-size:11px;color:var(--faint);margin-top:2px}
+.add{display:inline-flex;align-items:center;gap:5px;color:var(--sub);font-size:12px;margin-top:10px;border:1px dashed var(--line);border-radius:7px;padding:6px 10px;width:100%;justify-content:center}
+.rolehint{font-size:11px;color:var(--sub2);margin-top:14px;line-height:1.5;padding-top:12px;border-top:1px solid var(--line2)}
+.recbar{background:var(--surface);border:1px solid rgba(61,90,128,.28);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px}
+.recbar .lead{color:var(--sub);display:inline-flex;align-items:center;gap:6px}
+.pill{background:rgba(61,90,128,.09);color:var(--accent);border-radius:6px;padding:4px 10px;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--body);display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff;border:none;font-weight:500}
+.muted{color:var(--sub);font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.draft{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px 26px;min-height:280px;font-family:var(--serif);font-size:16px;color:var(--body);line-height:1.8;margin-top:12px}
+.draft .ph{color:var(--faint)}
+.ref{color:var(--accent);background:rgba(61,90,128,.1);border-radius:4px;padding:0 4px;font-size:12px;font-family:system-ui;cursor:pointer;text-decoration:underline dotted}
+.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+</style></head><body>
+<div class="wrap">
+  <div class="top">
+    <button class="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>返回主题库</button>
+    <button class="drafts">草稿箱（3）</button>
+  </div>
+  <h1>创作台</h1>
+
+  <div class="grid">
+    <div class="side">
+      <h4>素材（2）· 本次就用这些</h4>
+      <div class="mat"><span class="box"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span><div><div class="t">Demo Day 第4期 · 上篇</div><div class="s">飞书 · 多人分享</div></div></div>
+      <div class="mat"><span class="box"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span><div><div class="t">Demo Day 第4期 · 下篇</div><div class="s">飞书 · 多人分享</div></div></div>
+      <div class="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>加素材</div>
+      <div class="rolehint"><b style="color:var(--sub)">右侧 = 改稿</b><br>起稿在这里；对某段不满意，在右侧让 AI 审稿 / 给 3 个改法 / 换说法。</div>
+    </div>
+
+    <div>
+      <div class="recbar">
+        <span class="lead"><svg viewBox="0 0 24 24" style="width:14px"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>这 2 篇外部文章 → 建议</span>
+        <span class="pill">读书精读体<svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></span>
+        <span class="lead">发</span>
+        <span class="pill">公众号长文<svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></span>
+        <button class="btn-primary">生成</button>
+        <span class="muted">更多组合 <svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+
+      <div class="draft">
+        <span class="ph">（点「生成」后出稿，只用左侧勾选的 2 篇素材。示意效果：）</span><br><br>
+        先说结论：这场 Demo Day 里最值得记的，不是谁的产品更炫，而是几个人不约而同踩到的同一个坑 <span class="ref">[素材1]</span>。<br><br>
+        上篇里，分享者反复提到……<span class="ref">[素材2]</span>——点一下 <span class="ref">[素材N]</span> 就高亮左侧对应素材、并给原文链接，你随时知道这句话是哪来的。
+      </div>
+      <div class="actions">
+        <button class="btn">重新生成</button>
+        <button class="btn-primary">保存</button>
+        <button class="btn">去 AI 味</button>
+        <button class="btn">审稿</button>
+        <button class="btn">3 个改法</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

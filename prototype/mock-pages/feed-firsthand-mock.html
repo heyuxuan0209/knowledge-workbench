@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>信息流 · 一手优先分组 mock</title>
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--body2:#4a463d;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line08:rgba(33,31,26,.08);--line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:Georgia,'Songti SC','Noto Serif SC',serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.6}
+.tag-mock{position:fixed;top:12px;right:14px;background:var(--accent);color:#fff;font-size:12px;padding:4px 10px;border-radius:20px;z-index:9}
+.wrap{max-width:820px;margin:0 auto;padding:28px 22px 80px}
+.hd{margin-bottom:14px}
+.hd h1{font-family:var(--serif);font-size:22px;font-weight:600}
+.hd .sub{font-size:12.5px;color:var(--sub);margin-top:3px}
+/* 上方两层占位（保持现状） */
+.keep{background:var(--surface);border:1px dashed var(--line14);border-radius:11px;padding:10px 16px;font-size:12.5px;color:var(--sub2);margin-bottom:18px;line-height:1.8}
+.keep b{color:var(--body2)}
+/* 排序控件 */
+.sortbar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sortbar .lab{font-size:12px;color:var(--sub2);letter-spacing:1px}
+.pill{font-size:12.5px;padding:5px 14px;border-radius:16px;border:1px solid var(--line14);background:var(--surface);color:var(--body2);cursor:pointer}
+.pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.sortbar .why{font-size:11.5px;color:var(--faint);margin-left:4px}
+/* 催办条（可选件） */
+.nudge{background:rgba(169,121,31,.07);border:1px solid rgba(169,121,31,.3);border-radius:10px;padding:9px 15px;font-size:13px;color:var(--amber);margin:10px 0 16px;display:flex;align-items:center;gap:8px}
+.nudge .opt{margin-left:auto;font-size:10.5px;color:var(--faint);border:1px dashed var(--faint);border-radius:8px;padding:1px 7px}
+.nudge a{color:var(--amber);font-weight:600}
+/* 分组 */
+.grp{margin-bottom:20px}
+.ghead{display:flex;align-items:baseline;gap:10px;padding:8px 2px;border-bottom:2px solid var(--line14);margin-bottom:8px}
+.ghead .gt{font-family:var(--serif);font-size:16.5px;font-weight:600}
+.ghead .gn{font-size:12px;color:var(--sub2)}
+.ghead .gnew{font-size:11.5px;color:#fff;background:var(--red);border-radius:10px;padding:0 8px}
+.ghead .gwhat{font-size:11.5px;color:var(--faint);margin-left:auto;text-align:right}
+.grp.g1 .ghead{border-bottom-color:var(--accent)}
+.grp.g2 .ghead{border-bottom-color:var(--green)}
+.grp.g3 .ghead{border-bottom-color:var(--amber)}
+/* 卡片（紧凑行） */
+.row{display:flex;align-items:baseline;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer}
+.row:hover{background:var(--surface)}
+.row .tm{font-size:11px;color:var(--faint);flex-shrink:0;width:38px}
+.row .src{font-size:11.5px;flex-shrink:0;width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g1 .src{color:var(--accent);font-weight:600}
+.g2 .src{color:var(--green);font-weight:600}
+.g3 .src{color:var(--amber)}
+.g4 .src{color:var(--sub2)}
+.row .tt{flex:1;font-size:14px;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .badge{flex-shrink:0;font-size:10.5px;color:var(--sub2);border:1px solid var(--line14);border-radius:9px;padding:0 7px}
+.row .badge.of{color:var(--accent);border-color:var(--accent)}
+.row .badge.cl{color:var(--amber);border-color:var(--amber)}
+.row .act{flex-shrink:0;font-size:12px;color:#fff;background:var(--accent);border:none;border-radius:7px;padding:3px 12px;cursor:pointer;opacity:0;transition:opacity .12s}
+.row:hover .act{opacity:1}
+.row.dim .tt{color:var(--sub)}
+/* 折叠组 */
+.g4head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line10);border-radius:10px;cursor:pointer;font-size:13.5px;color:var(--sub);user-select:none}
+.g4head:hover{color:var(--accent)}
+.g4head .chev{font-size:11px;transition:transform .2s}
+.g4.open .g4head .chev{transform:rotate(90deg)}
+.g4 .g4list{display:none;padding-top:6px}
+.g4.open .g4list{display:block}
+/* 纯时间视图 */
+#flat{display:none}
+body.flat #grouped{display:none}
+body.flat #flat{display:block}
+.legend{margin-top:24px;font-size:12px;color:var(--sub2);text-align:center;line-height:2}
+</style>
+</head>
+<body>
+<div class="tag-mock">信息流 · 一手优先 mock</div>
+<div class="wrap">
+  <div class="hd">
+    <h1>资讯 · 信息流</h1>
+    <div class="sub">今日必看 / 今日热点在上方保持现状——这个 mock 只动它们下面的「信息流」区</div>
+  </div>
+
+  <div class="keep">▲ 此处为现有「今日必看」（📢×2 + ✨×3）与「今日热点」（事件簇），<b>保持现状不动</b>，略去以聚焦本次改动 ▲</div>
+
+  <div class="sortbar">
+    <span class="lab">排序</span>
+    <button class="pill on" id="pGroup">🥇 一手优先</button>
+    <button class="pill" id="pTime">最新</button>
+    <button class="pill">最热</button>
+    <span class="why">一手优先=按原料价值分组，组内按时间 · 点「最新」看现状对比</span>
+  </div>
+
+  <div class="nudge">🕐 本周一手信源还没读的 <a href="#">6 条</a>，最早已搁置 4 天 —— 原料别放凉<span class="opt">可选件 · 不要可去</span></div>
+
+  <!-- ═══ 分组视图（新默认） ═══ -->
+  <div id="grouped">
+
+    <div class="grp g1">
+      <div class="ghead"><span class="gt">📌 官方一手</span><span class="gn">今日 5 条</span><span class="gnew">3 未读</span><span class="gwhat">官方 blog + 官方号/员工号（T1·T1.5）</span></div>
+      <div class="row"><span class="tm">19:55</span><span class="src">Anthropic 官网</span><span class="tt">Claude 语音模式现已支持 Opus、Sonnet 及连接工具与多语言</span><span class="badge of">官方一手</span><button class="act">精读</button></div>
+      <div class="row"><span class="tm">19:43</span><span class="src">OpenAI 官网</span><span class="tt">ChatGPT 桌面版上线语音控制多智能体</span><span class="badge of">官方一手</span><button class="act">精读</button></div>
+      <div class="row"><span class="tm">17:55</span><span class="src">Greg Brockman</span><span class="tt">ChatGPT 向美国用户推出健康功能</span><span class="badge of">官方号</span><button class="act">精读</button></div>
+      <div class="row dim"><span class="tm">16:31</span><span class="src">Satya Nadella</span><span class="tt">微软 MAI 模型：以更低成本实现前沿能力规模化</span><span class="badge of">官方号</span><button class="act">精读</button></div>
+      <div class="row dim"><span class="tm">12:33</span><span class="src">通义千问官方</span><span class="tt">通义千问发布 Qwen-Audio-3.0-TTS，登顶 TTS 排行榜</span><span class="badge of">官方一手</span><button class="act">精读</button></div>
+    </div>
+
+    <div class="grp g2">
+      <div class="ghead"><span class="gt">🎯 你关注的人</span><span class="gn">今日 6 条</span><span class="gnew">4 未读</span><span class="gwhat">X builders · YouTube · 播客（你标了关注的）</span></div>
+      <div class="row"><span class="tm">05:19</span><span class="src">AI Engineer 峰会</span><span class="tt">训练前沿模型以超越黑客思维 — Uri Rolls & Thom W</span><button class="act">精读</button></div>
+      <div class="row"><span class="tm">00:00</span><span class="src">硅谷101</span><span class="tt">E245｜藏在大模型背后的新闻人：GPT 们的回复是这样写出来的</span><button class="act">精读</button></div>
+      <div class="row"><span class="tm">17:45</span><span class="src">AI Engineer 峰会</span><span class="tt">将任务与模型分离的非凡效果 — Maxime Rivest, DSPy</span><button class="act">精读</button></div>
+      <div class="row"><span class="tm">17:30</span><span class="src">AI Engineer 峰会</span><span class="tt">Notion 的 Token Town — 莎拉·萨克斯，Notion</span><button class="act">精读</button></div>
+      <div class="row dim"><span class="tm">16:48</span><span class="src">louis030195</span><span class="tt">推出 HN：Screenpipe（YC S26）——7x24 屏幕录制赋能你的 Agent</span><button class="act">精读</button></div>
+      <div class="row dim"><span class="tm">16:49</span><span class="src">jjfoooo4</span><span class="tt">反对开源 AI 的理由站不住脚</span><button class="act">精读</button></div>
+    </div>
+
+    <div class="grp g3">
+      <div class="ghead"><span class="gt">🔥 精选与热点</span><span class="gn">今日 4 条</span><span class="gwhat">AI HOT 精选 + 事件簇主条（同事件已去重）</span></div>
+      <div class="row"><span class="tm">18:35</span><span class="src">AI HOT 精选</span><span class="tt">TheNumbers.com 因 AI 爬虫与安全攻击导致网站崩溃重建</span><span class="badge cl">3 源同报</span><button class="act">精读</button></div>
+      <div class="row"><span class="tm">23:30</span><span class="src">AI HOT 精选</span><span class="tt">佛州男子因相信 ChatGPT 拒绝就医而险些丧命，起诉 OpenAI</span><button class="act">精读</button></div>
+      <div class="row dim"><span class="tm">昨天</span><span class="src">AI HOT 精选</span><span class="tt">Anthropic 因盗版书籍支付 15 亿美元和解金，创集体诉讼纪录</span><span class="badge cl">3 源同报</span><button class="act">精读</button></div>
+      <div class="row dim"><span class="tm">昨天</span><span class="src">AI HOT 精选</span><span class="tt">GigaToken 发布：分词速度提升约 1000 倍</span><span class="badge cl">2 源同报</span><button class="act">精读</button></div>
+    </div>
+
+    <div class="grp g4" id="g4">
+      <div class="g4head" onclick="document.getElementById('g4').classList.toggle('open')"><span class="chev">▶</span>其他 · 今日 27 条（GitHub trending ×12 · 二手报道与杂讯 ×15）——想逛再点开</div>
+      <div class="g4list">
+        <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">OmniRoute：免费 MIT AI 网关，一个端点调用 500+ 模型</span><button class="act">精读</button></div>
+        <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">awesome-claude-skills：精选 Claude 技能与工具合集</span><button class="act">精读</button></div>
+        <div class="row"><span class="tm">20:11</span><span class="src">AI HOT</span><span class="tt">DARPA 与美国空军试飞 AI 操控的 F-16 战机</span><button class="act">精读</button></div>
+        <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">Kronos：面向金融市场的语言基础模型</span><button class="act">精读</button></div>
+        <div class="row dim"><span class="tm">…</span><span class="src"></span><span class="tt">（其余 23 条）</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ 纯时间视图（现状对比） ═══ -->
+  <div id="flat">
+    <div style="font-size:12px;color:var(--red);margin:4px 0 10px">▼ 现状：纯时间混排——一手信源被 GitHub trending 和二手报道冲散，你要自己淘 ▼</div>
+    <div class="row"><span class="tm">05:19</span><span class="src" style="color:var(--green)">AI Engineer 峰会</span><span class="tt">训练前沿模型以超越黑客思维 — Uri Rolls & Thom W</span></div>
+    <div class="row"><span class="tm">00:00</span><span class="src" style="color:var(--green)">硅谷101</span><span class="tt">E245｜藏在大模型背后的新闻人</span></div>
+    <div class="row"><span class="tm">23:30</span><span class="src">AI HOT</span><span class="tt">佛州男子因相信 ChatGPT 拒绝就医而险些丧命，起诉 OpenAI</span></div>
+    <div class="row"><span class="tm">20:11</span><span class="src">AI HOT</span><span class="tt">DARPA 与美国空军试飞 AI 操控的 F-16 战机</span></div>
+    <div class="row"><span class="tm">19:55</span><span class="src" style="color:var(--accent);font-weight:600">Anthropic 官网</span><span class="tt">Claude 语音模式现已支持 Opus、Sonnet 及连接工具</span></div>
+    <div class="row"><span class="tm">19:43</span><span class="src" style="color:var(--accent);font-weight:600">OpenAI 官网</span><span class="tt">ChatGPT 桌面版上线语音控制多智能体</span></div>
+    <div class="row"><span class="tm">18:35</span><span class="src">AI HOT</span><span class="tt">TheNumbers.com 因 AI 爬虫与安全攻击导致网站崩溃重建</span></div>
+    <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">OmniRoute：免费 MIT AI 网关</span></div>
+    <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">awesome-claude-skills：精选合集</span></div>
+    <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">pi-web：pi 编程代理的 Web 界面</span></div>
+    <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">text-to-cad：文本转 CAD 技能集</span></div>
+    <div class="row"><span class="tm">18:01</span><span class="src">GitHub 趋势</span><span class="tt">alibaba/open-code-review</span></div>
+    <div class="row"><span class="tm">17:55</span><span class="src" style="color:var(--accent);font-weight:600">Greg Brockman</span><span class="tt">ChatGPT 向美国用户推出健康功能</span></div>
+    <div class="row"><span class="tm">17:45</span><span class="src" style="color:var(--green)">AI Engineer 峰会</span><span class="tt">将任务与模型分离的非凡效果 — DSPy</span></div>
+    <div class="row"><span class="tm">17:30</span><span class="src" style="color:var(--green)">AI Engineer 峰会</span><span class="tt">Notion 的 Token Town</span></div>
+    <div class="row dim"><span class="tm">…</span><span class="src"></span><span class="tt">（继续往下混排 40+ 条）</span></div>
+  </div>
+
+  <div class="legend">分组=显式可解释（组头写明谁在这组、为什么）· 组内纯时间 · 主动作=精读（消化→素材→创作台→小红书/公众号出稿）<br>彩色下划线：蓝=官方一手 绿=你关注的人 琥珀=精选热点</div>
+</div>
+<script>
+const pg=document.getElementById('pGroup'), pt=document.getElementById('pTime');
+pg.onclick=()=>{document.body.classList.remove('flat');pg.classList.add('on');pt.classList.remove('on')};
+pt.onclick=()=>{document.body.classList.add('flat');pt.classList.add('on');pg.classList.remove('on')};
+</script>
+</body>
+</html>

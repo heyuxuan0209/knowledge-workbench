@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台布局 · 改稿位置 × 草稿嵌栏</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);--accent:#3d5a80;--cards:#7a4d8f;--serif:'Newsreader',serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font-family:system-ui,-apple-system,sans-serif;font-size:13.5px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:18px 22px 50px}
+.demobar{background:#2c2a25;color:#e8e3d8;border-radius:9px;padding:9px 13px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px}
+.demobar b{color:#fff}.demobar button{background:rgba(255,255,255,.1);color:#e8e3d8;border:none;border-radius:6px;padding:6px 12px;font-size:12px}
+.demobar button.on{background:#fff;color:#2c2a25;font-weight:600}
+.demobar .desc{color:#a8a294;margin-left:auto;max-width:560px}
+h1{font-family:var(--serif);font-size:20px;margin:0 0 3px}
+svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;flex:none}
+/* 中间创作台 + 右栏创作助手 */
+.cols{display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start}
+.studio{border:1px solid var(--line10);border-radius:12px;background:var(--surface)}
+.grid2{display:grid;grid-template-columns:200px 1fr}
+.side{border-right:1px solid var(--line08);padding:12px;display:flex;flex-direction:column;min-height:100%}
+.side h4{font-size:11px;color:var(--sub2);font-weight:600;margin:0 0 6px}
+.mat{font-size:12px;padding:5px 0;border-bottom:1px solid var(--line08);color:var(--body)}
+.matchk{display:flex;gap:6px}.box{width:13px;height:13px;border-radius:3px;background:var(--accent);flex:none;margin-top:2px}
+.ref{margin-top:10px;padding-top:10px;border-top:1px solid var(--line08);font-size:11px;color:var(--sub2)}
+.ref .r{color:var(--accent);font-weight:600}
+.hint{margin-top:auto;padding-top:10px;border-top:1px solid var(--line08);font-size:10.5px;color:var(--sub2);line-height:1.5}
+.main{padding:12px 14px}
+.rec{border:1px solid rgba(61,90,128,.3);border-radius:9px;padding:9px 11px;margin-bottom:9px}
+.rec .tag{font-size:10px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:4px;padding:1px 6px}
+.rec h3{font-family:var(--serif);font-size:14px;margin:4px 0 5px}
+.rec p{margin:0 0 8px;font-size:11px;color:var(--sub)}
+.adj{display:flex;gap:14px;font-size:12px;color:var(--sub);margin-bottom:10px}
+.draft{border:1px solid var(--line10);border-radius:9px;padding:14px 16px;font-family:var(--serif);font-size:14px;color:var(--body);line-height:1.75;background:var(--surface);min-height:150px}
+.draftfull{min-height:150px}
+.btn{border:1px solid var(--line10);background:var(--surface);border-radius:7px;padding:6px 11px;font-size:12px;color:var(--body);display:inline-flex;gap:5px;align-items:center}
+.btn.primary{background:var(--accent);color:#fff;border:none;font-weight:600}
+.btn.cards{background:var(--cards);color:#fff;border:none;font-weight:600}
+.btn.ghost{border-color:transparent;color:var(--sub)}
+.bar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:11px 14px;border-top:1px solid var(--line08)}
+.sep{width:1px;height:20px;background:var(--line10);margin:0 2px}
+.push{margin-left:auto}
+/* 右栏 创作助手 */
+.assist{border:1px solid var(--line10);border-radius:12px;background:var(--surface);overflow:hidden}
+.assist .ah{padding:11px 13px;border-bottom:1px solid var(--line08);font-size:11px;letter-spacing:1px;color:var(--sub2);font-weight:600;text-transform:uppercase}
+.assist .ab{padding:12px 13px}
+.assist .lbl{font-size:11px;color:var(--sub2);margin:0 0 6px}
+.assist .tools{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chatbox{border:1px solid var(--line10);border-radius:8px;background:var(--brief-bg);padding:10px;font-size:12px;color:var(--faint);min-height:70px}
+.tag2{display:inline-block;font-size:10.5px;color:#8a5a12;background:rgba(169,121,31,.12);border-radius:5px;padding:2px 7px;margin-left:6px}
+</style></head><body>
+<div class="wrap">
+  <div class="demobar"><b>切布局看差异</b>
+    <button data-l="A" class="on">A · 当前（草稿全宽·改稿在底部）</button>
+    <button data-l="B">B · 草稿嵌右栏（改稿仍在底部）</button>
+    <button data-l="C">C · 草稿嵌右栏 + 改稿全在右侧</button>
+    <span class="desc" id="ldesc"></span>
+  </div>
+
+  <h1>创作台</h1>
+  <div style="font-size:12px;color:var(--sub2);margin-bottom:12px">选素材 → 按文体×平台生成 · 每段可溯源</div>
+
+  <div class="cols">
+    <!-- 中间创作台 -->
+    <div>
+      <div class="studio" id="studioBox"></div>
+      <div id="bottomBar"></div>
+    </div>
+    <!-- 右栏 创作助手 -->
+    <div class="assist" id="assistBox"></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s)
+let L='A'
+const DESC={
+ A:'当前实现：上面是「素材台 | 推荐/换文体」面板，草稿区在下面整幅宽；改稿按钮在最底部。素材台不通到底。',
+ B:'2c 草稿嵌右栏：草稿进右栏，左素材台一直通到草稿旁边（一个高高的整体面板，最贴原型）；改稿仍在底部。',
+ C:'嵌右栏 + 改稿全收进右侧「创作助手」：底部只留产出（生成/存/复制/导出/图卡），润色/审稿/改一段都搬到右栏，和对话在一起。'
+}
+// 素材台内容（B/C 通到底、带引用+说明；A 只到选择区）
+const sideFull=`<aside class="side">
+  <h4>素材（已选 2）</h4>
+  <div class="matchk mat"><span class="box"></span><span>Demo Day 第4期 · 上篇</span></div>
+  <div class="matchk mat"><span class="box"></span><span>Demo Day 第4期 · 下篇</span></div>
+  <div class="ref"><div style="font-weight:600;margin-bottom:4px">本文引用（2）</div><div><span class="r">[素材1]</span> Demo Day·上篇 · 原文↗</div><div><span class="r">[素材2]</span> Demo Day·下篇 · 原文↗</div></div>
+  <div class="hint" id="sideHint"></div>
+</aside>`
+const sideShort=`<aside class="side" style="min-height:auto">
+  <h4>素材（已选 2）</h4>
+  <div class="matchk mat"><span class="box"></span><span>Demo Day 第4期 · 上篇</span></div>
+  <div class="matchk mat"><span class="box"></span><span>Demo Day 第4期 · 下篇</span></div>
+</aside>`
+const recBlock=`<div class="rec"><span class="tag">推荐</span><h3>读书精读体 · 公众号长文</h3><p>你选的多是外部文章，适合消化成带你判断的解读。</p><button class="btn primary">用这个生成</button></div>
+  <div class="adj"><span>换文体 ▾</span><span>换平台 ▾</span><span>更多组合 ▾</span></div>`
+const draftDemo=`先说结论：这场 Demo Day 最值得记的，是几个人踩到的同一个坑 <span style="color:var(--accent)">[素材1]</span>。上篇反复提到…… <span style="color:var(--accent)">[素材2]</span>。`
+
+function bar(kind){ // kind: full=全改稿  slim=只产出
+  if(kind==='slim') return `<div class="bar"><button class="btn">重新生成</button><span class="sep"></span><button class="btn ghost">存草稿</button><button class="btn ghost">导出</button><span class="push"></span><button class="btn primary">复制全文</button></div>`
+  return `<div class="bar"><button class="btn">重新生成</button><button class="btn">润色</button><button class="btn">审稿</button><button class="btn">改一段</button><span class="sep"></span><button class="btn ghost">存草稿</button><button class="btn ghost">导出</button><span class="push"></span><button class="btn primary">复制全文</button></div>`
+}
+function assist(kind){ // kind: chat=仅对话  tools=改稿工具+对话
+  const tools = kind==='tools' ? `<div class="lbl">改稿工具</div><div class="tools"><button class="btn">润色（整篇）</button><button class="btn">审稿（找问题）</button><button class="btn">改一段（选中）</button></div>` : ''
+  return `<div class="ah">创作助手</div><div class="ab">${tools}<div class="lbl">跟它说怎么改</div><div class="chatbox">如「开头更狠」「压到 5 条」「加一个反方观点」→ 它直接改左边草稿</div></div>`
+}
+
+function render(){
+  const studio=$('#studioBox'), bottom=$('#bottomBar'), assistEl=$('#assistBox')
+  $('#ldesc').textContent=DESC[L]
+  if(L==='A'){
+    studio.innerHTML=`<div style="padding:12px 14px">${sideShortInline()}${recBlock}</div>`
+    // A：面板(素材+推荐) + 草稿全宽在下
+    studio.innerHTML=`<div class="grid2">${sideShort}<div class="main">${recBlock}</div></div>`
+    bottom.innerHTML=`<div class="draft draftfull" style="margin:12px 0 0">${draftDemo}</div>${bar('full')}`
+    assistEl.innerHTML=assist('chat')
+  }else if(L==='B'){
+    studio.innerHTML=`<div class="grid2">${sideFull}<div class="main">${recBlock}<div class="draft">${draftDemo}</div></div></div>${bar('full')}`
+    bottom.innerHTML=''
+    assistEl.innerHTML=assist('chat')
+    $('#sideHint').innerHTML='<b style="color:var(--sub)">改稿在底部</b><br>润色/审稿整篇；改一段=选中再改。右侧可对话改。'
+  }else{
+    studio.innerHTML=`<div class="grid2">${sideFull}<div class="main">${recBlock}<div class="draft">${draftDemo}</div></div></div>${bar('slim')}`
+    bottom.innerHTML=''
+    assistEl.innerHTML=assist('tools')
+    $('#sideHint').innerHTML='<b style="color:var(--sub)">改稿全在右侧</b><br>润色/审稿/改一段 + 对话，都在右边「创作助手」。底部只管产出。'
+  }
+}
+function sideShortInline(){return ''}
+document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{L=b.dataset.l;document.querySelectorAll('[data-l]').forEach(x=>x.classList.toggle('on',x===b));render()})
+render()
+</script>
+</body></html>

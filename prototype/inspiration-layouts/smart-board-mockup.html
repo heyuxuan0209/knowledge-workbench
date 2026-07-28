@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灵感库 · 写作看板（智能）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;
+    --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+    --accent:#3d5a80;--accent-hover:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;
+    --serif:'Newsreader',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:1000px;margin:0 auto;padding:26px 22px 80px;}
+  .intro{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.7;background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:14px 16px;}
+  .intro b{color:var(--text);}
+  /* 视图切换 */
+  .viewsw{display:inline-flex;border:1px solid var(--line10);border-radius:9px;overflow:hidden;margin-bottom:18px;}
+  .viewsw button{border:none;background:var(--surface);color:var(--sub);font-size:13px;font-weight:600;padding:9px 16px;cursor:pointer;}
+  .viewsw button.on{background:var(--accent);color:#fff;}
+  .viewsw button small{font-weight:400;opacity:.85;}
+  .h-title{font-family:var(--serif);font-size:23px;font-weight:600;}
+  .h-sub{font-size:13px;color:var(--sub2);margin:4px 0 14px;line-height:1.55;}
+  .quick{display:flex;gap:8px;margin:12px 0;}
+  .quick input{flex:1;border:1px solid var(--line10);background:var(--surface);border-radius:8px;padding:9px 13px;font-size:13.5px;}
+  .btn-p{border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn-g{border:none;background:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;padding:0;}
+  .btn-mini{border:1px solid var(--line10);background:var(--surface);color:var(--body);font-size:11.5px;padding:3px 9px;border-radius:6px;cursor:pointer;}
+  .panel{display:none} .panel.on{display:block}
+
+  /* 智能提示条 */
+  .smartbar{display:flex;align-items:flex-start;gap:9px;background:linear-gradient(180deg,rgba(61,90,128,.07),rgba(61,90,128,.03));border:1px solid rgba(61,90,128,.18);border-radius:10px;padding:11px 14px;font-size:13px;color:var(--body);margin-bottom:16px;line-height:1.6;}
+  .smartbar .ic{font-size:15px;line-height:1.4;}
+  .smartbar b{color:var(--accent);}
+
+  /* 看板 */
+  .board{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:13px;align-items:start;}
+  .col{background:rgba(33,31,26,.02);border:1px solid var(--line08);border-radius:12px;padding:11px 11px 6px;}
+  .col.ready{background:rgba(63,115,80,.05);border-color:rgba(63,115,80,.22);}
+  .col-h{font-size:13px;font-weight:600;color:var(--text);margin:2px 3px 11px;display:flex;align-items:center;gap:6px;}
+  .col-h .cnt{color:var(--faint);font-weight:400;font-size:12px;}
+  .col-h .hint{font-weight:400;font-size:11px;color:var(--sub2);margin-left:auto;}
+  .col.ready .col-h{color:var(--green);}
+
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:11px 12px;margin-bottom:9px;}
+  .card.dim{opacity:.55;}
+  .ctop{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+  .pill{font-size:10.5px;padding:1px 7px;border-radius:20px;font-weight:600;white-space:nowrap;}
+  .p-user{color:var(--green);background:rgba(63,115,80,.12);}
+  .p-feed{color:#b5762a;background:rgba(181,118,42,.13);}
+  .p-ai{color:#7a5cc4;background:rgba(122,92,196,.12);}
+  .ago{color:var(--faint);font-size:10.5px;margin-left:auto;}
+  .ctitle{font-family:var(--serif);font-size:14.5px;font-weight:600;line-height:1.38;}
+  /* 火候徽标 */
+  .heat{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 8px;margin-top:8px;}
+  .heat.ready{color:var(--green);background:rgba(63,115,80,.1);}
+  .heat.hot{color:var(--red);background:rgba(162,75,63,.09);}
+  .heat.low{color:var(--sub2);background:rgba(33,31,26,.05);}
+  .heat.writing{color:var(--accent);background:rgba(61,90,128,.09);}
+  .need{font-size:11.5px;color:var(--sub);margin-top:8px;line-height:1.5;}
+  .cfoot{display:flex;align-items:center;gap:9px;margin-top:10px;}
+  .del{margin-left:auto;color:var(--faint);cursor:pointer;font-size:12px;}
+  .barfill{height:4px;border-radius:3px;background:rgba(33,31,26,.08);margin-top:8px;overflow:hidden;}
+  .barfill i{display:block;height:100%;background:var(--green);}
+  .done-foot{margin-top:14px;font-size:12.5px;color:var(--sub);background:var(--brief-bg);border:1px solid var(--line08);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;}
+  .done-foot b{color:var(--text);}
+
+  /* 收集视图（A）精简复用 */
+  .sec{display:flex;align-items:center;gap:8px;margin:18px 2px 10px;font-size:12.5px;color:var(--sub2);font-weight:600;}
+  .sec .line{flex:1;height:1px;background:var(--line08);}
+  .cardA{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:13px 15px;margin-bottom:11px;}
+  .cardA .ctitle{font-size:16px;}
+  .fold-head{display:flex;align-items:center;gap:8px;background:var(--brief-bg);border:1px solid var(--line08);border-radius:10px;padding:11px 15px;cursor:pointer;font-size:13px;color:var(--sub);margin:8px 0;}
+  .fold-head b{color:var(--text)} .fold-head .arw{margin-left:auto;color:var(--sub2)}
+  .chip{font-size:11px;color:var(--body);background:rgba(33,31,26,.05);border-radius:6px;padding:2px 7px;}
+  .chip.topic{color:var(--accent);background:rgba(61,90,128,.09);}
+  .supp{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    这是把 <b>A（收集）</b> 和 <b>B（看板）</b> 合成一件事的方案：顶部切「收集视图 / 写作看板」，<b>同一批灵感换镜头</b>。
+    重点在<b>写作看板</b>——它的列不是你手动拖的状态，而是<b>系统按"火候"自动判定</b>：料够厚 / 贴合你有立场的主题 → 自动升到「可以写了」。
+    你不用管理列，只需在「可以写了」里做"写不写"的决定。
+  </div>
+
+  <div class="viewsw">
+    <button class="on" onclick="sw('board')">写作看板 · 智能</button>
+    <button onclick="sw('collect')">收集视图（A）</button>
+  </div>
+
+  <!-- ============ 写作看板 ============ -->
+  <div class="panel on" id="board">
+    <div class="h-title">💡 灵感库 · 写作看板</div>
+    <div class="h-sub">火候由系统算（料厚 · 贴合你的主题 · 时效）——你只管在「可以写了」里挑一条动笔</div>
+
+    <div class="smartbar">
+      <span class="ic">🧭</span>
+      <span>系统看了 <b>料厚 · 时效 · 是否贴合你在养的主题</b>：这周有 <b>2 条可以写了</b>，其中「AI Agent 保存按钮」<b>趁热</b>该先写；<b>4 条</b>攒着火候还不够（差料）；<b>3 条</b>热点已过期、建议清理。</span>
+    </div>
+
+    <div class="board">
+      <!-- 攒着 -->
+      <div class="col">
+        <div class="col-h">🌱 攒着 <span class="cnt">4</span><span class="hint">火候不够 · 差料</span></div>
+        <div class="card">
+          <div class="ctop"><span class="pill p-user">我记的</span><span class="ago">3 天前</span></div>
+          <div class="ctitle">我把"再建一个收集箱"的冲动摁住了</div>
+          <div class="need">还差料：手里 <b>0 条</b>，光一句话不好写</div>
+          <div class="cfoot"><button class="btn-mini">🔍 找相关素材</button><button class="btn-mini">✨ 让 AI 补料</button><span class="del">🗑</span></div>
+        </div>
+        <div class="card">
+          <div class="ctop"><span class="pill p-ai">AI 提议</span><span class="ago">5 天前</span></div>
+          <div class="ctitle">开源模型的"准生产时刻"到了吗</div>
+          <div class="need">火候：<b>1 条料</b>，再攒 1-2 条更好写</div>
+          <div class="barfill"><i style="width:35%"></i></div>
+          <div class="cfoot"><button class="btn-mini">🔍 找相关素材</button><span class="del">🗑</span></div>
+        </div>
+      </div>
+
+      <!-- 可以写了（智能核心） -->
+      <div class="col ready">
+        <div class="col-h">🔥 可以写了 <span class="cnt">2</span><span class="hint">系统判定料够/有立场</span></div>
+        <div class="card">
+          <div class="ctop"><span class="pill p-ai">AI 提议</span><span class="ago">2 小时前</span></div>
+          <div class="ctitle">你的 AI Agent 需要"保存按钮"：从 Langfuse 到 ZenML</div>
+          <div class="heat hot">⏰ 趁热 · 热点还有热度</div>
+          <div class="heat ready" style="margin-left:4px">🔥 料够了：2 条料 + 贴合主题「智能体工程」</div>
+          <div class="cfoot"><button class="btn-p" style="padding:5px 13px">去创作 →</button><span class="del">🗑</span></div>
+        </div>
+        <div class="card">
+          <div class="ctop"><span class="pill p-user">我记的</span><span class="ago">2 小时前</span></div>
+          <div class="ctitle">AI 工具选型的三个坑：别只盯着 GitHub 榜单</div>
+          <div class="heat ready">🔥 料够了：3 条料 + 你在养的主题「AI 选型」</div>
+          <div class="supp"><span class="chip">读书精读×3</span><span class="chip topic">主题：AI 选型</span></div>
+          <div class="cfoot"><button class="btn-p" style="padding:5px 13px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+        </div>
+      </div>
+
+      <!-- 在写 -->
+      <div class="col">
+        <div class="col-h">✍️ 在写 <span class="cnt">1</span></div>
+        <div class="card">
+          <div class="ctop"><span class="pill p-feed">来自资讯</span><span class="ago">3 天前动过</span></div>
+          <div class="ctitle">知识库真正的瓶颈是检索，不是存储</div>
+          <div class="heat writing">✍️ 草稿 640 字 · 引用 1 条料</div>
+          <div class="cfoot"><button class="btn-p" style="padding:5px 13px">继续写 →</button><span class="del">🗑</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="done-foot">
+      ✅ <b>已成篇 3</b> · 📘 <b>已养成主题 3</b>
+      <span style="color:var(--sub2)">— 展开看 ▾</span>
+      <span style="margin-left:auto;color:var(--faint);font-size:11.5px">以后这里接上「发出去 → 数据 → 复盘」，闭成完整环路</span>
+    </div>
+  </div>
+
+  <!-- ============ 收集视图 A（精简） ============ -->
+  <div class="panel" id="collect">
+    <div class="h-title">💡 灵感库</div>
+    <div class="h-sub">要写什么的种子 · 你的灵感铺在上面，AI 攒的折叠起来</div>
+    <div class="quick"><input placeholder="随手记一句：一个观点、一个角度、一句以后能写的话…"><button class="btn-p">＋ 记一条</button></div>
+    <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+    <div class="cardA">
+      <div class="ctop"><span class="pill p-user">我记的</span><span class="ago">2 小时前</span></div>
+      <div class="ctitle">AI 工具选型的三个坑：别只盯着 GitHub 榜单</div>
+      <div class="supp"><span style="color:var(--faint);font-size:11px">🔗 手里的料（3）：</span><span class="chip">读书精读×3</span><span class="chip topic">主题：AI 选型</span></div>
+      <div class="cfoot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+    <div class="cardA">
+      <div class="ctop"><span class="pill p-feed">来自资讯</span><span class="ago">昨天</span></div>
+      <div class="ctitle">知识库真正的瓶颈是检索，不是存储</div>
+      <div class="cfoot"><button class="btn-p" style="padding:4px 12px">去创作 →</button><button class="btn-g">养成主题</button><span class="del">🗑</span></div>
+    </div>
+    <div class="fold-head"><b>AI 帮你攒的 22 条选题</b>　<span style="color:var(--sub2)">有 6 条可能过期</span><span class="arw">展开看 ▾</span></div>
+    <div style="font-size:12px;color:var(--faint);text-align:center;padding:8px">（收集视图 = 之前的方案 A，同一批数据，换个镜头）</div>
+  </div>
+</div>
+<script>
+function sw(v){
+  document.querySelectorAll('.viewsw button').forEach((b,i)=>b.classList.toggle('on',(v==='board')===(i===0)));
+  document.querySelectorAll('.panel').forEach(el=>el.classList.toggle('on',el.id===v));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

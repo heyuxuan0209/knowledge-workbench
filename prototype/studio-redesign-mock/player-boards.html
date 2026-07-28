@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>竖版分镜 · 板式 × 内容序列</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;background:#e7e3da;color:#26241f;padding:24px 26px 70px}
+  h1{font-size:21px;font-weight:700}
+  .lead{font-size:13px;color:#6b6559;margin:7px 0 8px;line-height:1.6;max-width:1000px}
+  .lead b{color:#a8552e}
+  .row{margin-top:30px}
+  .rowhead{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
+  .rowhead .nm{font-size:15px;font-weight:700}.rowhead .no{font-size:12px;color:#8a8478}
+  .rowhead .desc{font-size:12px;color:#6b6559}.rowhead .src{font-size:10.5px;color:#fff;background:#8a7a55;border-radius:4px;padding:1px 6px}
+  .seq{display:grid;grid-template-columns:repeat(5,260px);gap:12px}
+  /* ===== 帧骨架（固定 260px 宽 + px 字号；板式只改变量/字体。不用 cqw：headless 里会塌） ===== */
+  .f{width:260px;height:462px;border-radius:15px;overflow:hidden;position:relative;
+     display:flex;flex-direction:column;padding:30px 22px 42px;background:var(--bg);color:var(--ink);box-shadow:0 8px 22px rgba(33,31,26,.16)}
+  .f .badge{position:absolute;top:14px;left:19px;font-size:10px;font-weight:700;color:var(--sub);opacity:.9}
+  .f .brand{position:absolute;bottom:13px;right:19px;font-size:9.5px;color:var(--sub);opacity:.75}
+  .f .kicker{font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;color:var(--accent)}
+  .f .big{font-size:40px;font-weight:800;line-height:1.14;color:var(--ink);font-family:var(--serif,inherit)}
+  .f .big em{font-style:normal;color:var(--accent)}
+  .f .sub{font-size:13.5px;line-height:1.5;color:var(--sub)}
+  .f .num{font-size:24px;font-weight:800;color:var(--accent);line-height:1;font-family:var(--serif,inherit)}
+  .f .title{font-size:22px;font-weight:700;line-height:1.32;color:var(--ink);font-family:var(--serif,inherit)}
+  .f .body{font-size:13px;line-height:1.62;color:var(--sub)}
+  .f .rule{height:1px;background:var(--line);margin:14px 0}
+  .f .dnum{font-size:86px;font-weight:800;color:var(--accent);line-height:.92;font-family:var(--serif,inherit)}
+  .f .dlabel{font-size:15px;line-height:1.4;color:var(--ink);font-weight:600}
+  .f .quote{font-size:25px;font-weight:700;line-height:1.4;color:var(--ink);font-family:var(--serif,inherit)}
+  .f .quote em{font-style:normal;color:var(--accent)}
+  .f .cta{font-size:17.5px;font-weight:700;line-height:1.4;color:var(--ink)}
+  .f .mark{width:22px;height:22px;background:var(--accent);margin-bottom:16px}
+  /* 帧类型布局 */
+  .cover{justify-content:center}.cover .kicker{margin-bottom:16px}.cover .sub{margin-top:16px}
+  .point{justify-content:flex-start;padding-top:44px}.point .title{margin-top:11px}
+  .data{justify-content:center;align-items:flex-start}.data .dlabel{margin-top:11px}.data .sub{margin-top:14px}
+  .quotef{justify-content:center}
+  .ctaf{justify-content:center;text-align:center;align-items:center}.ctaf .mark{margin:0 auto 16px}
+
+  /* ===== 板式（骨架 + 风格；前 3 是新做，后 4 直接搬图卡工具的真板式） ===== */
+  /* 1 暖刊 */
+  .warm{--bg:#f2ece0;--ink:#2c2820;--sub:#7a7264;--accent:#c1633a;--line:#d8cdba;--serif:'Newsreader',"Songti SC",serif}
+  .warm .big em{box-shadow:inset 0 -6px 0 rgba(193,99,58,.16)}
+  /* 2 午夜霓虹 */
+  .neon{--bg:#0e1016;--ink:#f4f6fa;--sub:#aab2c2;--accent:#5de3c4;--line:#2a2f3a}
+  .neon .big em,.neon .quote em{text-shadow:0 0 10px rgba(93,227,196,.5)}
+  /* 3 牛皮手账 */
+  .kraft{--bg:#d8c6a4;--ink:#3d2c17;--sub:#6b543a;--accent:#8a5a2b;--line:#b79a68;--serif:"Songti SC",serif;
+         background-image:radial-gradient(rgba(120,95,55,.09) 1px,transparent 1px);background-size:9px 9px}
+  .kraft .big em,.kraft .quote em{box-shadow:inset 0 -7px 0 rgba(214,120,60,.42)}
+  .kraft .body{background:#fbf6ea;border:1px dashed #b79a68;border-radius:6px;padding:9px}
+  /* 4 科技终端（等宽·终端绿/琥珀） */
+  .term{--bg:#0d1117;--ink:#e6edf3;--sub:#8b949e;--accent:#e3b341;--line:#30363d}
+  .term .kicker,.term .badge,.term .brand,.term .num,.term .dnum{color:#3fb950;font-family:ui-monospace,Menlo,monospace}
+  .term .big,.term .title,.term .quote,.term .body,.term .sub,.term .cta,.term .dlabel{font-family:ui-monospace,Menlo,monospace}
+  .term .big em,.term .quote em{color:#e3b341}
+  .term .body{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px}
+  /* 4 Aesop 药房（搬自图卡工具） */
+  .aesop{--bg:#E7E2D8;--ink:#1B1A17;--sub:#6B6459;--accent:#5A6247;--line:#CDC5B6}
+  /* 5 画廊深色（搬自图卡工具） */
+  .gallery{--bg:#1E1C19;--ink:#ECE4D6;--sub:#9A9184;--accent:#C79A5B;--line:#3A362F}
+  /* 6 深色科技（搬自图卡工具） */
+  .dark{--bg:#111318;--ink:#EAECEF;--sub:#9aa4b2;--accent:#3B82F6;--line:#2a2f3a}
+  .dark .kicker,.dark .badge,.dark .brand{font-family:ui-monospace,Menlo,monospace;color:#6EE7B7}
+  .dark .big{color:#fff}.dark .dnum{font-weight:700}
+  /* 7 新粗野（搬自图卡工具） */
+  .brut{--bg:#FFFDF5;--ink:#0A0A0A;--sub:#0A0A0A;--accent:#0A0A0A;--line:#0A0A0A}
+  .brut .kicker{background:#0A0A0A;color:#C7F000;padding:4px 8px;display:inline-block}
+  .brut .big em{background:#C7F000;padding:0 3px;box-decoration-break:clone}
+  .brut .title{font-weight:900}.brut .num,.brut .dnum{font-weight:900}
+  .brut .body{border-left:6px solid #C7F000;padding-left:10px}
+  .brut .quote em{background:#C7F000;padding:0 3px;box-decoration-break:clone}
+  .brut .cta{border:5px solid #0A0A0A;padding:10px 13px;box-shadow:8px 8px 0 #C7F000}
+</style></head>
+<body>
+  <h1>竖版分镜 · 板式 × 内容序列</h1>
+  <div class="lead">每个板式套<b>同一条内容的 5 页</b>（① 钩子大字 ② 一个论点 ③ 数据/对比 ④ 金句 ⑤ 收尾），这样你能看板式套在不同内容上立不立得住，不是只看一帧。前 4 个是你挑的（暖刊/午夜霓虹/牛皮手账/科技终端），<b>后 4 个直接是你图卡工具里的真板式</b>（Aesop/画廊/深色科技/新粗野）——图文卡和竖版视频以后共用一套主题。<b>报编号说你留哪几个</b>，选中的落进播放器+出片主题，其余删。</div>
+  <div id="rows"></div>
+<script>
+  // 5 页真内容（同一支视频，覆盖不同版式压力：大字/正文/数据/金句/CTA）
+  const FRAMES = [
+    {cls:'cover', badge:'镜 1/5', html:`<div class="kicker">AI协作反常识</div><div class="big">改<em>七八版</em><br>都不对</div><div class="sub">用文字指挥AI做UI，一天全白费</div><div class="brand">杰西卡聊AI</div>`},
+    {cls:'point', badge:'镜 2/5', html:`<div class="num">01</div><div class="title">我描述得越细，<br>它做得越偏</div><div class="rule"></div><div class="body">一个按钮怎么摆，来回改了七八轮，一整天就这么白搭了。</div><div class="brand">杰西卡聊AI</div>`},
+    {cls:'data', badge:'镜 3/5', html:`<div class="dnum">3下</div><div class="dlabel">点击，抵过一整天的来回讨论</div><div class="sub">换成「做几个 html 我来选」——三下点击就定了。</div><div class="brand">杰西卡聊AI</div>`},
+    {cls:'quotef', badge:'镜 4/5', html:`<div class="quote">别急着聊，<br>让它先<em>做出来</em><br>给你看。</div><div class="brand">杰西卡聊AI</div>`},
+    {cls:'ctaf', badge:'镜 5/5', html:`<div class="mark"></div><div class="cta">你也踩过这坑吗？<br>评论区聊聊</div><div class="brand" style="position:static;margin-top:16px;opacity:.9">杰西卡聊AI</div>`},
+  ];
+  const BOARDS = [
+    ['warm','暖刊','衬线+高亮块，克制刊物感','你选'],
+    ['neon','午夜霓虹','近黑+霓虹词，抖音电影感','你选'],
+    ['kraft','牛皮手账','牛皮纸+马克笔+虚线，手作感','你选'],
+    ['term','科技终端','等宽字+终端绿/琥珀，技术流','你选'],
+    ['aesop','Aesop 药房','米灰+橄榄绿，精修杂志','图卡'],
+    ['gallery','画廊深色','暖棕深底+金，画廊感','图卡'],
+    ['dark','深色科技','蓝黑+等宽绿，技术流','图卡'],
+    ['brut','新粗野','荧光绿块+硬阴影，冲击','图卡'],
+  ];
+  document.getElementById('rows').innerHTML = BOARDS.map(([cls,nm,desc,src],i)=>
+    `<div class="row">
+      <div class="rowhead"><span class="no">${i+1}</span><span class="nm">${nm}</span><span class="src">${src}</span><span class="desc">${desc}</span></div>
+      <div class="seq">${FRAMES.map(f=>`<div class="f ${cls} ${f.cls}"><div class="badge">${f.badge}</div>${f.html}</div>`).join('')}</div>
+    </div>`).join('');
+</script>
+</body></html>

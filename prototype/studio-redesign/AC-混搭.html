@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台改版 · 方案A+C 混搭 v3（可交互）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line:rgba(33,31,26,.1);--line2:rgba(33,31,26,.07);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:'Newsreader',serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 24px 40px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.back{color:var(--sub);background:none;border:none;font-size:13px;display:inline-flex;gap:6px;align-items:center;padding:0}
+h1{font-family:var(--serif);font-size:23px;font-weight:600;margin:0 0 14px}
+svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* 草稿箱 */
+.drafts-wrap{position:relative}
+.drafts-btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-size:13px;color:var(--sub);display:inline-flex;gap:6px;align-items:center}
+.drafts-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:328px;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:0 12px 32px rgba(33,31,26,.16);display:none}
+.drafts-panel.open{display:block}
+.dp-head{font-size:12px;color:var(--sub2);padding:11px 13px;border-bottom:1px solid var(--line2);display:flex;justify-content:space-between;align-items:center}
+.dp-clear{color:var(--sub);font-size:11px;cursor:pointer}.dp-clear:hover{color:var(--red)}
+.dp-list{max-height:288px;overflow-y:auto}
+.dp-row{display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--line2)}
+.dp-row:hover{background:rgba(61,90,128,.045)}
+.dp-row .info{flex:1;min-width:0;cursor:pointer}
+.dp-row .dt{font-size:13px;color:var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp-row .dm{font-size:11px;color:var(--faint);margin-top:2px}
+.dp-row .del{color:var(--faint);padding:5px;border-radius:6px;flex:none;background:none;border:none}
+.dp-row .del:hover{color:var(--red);background:rgba(162,75,63,.09)}
+.dp-empty{padding:24px;text-align:center;color:var(--faint);font-size:12px}
+
+.studio{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:visible;display:grid;grid-template-columns:228px 1fr;min-height:560px}
+.side{border-right:1px solid var(--line2);padding:16px 15px;display:flex;flex-direction:column;background:rgba(33,31,26,.012);border-radius:14px 0 0 14px}
+.side h4{font-size:12px;color:var(--sub2);margin:0 0 4px;font-weight:600;letter-spacing:.3px}
+.side .hint-top{font-size:11px;color:var(--faint);margin-bottom:10px}
+.mat{display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line2)}
+.box{width:15px;height:15px;border:1.5px solid var(--accent);border-radius:4px;margin-top:1px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent)}
+.box svg{width:10px;height:10px;color:#fff;stroke-width:2.5}
+.mat .t{font-size:13px;color:var(--body);line-height:1.45}.mat .s{font-size:11px;color:var(--faint);margin-top:2px}
+.add{display:inline-flex;align-items:center;gap:5px;color:var(--sub);font-size:12px;margin-top:11px;border:1px dashed var(--line);border-radius:7px;padding:7px 10px;justify-content:center}
+.rolehint{margin-top:auto;font-size:11px;color:var(--sub2);line-height:1.55;padding-top:14px;border-top:1px solid var(--line2)}
+.rolehint b{color:var(--sub)}
+
+.main{padding:16px 18px;display:flex;flex-direction:column}
+.sec{font-size:12.5px;color:var(--sub2);margin:0 0 9px}
+.rec-row{display:flex;gap:12px}
+.rec{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--surface)}
+.rec.primary{flex:1.9;border-color:rgba(61,90,128,.35)}.rec.alt{flex:1}
+.rec .head{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.rec .tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--accent);background:rgba(61,90,128,.09);border-radius:5px;padding:2px 7px}
+.rec .tag.gray{color:var(--sub2);background:var(--line2)}
+.rec h3{font-family:var(--serif);font-size:15.5px;margin:0;color:var(--text);font-weight:600}.rec.alt h3{font-size:14px}
+.rec p{margin:0 0 10px;color:var(--sub);font-size:12px;line-height:1.55}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 14px;font-size:13px;color:var(--body);display:inline-flex;align-items:center;gap:6px}
+.btn-sm{padding:6px 12px;font-size:12.5px}
+.btn-primary{background:var(--accent);color:#fff;border:none;font-weight:500}
+
+.adjust{display:flex;gap:15px;margin:11px 1px 0;font-size:12.5px;color:var(--sub)}
+.dd{position:relative}
+.trigger{display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none}
+.trigger:hover{color:var(--accent)}
+.menu{position:absolute;z-index:30;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(33,31,26,.14);padding:5px;min-width:190px;display:none}
+.menu.open{display:block}
+.menu .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:7px;font-size:13px;color:var(--body);cursor:pointer;white-space:nowrap}
+.menu .item:hover{background:rgba(61,90,128,.07)}
+.menu .item.active{color:var(--accent);font-weight:500}
+.menu .item .rt{font-size:10px;color:var(--accent);background:rgba(61,90,128,.11);border-radius:4px;padding:1px 6px}
+
+/* 更多组合 面板 */
+.combos{display:none;margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:13px;background:rgba(33,31,26,.012)}
+.combos.open{display:block}
+.combos .lab{font-size:11px;color:var(--sub2);margin:0 0 7px}
+.chiprow{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.pchip{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:5px 11px;font-size:12.5px;color:var(--body);cursor:pointer}
+.pchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.draft{flex:1;border:1px solid var(--line);border-radius:11px;padding:22px 24px;margin-top:16px;font-family:var(--serif);font-size:16px;color:var(--body);line-height:1.8;background:var(--surface)}
+.draft .ph{color:var(--faint)}
+.ref{color:var(--accent);background:rgba(61,90,128,.1);border-radius:4px;padding:0 4px;font-size:12px;font-family:system-ui;cursor:pointer;text-decoration:underline dotted}
+.actions{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+</style></head><body>
+<div class="wrap">
+  <div class="top">
+    <button class="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>返回主题库</button>
+    <div class="drafts-wrap">
+      <button class="drafts-btn" id="draftsBtn">草稿箱（<span id="dcount">7</span>）<svg viewBox="0 0 24 24" style="width:13px"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="drafts-panel" id="draftsPanel">
+        <div class="dp-head"><span>草稿箱 · <span id="dcount2">7</span> 篇</span><span class="dp-clear" id="clearAll">清空</span></div>
+        <div class="dp-list" id="dpList"></div>
+      </div>
+    </div>
+  </div>
+  <h1>创作台</h1>
+
+  <div class="studio">
+    <aside class="side">
+      <h4>素材（2）</h4>
+      <div class="hint-top">本次只用这些</div>
+      <div class="mat"><span class="box"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span><div><div class="t">Demo Day 第4期 · 上篇</div><div class="s">飞书 · 多人分享</div></div></div>
+      <div class="mat"><span class="box"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span><div><div class="t">Demo Day 第4期 · 下篇</div><div class="s">飞书 · 多人分享</div></div></div>
+      <div class="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>加素材</div>
+      <div class="rolehint"><b>右侧此栏 = 素材台</b><br>起稿在中间；对某段不满意，选中它 → 用右侧「审稿 / 3 个改法 / 换说法」调。<br><br>点正文里的 <span class="ref">[素材N]</span> 会高亮这里对应的素材、给原文链接。</div>
+    </aside>
+
+    <section class="main">
+      <div class="sec">基于左侧 2 篇外部文章，建议：</div>
+      <div class="rec-row">
+        <div class="rec primary">
+          <div class="head"><span class="tag"><svg viewBox="0 0 24 24" style="width:11px;height:11px"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>推荐</span><h3><span id="pcG">读书精读体</span> · <span id="pcP">公众号长文</span></h3></div>
+          <p>两篇外部文章，适合消化成一篇带你判断的深度解读，而非流水账摘要。</p>
+          <button class="btn-primary btn-sm">用这个生成</button>
+        </div>
+        <div class="rec alt">
+          <div class="head"><span class="tag gray">备选</span><h3>读书精读体 · 小红书卡片</h3></div>
+          <p>拆成 3 张收藏卡，接你已有的图卡工具。</p>
+          <button class="btn btn-sm">生成</button>
+        </div>
+      </div>
+
+      <div class="adjust">
+        <span class="dd"><span class="trigger" data-dd="mG">换文体 <svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></span><div class="menu" id="mG"></div></span>
+        <span class="dd"><span class="trigger" data-dd="mP">换平台 <svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></span><div class="menu" id="mP"></div></span>
+        <span class="dd"><span class="trigger" id="moreT">更多组合 <svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></span></span>
+      </div>
+
+      <div class="combos" id="combos">
+        <div class="lab">文体</div><div class="chiprow" id="cG"></div>
+        <div class="lab">平台形态</div><div class="chiprow" id="cP"></div>
+      </div>
+
+      <div class="draft">
+        <span class="ph">（点「用这个生成」后出稿，只用左侧勾选的 2 篇。示意：）</span><br><br>
+        先说结论：这场 Demo Day 最值得记的，不是谁的产品更炫，而是几个人踩到的同一个坑 <span class="ref">[素材1]</span>。<br><br>
+        上篇里，分享者反复提到…… <span class="ref">[素材2]</span>——每一句判断都挂着来源，点 <span class="ref">[素材N]</span> 高亮左栏对应素材 + 原文链接。
+      </div>
+      <div class="actions">
+        <button class="btn">重新生成</button><button class="btn-primary">保存</button>
+        <button class="btn">去 AI 味</button><button class="btn">审稿</button><button class="btn">3 个改法</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const GENRES=['读书精读体','思辨辨析体','方法教程体','实践复盘体','一句话提炼体','个人叙事体'];
+const PLATFORMS=['公众号长文','小红书长文','小红书卡片','抖音口播','抖音卡片','X短推','X长推','B站视频','即刻短思考','reddit帖'];
+const REC_G='读书精读体', REC_P='公众号长文';
+let curG=REC_G, curP=REC_P;
+const $=s=>document.querySelector(s);
+
+// —— 换文体 / 换平台 下拉 ——
+function buildMenu(id,arr,rec,getCur,setCur){
+  const m=$('#'+id);
+  m.innerHTML=arr.map(x=>`<div class="item${x===getCur()?' active':''}" data-v="${x}">${x}${x===rec?'<span class="rt">推荐</span>':''}</div>`).join('');
+  m.querySelectorAll('.item').forEach(it=>it.onclick=e=>{e.stopPropagation();setCur(it.dataset.v);closeAll();syncMenus();});
+}
+function syncMenus(){
+  buildMenu('mG',GENRES,REC_G,()=>curG,v=>{curG=v;$('#pcG').textContent=v;syncCombos();});
+  buildMenu('mP',PLATFORMS,REC_P,()=>curP,v=>{curP=v;$('#pcP').textContent=v;syncCombos();});
+}
+// —— 更多组合 面板 ——
+function syncCombos(){
+  $('#cG').innerHTML=GENRES.map(x=>`<span class="pchip${x===curG?' on':''}" data-g="${x}">${x}</span>`).join('');
+  $('#cP').innerHTML=PLATFORMS.map(x=>`<span class="pchip${x===curP?' on':''}" data-p="${x}">${x}</span>`).join('');
+  $('#cG').querySelectorAll('.pchip').forEach(c=>c.onclick=()=>{curG=c.dataset.g;$('#pcG').textContent=curG;syncCombos();syncMenus();});
+  $('#cP').querySelectorAll('.pchip').forEach(c=>c.onclick=()=>{curP=c.dataset.p;$('#pcP').textContent=curP;syncCombos();syncMenus();});
+}
+function closeAll(){document.querySelectorAll('.menu.open').forEach(m=>m.classList.remove('open'));$('#draftsPanel').classList.remove('open');}
+document.querySelectorAll('.trigger[data-dd]').forEach(t=>t.onclick=e=>{e.stopPropagation();const m=$('#'+t.dataset.dd);const was=m.classList.contains('open');closeAll();if(!was)m.classList.add('open');});
+$('#moreT').onclick=e=>{e.stopPropagation();closeAll();$('#combos').classList.toggle('open');};
+
+// —— 草稿箱：可滚动 + 可删除 ——
+let drafts=[
+ {t:'读Anthropic内部对话：从"用AI写代码"到"在AI时代理解代码"',m:'07-19 · 读书精读×公众号'},
+ {t:'和 AI 协作，真正的风险在你看不见的地方',m:'07-19 · 实践复盘×公众号'},
+ {t:'别让 AI 背着你跑',m:'07-19 · 实践复盘×小红书卡'},
+ {t:'数据摄入的责任，不该落在用户的手指上',m:'07-19 · 思辨辨析×公众号'},
+ {t:'周复盘喂养法：把散笔记逼成一个想法',m:'07-18 · 方法教程×小红书卡'},
+ {t:'FDE 与 AI 自进化 · 口播稿',m:'07-18 · 实践复盘×抖音'},
+ {t:'苍何/歸藏表达方法论速记',m:'07-17 · 读书精读×X短推'},
+];
+function renderDrafts(){
+  $('#dcount').textContent=drafts.length;$('#dcount2').textContent=drafts.length;
+  const l=$('#dpList');
+  if(!drafts.length){l.innerHTML='<div class="dp-empty">草稿箱空了</div>';return;}
+  l.innerHTML=drafts.map((d,i)=>`<div class="dp-row"><div class="info" title="${d.t}"><div class="dt">${d.t}</div><div class="dm">${d.m}</div></div><button class="del" data-i="${i}" title="删除"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button></div>`).join('');
+  l.querySelectorAll('.del').forEach(b=>b.onclick=e=>{e.stopPropagation();drafts.splice(+b.dataset.i,1);renderDrafts();});
+}
+$('#draftsBtn').onclick=e=>{e.stopPropagation();const p=$('#draftsPanel');const was=p.classList.contains('open');closeAll();if(!was)p.classList.add('open');};
+$('#clearAll').onclick=e=>{e.stopPropagation();if(confirm('清空草稿箱？'))drafts=[],renderDrafts();};
+
+document.addEventListener('click',closeAll);
+syncMenus();syncCombos();renderDrafts();
+</script>
+</body></html>

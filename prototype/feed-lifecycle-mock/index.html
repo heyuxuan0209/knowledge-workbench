@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Feed · 按状态定命运（mute/归档 v2）</title>
+<style>
+:root{--bg:#efece4;--card:#faf8f3;--ink:#211f1a;--body2:#3a382f;--sub2:#8a8478;
+--line08:rgba(33,31,26,.08);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-soft:rgba(61,90,128,.08);
+--warn:#a9791f;--warn-soft:rgba(169,121,31,.12);--flow:#5f7a6b;--flow-soft:rgba(95,122,107,.1);--mute:#9a5b5b;
+--serif:"Songti SC","Noto Serif SC",Georgia,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,"PingFang SC",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:24px 22px 90px}
+h1{font-family:var(--serif);font-size:22px;margin:0 0 3px}
+.sub{color:var(--sub2);font-size:13px;margin-bottom:14px}
+.principle{background:var(--card);border:1px solid var(--line08);border-radius:11px;padding:12px 15px;font-size:12.5px;line-height:1.7;margin-bottom:14px}
+.principle b{color:var(--accent)}.principle .r{color:var(--mute);font-weight:600}
+/* 命运表 */
+.fate{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:12px;background:var(--card);border-radius:10px;overflow:hidden;border:1px solid var(--line08)}
+.fate th,.fate td{padding:8px 10px;text-align:center;border:1px solid var(--line08)}
+.fate th{background:rgba(33,31,26,.03);color:var(--sub2);font-weight:600}
+.fate .rowh{text-align:left;font-weight:600;color:var(--body2);background:rgba(33,31,26,.02)}
+.fate .keep{color:var(--warn);font-weight:600}.fate .flow{color:var(--flow);font-weight:600}.fate .arch{color:var(--sub2)}
+/* 区块 */
+.sec{margin-bottom:8px}
+.sech{display:flex;align-items:center;gap:8px;margin:16px 0 4px;font-size:13px;font-weight:700}
+.sech svg{width:14px;height:14px}
+.sech .badge{font-size:11px;font-weight:600;padding:1px 8px;border-radius:20px}
+.sech .nag{background:var(--warn-soft);color:var(--warn)}
+.sech .riv{background:var(--flow-soft);color:var(--flow)}
+.sech .what{font-weight:400;color:var(--sub2);font-size:12px}
+/* 行 */
+.row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:9px;position:relative;transition:.12s}
+.row:hover{background:var(--card)}
+.row.nag{border-left:2px solid rgba(169,121,31,.4)}
+.row .time{color:var(--sub2);font-size:12px;width:70px;flex:none;padding-top:1px}
+.row .time .aged{color:var(--warn);font-weight:600}
+.row .src{color:var(--body2);font-size:12.5px;width:120px;flex:none;padding-top:1px;font-weight:500}
+.row .main{flex:1;min-width:0}
+.row .title{font-size:14px;cursor:pointer}.row .title:hover{color:var(--accent)}
+.row .sum{color:var(--sub2);font-size:12.5px;margin-top:2px;display:none}.row:hover .sum{display:block}
+.acts{display:none;gap:4px;flex:none;padding-top:1px}.row:hover .acts{display:flex}
+.acts button{border:1px solid var(--line14);background:var(--card);border-radius:7px;height:26px;padding:0 7px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--sub2);font-size:12px}
+.acts button:hover{border-color:var(--accent);color:var(--accent)}
+.acts button.away:hover{border-color:var(--flow);color:var(--flow)}
+.acts svg{width:13px;height:13px}
+.row.gone{animation:col .3s forwards}@keyframes col{to{opacity:0;height:0;padding:0;margin:0;overflow:hidden}}
+/* 反馈：源太吵 / 实体黑名单 */
+.noise{display:none;font-size:11.5px;color:var(--sub2);margin-top:3px}
+.row:hover .noise{display:block}
+.noise a{color:var(--mute);cursor:pointer;text-decoration:underline dotted}
+.mm{position:absolute;right:8px;top:32px;z-index:20;background:var(--card);border:1px solid var(--line14);border-radius:11px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:6px;width:280px;display:none}
+.mm.on{display:block}
+.mm .h{font-size:11px;color:var(--sub2);padding:5px 8px}
+.mm button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 9px;border-radius:7px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.mm button:hover{background:var(--accent-soft)}.mm .no{color:var(--mute);font-weight:600}
+.mm .sub2{font-size:11px;color:var(--sub2);padding:0 9px 6px}
+/* 底部说明 */
+.foot{margin-top:22px;padding:14px 16px;background:var(--card);border:1px solid var(--line08);border-radius:11px;font-size:12.5px;line-height:1.75;color:var(--body2)}
+.foot b{color:var(--accent)}.foot .x{color:var(--mute);font-weight:600}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2820;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;transition:.3s;z-index:70}
+.pill{font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px;vertical-align:1px}
+</style></head>
+<body><div class="wrap">
+  <h1>Feed · 按状态定命运（mute / 归档 · 重做版）</h1>
+  <div class="sub">修正上一版三个第一性错误：归档不按时间、mute 不学类别、反馈放对高度</div>
+
+  <div class="principle">
+    三条（都从你的原则长出来）：<br>
+    ① <b>按状态定命运，不按时间</b>（[[state-not-time]]/ADR-032）：<span style="color:var(--warn)">一手未处理→永远催办、绝不因老被埋</span>；<span style="color:var(--flow)">资讯没人要→过期真流走（删）</span>；已处理的一手才归档留档。<br>
+    ② <b>mute 只挂稳定身份</b>（ADR-040 红线）：源太吵→复用"暂停源"；某个具名实体太吵→拉黑该实体。<span class="r">没有"不喜欢这类"——那要系统偷偷学类别降权，红线</span>。<br>
+    ③ <b>反馈放对高度</b>：你要什么由"<b>登记的源 + 追踪的主题</b>"表达；单条不想看＝"划走"（处理完），不是教算法。
+  </div>
+
+  <table class="fate">
+    <tr><th></th><th>未处理</th><th>已处理（精读/提灵感/用过）</th><th>主动划走</th></tr>
+    <tr><td class="rowh">一手（组1/2）</td><td class="keep">催办 · 永不埋</td><td class="arch">归档 · 留档可搜</td><td class="arch">归档</td></tr>
+    <tr><td class="rowh">资讯（组3/4）</td><td class="flow">过期 → 流走·真删</td><td class="arch">已进素材（留）</td><td class="flow">流走·真删</td></tr>
+  </table>
+
+  <!-- 一手待处理：催办，永不埋 -->
+  <div class="sech"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>待处理的一手 <span class="badge nag">该清了 · 3 条 · 最早搁置 9 天</span><span class="what">— 资产候选，不因老沉底；清完自动归档</span></div>
+  <div class="feed" id="feed1">
+    <div class="row nag" data-src="Simon Willison" data-ent="Simon Willison"><span class="time"><span class="aged">搁置 9 天</span></span><span class="src">Simon Willison</span><div class="main"><div class="title">介绍 Claude Opus 5</div><div class="sum">半价接近 Fable 5，一个自己写 CV 管线重建零件的例子显示它 relentlessly proactive。</div><div class="noise">源里噪音多？<a onclick="openSrc(this,'Simon Willison')">管这个源 →</a></div></div><div class="acts">
+      <button title="精读" onclick="done(this,'已精读→归档留档')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>精读</button>
+      <button title="提灵感" onclick="done(this,'已提为选题→归档留档')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12c1 1 1 2 1 3h6c0-1 0-2 1-3a7 7 0 00-4-12z"/></svg>提灵感</button>
+      <button class="away" title="划走（处理完，不再出现）" onclick="done(this,'已划走')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>划走</button></div></div>
+
+    <div class="row nag" data-src="Dwarkesh Patel" data-ent="Dwarkesh Patel"><span class="time"><span class="aged">搁置 5 天</span></span><span class="src">Dwarkesh Patel</span><div class="main"><div class="title">与某研究者聊 scaling 的尽头</div><div class="sum">长访谈：关于预训练边际递减、下一代范式的判断。</div><div class="noise">源里噪音多？<a onclick="openSrc(this,'Dwarkesh Patel')">管这个源 →</a></div></div><div class="acts">
+      <button title="精读" onclick="done(this,'已精读→归档留档')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>精读</button>
+      <button title="提灵感" onclick="done(this,'已提为选题→归档留档')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12c1 1 1 2 1 3h6c0-1 0-2 1-3a7 7 0 00-4-12z"/></svg>提灵感</button>
+      <button class="away" title="划走" onclick="done(this,'已划走')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>划走</button></div></div>
+
+    <div class="row nag" data-src="Anthropic" data-ent="Anthropic"><span class="time"><span class="aged">搁置 2 天</span></span><span class="src">Anthropic News</span><div class="main"><div class="title">Claude Tag 发布<span class="pill" style="background:var(--accent-soft);color:var(--accent)">官方一手</span></div><div class="sum">把 Claude 融进 Slack，团队记忆 + 主动性 + 凭证注入。</div></div><div class="acts">
+      <button title="精读" onclick="done(this,'已精读→归档留档')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>精读</button>
+      <button title="提灵感" onclick="done(this,'已提为选题→归档留档')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12c1 1 1 2 1 3h6c0-1 0-2 1-3a7 7 0 00-4-12z"/></svg>提灵感</button>
+      <button class="away" title="划走" onclick="done(this,'已划走')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>划走</button></div></div>
+  </div>
+
+  <!-- 今日资讯：河，流走 -->
+  <div class="sech"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8c3 0 3 2 6 2s3-2 6-2 3 2 6 2M3 14c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/></svg>今日资讯 <span class="badge riv">路过的河 · 看过即流走</span><span class="what">— 没被 star/提灵感的，过期真删（不进冷区囤积）</span></div>
+  <div class="feed" id="feed2">
+    <div class="row" data-src="Hacker News" data-ent="某AI创业公司"><span class="time">6 小时前</span><span class="src">Hacker News</span><div class="main"><div class="title">某 AI 创业公司融资 5000 万</div><div class="sum">资讯类，看过就走；想留就 ★ 或提灵感。</div><div class="noise">这个实体总来、不想看？<a onclick="openEnt(this,'某AI创业公司')">拉黑这个实体 →</a></div></div><div class="acts">
+      <button title="以后再看(★留住)" onclick="toast('★ 已挂账，才会被留住')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>留住</button>
+      <button class="away" title="划走（流走）" onclick="done(this,'已流走')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>流走</button></div></div>
+    <div class="row" data-src="GitHub Trending" data-ent="GitHub Trending"><span class="time">8 小时前</span><span class="src">GitHub Trending</span><div class="main"><div class="title">某个 star 暴涨的 repo</div><div class="sum">榜单类资讯，天然易逝。</div></div><div class="acts">
+      <button title="留住" onclick="toast('★ 已挂账')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>留住</button>
+      <button class="away" title="流走" onclick="done(this,'已流走')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>流走</button></div></div>
+  </div>
+
+  <div class="foot">
+    <b>为什么没有"不喜欢这类内容"按钮？</b> 因为那要产品去<span class="x">推断类别、偷偷降权</span>——你的 ADR-040 红线（卡兹克 V7→V8 负优化实证）。你要少看什么，用<b>三个有稳定身份的杠杆</b>：<br>
+    · 整个源太杂 → <b>暂停/移除这个源</b>（复用现有源管理，不新造 mute）；<br>
+    · 某个具名实体（人/公司/话题实体，带别名集）总来 → <b>拉黑这个实体</b>（显式、可解除，像追踪主题的反面）；<br>
+    · 单条不想看 → <b>划走</b>（=这条处理完了）。<br>
+    <b>累积怎么办：</b> 一手靠"催办"逼你清（未处理封顶）；资讯靠"流走真删"（河不蓄水）；<b>没有任何东西按纯时间归档</b>——你没读的一手永远等你，不会被埋。
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function done(btn,msg){const r=btn.closest('.row');r.classList.add('gone');toast(msg);}
+function openSrc(a,src){closeMM();const r=a.closest('.row');const mm=mk(`<div class="h">「${src}」这个源怎么处理？</div>
+  <div class="sub2">复用现有源管理，不新造一套 mute</div>
+  <button onclick="act(this,'已暂停源「${src}」——停止收录，数据留、可恢复')"><span class="no">暂停</span>这个源（停收录、可恢复）</button>
+  <button onclick="act(this,'已移除源「${src}」')"><span class="no">移除</span>这个源</button>
+  <button style="color:var(--sub2)" onclick="closeMM()">取消</button>`);r.appendChild(mm);}
+function openEnt(a,ent){closeMM();const r=a.closest('.row');const mm=mk(`<div class="h">拉黑具名实体（显式、可解除）</div>
+  <div class="sub2">只黑这个实体本身，不推断"你讨厌这类"</div>
+  <button onclick="act(this,'已拉黑实体「${ent}」（含别名）——含它的条目不再进 feed；可在实体黑名单解除')"><span class="no">拉黑</span>「${ent}」及其别名</button>
+  <button style="color:var(--sub2)" onclick="closeMM()">取消</button>`);r.appendChild(mm);}
+function mk(html){const d=document.createElement('div');d.className='mm on';d.innerHTML=html;return d;}
+function act(btn,msg){const r=btn.closest('.row');closeMM();r.classList.add('gone');toast(msg);}
+function closeMM(){document.querySelectorAll('.mm').forEach(m=>m.remove());}
+document.addEventListener('click',e=>{if(!e.target.closest('.mm')&&!e.target.closest('.noise'))closeMM();});
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2800);}
+</script>
+</body></html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>飞书接入·重做 — 可点方案</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2; --brief-bg:#f4f6f9;
+    --text:#211f1a; --body:#332f27; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line10:rgba(33,31,26,.1); --line08:rgba(33,31,26,.08); --line07:rgba(33,31,26,.07); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --accent-hover:#2c456a; --amber:#a9791f; --green:#3f7350; --red:#a24b3f;
+    --fs:#2a6fb5; /* 飞书蓝 */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--body);font-family:-apple-system,"PingFang SC",system-ui,sans-serif;font-size:14px;line-height:1.6}
+  .wrap{max-width:920px;margin:0 auto;padding:20px 22px 80px}
+  h1{font-size:19px;color:var(--text);margin:0 0 3px;font-weight:650}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:18px}
+  /* 方案切换器 */
+  .switch{display:flex;gap:8px;margin:0 0 20px;flex-wrap:wrap}
+  .switch button{border:1px solid var(--line14);background:var(--surface);color:var(--sub);border-radius:22px;padding:7px 15px;font-size:13px;cursor:pointer}
+  .switch button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .switch .note{flex-basis:100%;color:var(--sub2);font-size:12px;margin-top:2px}
+  .plan{display:none}
+  .plan.on{display:block}
+  .planhead{font-size:13px;color:var(--accent);font-weight:600;margin:0 0 10px;padding:7px 12px;background:rgba(61,90,128,.07);border-radius:8px;border:1px solid rgba(61,90,128,.14)}
+  /* 通用块 */
+  .layertag{font-size:11.5px;color:var(--sub2);letter-spacing:.03em;margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+  .layertag::before{content:"";height:1px;flex:1;background:var(--line08)}
+  .layertag::after{content:"";height:1px;flex:4;background:var(--line08)}
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .fi{width:22px;height:22px;border-radius:6px;background:var(--fs);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+  .row{display:flex;align-items:center;gap:10px}
+  .ttl{font-size:14px;color:var(--text);font-weight:600}
+  .ttl b{color:var(--fs)}
+  .cap{color:var(--sub);font-size:12.5px}
+  .hint{font-size:12px;color:var(--sub2);background:rgba(42,111,181,.06);border:1px solid rgba(42,111,181,.16);border-radius:8px;padding:8px 11px;line-height:1.6;margin-top:10px}
+  .hint b{color:var(--fs)}
+  .btn{border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+  .btn-p{background:var(--accent);color:#fff}
+  .btn-g{background:none;color:var(--sub);border:1px solid var(--line14)}
+  .btn-mini{background:none;color:var(--fs);border:1px solid rgba(42,111,181,.3);border-radius:20px;padding:3px 11px;font-size:12px;cursor:pointer}
+  .pill{font-size:11px;border-radius:20px;padding:1px 8px}
+  .pill-fs{color:var(--fs);background:rgba(42,111,181,.12)}
+  .pill-idea{color:var(--green);background:rgba(63,115,80,.12)}
+  .pill-ask{color:var(--amber);background:rgba(169,121,31,.13)}
+  /* 捕获条目 */
+  .cap-item{border:1px solid var(--line10);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .cap-item .top{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  .cap-item .txt{font-size:13.5px;color:var(--text);line-height:1.5}
+  .cap-item .reply{font-size:12px;color:var(--sub);border-left:2px solid rgba(169,121,31,.4);padding-left:8px;margin-top:6px}
+  .cap-item .acts{display:flex;gap:7px;margin-top:9px;align-items:center}
+  .time{color:var(--faint);font-size:11px;margin-left:auto}
+  /* 取料 */
+  .take-row{display:flex;gap:8px;align-items:center}
+  .take-row input{flex:1;border:1px solid var(--line14);background:var(--surface);border-radius:9px;padding:9px 12px;font-size:13px;color:var(--body);font-family:inherit}
+  .seg{display:inline-flex;border:1px solid var(--line14);border-radius:8px;overflow:hidden;margin:10px 0 4px}
+  .seg button{border:none;background:var(--surface);color:var(--sub);font-size:12px;padding:5px 12px;cursor:pointer}
+  .seg button.on{background:rgba(42,111,181,.1);color:var(--fs)}
+  .res{display:flex;align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid var(--line08);font-size:13px;cursor:pointer;border-radius:6px}
+  .res:hover{background:rgba(42,111,181,.05)}
+  .res .ty{font-size:11px;color:var(--sub2);background:var(--line07);border-radius:20px;padding:1px 7px;flex-shrink:0}
+  .res .nm{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .res .why{color:var(--faint);font-size:11px;flex-shrink:0}
+  .res .go{margin-left:auto;color:var(--fs);font-size:11.5px;flex-shrink:0}
+  details.take summary{cursor:pointer;list-style:none;font-size:12px;color:var(--sub2)}
+  details.take summary::-webkit-details-marker{display:none}
+  /* 即时分析框（方案C用） */
+  .hero{background:var(--surface);border:1px dashed var(--line16);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .hero .lane-ttl{font-size:14px;color:var(--text);font-weight:600;margin-bottom:3px}
+  .lab{font-size:11px;border-radius:6px;padding:1px 7px;margin-right:7px}
+  .lab-deep{background:rgba(61,90,128,.12);color:var(--accent)}
+  .lab-fs{background:rgba(42,111,181,.12);color:var(--fs)}
+  .heroin{display:flex;gap:8px;margin:10px 0}
+  .heroin input{flex:1;border:1px solid var(--line14);background:var(--bg);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit}
+  .fmt{font-size:12px;color:var(--sub);line-height:1.7}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>飞书接入 · 重做方案（可点对比）</h1>
+  <div class="sub">定位：飞书 = 工作台的两个接口，不是镜像。<b>捕获</b>（私信机器人·默认静默·@它才回）流进灵感；<b>取料</b>（搜/粘/按意思搜）按需拉料。下面三版是这两块在灵感页怎么摆——点顶部切换比较。</div>
+
+  <div class="switch">
+    <button class="on" data-p="a">方案 A · 两块竖排</button>
+    <button data-p="b">方案 B · 飞书统一面板 + 内部 Tab</button>
+    <button data-p="c">方案 C · 捕获在灵感页 / 取料嵌进即时分析</button>
+    <div class="note">三版数据/能力完全一样，只是"捕获"和"取料"两块在页面里的摆法不同。</div>
+  </div>
+
+  <!-- ============ 方案 A：两块竖排 ============ -->
+  <div class="plan on" id="p-a">
+    <div class="planhead">方案 A：捕获、取料各一块，上下竖排。最直白——"记的"在上、"找料"在下，互不干扰。</div>
+
+    <div class="layertag">随手记 · 从飞书私信丢进来的</div>
+    <div class="card">
+      <div class="row"><span class="fi">飞</span><span class="ttl">飞书私信 · <b>你随手丢的</b> → 待挑进灵感</span>
+        <button class="btn-mini" style="margin-left:auto">↻ 收一下</button></div>
+      <div class="hint">私信这个机器人＝往工作台记一笔，它<b>默认不吭声、不花钱</b>。想让它帮你想想，消息里 <b>@它</b> 或用 <b>？</b> 结尾，它才回一句（走 DeepSeek，几乎不花钱），照样收进来。</div>
+      <div style="margin-top:12px">
+        <div class="cap-item">
+          <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="time">2 分钟前</span></div>
+          <div class="txt">BD 达人投放这套流程，其实能写成"个人如何把重复沟通自动化"的方法文</div>
+          <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+        </div>
+        <div class="cap-item">
+          <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="pill pill-ask">🗨 你问过它·已回</span><span class="time">1 小时前</span></div>
+          <div class="txt">@达人跟进助手 飞书多维表格当数据中枢靠谱吗？帮我想想坑</div>
+          <div class="reply">它回：能当 SoT，但别指望它自动登录平台抓数——平台→表那跳还是手动导出或 cookie，飞书只换了数据落点…</div>
+          <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+        </div>
+        <div class="cap-item">
+          <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="time">今天</span></div>
+          <div class="txt">"Claude Max ≠ API 额度"这个误区到处有人踩，能做个避坑小科普</div>
+          <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layertag">要用时找 · 从飞书取料</div>
+    <div class="card">
+      <div class="row"><span class="fi">飞</span><span class="ttl">从飞书取料 —— 找一篇文档/妙记/知识库，拉来当料或解读</span></div>
+      <div class="seg" style="margin-top:12px">
+        <button class="on">🔍 关键词搜</button><button>💡 按意思搜</button><button>🔗 粘链接</button>
+      </div>
+      <div class="take-row"><input placeholder="搜飞书里的文档 / 妙记 / 知识库…（搜不到就切「按意思搜」）"><button class="btn btn-p" style="padding:9px 14px">搜</button></div>
+      <div style="margin-top:8px">
+        <div class="res"><span class="ty">云文档</span><span class="nm">达人推进全流程自动化系统设计</span><span class="why">最近改过</span><span class="go">拉来解读 →</span></div>
+        <div class="res"><span class="ty">知识库</span><span class="nm">BD 投放 SOP · 沟通话术库</span><span class="go">拉来解读 →</span></div>
+        <div class="res"><span class="ty">妙记</span><span class="nm">0710 产品方案沟通会（转写）</span><span class="why">粘链接可选</span><span class="go">拉来解读 →</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 方案 B：统一面板 + Tab ============ -->
+  <div class="plan" id="p-b">
+    <div class="planhead">方案 B：一张"飞书"卡片，内部 Tab 切「📥 记的 / 🔍 取料」。省版面，飞书相关都收在一处。</div>
+    <div class="card" style="padding:0">
+      <div class="row" style="padding:13px 16px 0"><span class="fi">飞</span><span class="ttl">飞书</span>
+        <span class="cap" style="margin-left:8px">私信记一笔 · 要用时取料</span></div>
+      <div class="seg" style="margin:12px 16px 0">
+        <button class="on">📥 记的 <span class="pill pill-idea" style="margin-left:4px">3</span></button><button>🔍 取料</button>
+      </div>
+      <div style="padding:12px 16px 16px">
+        <div class="hint">私信机器人<b>默认静默、不花钱</b>；@它 或 ？结尾 才回一句（DeepSeek）。这里是你私信丢进来、待挑进灵感的。</div>
+        <div style="margin-top:12px">
+          <div class="cap-item">
+            <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="time">2 分钟前</span></div>
+            <div class="txt">BD 达人投放这套流程，能写成"把重复沟通自动化"的方法文</div>
+            <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+          </div>
+          <div class="cap-item">
+            <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="pill pill-ask">🗨 已回</span><span class="time">1 小时前</span></div>
+            <div class="txt">@达人跟进助手 多维表格当数据中枢靠谱吗？</div>
+            <div class="reply">它回：能当 SoT，但别指望自动抓数…</div>
+            <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap" style="text-align:center;font-size:12px;color:var(--faint)">（切到「🔍 取料」Tab 就是方案 A 下半块那套 搜/按意思搜/粘链接）</div>
+  </div>
+
+  <!-- ============ 方案 C：贴合现有主动/被动骨架 ============ -->
+  <div class="plan" id="p-c">
+    <div class="planhead">方案 C：贴现有版面骨架——取料是"主动·此刻要读"，塞进即时分析框；捕获是"被动·系统替你收"，放下方收件箱。改动最小，最像现在的灵感页。</div>
+
+    <div class="layertag">主动 · 即时（你此刻丢一个进来读）</div>
+    <div class="hero">
+      <div class="lane-ttl"><span class="lab lab-deep">消化</span>即时分析</div>
+      <div class="cap">丢一个东西进来 → AI 读懂 → 存成素材</div>
+      <div class="heroin"><input placeholder="粘链接，或粘大段文字…"><button class="btn btn-p" style="padding:9px 14px">读懂它</button></div>
+      <div class="fmt">
+        <div>🔗 <b>粘链接</b>：网页 · 公众号 · YouTube · B站 · <b>飞书文档/妙记链接</b></div>
+        <div>📎 <b>传文件</b>：音频 · PDF · Word · Markdown</div>
+      </div>
+      <div style="margin-top:10px">
+        <span class="lab lab-fs">飞</span>
+        <b style="font-size:12.5px;color:var(--fs)">从飞书取料</b>
+        <div class="seg" style="margin-top:8px"><button class="on">🔍 关键词</button><button>💡 按意思</button><button>🔗 粘链接</button></div>
+        <div class="take-row"><input placeholder="搜飞书文档/妙记/知识库…搜不到切「按意思」"><button class="btn btn-p" style="padding:9px 14px">搜</button></div>
+        <div style="margin-top:6px">
+          <div class="res"><span class="ty">云文档</span><span class="nm">达人推进全流程自动化系统设计</span><span class="go">拉来解读 →</span></div>
+          <div class="res"><span class="ty">知识库</span><span class="nm">BD 投放 SOP · 话术库</span><span class="go">拉来解读 →</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layertag">被动 · 持续（系统替你收，你挑）</div>
+    <div class="card">
+      <div class="row"><span class="fi">飞</span><span class="ttl">飞书私信 · <b>你随手丢的</b> → 待挑进灵感</span>
+        <button class="btn-mini" style="margin-left:auto">↻ 收一下</button></div>
+      <div class="hint">私信机器人<b>默认静默、不花钱</b>；@它 或 ？结尾 才回一句（DeepSeek）。</div>
+      <div style="margin-top:12px">
+        <div class="cap-item">
+          <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="time">2 分钟前</span></div>
+          <div class="txt">BD 投放这套流程能写成"重复沟通自动化"的方法文</div>
+          <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+        </div>
+        <div class="cap-item">
+          <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="pill pill-ask">🗨 已回</span><span class="time">1 小时前</span></div>
+          <div class="txt">@达人跟进助手 多维表格当数据中枢靠谱吗？</div>
+          <div class="reply">它回：能当 SoT，但别指望自动抓数…</div>
+          <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+  const btns=document.querySelectorAll('.switch button[data-p]');
+  btns.forEach(b=>b.onclick=()=>{
+    btns.forEach(x=>x.classList.remove('on')); b.classList.add('on');
+    document.querySelectorAll('.plan').forEach(p=>p.classList.remove('on'));
+    document.getElementById('p-'+b.dataset.p).classList.add('on');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+  // 演示：seg 切换 + 采纳/忽略视觉反馈
+  document.querySelectorAll('.seg').forEach(s=>s.querySelectorAll('button').forEach(b=>b.onclick=()=>{s.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on')}));
+  document.addEventListener('click',e=>{
+    if(e.target.classList.contains('btn-p')&&e.target.textContent.includes('采纳')){const it=e.target.closest('.cap-item');it.style.opacity=.4;it.querySelector('.acts').innerHTML='<span style="color:var(--green);font-size:12px">✓ 已进灵感库</span>'}
+    if(e.target.classList.contains('btn-g')&&e.target.textContent==='忽略'){const it=e.target.closest('.cap-item');it.style.opacity=.35;it.querySelector('.acts').innerHTML='<span style="color:var(--faint);font-size:12px">已忽略</span>'}
+  });
+</script>
+</body>
+</html>

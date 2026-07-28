@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>即时分析 × 随手记 · 层级展示</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;
+    --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+    --accent:#3d5a80;--green:#3f7350;--amber:#a9791f;--serif:'Newsreader',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:860px;margin:0 auto;padding:24px 22px 80px;}
+  .intro{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.7;background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:14px 16px;}
+  .intro b{color:var(--text);}
+  .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .tab{border:1px solid var(--line10);background:var(--surface);color:var(--sub);border-radius:9px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;}
+  .tab.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .tab small{display:block;font-weight:400;font-size:11px;opacity:.85;margin-top:2px;}
+  .panel{display:none} .panel.on{display:block}
+  .verdict{font-size:12.5px;color:var(--sub);margin:0 2px 14px;line-height:1.7;}
+  .verdict .g{color:var(--green);font-weight:600;}
+  .frame{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:16px 18px;}
+  .h-title{font-family:var(--serif);font-size:20px;font-weight:600;}
+  .h-sub{font-size:12.5px;color:var(--sub2);margin:3px 0 12px;}
+  .viewsw{display:inline-flex;border:1px solid var(--line10);border-radius:8px;overflow:hidden;margin-bottom:14px;}
+  .viewsw span{font-size:12.5px;font-weight:600;padding:6px 13px;color:var(--sub);}
+  .viewsw span.on{background:var(--accent);color:#fff;}
+  .btn-p{border:none;background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .plus{width:34px;height:34px;border:1px solid var(--line10);border-radius:8px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--sub);flex-shrink:0;}
+  .inp{flex:1;border:1px solid var(--line10);border-radius:8px;padding:9px 12px;font-size:12.5px;color:var(--faint);background:var(--surface);}
+  .sec{display:flex;align-items:center;gap:8px;margin:16px 2px 8px;font-size:12px;color:var(--sub2);font-weight:600;}
+  .sec .line{flex:1;height:1px;background:var(--line08);}
+  .empty{font-size:12.5px;color:var(--faint);padding:8px 2px;}
+  .lab{font-size:11px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:5px;}
+  .lab.deep{color:var(--accent);background:rgba(61,90,128,.1);}
+  .lab.quick{color:var(--green);background:rgba(63,115,80,.12);}
+  .cap{font-size:11.5px;color:var(--sub2);margin-top:6px;line-height:1.5;}
+
+  /* 方案1 并列双入口 */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .lane{border:1px solid var(--line10);border-radius:11px;padding:13px 14px;}
+  .lane.deep{background:rgba(61,90,128,.04);border-color:rgba(61,90,128,.22);}
+  .lane.quick{background:rgba(63,115,80,.035);border-color:rgba(63,115,80,.22);}
+  .lane .ttl{font-family:var(--serif);font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .lane .row{display:flex;gap:7px;align-items:center;margin-top:10px;}
+
+  /* 方案2 主次 */
+  .hero{background:rgba(61,90,128,.04);border:1px solid rgba(61,90,128,.22);border-radius:11px;padding:15px 16px;}
+  .hero .ttl{font-family:var(--serif);font-size:15.5px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .hero .d{font-size:12px;color:var(--sub2);margin:4px 0 11px;}
+  .hero .row{display:flex;gap:8px;align-items:center;}
+  .quickbar{display:flex;gap:8px;align-items:center;margin-top:11px;padding:9px 12px;border:1px solid var(--line10);border-radius:9px;background:var(--surface);}
+  .quickbar .ic{font-size:14px;}
+  .quickbar input{flex:1;border:none;background:none;font-size:12.5px;color:var(--faint);outline:none;}
+
+  /* 方案3 统一框 */
+  .unibox{border:1px solid rgba(61,90,128,.3);border-radius:11px;padding:6px 8px 6px 6px;display:flex;gap:8px;align-items:center;background:var(--surface);box-shadow:0 1px 0 rgba(61,90,128,.05);}
+  .unibox input{flex:1;border:none;background:none;font-size:13px;color:var(--faint);outline:none;padding:6px 4px;}
+  .splitnote{display:flex;gap:16px;margin-top:9px;font-size:11.5px;color:var(--sub2);}
+  .splitnote b{color:var(--body);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    关系：<b>即时分析</b>（外部东西→AI消化→素材，可提灵感，重）和 <b>随手记</b>（脑内一句话→直接成灵感，轻）是<b>同级的两种入口</b>，一重一轻、产物不同。
+    下面三种<b>层级展示</b>——都不矮化即时分析，只是它俩怎么并存。点标签切换选一个。
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-p="1" onclick="pick('1')">方案 1<small>并列双入口（同级）</small></button>
+    <button class="tab" data-p="2" onclick="pick('2')">方案 2<small>主次分层</small></button>
+    <button class="tab" data-p="3" onclick="pick('3')">方案 3<small>统一框·智能分流</small></button>
+  </div>
+
+  <!-- 方案1 -->
+  <div class="panel on" id="1">
+    <div class="verdict"><span class="g">同级并列</span>：两个入口左右平分、各自标清"输入什么、出什么"。一眼知道该用哪个，谁也不压谁。适合你觉得两者一样重要。</div>
+    <div class="frame">
+      <div class="h-title">💡 灵感库</div>
+      <div class="h-sub">要写什么的种子 · 素材是料、灵感是要写什么</div>
+      <div class="viewsw"><span class="on">收集视图</span><span>写作看板</span></div>
+      <div class="duo">
+        <div class="lane deep">
+          <div class="ttl"><span class="lab deep">消化</span>即时分析</div>
+          <div class="cap">丢链接 / 音频 / PDF / 会议纪要 → AI 读懂 → 存成素材，可提为灵感</div>
+          <div class="row"><div class="plus">＋</div><input class="inp" placeholder="粘链接，或粘大段文字…"><button class="btn-p">读懂它 →</button></div>
+        </div>
+        <div class="lane quick">
+          <div class="ttl"><span class="lab quick">闪念</span>随手记</div>
+          <div class="cap">脑里冒出的一句话、一个角度 → 直接成一条灵感（自动找贴合素材）</div>
+          <div class="row"><input class="inp" placeholder="随手记一句…"><button class="btn-p">＋ 记</button></div>
+        </div>
+      </div>
+      <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+      <div class="empty">（这里是你的灵感卡片）</div>
+    </div>
+  </div>
+
+  <!-- 方案2 -->
+  <div class="panel" id="2">
+    <div class="verdict"><span class="g">即时分析为主，随手记为轻量常驻</span>：即时分析是完整的顶部主入口（重管道），随手记是紧跟其下的一条轻输入。适合你觉得即时分析是"黄金入口"、随手记只是顺手补一句。</div>
+    <div class="frame">
+      <div class="h-title">💡 灵感库</div>
+      <div class="h-sub">要写什么的种子 · 素材是料、灵感是要写什么</div>
+      <div class="viewsw"><span class="on">收集视图</span><span>写作看板</span></div>
+      <div class="hero">
+        <div class="ttl"><span class="lab deep">消化</span>即时分析 · 从外部到你的认知</div>
+        <div class="d">丢链接 / 会议纪要 / 音频 / PDF → AI 读懂 → 存成素材 → 一键提为灵感</div>
+        <div class="row"><div class="plus">＋</div><input class="inp" placeholder="粘链接，或直接粘大段文字…"><button class="btn-p">读懂它 →</button></div>
+        <div class="quickbar"><span class="ic">✍️</span><input placeholder="或随手记一句灵感…（脑里冒出来的、不用消化的）"><button class="btn-p">记一条</button></div>
+      </div>
+      <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+      <div class="empty">（这里是你的灵感卡片）</div>
+    </div>
+  </div>
+
+  <!-- 方案3 -->
+  <div class="panel" id="3">
+    <div class="verdict"><span class="g">一个框、按输入分流</span>：粘链接/传文件 → 走即时分析出素材；打一句话 → 直接成灵感。最省版面、最"聪明"。<span style="color:var(--amber);font-weight:600">代价</span>：两条路藏在一个框后面，用户得靠提示知道规则。</div>
+    <div class="frame">
+      <div class="h-title">💡 灵感库</div>
+      <div class="h-sub">要写什么的种子 · 素材是料、灵感是要写什么</div>
+      <div class="viewsw"><span class="on">收集视图</span><span>写作看板</span></div>
+      <div class="unibox">
+        <div class="plus">＋</div>
+        <input placeholder="把链接 / 音频 / PDF 丢进来消化，或随手记一句灵感…">
+        <button class="btn-p">收进来 →</button>
+      </div>
+      <div class="splitnote">
+        <span><b>粘链接 / 传文件</b> → 即时分析，出素材（可提灵感）</span>
+        <span><b>打一句话</b> → 直接成一条灵感</span>
+      </div>
+      <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+      <div class="empty">（这里是你的灵感卡片）</div>
+    </div>
+  </div>
+</div>
+<script>
+function pick(p){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
+  document.querySelectorAll('.panel').forEach(el=>el.classList.toggle('on',el.id===p));
+}
+</script>
+</body>
+</html>

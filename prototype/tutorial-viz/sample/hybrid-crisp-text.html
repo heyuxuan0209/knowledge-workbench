@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>混合方案 · 文字走 HTML（清晰·标点对）</title>
+<style>
+  :root{
+    --paper:#f5f0e6; --ink:#2c2a26; --sub:#6f6a60; --indigo:#3d5a80; --teal:#7ba3a8;
+    --terra:#c9784e; --card:#fbf8f2; --line:rgba(44,42,38,.14);
+    --serif:'Songti SC','Noto Serif SC','Source Han Serif SC',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#d9d4c8;font-family:'PingFang SC','Noto Sans SC',system-ui,sans-serif;color:var(--ink);
+    display:flex;gap:26px;flex-wrap:wrap;justify-content:center;padding:26px}
+  .col{max-width:400px}
+  .note{font-size:13px;color:#3a4a3a;background:#eaf0e6;border:1px solid #c7d6c2;border-radius:10px;padding:12px 14px;margin-bottom:14px;line-height:1.7}
+  .note b{color:#2c5a2c}
+  /* 竖版画布 9:16 */
+  .frame{width:360px;height:640px;border-radius:26px;overflow:hidden;position:relative;
+    background:var(--paper);box-shadow:0 16px 44px rgba(0,0,0,.3)}
+  .inner{position:absolute;inset:0;padding:26px 22px 20px;display:flex;flex-direction:column}
+  /* 标题 */
+  .title{font-family:var(--serif);font-weight:700;font-size:30px;line-height:1.28;letter-spacing:.5px}
+  .title .n{color:var(--terra)}
+  .sub{font-size:12.5px;color:var(--sub);margin-top:7px;letter-spacing:.3px}
+  /* 顶部插画位（AI 出的透明 PNG 就放这，示意用简笔） */
+  .illus{height:96px;margin:12px 0 4px;border-radius:14px;background:
+    linear-gradient(180deg,#eef1f4,#e7ebf0);border:1px dashed var(--line);
+    display:flex;align-items:center;justify-content:center;gap:10px;position:relative}
+  .illus .lab{position:absolute;top:6px;left:10px;font-size:9.5px;color:#9aa;letter-spacing:.3px}
+  .illus .car{font-family:var(--serif);font-size:12px;color:#7a8a99}
+  .bubble{background:#fff;border:1px solid var(--line);border-radius:12px;padding:5px 9px;font-size:11px;color:#556}
+  .bubble.q{border-color:var(--terra);color:var(--terra)}
+  /* 卡片 */
+  .cards{display:flex;flex-direction:column;gap:8px;margin-top:8px;flex:1}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:9px 12px;display:flex;gap:11px;align-items:flex-start}
+  .card.hot{background:#f7ece7;border-color:#e3c3b4}
+  .no{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--terra);min-width:26px;line-height:1.1}
+  .ic{width:26px;height:26px;flex:0 0 auto;margin-top:2px}
+  .ic svg{width:100%;height:100%;stroke:var(--indigo);stroke-width:1.6;fill:none}
+  .card.hot .ic svg{stroke:var(--terra)}
+  .ct h4{font-size:14.5px;font-weight:700;margin-bottom:2px}
+  .ct p{font-size:11.5px;color:var(--sub);line-height:1.55}
+  /* 底部心法条 */
+  .bar{margin-top:9px;background:#22303f;color:#f3ede0;border-radius:12px;padding:11px 14px;font-size:12.5px;line-height:1.6;display:flex;gap:9px;align-items:flex-start}
+  .bar .t{flex:0 0 auto;width:20px;height:20px;margin-top:1px}
+  .bar .t svg{width:100%;height:100%;stroke:#e7c98a;stroke-width:1.6;fill:none}
+  .bar b{color:#e7c98a;font-weight:700}
+  .sign{position:absolute;right:16px;bottom:7px;font-size:10px;color:#b7ad98;font-family:var(--serif)}
+</style>
+</head>
+<body>
+  <div class="col">
+    <div class="note"><b>混合方案：</b>文字 + 排版 = HTML 真字体（<b>清晰、标点位置正确</b>、随时可改）；插画/人物/背景 = AI 出图放进虚线框那个位。<br>对比左边样片：这里的「，、。」都在字的正下方、不糊。</div>
+    <div class="frame">
+      <div class="inner">
+        <div class="title">用 <span class="n">5</span> 个问题，<br>穿透自己的判断</div>
+        <div class="sub">来自孟岩老师分享的一个小故事 · 方法教程体</div>
+
+        <div class="illus">
+          <span class="lab">AI 插画位（透明 PNG）</span>
+          <span class="bubble q">我到底知道什么？</span>
+          <span class="car">🚗→简笔两人</span>
+          <span class="bubble">嗯……</span>
+        </div>
+
+        <div class="cards">
+          <div class="card"><div class="no">01</div>
+            <div class="ic"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><line x1="14.5" y1="14.5" x2="20" y2="20"/></svg></div>
+            <div class="ct"><h4>事实依据</h4><p>我到底知道什么？分清一手事实，还是推测、感觉、听来的。</p></div></div>
+          <div class="card"><div class="no">02</div>
+            <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
+            <div class="ct"><h4>推理链条</h4><p>我是怎么得出这个结论的？逻辑链条中间有没有跳跃。</p></div></div>
+          <div class="card hot"><div class="no">03</div>
+            <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></svg></div>
+            <div class="ct"><h4>反方证据</h4><p>如果我是错的，最强反证是什么？是否选择性忽略。</p></div></div>
+          <div class="card"><div class="no">04</div>
+            <div class="ic"><svg viewBox="0 0 24 24"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="15" cy="8" r="2.4"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="16" r="2.4"/></svg></div>
+            <div class="ct"><h4>关键变量</h4><p>决定成败的那个变量，我是否真正理解它。</p></div></div>
+          <div class="card"><div class="no">05</div>
+            <div class="ic"><svg viewBox="0 0 24 24"><line x1="12" y1="4" x2="12" y2="20"/><line x1="6" y1="7" x2="18" y2="7"/><path d="M6 7l-3 6h6zM18 7l-3 6h6z"/></svg></div>
+            <div class="ct"><h4>下注代价</h4><p>我愿意投入多少？代价是否匹配我的认知深度。</p></div></div>
+        </div>
+
+        <div class="bar">
+          <div class="t"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg></div>
+          <div><b>核心心法：</b>不是为了证明自己对，而是接近真相、降低代价，做出更好的决策。</div>
+        </div>
+        <div class="sign">你的知识工作台</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

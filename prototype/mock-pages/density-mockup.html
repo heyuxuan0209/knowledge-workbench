@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>密度开关</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2; --brief-bg:#f4f6f9;
+    --body:#332f27; --body2:#4a463d; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line08:rgba(33,31,26,.08); --line10:rgba(33,31,26,.1); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --green:#3f7350; --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--body);font:14px/1.6 -apple-system,'PingFang SC',sans-serif;padding:26px 40px 90px}
+  h1{font:600 22px/1.3 var(--serif);margin:0 0 2px}
+  .lead{color:var(--sub);font-size:13px;margin-bottom:18px;max-width:900px}
+  .bar{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+  .seg{display:inline-flex;border:1px solid var(--line14);border-radius:9px;overflow:hidden;background:var(--surface)}
+  .seg button{font:600 13px/1 inherit;padding:9px 18px;border:none;background:none;color:var(--sub);cursor:pointer}
+  .seg button.on{background:var(--accent);color:#fff}
+  .hint{font-size:12px;color:var(--sub2)}
+  .hint b{color:var(--body2)}
+  .wrap{max-width:720px}
+  /* 舒适 */
+  .cozy .card{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:13px 15px 13px 17px;border-left:3px solid var(--green);margin-bottom:12px}
+  .cozy .card.un{border-left-color:var(--line14)}
+  .cozy .top{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint)}
+  .cozy .ti{font-family:var(--serif);font-weight:600;font-size:15px;line-height:1.4;margin:6px 0 5px}
+  .cozy .sum{font-size:12.5px;color:var(--body2);line-height:1.6}
+  .cozy .foot{display:flex;gap:10px;font-size:12px;color:var(--sub);margin-top:10px}
+  .cozy .foot .p{color:var(--accent);font-weight:600}
+  /* 紧凑 */
+  .compact .list{background:var(--surface);border:1px solid var(--line10);border-radius:10px;overflow:hidden}
+  .compact .row{display:flex;align-items:center;gap:11px;padding:10px 15px;border-top:1px solid var(--line08)}
+  .compact .row:first-child{border-top:none}
+  .compact .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .compact .dot.f{background:var(--green)}.compact .dot.u{background:var(--faint)}
+  .compact .ti{font-family:var(--serif);font-weight:600;font-size:13.5px;flex:none;max-width:44%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .compact .g{font-size:12px;color:var(--sub2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .compact .m{font-size:11px;color:var(--faint);flex:none}
+  .hide{display:none}
+  .cnt{font-size:12px;color:var(--sub2);margin-top:10px}
+</style></head>
+<body>
+<h1>密度开关 · 一个 Feed，两种看法</h1>
+<div class="lead">同一批资讯，"舒适"看得细、"紧凑"扫得快。切一下，感受一屏能装多少条——这种手感，文字描述不出来。</div>
+<div class="bar">
+  <div class="seg"><button id="b1" class="on" onclick="setD('cozy')">舒适</button><button id="b2" onclick="setD('compact')">紧凑</button></div>
+  <span class="hint" id="hint"><b>舒适</b>：留完整摘要，一屏约 4 条，适合慢读。</span>
+</div>
+
+<div class="wrap cozy" id="cozy">
+  <div class="card"><div class="top">aiDotEngineer · 13h · 观点</div><div class="ti">停止浪费 Token：为何自我提升先需要领域专业知识</div><div class="sum">通过论文分类任务自动改进循环的真实案例，揭示领域知识与目标函数对 Agent 持续改进的关键作用，并给出评估框架与失败模式清单。</div><div class="foot"><span class="p">AI 精读</span><span>选中解读</span><span>☆ 收藏</span></div></div>
+  <div class="card un"><div class="top">AI HOT · 4h · 观点</div><div class="ti">AI 热潮正在瓦解全球决策机制</div><div class="sum">一位有 300 多次行业交流经验的从业者观察到，全球机构陷入集体性 AI 狂热、忽视一线证据，呼吁重建以实据为锚的决策纪律。</div><div class="foot"><span class="p">AI 精读</span><span>选中解读</span><span>＋关注</span></div></div>
+  <div class="card"><div class="top">aiDotEngineer · 15h · 行业</div><div class="ti">停止租赁你的认知基础设施</div><div class="sum">基于自身造系统的成本体验，剖析市场推销策略背后的真实经济账，论证租用智能为何划不来、何时自建更省，给出决策表。</div><div class="foot"><span class="p">AI 精读</span><span>选中解读</span><span>查看↗</span></div></div>
+  <div class="card un"><div class="top">mbustamanter · 1d · 模型</div><div class="ti">GPT-5.6 用一条 Prompt 弥合凸优化 30 年空白</div><div class="sum">148 分钟推理的提示词，解决自 1996 年以来悬置的凸优化缺口，并用 Lean 形式化验证，展示前沿模型的数学推理边界。</div><div class="foot"><span class="p">AI 精读</span><span>选中解读</span><span>＋关注</span></div></div>
+</div>
+
+<div class="wrap compact hide" id="compact">
+  <div class="list">
+    <div class="row"><span class="dot f"></span><span class="ti">停止浪费 Token</span><span class="g">领域知识对 Agent 自改进的关键作用，附评估框架</span><span class="m">aiDotEngineer · 13h</span></div>
+    <div class="row"><span class="dot u"></span><span class="ti">AI 热潮正在瓦解全球决策机制</span><span class="g">集体性狂热、忽视证据，呼吁实据决策</span><span class="m">AI HOT · 4h</span></div>
+    <div class="row"><span class="dot f"></span><span class="ti">停止租赁你的认知基础设施</span><span class="g">自建 vs 租用的经济账与决策表</span><span class="m">aiDotEngineer · 15h</span></div>
+    <div class="row"><span class="dot u"></span><span class="ti">GPT-5.6 弥合凸优化 30 年空白</span><span class="g">148 分钟提示词解决 1996 年缺口，Lean 验证</span><span class="m">mbustamanter · 1d</span></div>
+    <div class="row"><span class="dot f"></span><span class="ti">你的 Agent 需要一个保存按钮</span><span class="g">长期存活费算力，崩溃从保存点恢复</span><span class="m">aiDotEngineer · 1d</span></div>
+    <div class="row"><span class="dot u"></span><span class="ti">停止假装你的 Agent 会思考</span><span class="g">拆解"推理"话术背后的真实机制</span><span class="m">AI HOT · 2d</span></div>
+    <div class="row"><span class="dot f"></span><span class="ti">上下文工程是新的提示工程</span><span class="g">从写提示到管上下文窗口的范式迁移</span><span class="m">latentspace · 2d</span></div>
+    <div class="row"><span class="dot u"></span><span class="ti">评估比模型更重要</span><span class="g">没有好评估，再强的模型也调不动</span><span class="m">AI HOT · 3d</span></div>
+  </div>
+  <div class="cnt">一屏约 8+ 条，操作 hover 一行才出——扫得最快。</div>
+</div>
+
+<script>
+function setD(d){
+  document.getElementById('cozy').classList.toggle('hide', d!=='cozy')
+  document.getElementById('compact').classList.toggle('hide', d!=='compact')
+  document.getElementById('b1').classList.toggle('on', d==='cozy')
+  document.getElementById('b2').classList.toggle('on', d==='compact')
+  document.getElementById('hint').innerHTML = d==='cozy'
+    ? '<b>舒适</b>：留完整摘要，一屏约 4 条，适合慢读。'
+    : '<b>紧凑</b>：一行一条，一屏 8+ 条，适合快速扫过挑感兴趣的。'
+}
+</script>
+</body></html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台 · 底部操作栏 3 种方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line:rgba(33,31,26,.1);--line2:rgba(33,31,26,.07);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:'Newsreader',serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--body);font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.55}
+.wrap{max-width:920px;margin:0 auto;padding:26px 24px 60px}
+h1{font-family:var(--serif);font-size:24px;margin:0 0 4px}
+.lede{color:var(--sub);font-size:13px;margin:0 0 26px}
+svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.opt{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:20px}
+.opt h2{font-family:var(--serif);font-size:18px;margin:0 0 3px;font-weight:600}
+.opt .desc{color:var(--sub);font-size:12.5px;margin:0 0 16px}
+.mockdraft{border:1px solid var(--line2);border-radius:9px;background:rgba(33,31,26,.015);height:66px;margin-bottom:12px;display:flex;align-items:center;padding:0 18px;color:var(--faint);font-family:var(--serif);font-size:15px}
+.state{font-size:11px;color:var(--sub2);margin:14px 0 7px;display:flex;align-items:center;gap:6px}
+.state b{color:var(--accent);font-weight:600}
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 13px;font-size:13px;color:var(--body);display:inline-flex;align-items:center;gap:6px}
+.btn.ghost{border-color:transparent;background:none;color:var(--sub);padding:8px 8px}
+.btn.primary{background:var(--accent);color:#fff;border:none;font-weight:500}
+.btn.cards{background:#7a4d8f;color:#fff;border:none;font-weight:500}
+.bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.divider{width:1px;height:22px;background:var(--line);margin:0 3px}
+.seglab{font-size:11px;color:var(--sub2);margin-right:2px;align-self:center}
+.push{margin-left:auto}
+.tag2{display:inline-flex;gap:5px;align-items:center;font-size:11px;color:var(--sub2);background:var(--line2);border-radius:5px;padding:3px 8px}
+</style></head><body>
+<div class="wrap">
+  <h1>底部操作栏 · 3 种方案</h1>
+  <p class="lede">三类诉求：改（整篇）· 存 · 拿走（复制/导出/出卡片）。选中段落的局部编辑走右侧，不进底部。每个方案都给「文字平台」和「卡片平台」两种状态。</p>
+
+  <!-- 方案1 -->
+  <div class="opt">
+    <h2>方案 1 · 分组工具条</h2>
+    <p class="desc">一行，按「改 | 存 | 拿走」用竖线分组。所有动作平铺可见，靠分组降低混乱。</p>
+    <div class="mockdraft">…生成的正文…</div>
+    <div class="state"><b>公众号长文（文字）</b></div>
+    <div class="bar">
+      <button class="btn"><svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0115-3.4L23 10M1 14l4.5 4.4A9 9 0 0020.5 15"/></svg>重新生成</button>
+      <button class="btn"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 14.6 7 18.2l1.9-5.8L4 8.8h6.1z"/></svg>去 AI 味</button>
+      <span class="divider"></span>
+      <button class="btn"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>存草稿</button>
+      <span class="divider"></span>
+      <button class="btn"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>复制全文</button>
+      <button class="btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>导出<svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div class="state"><b>小红书卡片</b> —— 多出主色「生成图文卡片」（接旧图卡工具）</div>
+    <div class="bar">
+      <button class="btn cards"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>生成图文卡片</button>
+      <button class="btn"><svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M3.5 9a9 9 0 0115-3.4L23 10"/></svg>重新生成</button>
+      <button class="btn">去 AI 味</button>
+      <span class="divider"></span>
+      <button class="btn">存草稿</button>
+      <span class="divider"></span>
+      <button class="btn">复制文字</button>
+    </div>
+  </div>
+
+  <!-- 方案2 -->
+  <div class="opt">
+    <h2>方案 2 · 主行动 + 次级</h2>
+    <p class="desc">一个随平台变的「主行动」放右侧最显眼；其余(改/存/导出)是低调的次级按钮。最不容易懵——永远有一个明确的下一步。</p>
+    <div class="mockdraft">…生成的正文…</div>
+    <div class="state"><b>公众号长文（文字）</b> —— 主行动 = 复制全文</div>
+    <div class="bar">
+      <button class="btn ghost">重新生成</button>
+      <button class="btn ghost">去 AI 味</button>
+      <button class="btn ghost">存草稿</button>
+      <button class="btn ghost">导出<svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></button>
+      <span class="push"></span>
+      <button class="btn primary"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>复制全文</button>
+    </div>
+    <div class="state"><b>小红书卡片</b> —— 主行动自动变成「生成图文卡片」</div>
+    <div class="bar">
+      <button class="btn ghost">重新生成</button>
+      <button class="btn ghost">去 AI 味</button>
+      <button class="btn ghost">存草稿</button>
+      <button class="btn ghost">复制文字</button>
+      <span class="push"></span>
+      <button class="btn cards"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>生成图文卡片</button>
+    </div>
+  </div>
+
+  <!-- 方案3 -->
+  <div class="opt">
+    <h2>方案 3 · 按意图两段（带文字标签）</h2>
+    <p class="desc">直接写出「改」「用」两个意图标签，各管一组。最自解释，新用户一眼知道在哪干嘛。</p>
+    <div class="mockdraft">…生成的正文…</div>
+    <div class="state"><b>公众号长文（文字）</b></div>
+    <div class="bar" style="margin-bottom:9px"><span class="seglab">改 ·</span>
+      <button class="btn">重新生成</button><button class="btn">去 AI 味</button>
+      <span class="tag2">某段不满意？选中它 → 右侧改</span>
+    </div>
+    <div class="bar"><span class="seglab">用 ·</span>
+      <button class="btn">存草稿</button><button class="btn">复制全文</button>
+      <button class="btn">导出<svg viewBox="0 0 24 24" style="width:12px"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div class="state"><b>小红书卡片</b></div>
+    <div class="bar" style="margin-bottom:9px"><span class="seglab">改 ·</span>
+      <button class="btn">重新生成</button><button class="btn">去 AI 味</button>
+    </div>
+    <div class="bar"><span class="seglab">用 ·</span>
+      <button class="btn cards"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>生成图文卡片</button>
+      <button class="btn">存草稿</button><button class="btn">复制文字</button>
+    </div>
+  </div>
+
+  <div style="font-size:12.5px;color:var(--sub);background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:14px 16px">
+    <b>卡片平台点「生成图文卡片」之后</b>：正文（封面+每张卡文字）→ 直接送进你已有的图文卡工具（HTML 模板渲染，ADR-024），出成可下载的图片卡片组；不重做工具，复用旧的那个页。
+  </div>
+</div>
+</body></html>

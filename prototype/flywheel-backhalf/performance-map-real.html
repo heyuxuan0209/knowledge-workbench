@@ -1,0 +1,144 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>表现地图 · 真实数据（钩子 × 内容）</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--brief:#f4f6f9;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);--accent:#3d5a80;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:'Newsreader',serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1140px;margin:0 auto;padding:24px 22px 90px}
+h1{font-family:var(--serif);font-size:25px;font-weight:600;margin:0 0 4px}
+.sub{font-size:13px;color:var(--sub2);margin-bottom:6px}
+.note{font-size:12.5px;color:var(--sub);background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:12px 15px;line-height:1.7;margin:14px 0 20px}
+.note b{color:var(--text)}
+.main{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+.plot-card{flex:1;min-width:520px;background:var(--surface);border:1px solid var(--line10);border-radius:14px;padding:18px 20px 16px}
+.plot-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.plot-h .t{font-family:var(--serif);font-size:17px;font-weight:600}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.fbtn{border:1px solid var(--line10);background:var(--surface);color:var(--sub);font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:7px;cursor:pointer}
+.fbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.scatter{position:relative;width:100%;aspect-ratio:1/.82;background:linear-gradient(180deg,#f7f9fc,#f2f4f7);border:1px solid var(--line10);border-radius:10px}
+.qbg{position:absolute;font-size:11px;font-weight:600;opacity:.9;pointer-events:none;line-height:1.3}
+.crossv{position:absolute;top:2%;bottom:9%;border-left:1px dashed rgba(33,31,26,.22)}
+.crossh{position:absolute;left:9%;right:4%;border-top:1px dashed rgba(33,31,26,.22)}
+.medlab{position:absolute;font-size:9.5px;color:var(--sub2);background:rgba(255,255,255,.7);padding:0 3px;border-radius:3px}
+.axx{position:absolute;bottom:2%;left:50%;transform:translateX(-50%);font-size:11px;color:var(--sub2);font-weight:600}
+.axy{position:absolute;left:1%;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;font-size:11px;color:var(--sub2);font-weight:600;letter-spacing:1px}
+.dot{position:absolute;border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.18);transition:transform .1s}
+.dot:hover{transform:translate(-50%,-50%) scale(1.22);z-index:9}
+.dot.low{opacity:.5;border-style:dashed}
+.dot.dy{border-color:#211f1a}.dot.wx{border-color:#3f7350}
+.dot.sel{outline:3px solid rgba(61,90,128,.35);outline-offset:1px}
+#tip{position:fixed;pointer-events:none;z-index:99;background:rgba(28,26,22,.95);color:#fff;font-size:12px;padding:7px 10px;border-radius:8px;max-width:260px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.25);display:none}
+#tip .tt{font-weight:600;margin-bottom:3px}#tip .tm{font-size:10.5px;opacity:.8}
+.leg{font-size:11px;color:var(--sub);margin-top:10px;line-height:1.7}
+.leg .sw{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;margin:0 3px 0 10px;border:1.5px solid #fff}
+.side{width:330px;flex:0 0 auto}
+.detail{background:var(--surface);border:1px solid var(--line10);border-radius:14px;padding:16px 17px;position:sticky;top:16px}
+.detail .badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;margin-bottom:9px}
+.detail h3{font-family:var(--serif);font-size:16px;margin:0 0 3px;line-height:1.35}
+.detail .meta{font-size:11.5px;color:var(--sub2);margin-bottom:12px}
+.funnel{display:flex;gap:7px;margin:12px 0}
+.fcell{flex:1;text-align:center;background:var(--brief);border:1px solid var(--line08);border-radius:8px;padding:8px 3px}
+.fcell .v{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}.fcell .l{font-size:9.5px;color:var(--sub2);margin-top:2px}
+.reco{font-size:12.5px;color:var(--body);background:var(--brief);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:10px 12px;margin-top:12px;line-height:1.6}.reco b{color:var(--accent)}
+.raw{font-size:11px;color:var(--sub);margin-top:12px;line-height:1.8}.raw span{color:var(--body);font-weight:600}
+.ranks{margin-top:20px}.ranks h4{font-family:var(--serif);font-size:14px;margin:0 0 8px}
+.rline{display:flex;gap:8px;align-items:baseline;font-size:12px;padding:5px 0;border-bottom:1px solid var(--line08);cursor:pointer}
+.rline:hover{background:rgba(61,90,128,.04)}
+.rline .rt{flex:1;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rline .rv{color:var(--sub2);font-variant-numeric:tabular-nums;font-size:11px}
+</style></head><body><div class="wrap">
+<h1>表现地图 · 你的真实内容</h1>
+<div class="sub" id="subline">AI/科技内容 · 已滤掉美食生活 · 数据来自平台导出</div>
+<div class="note">
+<div style="font-weight:600;color:var(--text);margin-bottom:7px">看图说明</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 22px">
+<div>■ <b>横轴 钩子力</b>：小红书/抖音＝封面点击率、公众号＝打开率——<b>能不能被点开</b>（标题+封面决定）</div>
+<div>■ <b>纵轴 内容力（收藏率）</b>：收藏率＝收藏数/观看数，读者觉不觉得<b>有收获</b>（正文决定，你的第一尺子）</div>
+<div>■ <b>点大小＝曝光/送达</b>：越大越可信</div>
+<div>■ <b>虚线圈＝低样本</b>（曝光&lt;500）：别过度解读</div>
+<div>■ <b>十字线＝你自己账号中位</b>：比的是"这篇比你平常强还是弱"</div>
+<div>■ <b>鼠标悬停即显标题</b>，点击看完整诊断</div>
+</div>
+</div>
+<div class="main">
+ <div class="plot-card">
+  <div class="plot-h"><span class="t">钩子 × 内容 四象限</span>
+   <div class="filters"><button class="fbtn on" data-f="all">全部</button><button class="fbtn" data-f="小红书">小红书</button><button class="fbtn" data-f="抖音">抖音</button><button class="fbtn" data-f="公众号">公众号</button><button class="fbtn" data-f="hi">仅高样本</button></div>
+  </div>
+  <div class="scatter" id="sc">
+   <div class="crossv" style="left:57.45%"></div><div class="crossh" style="top:51.66%"></div>
+   <div class="medlab" style="left:57.45%;top:3%;transform:translateX(4px)">钩子中位 0.118</div>
+   <div class="medlab" style="top:51.66%;left:9.5%;transform:translateY(-14px)">收藏中位 6.9%</div>
+   <div class="qbg" style="right:5%;top:6%;color:var(--green)">↗ 双高·标杆</div>
+   <div class="qbg" style="left:11%;top:6%;color:var(--accent);text-align:left">内容强没被看见<br><span style="font-weight:400;color:var(--sub2)">换钩子·重发</span></div>
+   <div class="qbg" style="right:5%;bottom:12%;color:var(--amber);text-align:right">钩子强内容弱<br><span style="font-weight:400;color:var(--sub2)">修正文</span></div>
+   <div class="qbg" style="left:11%;bottom:12%;color:var(--red)">双低·重做</div>
+   <div class="axx">钩子力（封面点击率/打开率）→</div><div class="axy">内容力（收藏率）→</div>
+  </div>
+  <div class="leg"><span class="sw" style="background:var(--accent);border-color:#fff"></span>小红书<span class="sw" style="background:#8a8478;border-color:#211f1a"></span>抖音<span class="sw" style="background:#8a8478;border-color:#3f7350"></span>公众号 · 点大=曝光高 · 填色=所在象限 · 虚线圈=低样本</div>
+ </div>
+ <div class="side"><div class="detail" id="dt">
+   <div class="badge" style="background:rgba(33,31,26,.06);color:var(--sub2)">点一个点看诊断</div>
+   <h3 id="dtT">你的内容落在这里</h3>
+   <div class="meta" id="dtM">四象限＝四种处方。左上是"被低估的金子"，右下是"标题党"。</div>
+   <div id="dtBody" style="display:none">
+     <div class="funnel">
+       <div class="fcell"><div class="v" id="fImp">–</div><div class="l" id="fImpL">曝光</div></div>
+       <div class="fcell"><div class="v" id="fCtr">–</div><div class="l" id="fCtrL">钩子力</div></div>
+       <div class="fcell"><div class="v" id="fSr">–</div><div class="l">收藏率</div></div>
+       <div class="fcell"><div class="v" id="fFan">–</div><div class="l">涨粉</div></div>
+     </div>
+     <div class="reco" id="dtReco"></div><div class="raw" id="dtRaw"></div>
+   </div>
+   <div class="ranks"><h4>被低估的金子 · 内容强没被看见</h4><div id="goldList"></div></div>
+ </div></div>
+</div>
+<div class="note" style="margin-top:22px"><b>这就是"极轻版"要验证的：看着能不能激发方向感？</b> 若行我落成产品——上传各平台 xlsx → 自动算漏斗入库 → 这张图 + 发布台账。归拢方式＝<b>每周下载平台导出丢进来</b>（不碰 cookie/API）。公众号=推送模型，用<b>打开率当钩子力</b>；深评·私信导出无、手动记。</div>
+<div id="tip"><div class="tt"></div><div class="tm"></div></div>
+<script>
+const PTS=[{"l": 58.47, "t": 46.21, "s": 26.9, "plat": "小红书", "qc": "#3f7350", "quad": "双高·标杆", "title": "收藏 = 稍后读 = 永远不读，直到我做了它", "pub": "2026-07-17", "ctr": 0.121, "sr": 7.9, "imp": 223, "view": 38, "save": 3, "fans": 0, "like": 3, "cmt": 0, "share": 2, "low": true}, {"l": 32.71, "t": 60.33, "s": 32.2, "plat": "小红书", "qc": "#a24b3f", "quad": "双低·重做", "title": "Anthropic教你和AI协作的六个技巧", "pub": "2026-07-16", "ctr": 0.058, "sr": 5.4, "imp": 1337, "view": 74, "save": 4, "fans": 0, "like": 4, "cmt": 0, "share": 3, "low": false}, {"l": 37.21, "t": 77.49, "s": 31.7, "plat": "小红书", "qc": "#a24b3f", "quad": "双低·重做", "title": "别再逼自己\"把需求想清楚\"了", "pub": "2026-07-16", "ctr": 0.069, "sr": 2.4, "imp": 1148, "view": 84, "save": 2, "fans": 0, "like": 5, "cmt": 0, "share": 1, "low": false}, {"l": 63.38, "t": 91.0, "s": 28.0, "plat": "小红书", "qc": "#a9791f", "quad": "钩子强内容弱·修正文", "title": "终于可以在一个终端里调用不同agent了", "pub": "2026-07-04", "ctr": 0.133, "sr": 0.0, "imp": 316, "view": 44, "save": 0, "fans": 0, "like": 2, "cmt": 0, "share": 0, "low": true}, {"l": 42.12, "t": 82.27, "s": 30.7, "plat": "小红书", "qc": "#a24b3f", "quad": "双低·重做", "title": "AI 自动化的门槛，被 Codex 这个功能击穿了", "pub": "2026-06-22", "ctr": 0.081, "sr": 1.5, "imp": 807, "view": 65, "save": 1, "fans": 0, "like": 3, "cmt": 0, "share": 1, "low": false}, {"l": 50.7, "t": 91.0, "s": 26.9, "plat": "小红书", "qc": "#a24b3f", "quad": "双低·重做", "title": "Harness 落地全指南｜亲测30天见效", "pub": "2026-04-09", "ctr": 0.102, "sr": 0.0, "imp": 219, "view": 27, "save": 0, "fans": 0, "like": 2, "cmt": 0, "share": 1, "low": true}, {"l": 47.43, "t": 91.0, "s": 26.8, "plat": "小红书", "qc": "#a24b3f", "quad": "双低·重做", "title": "✅Harness落地全指南｜亲测30天见效", "pub": "2026-04-09", "ctr": 0.094, "sr": 0.0, "imp": 212, "view": 29, "save": 0, "fans": 0, "like": 3, "cmt": 1, "share": 0, "low": true}, {"l": 56.42, "t": 52.14, "s": 29.7, "plat": "小红书", "qc": "#a24b3f", "quad": "双低·重做", "title": "为什么你的AI Agent，多轮对话总是崩？", "pub": "2026-04-07", "ctr": 0.116, "sr": 6.8, "imp": 581, "view": 73, "save": 5, "fans": 1, "like": 2, "cmt": 1, "share": 0, "low": false}, {"l": 62.97, "t": 17.87, "s": 33.1, "plat": "小红书", "qc": "#3f7350", "quad": "双高·标杆", "title": "Agent命中率从30%到80%，我复盘了这套SOP", "pub": "2026-02-27", "ctr": 0.132, "sr": 12.9, "imp": 1799, "view": 225, "save": 29, "fans": 2, "like": 14, "cmt": 0, "share": 2, "low": false}, {"l": 40.89, "t": 32.51, "s": 32.0, "plat": "小红书", "qc": "#3d5a80", "quad": "内容强没被看见·换钩子重发", "title": "AI Agent从0到1设计全流程指南", "pub": "2026-02-23", "ctr": 0.078, "sr": 10.3, "imp": 1248, "view": 97, "save": 10, "fans": 2, "like": 3, "cmt": 2, "share": 0, "low": false}, {"l": 41.71, "t": 47.05, "s": 33.0, "plat": "小红书", "qc": "#3d5a80", "quad": "内容强没被看见·换钩子重发", "title": "RAG从0-1-进阶篇（混合检索策略）", "pub": "2026-02-10", "ctr": 0.08, "sr": 7.7, "imp": 1790, "view": 142, "save": 11, "fans": 0, "like": 10, "cmt": 1, "share": 1, "low": false}, {"l": 33.94, "t": 46.98, "s": 33.3, "plat": "小红书", "qc": "#3d5a80", "quad": "内容强没被看见·换钩子重发", "title": "RAG入门篇-从原理到实践", "pub": "2026-02-09", "ctr": 0.061, "sr": 7.8, "imp": 1943, "view": 116, "save": 9, "fans": 1, "like": 10, "cmt": 1, "share": 2, "low": false}, {"l": 35.17, "t": 58.01, "s": 34.0, "plat": "小红书", "qc": "#a24b3f", "quad": "双低·重做", "title": "RAG 0-1全攻略教程，从概念到实战到优化", "pub": "2026-02-08", "ctr": 0.064, "sr": 5.8, "imp": 2447, "view": 172, "save": 10, "fans": 1, "like": 12, "cmt": 5, "share": 4, "low": false}, {"l": 70.73, "t": 51.19, "s": 34.3, "plat": "小红书", "qc": "#3f7350", "quad": "双高·标杆", "title": "别再手动搬运，Claude一键脚本自动整理文档", "pub": "2026-02-04", "ctr": 0.151, "sr": 7.0, "imp": 2703, "view": 399, "save": 28, "fans": 2, "like": 18, "cmt": 0, "share": 13, "low": false}, {"l": 74.0, "t": 49.24, "s": 38.7, "plat": "小红书", "qc": "#3f7350", "quad": "双高·标杆", "title": "拒绝重复调教！Claude多窗口协作终极方案", "pub": "2026-02-01", "ctr": 0.159, "sr": 7.4, "imp": 12211, "view": 1970, "save": 145, "fans": 8, "like": 84, "cmt": 10, "share": 33, "low": false}, {"l": 60.92, "t": 67.09, "s": 33.2, "plat": "小红书", "qc": "#a9791f", "quad": "钩子强内容弱·修正文", "title": "告别重复造轮子！手把手教你Claude Skills", "pub": "2026-01-30", "ctr": 0.127, "sr": 4.2, "imp": 1876, "view": 261, "save": 11, "fans": 0, "like": 8, "cmt": 0, "share": 4, "low": false}, {"l": 80.95, "t": 30.53, "s": 41.0, "plat": "小红书", "qc": "#3f7350", "quad": "双高·标杆", "title": "Token 激降 87%！Claude Code 文档 12分类", "pub": "2026-01-29", "ctr": 0.176, "sr": 10.7, "imp": 26670, "view": 4710, "save": 502, "fans": 52, "like": 249, "cmt": 58, "share": 100, "low": false}, {"l": 86.68, "t": 46.13, "s": 40.2, "plat": "小红书", "qc": "#3f7350", "quad": "双高·标杆", "title": "Claude烧钱心碎？这招让 Token 消耗降低80%", "pub": "2026-01-28", "ctr": 0.19, "sr": 7.9, "imp": 20449, "view": 3869, "save": 306, "fans": 24, "like": 160, "cmt": 12, "share": 70, "low": false}, {"l": 64.19, "t": 14.21, "s": 34.4, "plat": "小红书", "qc": "#3f7350", "quad": "双高·标杆", "title": "Claude Code 从 0 到 1 全攻略手册-文字版", "pub": "2026-01-28", "ctr": 0.135, "sr": 13.5, "imp": 2861, "view": 399, "save": 54, "fans": 3, "like": 21, "cmt": 0, "share": 11, "low": false}, {"l": 58.47, "t": 69.64, "s": 35.0, "plat": "小红书", "qc": "#a9791f", "quad": "钩子强内容弱·修正文", "title": "小白必看！🚀 手把手教你用Gemini Gems定", "pub": "2026-01-21", "ctr": 0.121, "sr": 3.8, "imp": 3464, "view": 425, "save": 16, "fans": 1, "like": 13, "cmt": 0, "share": 0, "low": false}, {"l": 9.0, "t": 86.73, "s": 29.5, "plat": "抖音", "qc": "#a24b3f", "quad": "双低·重做", "title": "6 个技巧让 AI 帮你挖出脑子里的东西。#claude #codex #提示词", "pub": "2026-07-18", "ctr": 0.0, "sr": 0.8, "imp": 531, "view": 531, "save": 4, "fans": 0, "like": 18, "cmt": 1, "share": 1, "low": false}, {"l": 9.0, "t": 91.0, "s": 14.2, "plat": "公众号", "qc": "#a24b3f", "quad": "双低·重做", "title": "我的收藏夹从「稍后读」变成了「已读懂」：一个开源小工具的诞生", "pub": "", "ctr": 0.0, "sr": 0.0, "imp": 2, "view": 2, "save": 0, "fans": 0, "like": 2, "cmt": 0, "share": 0, "low": true}];
+const RECO={
+ "双高·标杆":"<b>标杆。</b>钩子和内容都在你水平线之上。拆它的主题/角度/标题/开头，当模板复制到下一篇。",
+ "钩子强内容弱·修正文":"<b>标题把人骗进来了，正文没接住。</b>钩子可复用，但要回炉正文——信息密度/收获感不够。",
+ "内容强没被看见·换钩子重发":"<b>被低估的金子。</b>正文读者认可（收藏率高于中位），但钩子弱没拿到曝光。换更强标题/封面重发，很可能翻盘。",
+ "双低·重做":"<b>钩子内容都低于平常。</b>选题或两头没做好——低样本先别急着下结论。"};
+const PLABEL={"小红书":"封面点击率","抖音":"封面点击率","公众号":"打开率"};
+const PIMP={"小红书":"曝光","抖音":"播放","公众号":"送达"};
+const sc=document.getElementById('sc'),tip=document.getElementById('tip');
+function render(f){
+ sc.querySelectorAll('.dot').forEach(e=>e.remove());
+ PTS.forEach((p,i)=>{
+   if(f==='小红书'&&p.plat!=='小红书')return;if(f==='抖音'&&p.plat!=='抖音')return;
+   if(f==='公众号'&&p.plat!=='公众号')return;if(f==='hi'&&p.low)return;
+   const d=document.createElement('div');
+   d.className='dot '+(p.plat==='抖音'?'dy ':p.plat==='公众号'?'wx ':'')+(p.low?'low':'');
+   d.style.left=p.l+'%';d.style.top=p.t+'%';d.style.width=p.s+'px';d.style.height=p.s+'px';d.style.background=p.qc;
+   d.onclick=()=>show(i,d);
+   d.onmousemove=(e)=>{tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+     tip.querySelector('.tt').textContent=p.title;
+     tip.querySelector('.tm').textContent=p.plat+' · '+p.pub+' · '+PIMP[p.plat]+p.imp+(p.low?' · 低样本':'');};
+   d.onmouseleave=()=>tip.style.display='none';
+   sc.appendChild(d);
+ });
+}
+function show(i,el){
+ const p=PTS[i];document.querySelectorAll('.dot.sel').forEach(e=>e.classList.remove('sel'));if(el)el.classList.add('sel');
+ document.getElementById('dtBody').style.display='block';
+ const b=document.querySelector('#dt .badge');b.textContent=p.quad+(p.low?' · 低样本':'');
+ b.style.background='color-mix(in srgb,'+p.qc+' 14%,transparent)';b.style.color=p.qc;
+ document.getElementById('dtT').textContent=p.title;
+ document.getElementById('dtM').textContent=p.plat+' · '+p.pub+' · '+p.imp+' '+PIMP[p.plat];
+ document.getElementById('fImp').textContent=p.imp;document.getElementById('fImpL').textContent=PIMP[p.plat];
+ document.getElementById('fCtr').textContent=p.ctr.toFixed(3);document.getElementById('fCtrL').textContent=PLABEL[p.plat];
+ document.getElementById('fSr').textContent=p.sr+'%';document.getElementById('fFan').textContent='+'+p.fans;
+ document.getElementById('dtReco').innerHTML=RECO[p.quad]+(p.low?' <span style="color:var(--amber)">⚠ 低样本，当趋势别当结论。</span>':'');
+ document.getElementById('dtRaw').innerHTML='观看 <span>'+p.view+'</span> · 收藏 <span>'+p.save+'</span> · 赞 <span>'+p.like+'</span> · 评 <span>'+p.cmt+'</span> · 分享 <span>'+p.share+'</span>';
+}
+document.querySelectorAll('.fbtn').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render(btn.dataset.f);});
+const gold=PTS.map((p,i)=>({p,i})).filter(o=>o.p.quad.includes('换钩子')).sort((a,b)=>b.p.sr-a.p.sr);
+document.getElementById('goldList').innerHTML=gold.map(o=>`<div class="rline" onclick="show(${o.i})"><span class="rt">${o.p.title}</span><span class="rv">收藏${o.p.sr}% · 钩子${o.p.ctr.toFixed(3)}</span></div>`).join('')||'<div style="font-size:12px;color:var(--sub2)">暂无</div>';
+document.getElementById('subline').textContent='共 '+PTS.length+' 篇 AI/科技内容（'+[...new Set(PTS.map(p=>p.plat))].join(' + ')+'）· 已滤掉美食生活 · 数据来自平台导出';
+render('all');
+</script></body></html>

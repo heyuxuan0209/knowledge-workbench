@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可视化教程 · 混合成品（D卡片 + A暖插画 + HTML文字）</title>
+<style>
+  :root{
+    --paper:#f2ede2; --paper2:#f8f4ea; --ink:#2b2924; --sub:#6f6a60;
+    --indigo:#3d5a80; --teal:#7ba3a8; --terra:#c9784e; --terra-d:#b0623a;
+    --card:#fbf8f2; --line:rgba(43,41,36,.13); --navy:#22303f;
+    --serif:'Songti SC','Noto Serif SC',serif; --sans:'PingFang SC','Noto Sans SC',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#cfc9bd;font-family:var(--sans);color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px}
+  .bartop{font-size:13px;color:#333;background:#eee7d8;border:1px solid #d8cfbc;border-radius:9px;padding:9px 13px;max-width:460px;line-height:1.6}
+  .bartop b{color:var(--terra-d)}
+  /* 缩放预览：真实像素 1080x1920，用 transform 缩小显示 */
+  .scaler{width:453px;height:806px;overflow:hidden;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.32)}
+  .frame{width:1080px;height:1920px;transform:scale(.4194);transform-origin:top left;
+    background:
+      radial-gradient(120% 60% at 50% 0%, #f8f4ea, var(--paper) 60%);
+    padding:64px 60px 40px;display:flex;flex-direction:column;position:relative;font-size:16px}
+  /* 标题 */
+  .title{font-family:var(--serif);font-weight:700;font-size:74px;line-height:1.22;letter-spacing:1px}
+  .title .n{color:var(--terra);font-size:82px}
+  .sub{font-size:26px;color:var(--sub);margin-top:14px;letter-spacing:.5px}
+  /* 插画带（AI 透明 PNG；独立区域，不压字） */
+  .illwrap{margin:20px 0 6px;height:360px;border-radius:26px;position:relative;overflow:hidden;
+    background:linear-gradient(180deg,#efeade,#e9e3d5);border:1px solid var(--line)}
+  .illwrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center;padding:14px}
+  .illwrap .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#a89f8c;font-size:24px;font-family:var(--serif)}
+  .story{font-size:27px;color:#5a5648;line-height:1.5;margin:12px 4px 0;font-family:var(--serif)}
+  .story b{color:var(--terra-d)}
+  /* 卡片区（D 风：大描边编号 + 线性图标 + 标题 + 一句） */
+  .cards{display:flex;flex-direction:column;gap:20px;margin-top:20px;flex:1}
+  .card{background:var(--card);border:1.6px solid var(--line);border-radius:22px;padding:24px 28px;display:flex;gap:24px;align-items:center;flex:1}
+  .card.hot{background:#f7ebe3;border-color:#e2bfab}
+  .no{font-family:var(--serif);font-size:62px;font-weight:700;color:#cbb9a4;min-width:78px;line-height:1;letter-spacing:-2px}
+  .card.hot .no{color:var(--terra)}
+  .ic{width:52px;height:52px;flex:0 0 auto}
+  .ic svg{width:100%;height:100%;stroke:var(--indigo);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .card.hot .ic svg{stroke:var(--terra-d)}
+  .ct{flex:1}
+  .ct h4{font-size:34px;font-weight:700;margin-bottom:6px;letter-spacing:.5px}
+  .card.hot .ct h4{color:var(--terra-d)}
+  .ct p{font-size:25px;color:var(--sub);line-height:1.5}
+  /* 底部心法条 */
+  .bar{margin-top:22px;background:var(--navy);color:#f3ede0;border-radius:22px;padding:26px 30px;display:flex;gap:20px;align-items:center}
+  .bar .t{width:48px;height:48px;flex:0 0 auto}
+  .bar .t svg{width:100%;height:100%;stroke:#e7c98a;stroke-width:1.7;fill:none}
+  .bar .txt{font-size:27px;line-height:1.5}
+  .bar b{color:#e7c98a;font-weight:700}
+  .sign{margin-top:14px;text-align:right;padding-right:2px;font-size:26px;color:var(--terra-d);font-family:var(--serif);font-weight:600;letter-spacing:.5px}
+  .sign::before{content:"";display:inline-block;width:18px;height:18px;margin-right:8px;border-radius:50%;background:var(--terra);vertical-align:-2px}
+</style>
+</head>
+<body>
+  <div class="bartop"><b>混合成品：</b>D 干净卡片 + A 暖手绘插画（顶部独立区、不压字）+ 文字全走 HTML（清晰、标点正）。真实像素 1080×1920，此处缩放预览。落款＝杰西卡聊AI。</div>
+  <div class="scaler">
+    <div class="frame">
+      <div>
+        <div class="title">用 <span class="n">5</span> 个问题，<br>穿透自己的判断</div>
+        <div class="sub">来自孟岩老师分享的一个小故事 · 方法教程体</div>
+      </div>
+
+      <div class="illwrap">
+        <img src="assets/illus-car.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="ph" style="display:none">［ A 暖插画位 · 车里两人对话 ］</div>
+      </div>
+      <div class="story">朋友重仓一只票，我问了他 5 个问题——<b>问到第 3 个，他就答不上来了。</b></div>
+
+      <div class="cards">
+        <div class="card"><div class="no">01</div>
+          <div class="ic"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><line x1="14.5" y1="14.5" x2="20" y2="20"/></svg></div>
+          <div class="ct"><h4>事实依据</h4><p>我到底知道什么？分清一手事实，还是推测、感觉、听来的。</p></div></div>
+        <div class="card"><div class="no">02</div>
+          <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21M5.6 5.6l2.2 2.2M16.2 16.2l2.2 2.2M18.4 5.6l-2.2 2.2M7.8 16.2l-2.2 2.2"/></svg></div>
+          <div class="ct"><h4>推理链条</h4><p>我是怎么得出这个结论的？逻辑链条中间有没有跳跃。</p></div></div>
+        <div class="card hot"><div class="no">03</div>
+          <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.2-3 7.4-7 8.6-4-1.2-7-4.4-7-8.6V6z"/><path d="M9.6 9.6l4.8 4.8M14.4 9.6l-4.8 4.8"/></svg></div>
+          <div class="ct"><h4>反方证据</h4><p>如果我是错的，最强反证是什么？我是否选择性忽略了它。</p></div></div>
+        <div class="card"><div class="no">04</div>
+          <div class="ic"><svg viewBox="0 0 24 24"><line x1="4" y1="8.5" x2="20" y2="8.5"/><circle cx="15" cy="8.5" r="2.6"/><line x1="4" y1="15.5" x2="20" y2="15.5"/><circle cx="9" cy="15.5" r="2.6"/></svg></div>
+          <div class="ct"><h4>关键变量</h4><p>决定成败的那个变量，我是否真正理解它。</p></div></div>
+        <div class="card"><div class="no">05</div>
+          <div class="ic"><svg viewBox="0 0 24 24"><line x1="12" y1="4" x2="12" y2="20"/><line x1="5.5" y1="7.5" x2="18.5" y2="7.5"/><path d="M5.5 7.5l-2.6 5.4h5.2zM18.5 7.5l-2.6 5.4h5.2z"/></svg></div>
+          <div class="ct"><h4>下注代价</h4><p>我愿意投入多少？代价是否匹配我的认知深度。</p></div></div>
+      </div>
+
+      <div class="bar">
+        <div class="t"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.6"/></svg></div>
+        <div class="txt"><b>核心心法：</b>不是为了证明自己对，而是接近真相、降低代价，做出更好的决策。</div>
+      </div>
+      <div class="sign">杰西卡聊AI</div>
+    </div>
+  </div>
+</body>
+</html>

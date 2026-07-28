@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可视化教程 · 竖版口播视频（抖音/小红书）</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2; --text:#211f1a; --body:#332f27; --sub:#706b60;
+    --faint:#b0a894; --line10:rgba(33,31,26,.1); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --accent-hover:#2c456a; --amber:#a9791f; --green:#3f7350; --red:#a24b3f;
+    --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:#e7e3da;color:var(--text);font-size:14px}
+  .top{background:#22303f;color:#fff;padding:12px 22px}
+  .top h1{font-family:var(--serif);font-size:17px;font-weight:600}
+  .top p{font-size:12px;color:#b8c4d0;margin-top:3px}
+  .wrap{display:flex;gap:26px;padding:26px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+
+  /* ===== 竖版手机画布 9:16 ===== */
+  .stage{flex:0 0 auto}
+  .phone{width:340px;height:604px;border-radius:30px;background:#0d0f12;padding:10px;box-shadow:0 18px 50px rgba(0,0,0,.35);position:relative}
+  .screen{width:100%;height:100%;border-radius:22px;overflow:hidden;position:relative;background:#12161c}
+  .notch{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:96px;height:20px;background:#0d0f12;border-radius:12px;z-index:9}
+
+  /* 分镜场景 */
+  .scene{position:absolute;inset:0;display:flex;flex-direction:column;padding:56px 26px 96px;opacity:0;transition:opacity .45s;pointer-events:none;
+    background:radial-gradient(120% 80% at 50% 0%,#1b2634,#0f1319)}
+  .scene.on{opacity:1}
+  .scene .kicker{font-size:12px;letter-spacing:2px;color:#7fa8d8;font-weight:600;margin-bottom:auto}
+  .scene .big{font-family:var(--serif);color:#fff;font-weight:700;line-height:1.28}
+  .scene .big.xl{font-size:33px}
+  .scene .big.lg{font-size:27px}
+  .scene .em{font-size:66px;line-height:1;margin-bottom:16px}
+  .scene .sub{color:#c7d2df;font-size:15px;line-height:1.6;margin-top:14px}
+  .scene .qno{display:inline-flex;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;
+    font-size:22px;font-weight:800;align-items:center;justify-content:center;margin-bottom:18px}
+  .scene .hl{color:#ffd479}
+  .scene .accent{color:#8fb3e0}
+  /* 逐条揭示 */
+  .reveal{opacity:0;transform:translateY(12px);transition:all .5s}
+  .scene.on .reveal{opacity:1;transform:none}
+  .scene.on .r2{transition-delay:.35s}.scene.on .r3{transition-delay:.7s}
+  /* 烧录字幕（抖音静音也看得懂） */
+  .caption{position:absolute;left:16px;right:16px;bottom:60px;text-align:center;color:#fff;font-size:16px;font-weight:600;
+    line-height:1.5;text-shadow:0 2px 8px rgba(0,0,0,.7);z-index:8}
+  .caption .box{background:rgba(0,0,0,.34);display:inline;padding:3px 8px;border-radius:6px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  /* 进度 + 口播波形 */
+  .hud{position:absolute;left:16px;right:16px;bottom:22px;z-index:8}
+  .bar{height:3px;background:rgba(255,255,255,.22);border-radius:2px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:#ffd479;transition:width .1s linear}
+  .wave{display:flex;gap:2px;align-items:flex-end;height:18px;margin-top:8px;justify-content:center;opacity:.75}
+  .wave span{width:2px;background:#8fb3e0;border-radius:1px;animation:bob 1s ease-in-out infinite}
+  @keyframes bob{0%,100%{height:4px}50%{height:16px}}
+  .paused .wave span{animation-play-state:paused}
+  .brandtag{position:absolute;top:44px;right:18px;font-size:11px;color:rgba(255,255,255,.5);z-index:8}
+
+  /* 播放控制 */
+  .controls{display:flex;align-items:center;gap:12px;margin-top:14px;justify-content:center}
+  .controls button{border:1px solid var(--line14);background:var(--surface);border-radius:9px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+  .controls button.play{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .dots{display:flex;gap:6px;justify-content:center;margin-top:10px}
+  .dots i{width:7px;height:7px;border-radius:50%;background:var(--faint);cursor:pointer}
+  .dots i.on{background:var(--accent);width:18px;border-radius:4px}
+  .meta{text-align:center;font-size:11.5px;color:var(--sub);margin-top:8px}
+
+  /* ===== 右侧：分镜脚本面板 ===== */
+  .panel{flex:1 1 420px;max-width:560px}
+  .panel h2{font-family:var(--serif);font-size:19px;margin-bottom:4px}
+  .panel .psub{font-size:12.5px;color:var(--sub);margin-bottom:14px}
+  .exports{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .ex{border:1px solid var(--line14);background:var(--surface);border-radius:9px;padding:9px 13px;font-size:12.5px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .ex.p{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .ex:hover{border-color:var(--accent)}
+  .voice{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:12.5px;color:var(--body)}
+  .voice select{font-family:inherit;font-size:12.5px;padding:6px 9px;border-radius:7px;border:1px solid var(--line14);background:#fff}
+  .shot{border:1px solid var(--line10);border-radius:11px;background:var(--surface);padding:13px 15px;margin-bottom:10px;cursor:pointer;transition:.2s}
+  .shot.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(61,90,128,.12)}
+  .shot .sh{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .shot .sn{font-size:11px;font-weight:700;color:#fff;background:var(--accent);border-radius:5px;padding:2px 7px}
+  .shot .stt{font-weight:600;font-size:13.5px}
+  .shot .dur{margin-left:auto;font-size:11px;color:var(--sub)}
+  .shot .ko{font-size:13px;color:var(--body);line-height:1.6}
+  .shot .ko b{color:var(--accent)}
+  .shot .vis{font-size:11.5px;color:var(--sub);margin-top:6px;border-top:1px dashed var(--line14);padding-top:6px}
+  .shot .vis b{color:var(--amber)}
+  .flow{background:#f4f6f9;border:1px solid var(--line10);border-radius:11px;padding:14px 16px;margin-top:16px;font-size:12.5px;color:var(--body);line-height:1.8}
+  .flow b{color:var(--accent)}
+  .flow .step{display:inline-block;background:#fff;border:1px solid var(--line14);border-radius:6px;padding:2px 8px;margin:2px 2px}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>可视化教程 · 竖版口播视频形态</h1>
+  <p>9:16 · 字幕烧录 · 逐镜播放 + TTS 口播 —— 工作台出「播放器 + 口播音频 + 分镜稿」，你拿去剪映收尾发抖音/小红书</p>
+</div>
+
+<div class="wrap">
+  <!-- 竖版画布 -->
+  <div class="stage">
+    <div class="phone">
+      <div class="screen" id="screen">
+        <div class="notch"></div>
+        <!-- 场景们 -->
+        <div class="scene on" data-cap="朋友重仓买了一只票，我只问了他5个问题">
+          <div class="kicker">钩子 · 0–3s</div>
+          <div class="em reveal">🤔</div>
+          <div class="big xl reveal r2">朋友重仓一只票<br>我问了他 <span class="hl">5 个问题</span></div>
+          <div class="sub reveal r3">问到第 3 个，他就<span class="accent">答不上来了</span>。</div>
+        </div>
+        <div class="scene" data-cap="给任何决策，先问自己这5个问题">
+          <div class="kicker">框架</div>
+          <div class="big lg reveal">给任何想法 / 决策<br>设计一套 <span class="hl">「5 个问题」</span></div>
+          <div class="sub reveal r2">持续追问自己 —— 不为证明对，而为接近真相。</div>
+        </div>
+        <div class="scene" data-cap="第一问：我到底知道什么？分清事实和感觉">
+          <div class="kicker">第 1 问 · 事实依据</div>
+          <div class="qno reveal">01</div>
+          <div class="big lg reveal r2">我到底<span class="hl">知道</span>什么？</div>
+          <div class="sub reveal r3">哪些是一手事实，哪些只是推测、感觉、听来的？</div>
+        </div>
+        <div class="scene" data-cap="第三问：最强的反方证据是什么？">
+          <div class="kicker">第 3 问 · 反方证据</div>
+          <div class="qno reveal" style="background:var(--red)">03</div>
+          <div class="big lg reveal r2">如果我是错的<br><span class="hl">最强反证</span>是什么？</div>
+          <div class="sub reveal r3">有哪些证据支持相反观点，我是不是选择性忽略了？</div>
+        </div>
+        <div class="scene" data-cap="第五问：我愿意付出多少代价？">
+          <div class="kicker">第 5 问 · 下注代价</div>
+          <div class="qno reveal" style="background:var(--green)">05</div>
+          <div class="big lg reveal r2">我愿意<span class="hl">投入多少</span>？<br>代价匹配吗？</div>
+          <div class="sub reveal r3">投入的资源，是否匹配我真实的认知深度？</div>
+        </div>
+        <div class="scene" data-cap="心法：不为证明自己对，而为做出更好的决策">
+          <div class="kicker">收尾 · 心法</div>
+          <div class="em reveal">🎯</div>
+          <div class="big lg reveal r2">开启<span class="hl">「追问模式」</span></div>
+          <div class="sub reveal r3">不是为了证明自己对，<br>而是接近真相、降低代价，做出更好的决策。</div>
+        </div>
+
+        <div class="brandtag">@你的账号</div>
+        <div class="caption"><span class="box" id="cap">朋友重仓买了一只票，我只问了他5个问题</span></div>
+        <div class="hud">
+          <div class="bar"><i id="barfill"></i></div>
+          <div class="wave" id="wave"></div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="play" id="playbtn" onclick="toggle()">⏸ 暂停</button>
+      <button onclick="restart()">↺ 重放</button>
+    </div>
+    <div class="dots" id="dots"></div>
+    <div class="meta" id="metaline">分镜 1/6 · 总时长 ~62s · 竖版 1080×1920</div>
+  </div>
+
+  <!-- 分镜脚本面板 -->
+  <div class="panel">
+    <h2>分镜口播稿</h2>
+    <div class="psub">派生自定稿「决策五问」· 抖音口播 genre · 每镜给：口播文本 + 时长 + 画面。点某镜可跳到那一镜。</div>
+
+    <div class="exports">
+      <span class="ex p">⬇ 导出竖版 HTML 播放器</span>
+      <span class="ex">🔊 导出口播音频（.mp3 分镜/整段）</span>
+      <span class="ex">📝 导出分镜脚本</span>
+      <span class="ex">🖼 也出一张封面大图</span>
+    </div>
+    <div class="voice">
+      🎙 口播声音：
+      <select><option>云希 · 沉稳男声（edge-tts 免费）</option><option>晓晓 · 亲和女声</option><option>火山·擎苍（付费·更像真人）</option><option>MiniMax·中文男声</option></select>
+      <span style="color:var(--sub)">· 语速 中</span>
+    </div>
+
+    <div class="shot active" data-i="0"><div class="sh"><span class="sn">镜1</span><span class="stt">钩子</span><span class="dur">0–3s</span></div>
+      <div class="ko">「朋友重仓买了一只票。我说，正好，我来问你<b>5 个问题</b>——结果问到第 3 个，他就答不上来了。」</div>
+      <div class="vis"><b>画面</b>：😯 表情 + 大字「5个问题」逐字弹出，红色高亮「第3个卡住」</div></div>
+    <div class="shot" data-i="1"><div class="sh"><span class="sn">镜2</span><span class="stt">框架</span><span class="dur">3–12s</span></div>
+      <div class="ko">「其实给任何决策，你都可以设计一套<b>『5 个问题』</b>，逼自己往深里想。」</div>
+      <div class="vis"><b>画面</b>：标题 + 五个小图标一字排开，依次点亮</div></div>
+    <div class="shot" data-i="2"><div class="sh"><span class="sn">镜3</span><span class="stt">第1问</span><span class="dur">12–24s</span></div>
+      <div class="ko">「第一问：我<b>到底知道什么</b>？分清哪些是一手事实，哪些只是感觉和听来的。」</div>
+      <div class="vis"><b>画面</b>：01 圆标 + 🔍，字幕同步高亮「事实 / 感觉」</div></div>
+    <div class="shot" data-i="3"><div class="sh"><span class="sn">镜4</span><span class="stt">第3问</span><span class="dur">24–40s</span></div>
+      <div class="ko">「最狠的是第三问：如果我是错的，<b>最强的反方证据</b>是什么？我是不是选择性忽略了它？」</div>
+      <div class="vis"><b>画面</b>：03 红圆标 + 🛡️，反证清单逐条冒出</div></div>
+    <div class="shot" data-i="4"><div class="sh"><span class="sn">镜5</span><span class="stt">第5问</span><span class="dur">40–52s</span></div>
+      <div class="ko">「第五问：我愿意<b>投入多少</b>？这个代价，配得上我对它的认知深度吗？」</div>
+      <div class="vis"><b>画面</b>：05 绿圆标 + ⚖️ 天平</div></div>
+    <div class="shot" data-i="5"><div class="sh"><span class="sn">镜6</span><span class="stt">心法</span><span class="dur">52–62s</span></div>
+      <div class="ko">「记住：问这 5 个问题不是为了证明自己对，而是<b>接近真相、降低代价</b>，做出更好的决策。」</div>
+      <div class="vis"><b>画面</b>：🎯 + 「开启追问模式」，落款 @账号 + 引导关注</div></div>
+
+    <div class="flow">
+      <b>成片动线（半自动）：</b><br>
+      工作台 <span class="step">出竖版 HTML 播放器</span> + <span class="step">TTS 口播 mp3</span> + <span class="step">分镜稿</span>
+      → 你 <span class="step">录屏 / 导帧</span> → <b>剪映</b> <span class="step">导入音频</span><span class="step">美化字幕</span><span class="step">配 BGM/节奏</span>
+      → 竖版 MP4 → <b>抖音</b> / <b>小红书</b>（同一份通用）
+    </div>
+  </div>
+</div>
+
+<script>
+  const scenes=[...document.querySelectorAll('.scene')];
+  const shots=[...document.querySelectorAll('.shot')];
+  const durs=[3.4,4.2,4.6,5.0,4.4,5.2]; // 各镜秒数（mock 加速）
+  const cap=document.getElementById('cap'), barfill=document.getElementById('barfill');
+  const dotsBox=document.getElementById('dots'), meta=document.getElementById('metaline');
+  let cur=0, t=0, playing=true, raf;
+  scenes.forEach((_,i)=>{const d=document.createElement('i');if(i===0)d.classList.add('on');d.onclick=()=>go(i);dotsBox.appendChild(d)});
+  const wave=document.getElementById('wave');
+  for(let i=0;i<21;i++){const s=document.createElement('span');s.style.animationDelay=(i*0.05)+'s';wave.appendChild(s)}
+
+  function show(i){
+    scenes.forEach((s,k)=>s.classList.toggle('on',k===i));
+    shots.forEach((s,k)=>s.classList.toggle('active',k===i));
+    [...dotsBox.children].forEach((d,k)=>d.classList.toggle('on',k===i));
+    cap.textContent=scenes[i].dataset.cap;
+    meta.textContent=`分镜 ${i+1}/6 · 总时长 ~62s · 竖版 1080×1920`;
+  }
+  function go(i){cur=i;t=0;show(i)}
+  function restart(){go(0);if(!playing)toggle()}
+  function toggle(){
+    playing=!playing;
+    document.getElementById('playbtn').textContent=playing?'⏸ 暂停':'▶ 播放';
+    document.getElementById('screen').classList.toggle('paused',!playing);
+    if(playing)tick();
+  }
+  let last=performance.now();
+  function tick(){
+    if(!playing)return;
+    raf=requestAnimationFrame(tick);
+    const now=performance.now(); const dt=(now-last)/1000; last=now;
+    t+=dt;
+    barfill.style.width=Math.min(100,t/durs[cur]*100)+'%';
+    if(t>=durs[cur]){cur=(cur+1)%scenes.length;t=0;show(cur)}
+  }
+  shots.forEach(s=>s.onclick=()=>go(+s.dataset.i));
+  last=performance.now();tick();
+</script>
+</body>
+</html>

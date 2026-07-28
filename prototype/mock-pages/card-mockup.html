@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>资讯卡片形态</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2; --brief-bg:#f4f6f9;
+    --body:#332f27; --body2:#4a463d; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line08:rgba(33,31,26,.08); --line10:rgba(33,31,26,.1); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --amber:#a9791f; --green:#3f7350; --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--body);font:14px/1.6 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;padding:26px 40px 90px}
+  h1{font:600 22px/1.3 var(--serif);margin:0 0 2px}
+  .lead{color:var(--sub);font-size:13px;margin-bottom:6px;max-width:980px}
+  .vbar{display:flex;align-items:baseline;gap:12px;margin:30px 0 4px;border-top:1px dashed var(--line14);padding-top:20px}
+  .vtag{font:600 12px/1 #fff;background:var(--accent);color:#fff;padding:5px 9px;border-radius:7px}
+  .vtag.cur{background:#8a8478}
+  .vname{font:600 17px/1.3 var(--serif)}
+  .vwhy{color:var(--sub);font-size:12.5px;margin:2px 0 14px;max-width:1000px}
+  .vwhy b{color:var(--body2)}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:1180px}
+  .pill{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:12px;display:inline-flex;align-items:center}
+  .p-foll{color:var(--green);background:rgba(63,115,80,.12)}
+  .p-un{color:var(--sub2);background:rgba(33,31,26,.06)}
+  .p-cat{color:var(--accent);background:rgba(61,90,128,.1)}
+  .btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid var(--line14);background:var(--surface);color:var(--body2)}
+  .btn.p{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .lnk{font-size:12px;color:var(--sub)}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none;display:inline-block}
+  .dot.f{background:var(--green)}.dot.u{background:var(--faint)}
+  .star{margin-left:auto;color:var(--faint)}
+  .c0{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:12px 14px}
+  .c0 .meta{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--sub2);flex-wrap:wrap}
+  .c0 .ti{font-family:var(--serif);font-weight:600;font-size:15px;line-height:1.4;margin:7px 0 5px}
+  .c0 .sum{font-size:12.5px;color:var(--body2);line-height:1.6}
+  .c0 .foot{display:flex;gap:9px;align-items:center;margin-top:10px}
+  .cA{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:13px 15px;position:relative}
+  .cA .ti{font-family:var(--serif);font-weight:600;font-size:15.5px;line-height:1.4}
+  .cA .sum{font-size:12.5px;color:var(--sub);line-height:1.55;margin-top:5px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .cA .meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--faint);margin-top:8px}
+  .cA .foot{display:flex;gap:9px;align-items:center;margin-top:10px;padding-top:9px;border-top:1px dashed var(--line08)}
+  .cA.hov{box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:var(--line14)}
+  .hovtag{position:absolute;top:-9px;right:12px;background:var(--accent);color:#fff;font-size:10px;padding:2px 8px;border-radius:5px}
+  .listB{max-width:1180px;background:var(--surface);border:1px solid var(--line10);border-radius:10px;overflow:hidden}
+  .rowB{display:flex;align-items:center;gap:11px;padding:11px 15px;border-top:1px solid var(--line08)}
+  .rowB:first-child{border-top:none}
+  .rowB .ti{font-family:var(--serif);font-weight:600;font-size:14px;flex:none;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rowB .g{font-size:12px;color:var(--sub2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rowB .m{font-size:11px;color:var(--faint);flex:none}
+  .rowB .a{font-size:11.5px;color:var(--accent);flex:none}
+  .rowB.hov{background:var(--brief-bg)}
+  .cC{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:13px 15px 13px 17px;position:relative;border-left:3px solid var(--green)}
+  .cC.un{border-left-color:var(--line14)}
+  .cC .top{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint)}
+  .cC .ti{font-family:var(--serif);font-weight:600;font-size:15px;line-height:1.4;margin:6px 0 5px}
+  .cC .sum{font-size:12.5px;color:var(--body2);line-height:1.6}
+  .cC .foot{display:flex;gap:9px;align-items:center;margin-top:10px;opacity:.5}
+  .cC.hov .foot{opacity:1}
+  .note{font-size:11.5px;color:var(--faint);margin-top:9px}
+</style></head>
+<body>
+<h1>资讯卡片形态 · 四选一</h1>
+<div class="lead">核心：把"扫"和"读"分开——静息态只留分诊三要素（标题·一行要点·极简来源），操作 hover 才出。从满配（现状）到极简列表（B）是一条密度谱，挑你舒服的。</div>
+
+<div class="vbar"><span class="vtag cur">现状</span><span class="vname">满配卡（每张都铺满）</span></div>
+<div class="vwhy">元信息 5 项 + 完整摘要 + 3–4 个按钮，一屏 9 张全一样重，没有层次、无从下眼。</div>
+<div class="grid3">
+  <div class="c0"><div class="meta"><span class="pill p-foll">已关注</span>aiDotEngineer · 13h<span class="pill p-cat">观点</span><span class="star">☆</span></div><div class="ti">停止浪费 Token：为何自我提升先需要领域专业知识</div><div class="sum">通过论文分类任务自动改进循环的真实案例，揭示领域知识与目标函数对 Agent 持续改进的关键作用，并给出评估框架与失败模式清单。</div><div class="foot"><span class="btn p">AI 精读</span><span class="lnk">选中解读</span><span class="lnk">查看↗</span></div></div>
+  <div class="c0"><div class="meta"><span class="pill p-un">未标注</span>AI HOT · 4h<span class="pill p-cat">观点</span><span class="star">☆</span></div><div class="ti">AI 热潮正在瓦解全球决策机制</div><div class="sum">一位有 300 多次行业交流经验的从业者观察到，全球公私机构陷入集体性 AI 狂热、忽视一线证据，呼吁重建以实据为锚的决策纪律。</div><div class="foot"><span class="btn p">AI 精读</span><span class="lnk">选中解读</span><span class="lnk">＋关注</span></div></div>
+  <div class="c0"><div class="meta"><span class="pill p-foll">已关注</span>aiDotEngineer · 15h<span class="pill p-cat">行业</span><span class="star">☆</span></div><div class="ti">停止租赁你的认知基础设施</div><div class="sum">基于自身造系统的成本体验，剖析市场推销策略背后的真实经济账，论证租用智能为何划不来、何时自建更省，给出决策表。</div><div class="foot"><span class="btn p">AI 精读</span><span class="lnk">选中解读</span><span class="lnk">查看↗</span></div></div>
+</div>
+
+<div class="vbar"><span class="vtag">方案 A</span><span class="vname">分诊卡（静息极简，hover 出操作）</span></div>
+<div class="vwhy">静息只留 <b>标题 + 一行要点 + 极简来源（小圆点=关注状态 · 作者 · 时间）</b>，按钮不占地；<b>hover 一张卡才浮出操作条</b>（右侧第 3 张演示 hover 态）。扫的时候满屏是标题，最干净。</div>
+<div class="grid3">
+  <div class="cA"><div class="ti">停止浪费 Token：为何自我提升先需要领域专业知识</div><div class="sum">领域知识与目标函数对 Agent 持续改进的关键作用，附评估框架与失败清单。</div><div class="meta"><span class="dot f"></span>aiDotEngineer · 13h · 观点</div></div>
+  <div class="cA"><div class="ti">AI 热潮正在瓦解全球决策机制</div><div class="sum">从业者观察集体性 AI 狂热、忽视一线证据，呼吁重建实据决策纪律。</div><div class="meta"><span class="dot u"></span>AI HOT · 4h · 观点</div></div>
+  <div class="cA hov"><span class="hovtag">hover 态</span><div class="ti">停止租赁你的认知基础设施</div><div class="sum">自建 vs 租用的真实经济账，论证租用为何划不来、何时自建更省。</div><div class="meta"><span class="dot f"></span>aiDotEngineer · 15h · 行业</div><div class="foot"><span class="btn p">AI 精读</span><span class="lnk">选中解读</span><span class="lnk">☆ 收藏</span><span class="lnk">查看↗</span></div></div>
+</div>
+<div class="note">小圆点：绿=已关注、灰=未关注（不再用满色 pill 抢眼）。分类降成尾巴上的小灰字。</div>
+
+<div class="vbar"><span class="vtag">方案 B</span><span class="vname">紧凑列表（扫得最快）</span></div>
+<div class="vwhy">一行一条：<b>关注点 · 标题 · 半行要点 · 作者时间</b>，操作 hover 一行才出。一屏能扫 20+ 条，最适合"快速过一遍挑感兴趣的"；代价：信息最少，要点开才看全。</div>
+<div class="listB">
+  <div class="rowB hov"><span class="dot f"></span><span class="ti">停止浪费 Token</span><span class="g">领域知识对 Agent 自改进的关键作用，附评估框架</span><span class="a">AI 精读 · 选中 · ☆</span></div>
+  <div class="rowB"><span class="dot u"></span><span class="ti">AI 热潮正在瓦解全球决策机制</span><span class="g">集体性狂热、忽视证据，呼吁实据决策</span><span class="m">AI HOT · 4h · 观点</span></div>
+  <div class="rowB"><span class="dot f"></span><span class="ti">停止租赁你的认知基础设施</span><span class="g">自建 vs 租用的经济账与决策表</span><span class="m">aiDotEngineer · 15h · 行业</span></div>
+  <div class="rowB"><span class="dot u"></span><span class="ti">GPT-5.6 用一条 Prompt 弥合凸优化 30 年空白</span><span class="g">148 分钟提示词解决 1996 年来的缺口，Lean 验证</span><span class="m">mbustamanter · 1d · 模型</span></div>
+  <div class="rowB"><span class="dot f"></span><span class="ti">你的 Agent 需要一个保存按钮</span><span class="g">长期存活费算力，崩溃从保存点恢复</span><span class="m">aiDotEngineer · 1d · 观点</span></div>
+</div>
+<div class="note">第一行为 hover 态：右侧浮出「AI 精读 · 选中 · ☆」。</div>
+
+<div class="vbar"><span class="vtag">方案 C</span><span class="vname">舒适 · 去噪（保留完整摘要）</span></div>
+<div class="vwhy">留住你要的<b>完整摘要</b>，但把噪音去掉：元信息压成一行小灰字、关注状态变成<b>左侧色条</b>（绿=已关注/灰=未关注）、按钮平时半透明、hover 变实。想深读又嫌现在乱，选这个。</div>
+<div class="grid3">
+  <div class="cC hov"><div class="top">aiDotEngineer · 13h · 观点</div><div class="ti">停止浪费 Token：为何自我提升先需要领域专业知识</div><div class="sum">通过论文分类任务自动改进循环的真实案例，揭示领域知识与目标函数对 Agent 持续改进的关键作用，并给出评估框架与失败模式清单。</div><div class="foot"><span class="btn p">AI 精读</span><span class="lnk">选中解读</span><span class="lnk">☆</span></div></div>
+  <div class="cC un"><div class="top">AI HOT · 4h · 观点</div><div class="ti">AI 热潮正在瓦解全球决策机制</div><div class="sum">一位有 300 多次行业交流经验的从业者观察到，全球机构陷入集体性 AI 狂热、忽视一线证据，呼吁重建以实据为锚的决策纪律。</div><div class="foot"><span class="btn p">AI 精读</span><span class="lnk">选中解读</span><span class="lnk">＋关注</span></div></div>
+  <div class="cC"><div class="top">aiDotEngineer · 15h · 行业</div><div class="ti">停止租赁你的认知基础设施</div><div class="sum">基于自身造系统的成本体验，剖析市场推销策略背后的真实经济账，论证租用智能为何划不来、何时自建更省，给出决策表。</div><div class="foot"><span class="btn p">AI 精读</span><span class="lnk">选中解读</span><span class="lnk">查看↗</span></div></div>
+</div>
+<div class="note">左侧色条=关注状态；第 1 张为 hover 态（按钮变实）。</div>
+</body></html>

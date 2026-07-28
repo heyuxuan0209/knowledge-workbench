@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>信息流 · 扫读模型（已读=来过，零点击）mock</title>
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--body2:#4a463d;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line08:rgba(33,31,26,.08);--line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:Georgia,'Songti SC','Noto Serif SC',serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.6}
+.tag-mock{position:fixed;top:12px;right:14px;background:var(--accent);color:#fff;font-size:12px;padding:4px 10px;border-radius:20px;z-index:9}
+.wrap{max-width:820px;margin:0 auto;padding:26px 22px 90px}
+.hd h1{font-family:var(--serif);font-size:21px;font-weight:600}
+.hd .sub{font-size:12.5px;color:var(--sub);margin:3px 0 14px;line-height:1.8}
+/* 顶部状态 */
+.status{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:11px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--body)}
+.status b{color:var(--text)}
+.status .dim{color:var(--sub2);font-size:12px}
+.status .again{margin-left:auto;font-size:12px;padding:5px 13px;border-radius:14px;border:1px solid var(--amber);background:none;color:var(--amber);cursor:pointer}
+.status .again:hover{background:var(--amber);color:#fff}
+/* 组 */
+.grp{margin-bottom:16px}
+.ghead{display:flex;align-items:baseline;gap:10px;padding:8px 2px;border-bottom:2px solid var(--line14);margin-bottom:4px}
+.g1 .ghead{border-bottom-color:var(--accent)}.g2 .ghead{border-bottom-color:var(--green)}.g3 .ghead{border-bottom-color:var(--amber)}
+.ghead .gt{font-family:var(--serif);font-size:16px;font-weight:600}
+.ghead .gnew{font-size:11.5px;color:#fff;background:var(--red);border-radius:10px;padding:0 8px}
+.ghead .gnone{font-size:12px;color:var(--sub2)}
+/* 行 */
+.row{display:flex;align-items:baseline;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer}
+.row:hover{background:var(--surface)}
+.row .tm{font-size:11px;color:var(--faint);flex-shrink:0;width:38px}
+.row .src{font-size:11.5px;flex-shrink:0;width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.g1 .src{color:var(--accent)}.g2 .src{color:var(--green)}.g3 .src{color:var(--amber)}
+.row .tt{flex:1;font-size:14px;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .acts{flex-shrink:0;display:flex;gap:6px;opacity:0}
+.row:hover .acts{opacity:1}
+.abtn{font-size:11.5px;border:1px solid var(--line14);background:var(--surface);border-radius:7px;padding:2px 10px;cursor:pointer;color:var(--sub)}
+.abtn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.abtn:hover{border-color:var(--accent);color:var(--accent)}.abtn.pri:hover{color:#fff;opacity:.85}
+.row .mark{display:none;flex-shrink:0;font-size:11px;border-radius:8px;padding:1px 8px}
+.row.marked .mark{display:inline}
+.mark.read{color:var(--accent);border:1px solid var(--accent)}
+.mark.star{color:var(--amber);border:1px solid var(--amber)}
+.mark.idea{color:var(--green);border:1px solid var(--green)}
+/* 之前的（折叠） */
+.oldbar{font-size:12px;color:var(--sub2);padding:6px 10px;cursor:pointer;user-select:none}
+.oldbar:hover{color:var(--accent)}
+.oldlist{display:none}
+.grp.showold .oldlist{display:block}
+.oldlist .row{opacity:.5}
+/* 新内容终点线 */
+.endline{margin:22px 0 8px;text-align:center;position:relative}
+.endline:before{content:'';position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--line14)}
+.endline span{position:relative;background:var(--bg);padding:0 16px;font-size:13.5px;color:var(--green);font-weight:600}
+.endcard{background:linear-gradient(135deg,rgba(63,115,80,.08),rgba(61,90,128,.06));border:1px solid rgba(63,115,80,.3);border-radius:14px;padding:18px 22px;text-align:center}
+.endcard .t{font-size:14px;color:var(--body);margin-bottom:12px}
+.endcard .t b{color:var(--green)}
+.endcard .nexts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.endcard .nx{font-size:12.5px;padding:7px 14px;border-radius:9px;border:1px solid var(--line14);background:var(--surface);color:var(--body2);cursor:pointer}
+.endcard .nx.pri{background:var(--green);border-color:var(--green);color:#fff}
+.endcard .nx:hover{border-color:var(--accent)}
+/* 挂账区 */
+.iou{margin-top:18px;background:var(--surface);border:1px solid var(--line10);border-left:3px solid var(--amber);border-radius:10px;padding:11px 16px;font-size:12.5px;color:var(--body)}
+.iou b{color:var(--amber)}
+.iou .it{color:var(--sub);margin-top:3px}
+.note{font-size:11.5px;color:var(--faint);text-align:center;margin-top:22px;line-height:2}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--text);color:#efece4;font-size:12.5px;padding:8px 18px;border-radius:18px;opacity:0;transition:opacity .25s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="tag-mock">扫读模型 mock · 零点击已读</div>
+<div class="wrap">
+  <div class="hd">
+    <h1>资讯 · 信息流</h1>
+    <div class="sub"><b>规则一句话：扫过 = 已读，你不用点任何按钮。</b>不感兴趣滑过去就行；只有感兴趣才动手（精读 / ★ / 💡 / 追踪）。玩法：往下扫到绿色终点线，然后点右上「模拟明天再来」感受第二天。</div>
+  </div>
+
+  <div class="status">
+    <span>上次来：<b id="lastseen">昨天 20:10</b></span>
+    <span>之后新到 <b id="newcount">9</b> 条</span>
+    <span class="dim" id="newdist">一手 3 · 关注 4 · 精选 2</span>
+    <button class="again" id="tomorrow">☀️ 模拟明天再来</button>
+  </div>
+
+  <div id="feed"></div>
+
+  <div class="endline"><span id="endtext">✅ 新内容到这儿就完了</span></div>
+  <div class="endcard">
+    <div class="t">上次之后的 <b id="endnum">9</b> 条你都扫过了——<b>不用点任何东西，来过就算清</b>。感兴趣的都在下面留了痕。</div>
+    <div class="nexts">
+      <span class="nx pri">去创作台 · 把料变成稿 →</span>
+      <span class="nx">看追踪主题（Claude +3）</span>
+      <span class="nx">▸ 展开「其他」组（27 条新）</span>
+    </div>
+  </div>
+
+  <div class="iou">
+    <b>★ 挂账的以后再看 · 2 条</b>——这是唯一会催你的：<span style="color:var(--red)">「AI 生图防伪」已挂 8 天</span>，要么读要么放它走
+    <div class="it">· AI 生图时代的信息防伪（挂 8 天）　· Notion 的 Token Town（挂 2 天）</div>
+  </div>
+
+  <div class="note">已读 = 以"你上次来"为界自动划线，不追踪你眼球、不用逐条点 · 有动作的条目永远留痕可查<br>唯一的催办对象是你主动挂账的 ★——不感兴趣的沉默滑过，系统不纠缠</div>
+</div>
+<div id="toast"></div>
+<script>
+let DAY=1;
+const D1={
+ 1:[{tm:'19:55',src:'Anthropic 官网',tt:'Claude 语音模式现已支持 Opus、Sonnet 及连接工具与多语言'},
+    {tm:'19:43',src:'OpenAI 官网',tt:'ChatGPT 桌面版上线语音控制多智能体'},
+    {tm:'17:55',src:'Greg Brockman',tt:'ChatGPT 向美国用户推出健康功能'}],
+ 2:[{tm:'05:19',src:'AI Engineer 峰会',tt:'训练前沿模型以超越黑客思维 — Uri Rolls & Thom W'},
+    {tm:'00:00',src:'硅谷101',tt:'E245｜藏在大模型背后的新闻人'},
+    {tm:'17:45',src:'AI Engineer 峰会',tt:'将任务与模型分离的非凡效果 — DSPy'},
+    {tm:'16:48',src:'louis030195',tt:'推出 HN：Screenpipe（YC S26）——7x24 屏幕录制'}],
+ 3:[{tm:'18:35',src:'AI HOT 精选',tt:'TheNumbers.com 因 AI 爬虫与攻击崩溃重建'},
+    {tm:'23:30',src:'AI HOT 精选',tt:'佛州男子因相信 ChatGPT 拒绝就医险丧命，起诉 OpenAI'}]};
+const D2={
+ 1:[{tm:'09:12',src:'OpenAI 官网',tt:'GPT-5.6 Terra 开放微调 API'},
+    {tm:'08:30',src:'Claude Devs',tt:'Claude Code 新增团队共享 skills 目录'}],
+ 2:[{tm:'07:44',src:'levelsio',tt:'一个人 + 12 个 agent：我的月度构建复盘'},
+    {tm:'06:15',src:'姚金刚',tt:'用 HTML 做视频的三个月：数据和踩坑全公开'}],
+ 3:[{tm:'08:02',src:'AI HOT 精选',tt:'Kimi K3 开放权重首日实测汇总'}]};
+const OLD={
+ 1:[{tm:'前天',src:'Satya Nadella',tt:'微软 MAI 模型：更低成本实现前沿能力',mk:null},
+    {tm:'前天',src:'通义千问官方',tt:'Qwen-Audio-3.0-TTS 登顶 TTS 排行榜',mk:null}],
+ 2:[{tm:'前天',src:'Notion · 莎拉',tt:'Notion 的 Token Town — 成本治理',mk:['star','★ 以后再看']},
+    {tm:'前天',src:'jjfoooo4',tt:'反对开源 AI 的理由站不住脚',mk:null}],
+ 3:[{tm:'前天',src:'AI HOT 精选',tt:'Anthropic 15 亿美元和解获批',mk:['read','✓ 精读过']}]};
+const GROUPS={1:{cls:'g1',t:'📌 官方一手'},2:{cls:'g2',t:'🎯 你关注的 Builder · 一手'},3:{cls:'g3',t:'🔥 精选与热点'}};
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1700)}
+function mkRow(d,markable){
+  const r=document.createElement('div');r.className='row'+(d.mk?' marked':'');
+  r.innerHTML='<span class="tm">'+d.tm+'</span><span class="src">'+d.src+'</span><span class="tt">'+d.tt+'</span>'
+   +(d.mk?'<span class="mark '+d.mk[0]+'">'+d.mk[1]+'</span>':'<span class="mark"></span>')
+   +'<span class="acts"><button class="abtn pri">精读</button><button class="abtn">★以后</button><button class="abtn">💡灵感</button><button class="abtn">＋追踪</button></span>';
+  r.querySelectorAll('.abtn').forEach(b=>b.onclick=e=>{e.stopPropagation();
+    const a=b.textContent; const mark=r.querySelector('.mark'); r.classList.add('marked');
+    if(a==='精读'){mark.className='mark read';mark.textContent='✓ 精读过';toast('打开站内精读（读完自动留痕）')}
+    if(a==='★以后'){mark.className='mark star';mark.textContent='★ 以后再看';toast('挂账了——7 天没动会催你')}
+    if(a==='💡灵感'){mark.className='mark idea';mark.textContent='💡 已提灵感';toast('进灵感库了')}
+    if(a==='＋追踪'){toast('已按这条的主题建议追踪（AI 提议卡确认）')}
+  });
+  return r;
+}
+function render(){
+  const NEW = DAY===1? D1 : D2;
+  const feed=document.getElementById('feed');feed.innerHTML='';
+  let n=0, dist=[];
+  for(const g of [1,2,3]){
+    const grp=document.createElement('div');grp.className='grp '+GROUPS[g].cls;
+    const news=NEW[g]||[];
+    n+=news.length; dist.push(news.length);
+    grp.innerHTML='<div class="ghead"><span class="gt">'+GROUPS[g].t+'</span>'+(news.length?'<span class="gnew">新 '+news.length+'</span>':'<span class="gnone">今天没新的</span>')+'</div>';
+    news.forEach(d=>grp.appendChild(mkRow(d)));
+    // 之前的折叠
+    const olds=(DAY===1? OLD[g] : (OLD[g]||[]).concat(D1[g]||[]));
+    const ob=document.createElement('div');ob.className='oldbar';ob.textContent='之前的 '+olds.length+' 条（你来过时都在，算扫过）▸';
+    ob.onclick=()=>grp.classList.toggle('showold');
+    grp.appendChild(ob);
+    const ol=document.createElement('div');ol.className='oldlist';
+    olds.forEach(d=>ol.appendChild(mkRow(d)));
+    grp.appendChild(ol);
+    feed.appendChild(grp);
+  }
+  document.getElementById('newcount').textContent=n;
+  document.getElementById('endnum').textContent=n;
+  document.getElementById('newdist').textContent='一手 '+dist[0]+' · 关注 '+dist[1]+' · 精选 '+dist[2];
+  document.getElementById('lastseen').textContent = DAY===1? '昨天 20:10' : '今天 09:40（刚才那次）';
+  document.getElementById('endtext').textContent = '✅ 新内容到这儿就完了';
+}
+document.getElementById('tomorrow').onclick=()=>{DAY=2;render();toast('第二天：昨天的自动归入"之前的"，只有新到的等你扫');window.scrollTo({top:0,behavior:'smooth'})};
+render();
+</script>
+</body>
+</html>

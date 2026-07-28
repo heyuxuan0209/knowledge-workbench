@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>信息流 · 处理进度与"今日已清" mock</title>
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--body2:#4a463d;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line08:rgba(33,31,26,.08);--line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:Georgia,'Songti SC','Noto Serif SC',serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.6}
+.tag-mock{position:fixed;top:12px;right:14px;background:var(--accent);color:#fff;font-size:12px;padding:4px 10px;border-radius:20px;z-index:9}
+.wrap{max-width:820px;margin:0 auto;padding:26px 22px 90px}
+.hd h1{font-family:var(--serif);font-size:21px;font-weight:600}
+.hd .sub{font-size:12.5px;color:var(--sub);margin:3px 0 14px}
+/* 进度条 */
+.progress{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:12px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px}
+.progress .pt{font-size:14px;font-weight:600;color:var(--body)}
+.progress .pd{font-size:12px;color:var(--sub2)}
+.pbar{flex:1;height:6px;background:var(--line10);border-radius:3px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--green);border-radius:3px;transition:width .3s}
+.ptoggle{font-size:12px;padding:4px 12px;border-radius:14px;border:1px solid var(--line14);background:none;color:var(--body2);cursor:pointer}
+.ptoggle.on{background:var(--accent);border-color:var(--accent);color:#fff}
+/* 组 */
+.grp{margin-bottom:18px}
+.ghead{display:flex;align-items:baseline;gap:10px;padding:8px 2px;border-bottom:2px solid var(--line14);margin-bottom:6px}
+.g1 .ghead{border-bottom-color:var(--accent)}.g2 .ghead{border-bottom-color:var(--green)}.g3 .ghead{border-bottom-color:var(--amber)}
+.ghead .gt{font-family:var(--serif);font-size:16px;font-weight:600}
+.ghead .left{font-size:12px;color:var(--sub2)}
+.ghead .done-badge{font-size:12px;color:var(--green);font-weight:600;display:none}
+.grp.alldone .ghead .done-badge{display:inline}
+.grp.alldone .ghead .left{display:none}
+/* 行 */
+.row{display:flex;align-items:baseline;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:opacity .3s}
+.row:hover{background:var(--surface)}
+.row .tm{font-size:11px;color:var(--faint);flex-shrink:0;width:38px}
+.row .src{font-size:11.5px;flex-shrink:0;width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.g1 .src{color:var(--accent)}.g2 .src{color:var(--green)}.g3 .src{color:var(--amber)}
+.row .tt{flex:1;font-size:14px;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .acts{flex-shrink:0;display:flex;gap:6px;opacity:0}
+.row:hover .acts{opacity:1}
+.abtn{font-size:11.5px;border:1px solid var(--line14);background:var(--surface);border-radius:7px;padding:2px 10px;cursor:pointer;color:var(--sub)}
+.abtn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.abtn:hover{border-color:var(--accent);color:var(--accent)}
+.abtn.pri:hover{color:#fff;opacity:.85}
+/* 已处理态 */
+.row.donerow{opacity:.45}
+.row.donerow .tt{color:var(--sub2);text-decoration:none}
+.row .mark{display:none;flex-shrink:0;font-size:11px;border-radius:8px;padding:1px 8px}
+.row.donerow .mark{display:inline}
+.mark.read{color:var(--green);border:1px solid var(--green)}
+.mark.saved{color:var(--accent);border:1px solid var(--accent)}
+.mark.star{color:var(--amber);border:1px solid var(--amber)}
+body.hideDone .row.donerow{display:none}
+/* 已处理折叠条 */
+.donebar{font-size:12px;color:var(--sub2);padding:5px 10px;cursor:pointer;user-select:none;display:none}
+.donebar:hover{color:var(--accent)}
+body.hideDone .donebar{display:block}
+/* 全清庆祝 */
+#alldone{display:none;background:linear-gradient(135deg,rgba(63,115,80,.09),rgba(61,90,128,.07));border:1px solid rgba(63,115,80,.35);border-radius:16px;padding:28px 26px;text-align:center;margin-top:8px}
+#alldone .big{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--green);margin-bottom:6px}
+#alldone .why{font-size:13px;color:var(--sub);margin-bottom:16px}
+#alldone .nexts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+#alldone .nx{font-size:13px;padding:8px 16px;border-radius:10px;border:1px solid var(--line14);background:var(--surface);color:var(--body2);cursor:pointer;text-decoration:none}
+#alldone .nx.pri{background:var(--green);border-color:var(--green);color:#fff}
+#alldone .nx:hover{border-color:var(--accent)}
+.note{font-size:11.5px;color:var(--faint);text-align:center;margin-top:20px;line-height:1.9}
+/* toast */
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--text);color:#efece4;font-size:12.5px;padding:8px 18px;border-radius:18px;opacity:0;transition:opacity .25s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body class="hideDone">
+<div class="tag-mock">处理进度 mock · 可以真点</div>
+<div class="wrap">
+  <div class="hd">
+    <h1>资讯 · 信息流</h1>
+    <div class="sub">玩法：hover 每一行，用右侧按钮把条目一条条"处理"掉（读过 / 存素材 / 以后再看 / 不看）——感受组清空、全清空时页面怎么回应你</div>
+  </div>
+
+  <div class="progress">
+    <span class="pt">今日待处理</span>
+    <div class="pbar"><i id="pfill" style="width:0%"></i></div>
+    <span class="pd" id="pnum"></span>
+    <button class="ptoggle on" id="tHide">只看未处理</button>
+    <button class="ptoggle" id="tAll">全部</button>
+  </div>
+
+  <div id="feed"></div>
+
+  <div id="alldone">
+    <div class="big">✅ 今天的一手信源清完了</div>
+    <div class="why">组1 + 组2 共 11 条：读了 6 · 存素材 2 · 以后再看 1 · 不看 2 —— 注意力花在了刀刃上</div>
+    <div class="nexts">
+      <a class="nx pri">去创作台 · 把今天的料变成稿 →</a>
+      <a class="nx">看追踪主题新进展（Claude +3）</a>
+      <a class="nx">逛逛「其他」组（27 条）</a>
+    </div>
+  </div>
+
+  <div class="note">规则：读过/存素材/不看 = 处理完成（沉底或隐藏，可切「全部」找回）· ★以后再看 = 挂账，7 天没动会来催<br>「处理」不删任何东西——只是让页面知道你看到哪了，好在你清完时告诉你一声</div>
+</div>
+<div id="toast"></div>
+<script>
+const DATA=[
+ {g:1,tm:'19:55',src:'Anthropic 官网',tt:'Claude 语音模式现已支持 Opus、Sonnet 及连接工具与多语言',st:null},
+ {g:1,tm:'19:43',src:'OpenAI 官网',tt:'ChatGPT 桌面版上线语音控制多智能体',st:null},
+ {g:1,tm:'17:55',src:'Greg Brockman',tt:'ChatGPT 向美国用户推出健康功能',st:'read'},
+ {g:1,tm:'16:31',src:'Satya Nadella',tt:'微软 MAI 模型：以更低成本实现前沿能力规模化',st:null},
+ {g:1,tm:'12:33',src:'通义千问官方',tt:'通义千问发布 Qwen-Audio-3.0-TTS，登顶 TTS 排行榜',st:'skip'},
+ {g:2,tm:'05:19',src:'AI Engineer 峰会',tt:'训练前沿模型以超越黑客思维 — Uri Rolls & Thom W',st:null},
+ {g:2,tm:'00:00',src:'硅谷101',tt:'E245｜藏在大模型背后的新闻人：GPT 们的回复是这样写出来的',st:'saved'},
+ {g:2,tm:'17:45',src:'AI Engineer 峰会',tt:'将任务与模型分离的非凡效果 — Maxime Rivest, DSPy',st:null},
+ {g:2,tm:'17:30',src:'Notion · 莎拉',tt:'Notion 的 Token Town — 模型涨价与成本治理',st:null},
+ {g:2,tm:'16:48',src:'louis030195',tt:'推出 HN：Screenpipe（YC S26）——7x24 屏幕录制赋能 Agent',st:null},
+ {g:2,tm:'16:49',src:'jjfoooo4',tt:'反对开源 AI 的理由站不住脚',st:null},
+ {g:3,tm:'18:35',src:'AI HOT 精选',tt:'TheNumbers.com 因 AI 爬虫与安全攻击导致网站崩溃重建',st:null},
+ {g:3,tm:'23:30',src:'AI HOT 精选',tt:'佛州男子因相信 ChatGPT 拒绝就医而险些丧命，起诉 OpenAI',st:null},
+ {g:3,tm:'昨天',src:'AI HOT 精选',tt:'Anthropic 15 亿美元和解金，创集体诉讼纪录',st:'read'},
+];
+const GROUPS={1:{cls:'g1',t:'📌 官方一手'},2:{cls:'g2',t:'🎯 你关注的 Builder · 一手'},3:{cls:'g3',t:'🔥 精选与热点'}};
+const MARKS={read:['✓ 读过','read'],saved:['✓ 已存素材','saved'],star:['★ 以后再看','star'],skip:['✕ 不看','read']};
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1600)}
+function render(){
+  const feed=document.getElementById('feed');feed.innerHTML='';
+  let pending=0,total=0,doneCount={read:0,saved:0,star:0,skip:0};
+  for(const g of [1,2,3]){
+    const items=DATA.filter(d=>d.g===g);
+    const grp=document.createElement('div');grp.className='grp '+GROUPS[g].cls;
+    const undone=items.filter(d=>!d.st).length;
+    const doneN=items.length-undone;
+    if(g!==3){pending+=undone;total+=items.length}
+    grp.innerHTML='<div class="ghead"><span class="gt">'+GROUPS[g].t+'</span><span class="left">还剩 '+undone+' / '+items.length+'</span><span class="done-badge">✅ 今日已清（'+items.length+' 条）</span></div>';
+    if(undone===0)grp.classList.add('alldone');
+    items.forEach((d,idx)=>{
+      const r=document.createElement('div');r.className='row'+(d.st?' donerow':'');
+      const mk=d.st?MARKS[d.st]:null;
+      r.innerHTML='<span class="tm">'+d.tm+'</span><span class="src">'+d.src+'</span><span class="tt">'+d.tt+'</span>'
+        +(mk?'<span class="mark '+mk[1]+'">'+mk[0]+'</span>':'')
+        +'<span class="acts"><button class="abtn pri" data-a="read">读过了</button><button class="abtn" data-a="saved">存素材</button><button class="abtn" data-a="star">★以后</button><button class="abtn" data-a="skip">✕不看</button></span>';
+      r.querySelectorAll('.abtn').forEach(b=>b.onclick=e=>{e.stopPropagation();d.st=b.dataset.a;
+        toast(b.dataset.a==='read'?'标为已读':b.dataset.a==='saved'?'已存入素材，AI 正把它归到主题 →':b.dataset.a==='star'?'挂到「以后再看」（7 天没动会催你）':'不看了，同类少推');render()});
+      grp.appendChild(r);
+    });
+    if(doneN>0){const db=document.createElement('div');db.className='donebar';db.textContent='已处理 '+doneN+' 条 ▸ 点「全部」查看';grp.appendChild(db)}
+    feed.appendChild(grp);
+  }
+  DATA.forEach(d=>{if(d.st)doneCount[d.st]=(doneCount[d.st]||0)+1});
+  const done=total-pending;
+  document.getElementById('pfill').style.width=(done/total*100)+'%';
+  document.getElementById('pnum').textContent='一手+关注 '+done+' / '+total;
+  document.getElementById('alldone').style.display=pending===0?'block':'none';
+}
+document.getElementById('tHide').onclick=()=>{document.body.classList.add('hideDone');tHide.classList.add('on');tAll.classList.remove('on')};
+document.getElementById('tAll').onclick=()=>{document.body.classList.remove('hideDone');tAll.classList.add('on');tHide.classList.remove('on')};
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可视化教程 · 输出页形态（决策 3）</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2; --brief-bg:#f4f6f9; --text:#211f1a;
+    --body:#332f27; --body2:#4a463d; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line10:rgba(33,31,26,.1); --line08:rgba(33,31,26,.08); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --accent-hover:#2c456a; --amber:#a9791f; --green:#3f7350; --red:#a24b3f;
+    --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+  .picker{position:sticky;top:0;z-index:50;background:#22303f;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .picker h1{font-family:var(--serif);font-size:16px;font-weight:600}
+  .picker .hint{font-size:12px;color:#b8c4d0;margin-right:auto}
+  .picker button{border:1px solid #4a5a6a;background:#2c3d4d;color:#cdd7e0;padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit}
+  .picker button.on{background:#fff;color:#22303f;border-color:#fff;font-weight:600}
+  .vlabel{padding:10px 20px;background:#fbf3e4;border-bottom:1px solid var(--line10);font-size:13px;color:var(--body2)}
+  .vlabel b{color:var(--accent)}
+
+  /* 输出页顶栏（模拟工作台里的教程预览容器） */
+  .vbar{height:50px;display:flex;align-items:center;gap:12px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line10);position:sticky;top:110px;z-index:30}
+  .vbar .back{color:var(--sub);font-size:13px;cursor:pointer}
+  .vbar .vt{font-family:var(--serif);font-size:16px;font-weight:600}
+  .vbar .grow{margin-left:auto}
+  .vbtn{border:1px solid var(--line14);background:#fff;color:var(--body2);padding:7px 13px;border-radius:8px;font-size:12.5px;cursor:pointer;display:inline-flex;gap:5px;align-items:center}
+  .vbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .vbtn.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  .stage{max-width:1180px;margin:0 auto;padding:26px 24px 80px}
+
+  /* ===== 假信息大图（模拟 baoyu 出的 PNG，让你感觉版式；真实是插画位图）===== */
+  .fig{background:linear-gradient(180deg,#f7f5ef,#f2efe7);border:1px solid var(--line10);border-radius:14px;padding:26px 30px;box-shadow:0 2px 14px rgba(33,31,26,.06)}
+  .fig .ftitle{font-size:26px;font-weight:800;color:#1f2d3a;line-height:1.25;letter-spacing:.5px}
+  .fig .ftitle .hl{color:var(--amber)}
+  .fig .fsub{font-size:13px;color:var(--sub);margin:6px 0 20px;border-bottom:1px dashed var(--line14);padding-bottom:14px}
+  .fcards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  .fcard{background:#fff;border:1px solid var(--line10);border-radius:12px;padding:14px 12px;text-align:center;position:relative}
+  .fcard .no{position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(61,90,128,.3)}
+  .fcard .icon{width:44px;height:44px;border-radius:12px;margin:12px auto 10px;display:flex;align-items:center;justify-content:center;font-size:22px}
+  .fcard h4{font-size:14px;color:#1f2d3a;margin-bottom:6px}
+  .fcard p{font-size:11px;color:var(--sub);line-height:1.5}
+  .fcard .tag{margin-top:9px;font-size:10px;color:var(--accent);background:rgba(61,90,128,.09);padding:3px 7px;border-radius:5px;display:inline-block}
+  .c1 .icon{background:#e7eef6}.c2 .icon{background:#e5f0e9}.c3 .icon{background:#fbe9e6}
+  .c4 .icon{background:#efe8f4}.c5 .icon{background:#fbf1e0}
+  .fstrip{margin-top:20px;background:#22303f;color:#fff;border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px}
+  .fstrip .em{font-size:22px}
+  .fstrip .st b{font-size:14px}.fstrip .st span{font-size:12px;color:#b8c4d0}
+  .fsign{text-align:right;font-size:11px;color:var(--faint);margin-top:12px}
+  .figcap{text-align:center;font-size:12px;color:var(--sub);margin-top:12px}
+  .badge-png{display:inline-block;font-size:10.5px;color:#fff;background:var(--green);padding:2px 8px;border-radius:5px;margin-left:8px}
+
+  /* ===== 形态 1：单张大图海报 ===== */
+  .poster .fig{max-width:960px;margin:0 auto}
+
+  /* ===== 形态 2：分章滚动（yao 式）===== */
+  .chapters{display:grid;grid-template-columns:190px 1fr;gap:30px;align-items:start}
+  .toc{position:sticky;top:174px;background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:14px}
+  .toc h5{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--sub2);margin-bottom:10px}
+  .toc a{display:block;font-size:13px;color:var(--body2);padding:7px 9px;border-radius:7px;text-decoration:none;margin-bottom:2px}
+  .toc a.on{background:rgba(61,90,128,.1);color:var(--accent);font-weight:600}
+  .chap{margin-bottom:34px}
+  .chap .cnum{font-size:12px;color:var(--accent);font-weight:700;letter-spacing:.5px}
+  .chap h3{font-family:var(--serif);font-size:21px;margin:3px 0 10px}
+  .chap p{color:var(--body);font-size:14.5px;line-height:1.8;margin-bottom:14px}
+  .chapfig{background:#f7f5ef;border:1px solid var(--line10);border-radius:12px;padding:18px;text-align:center}
+  .chapfig .mini{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+  .chapfig .mc{background:#fff;border:1px solid var(--line10);border-radius:9px;padding:11px 13px;font-size:12px;color:var(--body2);min-width:96px}
+  .chapfig .mc .mi{font-size:20px;margin-bottom:4px}
+  .chapfig .arrow{color:var(--accent);font-size:18px}
+  .chapfig .cap{font-size:11px;color:var(--sub);margin-top:11px}
+
+  /* ===== 形态 3：图文文章式 ===== */
+  .article{max-width:720px;margin:0 auto;background:#fff;border:1px solid var(--line10);border-radius:14px;padding:38px 46px}
+  .article h2{font-family:var(--serif);font-size:27px;line-height:1.3;margin-bottom:6px}
+  .article .amETA{color:var(--sub);font-size:12.5px;margin-bottom:22px}
+  .article p{color:var(--body);font-size:15px;line-height:1.85;margin-bottom:16px}
+  .article h3{font-family:var(--serif);font-size:19px;margin:26px 0 10px}
+  .inlinefig{margin:22px -8px;background:#f7f5ef;border:1px solid var(--line10);border-radius:12px;padding:16px;text-align:center}
+  .inlinefig .fcards{grid-template-columns:repeat(5,1fr);gap:8px}
+  .inlinefig .fcard{padding:10px 6px}.inlinefig .fcard .icon{width:34px;height:34px;font-size:17px;margin:8px auto 7px}
+  .inlinefig .fcard h4{font-size:11.5px}.inlinefig .fcard p{display:none}.inlinefig .fcard .no{width:20px;height:20px;font-size:10px}
+  .inlinefig .cap{font-size:11px;color:var(--sub);margin-top:10px}
+
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="picker">
+  <h1>决策 3 · 可视化教程「输出页」长啥样</h1>
+  <span class="hint">HTML 预览 + 导出 HTML/md —— 三种排版，点上面切换</span>
+  <button class="on" onclick="pick(1,this)">形态 1 · 单张大图海报</button>
+  <button onclick="pick(2,this)">形态 2 · 分章滚动</button>
+  <button onclick="pick(3,this)">形态 3 · 图文文章</button>
+</div>
+<div class="vlabel" id="vlabel"></div>
+
+<!-- 教程预览容器顶栏 -->
+<div class="vbar">
+  <span class="back">← 返回创作台</span>
+  <span class="vt">决策五问 · 可视化教程</span>
+  <span class="grow"></span>
+  <button class="vbtn">↻ 换个风格重出</button>
+  <button class="vbtn">⬇ 导出 MD</button>
+  <button class="vbtn p">⬇ 导出 HTML</button>
+</div>
+
+<div class="stage">
+
+  <!-- ============ 形态 1：单张大图海报 ============ -->
+  <div id="v1" class="poster">
+    <div class="fig">
+      <div class="ftitle">高质量决策的关键：用 <span class="hl">5 个问题</span>，穿透自己的判断</div>
+      <div class="fsub">来自孟岩老师分享的一个小故事 · 给任何想法/决策设计一套"5 个问题"，持续追问自己</div>
+      <div class="fcards">
+        <div class="fcard c1"><div class="no">01</div><div class="icon">🔍</div><h4>我知道什么</h4><p>分清一手事实 vs 推测/感觉/听来的</p><span class="tag">掌握程度</span></div>
+        <div class="fcard c2"><div class="no">02</div><div class="icon">🧩</div><h4>怎么得出的</h4><p>逻辑链条中间有没有跳跃</p><span class="tag">逻辑严密</span></div>
+        <div class="fcard c3"><div class="no">03</div><div class="icon">🛡️</div><h4>反方证据</h4><p>最强反例是什么，是否选择性忽略</p><span class="tag">客观开放</span></div>
+        <div class="fcard c4"><div class="no">04</div><div class="icon">🎚️</div><h4>关键变量</h4><p>决定成败的那个，是否真正理解</p><span class="tag">核心洞察</span></div>
+        <div class="fcard c5"><div class="no">05</div><div class="icon">⚖️</div><h4>下注代价</h4><p>愿投入多少，是否匹配认知深度</p><span class="tag">风险边界</span></div>
+      </div>
+      <div class="fstrip">
+        <span class="em">🎯</span>
+        <div class="st"><b>核心心法：</b><span>不是为了证明自己对，而是接近真相、降低代价，做出更好的决策。</span></div>
+      </div>
+      <div class="fsign">— 姚金刚同款画风 · 你的知识工作台</div>
+    </div>
+    <div class="figcap">形态 1 = 一份定稿出<b>一张</b>信息大图 <span class="badge-png">真实产物是带插画的 PNG</span>（这里用 CSS 示意版式；小人/图标那层由 baoyu-infographic 画）</div>
+  </div>
+
+  <!-- ============ 形态 2：分章滚动 ============ -->
+  <div id="v2" class="hidden">
+    <div class="chapters">
+      <nav class="toc">
+        <h5>目录</h5>
+        <a class="on">引子 · 一个小故事</a>
+        <a>决策五问框架</a>
+        <a>为什么要问自己</a>
+        <a>核心心法</a>
+      </nav>
+      <div>
+        <div class="chap">
+          <div class="cnum">引子</div>
+          <h3>一个小故事：问到第 3 个就答不上来</h3>
+          <p>朋友大仓位配置了一只股票。孟岩说：正好测试下我的理论——我来问你 5 个问题。问到第 3 个，对方就答不上来了。如果你能顶住这 5 个问题，说明你的洞见确实超过了绝大多数人。</p>
+          <div class="chapfig">
+            <div class="mini">
+              <div class="mc"><div class="mi">☕</div>闲聊爱好</div><span class="arrow">→</span>
+              <div class="mc"><div class="mi">📈</div>大仓位买入</div><span class="arrow">→</span>
+              <div class="mc"><div class="mi">❓</div>连问 5 问</div><span class="arrow">→</span>
+              <div class="mc"><div class="mi">🏆</div>第3问卡住</div>
+            </div>
+            <div class="cap">本章配图 · 由 baoyu-infographic 出一张 PNG（含插画人物/车内对话场景）</div>
+          </div>
+        </div>
+        <div class="chap">
+          <div class="cnum">框架</div>
+          <h3>决策五问：持续追问自己</h3>
+          <p>给任何想法或决策，设计一套"5 个问题"逐一逼问：知道什么 → 怎么得出 → 反方证据 → 关键变量 → 下注代价。</p>
+          <div class="chapfig">
+            <div class="mini">
+              <div class="mc"><div class="mi">🔍</div>01 知道什么</div>
+              <div class="mc"><div class="mi">🧩</div>02 怎么得出</div>
+              <div class="mc"><div class="mi">🛡️</div>03 反方证据</div>
+              <div class="mc"><div class="mi">🎚️</div>04 关键变量</div>
+              <div class="mc"><div class="mi">⚖️</div>05 下注代价</div>
+            </div>
+            <div class="cap">本章配图 · 五问一图流</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="figcap" style="margin-top:24px">形态 2 = 拆成章节，<b>每章配一张图</b>（yao 那套）。适合长教程、能沉浸读；出图更多、更慢。</div>
+  </div>
+
+  <!-- ============ 形态 3：图文文章 ============ -->
+  <div id="v3" class="hidden">
+    <div class="article">
+      <h2>用 5 个问题，穿透自己的判断</h2>
+      <div class="amETA">方法教程体 · 约 6 分钟读完 · 派生自你的定稿</div>
+      <p>朋友大仓位配置了一只股票。孟岩说：正好测试下我的理论——我来问你 5 个问题。结果问到第 3 个，对方就答不上来了。</p>
+      <p>这套"决策五问"不为证明谁对，而是逼自己接近真相：</p>
+      <div class="inlinefig">
+        <div class="fcards">
+          <div class="fcard c1"><div class="no">1</div><div class="icon">🔍</div><h4>知道什么</h4></div>
+          <div class="fcard c2"><div class="no">2</div><div class="icon">🧩</div><h4>怎么得出</h4></div>
+          <div class="fcard c3"><div class="no">3</div><div class="icon">🛡️</div><h4>反方证据</h4></div>
+          <div class="fcard c4"><div class="no">4</div><div class="icon">🎚️</div><h4>关键变量</h4></div>
+          <div class="fcard c5"><div class="no">5</div><div class="icon">⚖️</div><h4>下注代价</h4></div>
+        </div>
+        <div class="cap">关键处嵌一张信息图，其余是正文</div>
+      </div>
+      <h3>为什么要问自己这 5 个问题</h3>
+      <p>避免高估自己、暴露认知漏洞、开启理性脑对抗情绪偏见——问题本身质量不重要，重要的是"开启追问模式"。一旦开启，决策质量自然不同。</p>
+    </div>
+    <div class="figcap" style="margin-top:24px">形态 3 = <b>正文为主、关键处插图</b>。最接近公众号图文、最好读；"图"的分量最轻。</div>
+  </div>
+</div>
+
+<script>
+  const labels={
+    1:'<b>形态 1 · 单张大图海报</b>：一份定稿 = 一张信息大图，正是你发的三张参考图那样。最省（出 1 张图）、最能直接转发/发小红书；缺点是长内容会被压得很密。',
+    2:'<b>形态 2 · 分章滚动</b>：拆成章节，每章一段文字 + 一张配图，左侧 sticky 目录（yao-tutorial-skill 的做法）。适合系统长教程、沉浸阅读；出图多、慢、贵。',
+    3:'<b>形态 3 · 图文文章</b>：正文为主，只在关键处嵌 1–2 张信息图。最好读、最像公众号；"可视化"分量最轻，偏"配图文章"而非"信息大图"。'
+  };
+  function pick(v,btn){
+    document.querySelectorAll('.picker button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('vlabel').innerHTML=labels[v];
+    [1,2,3].forEach(i=>document.getElementById('v'+i).classList.toggle('hidden',i!==v));
+  }
+  pick(1,document.querySelector('.picker button'));
+</script>
+</body>
+</html>

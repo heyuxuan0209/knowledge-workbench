@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内容飞轮后半环 · 发布台账 + 表现地图（原型）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;
+    --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+    --accent:#3d5a80;--accent-hover:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--purple:#7a5cc4;
+    --serif:'Newsreader',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:1020px;margin:0 auto;padding:22px 22px 90px;}
+
+  /* 顶部说明 */
+  .note{font-size:12.5px;color:var(--sub);background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:12px 15px;line-height:1.7;margin-bottom:16px;}
+  .note b{color:var(--text);}
+  .note .tag{display:inline-block;font-size:11px;font-weight:600;color:var(--amber);background:rgba(169,121,31,.12);border-radius:5px;padding:1px 7px;margin-right:6px;}
+
+  /* 放置位切换 */
+  .place{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .place .lbl{font-size:12px;color:var(--sub2);}
+  .seg{display:inline-flex;border:1px solid var(--line10);border-radius:9px;overflow:hidden;}
+  .seg button{border:none;background:var(--surface);color:var(--sub);font-size:12.5px;font-weight:600;padding:8px 15px;cursor:pointer;}
+  .seg button.on{background:var(--accent);color:#fff;}
+  .seg button small{font-weight:400;opacity:.8;display:block;font-size:10.5px;margin-top:1px;}
+
+  /* 模拟顶栏（放置位 A） */
+  .chrome{background:var(--surface);border:1px solid var(--line10);border-bottom:none;border-radius:12px 12px 0 0;padding:0 16px;display:flex;gap:2px;}
+  .chrome .nav{font-size:13px;color:var(--sub);padding:12px 12px 11px;border-bottom:2px solid transparent;cursor:default;}
+  .chrome .nav.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+  .chrome.hidden{display:none}
+  /* 放置位 B 的面包屑 */
+  .crumbB{display:none;font-size:12px;color:var(--sub2);background:rgba(61,90,128,.05);border:1px solid rgba(61,90,128,.15);border-radius:10px;padding:9px 14px;margin-bottom:0;line-height:1.6;}
+  .crumbB b{color:var(--accent);}
+  .stage.B .crumbB{display:block;border-radius:10px 10px 0 0;}
+  .stage.B .chrome{display:none}
+
+  .surface{background:var(--surface);border:1px solid var(--line10);border-radius:0 0 12px 12px;padding:20px 20px 24px;}
+
+  h1.h{font-family:var(--serif);font-size:24px;font-weight:600;margin:2px 0 3px;}
+  .hsub{font-size:12.5px;color:var(--sub2);margin-bottom:20px;line-height:1.55;}
+
+  .secttl{font-family:var(--serif);font-size:18px;font-weight:600;margin:26px 0 4px;display:flex;align-items:baseline;gap:9px;}
+  .secttl .n{font-size:12px;color:var(--faint);font-weight:400;}
+  .sectsub{font-size:12px;color:var(--sub);margin-bottom:13px;line-height:1.55;}
+
+  /* ===== 发布台账 ===== */
+  .ledger{width:100%;border-collapse:collapse;font-size:13px;}
+  .ledger th{text-align:left;font-weight:600;color:var(--sub2);font-size:11.5px;padding:8px 10px;border-bottom:1px solid var(--line10);white-space:nowrap;}
+  .ledger td{padding:11px 10px;border-bottom:1px solid var(--line08);vertical-align:top;}
+  .ledger tr:hover td{background:rgba(33,31,26,.015);}
+  .plat{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+  .plat.xhs{color:#c0392b;background:rgba(192,57,43,.1);}
+  .plat.wx{color:#3f7350;background:rgba(63,115,80,.12);}
+  .plat.dy{color:#211f1a;background:rgba(33,31,26,.08);}
+  .ttl{font-family:var(--serif);font-size:14px;font-weight:600;line-height:1.35;}
+  .from{font-size:11px;color:var(--sub2);margin-top:3px;}
+  .rate{font-variant-numeric:tabular-nums;font-weight:600;}
+  .pending{color:var(--amber);font-size:11px;font-weight:600;background:rgba(169,121,31,.1);border-radius:5px;padding:1px 7px;white-space:nowrap;}
+  .link{color:var(--accent);text-decoration:none;font-size:11.5px;}
+
+  .addbtn{margin-top:14px;border:1px dashed var(--line10);background:none;color:var(--accent);font-size:13px;font-weight:600;padding:10px 16px;border-radius:9px;cursor:pointer;width:100%;}
+  .addbtn:hover{background:rgba(61,90,128,.05);}
+
+  /* 登记表单 */
+  .form{display:none;border:1px solid rgba(61,90,128,.2);background:rgba(61,90,128,.03);border-radius:10px;padding:15px;margin-top:12px;}
+  .form.on{display:block;}
+  .form .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .form label{font-size:11px;color:var(--sub2);font-weight:600;display:block;margin-bottom:4px;}
+  .form .fld{flex:1;min-width:130px;}
+  .form input,.form select{width:100%;border:1px solid var(--line10);background:var(--surface);border-radius:7px;padding:8px 10px;font-size:13px;}
+  .form .req::after{content:' *';color:var(--red);}
+  .form .hint{font-size:11px;color:var(--sub);margin:2px 0 12px;line-height:1.5;}
+  .form .acts{display:flex;gap:9px;align-items:center;}
+  .btn-p{border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:8px;cursor:pointer;}
+  .btn-t{border:none;background:none;color:var(--sub);font-size:12.5px;cursor:pointer;}
+  .rateGroup{border-top:1px dashed var(--line10);margin-top:6px;padding-top:12px;}
+  .rateGroup .cap{font-size:11px;color:var(--amber);font-weight:600;margin-bottom:8px;}
+
+  /* ===== 表现地图 ===== */
+  .coldbar{display:flex;align-items:flex-start;gap:9px;background:linear-gradient(180deg,rgba(169,121,31,.09),rgba(169,121,31,.03));border:1px solid rgba(169,121,31,.25);border-radius:10px;padding:11px 14px;font-size:12.5px;color:var(--body);line-height:1.6;margin-bottom:14px;}
+  .coldbar b{color:var(--amber);}
+  .vizsw{display:inline-flex;border:1px solid var(--line10);border-radius:9px;overflow:hidden;margin-bottom:16px;}
+  .vizsw button{border:none;background:var(--surface);color:var(--sub);font-size:12.5px;font-weight:600;padding:8px 15px;cursor:pointer;}
+  .vizsw button.on{background:var(--accent);color:#fff;}
+  .vizpanel{display:none} .vizpanel.on{display:block}
+
+  /* 方案1 散点 */
+  .scatter-wrap{display:flex;gap:20px;flex-wrap:wrap;}
+  .scatter{position:relative;width:460px;height:400px;flex:0 0 auto;background:var(--brief-bg);border:1px solid var(--line10);border-radius:12px;}
+  .axis-y{position:absolute;left:8px;top:50%;transform:rotate(-180deg);writing-mode:vertical-rl;font-size:11px;color:var(--sub2);font-weight:600;}
+  .axis-x{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--sub2);font-weight:600;}
+  .quad{position:absolute;font-size:10.5px;color:var(--faint);font-weight:600;}
+  .midv{position:absolute;left:50%;top:26px;bottom:26px;border-left:1px dashed var(--line10);}
+  .midh{position:absolute;top:50%;left:26px;right:26px;border-top:1px dashed var(--line10);}
+  .dot{position:absolute;border-radius:50%;background:rgba(61,90,128,.75);border:2px solid var(--surface);cursor:pointer;transition:transform .1s;box-shadow:0 1px 4px rgba(0,0,0,.15);}
+  .dot:hover{transform:scale(1.25);z-index:5;}
+  .dot.sample{background:rgba(176,168,148,.6);}
+  .dotlab{position:absolute;font-size:9.5px;color:var(--sub2);pointer-events:none;transform:translate(10px,-6px);white-space:nowrap;}
+  .detail{flex:1;min-width:240px;background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:16px;}
+  .detail h4{font-family:var(--serif);font-size:15px;margin:0 0 3px;}
+  .detail .dq{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;display:inline-block;margin-bottom:12px;}
+  .detail dl{margin:0;font-size:12.5px;}
+  .detail dt{color:var(--sub2);font-size:11px;font-weight:600;margin-top:9px;}
+  .detail dd{margin:2px 0 0;color:var(--body);line-height:1.5;}
+  .legend{font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6;}
+  .legend .k{display:inline-block;width:9px;height:9px;border-radius:50%;background:rgba(61,90,128,.75);margin-right:4px;vertical-align:middle;}
+
+  /* 方案2 条形 */
+  .barrow{display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line08);}
+  .barrow .meta{font-size:12.5px;}
+  .barrow .meta .t{font-family:var(--serif);font-weight:600;line-height:1.3;}
+  .barrow .meta .p{font-size:11px;color:var(--sub2);margin-top:2px;}
+  .bars{display:flex;flex-direction:column;gap:6px;}
+  .barline{display:grid;grid-template-columns:74px 1fr 54px;gap:8px;align-items:center;font-size:11px;}
+  .barline .lab{color:var(--sub2);}
+  .track{height:8px;background:rgba(33,31,26,.06);border-radius:5px;overflow:hidden;}
+  .track i{display:block;height:100%;border-radius:5px;}
+  .track.a i{background:var(--accent);} .track.b i{background:var(--green);} .track.c i{background:var(--purple);}
+  .barline .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--body);font-weight:600;}
+
+  /* 方案3 卡片 */
+  .pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+  .pcard{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:14px;}
+  .pcard .ph{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .pcard .pt{font-family:var(--serif);font-size:14px;font-weight:600;line-height:1.3;}
+  .metrics{display:flex;gap:8px;}
+  .metric{flex:1;text-align:center;background:var(--brief-bg);border:1px solid var(--line08);border-radius:8px;padding:9px 4px;}
+  .metric .mv{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text);}
+  .metric .mv.pend{font-size:11px;color:var(--amber);font-weight:600;}
+  .metric .ml{font-size:10px;color:var(--sub2);margin-top:2px;}
+
+  /* ===== 关键发现 ===== */
+  .findbox{background:var(--brief-bg);border:1px dashed var(--line10);border-radius:11px;padding:16px 18px;color:var(--sub);font-size:13px;line-height:1.7;}
+  .findbox b{color:var(--text);}
+  .findbox .em{color:var(--amber);font-weight:600;}
+  .kv{font-size:12.5px;color:var(--body);margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="note">
+    <span class="tag">原型 · 待你点着定形态</span>
+    这是<b>内容飞轮后半环</b>（发布 → 数据 → 复盘）的可点原型。指标用你既有的<b>三率：收藏率 / 转发数 / 深评·私信数</b>（非参考稿的阅读×互动）。
+    数据是 <code>templates/publish-log.md</code> 的 4 个真实发布物；三率按 D+7 规矩 <b>07-23 才齐</b>，现在标「待抄」。
+    表现地图的散点为<b>示例形态</b>（非真实数据），仅供你判断"这种版式看着能不能激发方向感"。
+  </div>
+
+  <div class="place">
+    <span class="lbl">放置位（两版都画，你选）：</span>
+    <div class="seg">
+      <button class="on" onclick="setPlace('A',this)">A · 新一级 tab「复盘」<small>与 资讯/素材/主题/灵感/创作 并列</small></button>
+      <button onclick="setPlace('B',this)">B · 挂创作看板底部<small>接「发布→数据→复盘」那个留位</small></button>
+    </div>
+  </div>
+
+  <div class="stage A" id="stage">
+    <!-- 放置位 A：顶栏 -->
+    <div class="chrome" id="chrome">
+      <span class="nav">资讯</span>
+      <span class="nav">素材</span>
+      <span class="nav">主题</span>
+      <span class="nav">灵感</span>
+      <span class="nav">创作</span>
+      <span class="nav on">复盘</span>
+    </div>
+    <!-- 放置位 B：面包屑 -->
+    <div class="crumbB">
+      创作 · 写作看板 ▸ 底部延展 &nbsp;→&nbsp; <b>发布 → 数据 → 复盘</b>（原「以后接…」留位现在长出来了）
+    </div>
+
+    <div class="surface">
+      <h1 class="h">复盘 · 发出去之后</h1>
+      <div class="hsub">环路的后半程：每发一篇登记进台账 → D+7 抄回三率 → 表现地图看形态 → 攒够再谈"往哪写"。冷启动期只登记、不解读。</div>
+
+      <!-- ============ 1 发布台账 ============ -->
+      <div class="secttl">发布台账 <span class="n">01 · 每发一篇手动登记，10 秒</span></div>
+      <div class="sectsub">
+        同一深稿裂变多平台就登记多行。<b>三率暂手动抄</b>；小红书 / 抖音后台数据将来走归拢接口自动填（见页底「长期接口」）。
+      </div>
+
+      <table class="ledger">
+        <thead><tr>
+          <th>平台</th><th>标题</th><th>日期</th><th>收藏率</th><th>转发</th><th>深评·私信</th><th>链接</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="plat xhs">小红书</span></td>
+            <td><div class="ttl">Anthropic 教你和 AI 协作的六个技巧</div><div class="from">长文版 · 派生自 fable-unhobbling-article</div></td>
+            <td>07-16</td>
+            <td><span class="pending">待抄 07-23</span></td><td><span class="pending">—</span></td><td><span class="pending">—</span></td>
+            <td><a class="link" href="#">链接 ↗</a></td>
+          </tr>
+          <tr>
+            <td><span class="plat xhs">小红书</span></td>
+            <td><div class="ttl">别再逼自己"把需求想清楚"了</div><div class="from">卡片版 · 同深稿裂变（悬念钩，与长文权威钩同场 A/B）</div></td>
+            <td>07-16</td>
+            <td><span class="pending">待抄 07-23</span></td><td><span class="pending">—</span></td><td><span class="pending">—</span></td>
+            <td><a class="link" href="#">链接 ↗</a></td>
+          </tr>
+          <tr>
+            <td><span class="plat xhs">小红书</span></td>
+            <td><div class="ttl">收藏 = 稍后读 = 永远不读，直到我做了它</div><div class="from">派生自 read-anything-long</div></td>
+            <td>07-17</td>
+            <td><span class="pending">待抄 07-24</span></td><td><span class="pending">—</span></td><td><span class="pending">—</span></td>
+            <td><a class="link" href="#">链接 ↗</a></td>
+          </tr>
+          <tr>
+            <td><span class="plat wx">公众号</span></td>
+            <td><div class="ttl">收藏 = 稍后读 = 永远不读，直到我做了它</div><div class="from">同一篇 · 双平台对照</div></td>
+            <td>07-17</td>
+            <td><span class="pending">待抄 07-24</span></td><td><span class="pending">—</span></td><td><span class="pending">—</span></td>
+            <td><span class="from">待补</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <button class="addbtn" onclick="toggleForm()">＋ 登记一篇发布</button>
+
+      <div class="form" id="form">
+        <div class="row">
+          <div class="fld"><label class="req">平台</label><select><option>小红书</option><option>公众号</option><option>抖音</option><option>其他</option></select></div>
+          <div class="fld"><label class="req">日期</label><input type="date" value="2026-07-20"></div>
+        </div>
+        <div class="row">
+          <div class="fld" style="flex:2"><label class="req">标题（发布时的定稿标题）</label><input placeholder="平台上真实用的标题"></div>
+        </div>
+        <div class="row">
+          <div class="fld" style="flex:2"><label class="req">派生自哪篇深稿</label><input placeholder="从草稿箱选，或填 published/xxx.md"></div>
+          <div class="fld"><label>链接（选填）</label><input placeholder="发布后补也行"></div>
+        </div>
+        <div class="hint">↑ 必填只有 4 项。登记时顺手给复盘卡填一句「发布时预判」——预判只能发布时填，事后补是失真的。</div>
+        <div class="rateGroup">
+          <div class="cap">三率 · 现在可留空，D+7（约一周后）从平台后台抄回</div>
+          <div class="row">
+            <div class="fld"><label>收藏率 %</label><input placeholder="收藏÷阅读"></div>
+            <div class="fld"><label>转发数</label><input placeholder="次"></div>
+            <div class="fld"><label>深评·私信</label><input placeholder="条（从第一篇就算数）"></div>
+          </div>
+        </div>
+        <div class="acts">
+          <button class="btn-p">登记</button>
+          <button class="btn-t" onclick="toggleForm()">取消</button>
+        </div>
+      </div>
+
+      <!-- ============ 2 表现地图 ============ -->
+      <div class="secttl">表现地图 <span class="n">02 · 把"哪种写法有效"变成体感</span></div>
+      <div class="coldbar">
+        <span>❄️</span>
+        <span><b>冷启动期，只当信号看</b>——读者规模起来前，前 5 篇外部数据只登记不解读；攒满 5 张复盘卡才据此调创作。下面是<b>示例形态</b>，07-23 真三率齐了才画真点。</span>
+      </div>
+
+      <div class="vizsw">
+        <button class="on" onclick="setViz(1,this)">① 传播 × 留存 散点</button>
+        <button onclick="setViz(2,this)">② 三率并排条</button>
+        <button onclick="setViz(3,this)">③ 每篇一卡</button>
+      </div>
+
+      <!-- 方案1 散点 -->
+      <div class="vizpanel on" id="viz1">
+        <div class="scatter-wrap">
+          <div class="scatter" id="scatter">
+            <div class="midv"></div><div class="midh"></div>
+            <div class="axis-y">收藏率 →（值不值得留）</div>
+            <div class="axis-x">转发数 →（传得多远）</div>
+            <div class="quad" style="right:14px;top:14px;">叫好又叫座</div>
+            <div class="quad" style="left:34px;top:14px;">私藏好文<br><span style="font-weight:400">存了没扩散</span></div>
+            <div class="quad" style="right:14px;bottom:30px;">热闹一阵<br><span style="font-weight:400">扩散没沉淀</span></div>
+            <div class="quad" style="left:34px;bottom:30px;">没起水花</div>
+            <!-- 示例点 -->
+            <div class="dot sample" style="left:78%;top:22%;width:26px;height:26px;" onclick="showDot(0)"></div>
+            <div class="dotlab" style="left:78%;top:22%;">六个技巧·长文</div>
+            <div class="dot sample" style="left:30%;top:30%;width:18px;height:18px;" onclick="showDot(1)"></div>
+            <div class="dotlab" style="left:30%;top:30%;">六个技巧·卡片</div>
+            <div class="dot sample" style="left:64%;top:66%;width:14px;height:14px;" onclick="showDot(2)"></div>
+            <div class="dotlab" style="left:64%;top:66%;">收藏=稍后读·小红书</div>
+            <div class="dot sample" style="left:40%;top:74%;width:20px;height:20px;" onclick="showDot(3)"></div>
+            <div class="dotlab" style="left:40%;top:74%;">同篇·公众号</div>
+          </div>
+          <div class="detail" id="detail">
+            <h4 id="d-t">点一个点，看它的形态</h4>
+            <div class="dq" id="d-q" style="background:rgba(33,31,26,.06);color:var(--sub2);">示例数据 · 非真实</div>
+            <dl>
+              <dt>主题</dt><dd id="d-topic">—</dd>
+              <dt>角度</dt><dd id="d-angle">—</dd>
+              <dt>标题承诺</dt><dd id="d-title">—</dd>
+              <dt>开头</dt><dd id="d-lead">—</dd>
+            </dl>
+            <div class="legend"><span class="k"></span>点的<b>大小 = 深评·私信数</b>（共鸣深度）；横=转发、纵=收藏率。三率一张图看全。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 方案2 条形 -->
+      <div class="vizpanel" id="viz2">
+        <div id="barrows"></div>
+        <div class="legend" style="margin-top:12px;">每篇三条：收藏率 / 转发 / 深评·私信，同尺度并排——适合直接比"这篇强在哪条"。示例数据。</div>
+      </div>
+
+      <!-- 方案3 卡片 -->
+      <div class="vizpanel" id="viz3">
+        <div class="pgrid" id="pcards"></div>
+        <div class="legend" style="margin-top:12px;">每篇一张卡，三率大字直给 + 形态摘要。最省事、无图表，弱在看不出"整体分布/象限"。示例数据。</div>
+      </div>
+
+      <!-- ============ 3 关键发现 ============ -->
+      <div class="secttl">关键发现 & 下期方向 <span class="n">03 · 攒够 5 篇才长出来</span></div>
+      <div class="findbox">
+        <span class="em">冷启动期 · 暂不解读。</span>还差 <b>3 篇</b>发布 + 三率到齐（当前 2 篇有卡、0 篇有数），凑满 5 张复盘卡后这里才会自动生成：
+        <div class="kv">· <b>本月发现</b>：哪种主题/角度/标题承诺进了「叫好又叫座」象限</div>
+        <div class="kv">· <b>相似对照</b>：同深稿的长文钩 vs 卡片钩、小红书 vs 公众号，谁的三率更好</div>
+        <div class="kv">· <b>下期验证</b>：下 3 篇优先试哪个方向（一次只押一个变量）</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:18px;">
+    <b>长期接口（你定的硬约束）</b>：三率不能每次手填。台账底层做成通用归拢接口
+    <code>POST /api/publications/ingest</code>，将来<b>小红书 / 抖音后台</b>连接器往里灌数据。三条候选路径我会另附一版让你选：
+    ①周末批量粘（最轻，先跑）；②浏览器 cookie 抓后台（半自动，需小号/合规评估）；③开放平台 API（最稳，抖音需企业资质、小红书受限）。
+  </div>
+
+</div>
+
+<script>
+  const SAMPLE = [
+    {t:'Anthropic 教你和 AI 协作的六个技巧', q:'叫好又叫座', qc:'var(--green)', topic:'AI 协作方法', angle:'权威背书 + 直给数字', title:'去悬念、换权威钩，比草稿短一半', lead:'开门见山抛"六个技巧"清单'},
+    {t:'别再逼自己"把需求想清楚"了（卡片版）', q:'私藏好文', qc:'var(--accent)', topic:'AI 协作方法', angle:'悬念钩 + 反常识', title:'保留草稿悬念钩，与长文同场 A/B', lead:'用"别再逼自己"制造停顿'},
+    {t:'收藏=稍后读=永远不读（小红书）', q:'热闹一阵', qc:'var(--amber)', topic:'个人知识管理', angle:'痛点公式 + 转折悬念', title:'从结果陈述改成痛点公式', lead:'"收藏=稍后读=永远不读"三段递进'},
+    {t:'收藏=稍后读（公众号·同篇）', q:'私藏好文', qc:'var(--accent)', topic:'个人知识管理', angle:'同篇 · 平台对照', title:'同标题跨平台', lead:'同上，公众号读者结构不同'},
+  ];
+  const BARDATA = [
+    {t:'六个技巧·长文', p:'小红书 07-16', a:82, b:70, c:60},
+    {t:'六个技巧·卡片', p:'小红书 07-16', a:74, b:30, c:35},
+    {t:'收藏=稍后读', p:'小红书 07-17', a:40, b:64, c:20},
+    {t:'同篇·公众号', p:'公众号 07-17', a:70, b:44, c:48},
+  ];
+  const RAW = [
+    {cang:'高', fw:'多', sx:'多'},{cang:'较高', fw:'少', sx:'少'},
+    {cang:'低', fw:'多', sx:'少'},{cang:'较高', fw:'中', sx:'中'},
+  ];
+
+  function setPlace(p, el){
+    document.getElementById('stage').className = 'stage ' + p;
+    el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+    el.classList.add('on');
+  }
+  function toggleForm(){ document.getElementById('form').classList.toggle('on'); }
+  function setViz(n, el){
+    for(let i=1;i<=3;i++) document.getElementById('viz'+i).classList.remove('on');
+    document.getElementById('viz'+n).classList.add('on');
+    el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+    el.classList.add('on');
+  }
+  function showDot(i){
+    const s = SAMPLE[i];
+    document.getElementById('d-t').textContent = s.t;
+    const q = document.getElementById('d-q');
+    q.textContent = s.q + ' · 示例';
+    q.style.background = 'color-mix(in srgb,'+s.qc+' 14%, transparent)';
+    q.style.color = s.qc;
+    document.getElementById('d-topic').textContent = s.topic;
+    document.getElementById('d-angle').textContent = s.angle;
+    document.getElementById('d-title').textContent = s.title;
+    document.getElementById('d-lead').textContent = s.lead;
+  }
+  // 条形
+  document.getElementById('barrows').innerHTML = BARDATA.map(d=>`
+    <div class="barrow">
+      <div class="meta"><div class="t">${d.t}</div><div class="p">${d.p}</div></div>
+      <div class="bars">
+        <div class="barline"><span class="lab">收藏率</span><div class="track a"><i style="width:${d.a}%"></i></div><span class="val">示例</span></div>
+        <div class="barline"><span class="lab">转发</span><div class="track b"><i style="width:${d.b}%"></i></div><span class="val">示例</span></div>
+        <div class="barline"><span class="lab">深评·私信</span><div class="track c"><i style="width:${d.c}%"></i></div><span class="val">示例</span></div>
+      </div>
+    </div>`).join('');
+  // 卡片
+  document.getElementById('pcards').innerHTML = SAMPLE.map((s,i)=>`
+    <div class="pcard">
+      <div class="ph"><span class="plat ${i===3?'wx':'xhs'}">${i===3?'公众号':'小红书'}</span><div class="pt">${s.t}</div></div>
+      <div class="metrics">
+        <div class="metric"><div class="mv pend">待抄</div><div class="ml">收藏率</div></div>
+        <div class="metric"><div class="mv pend">待抄</div><div class="ml">转发</div></div>
+        <div class="metric"><div class="mv pend">待抄</div><div class="ml">深评·私信</div></div>
+      </div>
+      <div class="legend" style="margin-top:10px;">${s.topic} · ${s.angle}</div>
+    </div>`).join('');
+</script>
+</body>
+</html>

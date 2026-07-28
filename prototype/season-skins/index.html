@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识工作台 · 四季皮肤 · UI 版式对比</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ================================================================
+   四季皮肤 · 沉浸玻璃 —— 3 版式 × 2 背景 对比台
+   两个开关正好对应你的两个问题：
+     背景：照片壁纸 / 纯氛围渐变
+     版式：全沉浸 / 阅读画布 / 顶部氛围带
+   ================================================================ */
+:root, [data-season="autumn"]{
+  --photo:url("photos/autumn.jpg");
+  --scene:radial-gradient(130% 95% at 84% 4%,rgba(224,168,104,.55),transparent 52%),radial-gradient(95% 85% at 6% 96%,rgba(196,140,86,.42),transparent 56%),linear-gradient(158deg,#f7efe2,#f0e2cd 52%,#e7d3b7);
+  --glass:252 246 236; --card:255 250 242;
+  --ink:#2c2419; --ink2:#4b3f30; --ink-sub:#7a6c58; --ink-faint:#a99a82;
+  --line:rgba(44,36,25,.12); --line-soft:rgba(44,36,25,.08);
+  --accent:#bf6a2c; --accent-rgb:191 106 44; --on-accent:#fff;
+  --green:#5f7f3f; --red:#a24b3f; --amber:#a9791f; --shadow:rgba(90,60,30,.16);
+}
+[data-season="spring"]{
+  --photo:url("photos/spring.jpg");
+  --scene:radial-gradient(130% 95% at 82% 2%,rgba(246,196,214,.6),transparent 52%),radial-gradient(100% 90% at 6% 98%,rgba(196,224,178,.5),transparent 56%),linear-gradient(158deg,#f8eef1,#f1eee6 48%,#e6efdc);
+  --glass:252 247 248; --card:255 251 251;
+  --ink:#2a271f; --ink2:#463f33; --ink-sub:#6f6a5b; --ink-faint:#a7ab97;
+  --line:rgba(42,39,31,.11); --line-soft:rgba(42,39,31,.07);
+  --accent:#6a9a4c; --accent-rgb:106 154 76; --on-accent:#fff;
+  --green:#5a9a5f; --red:#c0768a; --amber:#c98a3a; --shadow:rgba(120,90,110,.16);
+}
+[data-season="summer"]{
+  --photo:url("photos/summer.jpg");
+  --scene:radial-gradient(130% 95% at 85% 0%,rgba(150,220,228,.6),transparent 52%),radial-gradient(100% 90% at 4% 98%,rgba(178,224,222,.52),transparent 58%),linear-gradient(160deg,#ecf7f8,#ddeff2 50%,#cfe8ee);
+  --glass:246 252 253; --card:252 254 255;
+  --ink:#16262e; --ink2:#2e3d45; --ink-sub:#5a6d76; --ink-faint:#93a6ad;
+  --line:rgba(22,38,46,.11); --line-soft:rgba(22,38,46,.07);
+  --accent:#1590a8; --accent-rgb:21 144 168; --on-accent:#fff;
+  --green:#2f9c6d; --red:#d0705c; --amber:#c88a2a; --shadow:rgba(30,110,130,.16);
+}
+[data-season="winter"]{
+  --photo:url("photos/winter.jpg");
+  --scene:radial-gradient(130% 95% at 80% 2%,rgba(74,110,158,.55),transparent 52%),radial-gradient(95% 88% at 4% 98%,rgba(38,58,96,.55),transparent 58%),linear-gradient(160deg,#161d2b,#10151f 58%,#0b0f17);
+  --glass:30 40 58; --card:34 44 62;
+  --ink:#eef2f8; --ink2:#c6cedb; --ink-sub:#94a0b1; --ink-faint:#606b7c;
+  --line:rgba(238,242,248,.12); --line-soft:rgba(238,242,248,.07);
+  --accent:#79aae2; --accent-rgb:121 170 226; --on-accent:#0d1420;
+  --green:#63b184; --red:#df8175; --amber:#d7a854; --shadow:rgba(0,0,0,.4);
+}
+[data-season="winter-light"]{
+  --photo:url("photos/winter.jpg");
+  --scene:radial-gradient(130% 95% at 82% 2%,rgba(200,222,244,.7),transparent 52%),radial-gradient(100% 90% at 4% 98%,rgba(214,228,242,.6),transparent 58%),linear-gradient(160deg,#f0f5fa,#e6eef6 55%,#dbe6f1);
+  --glass:250 252 255; --card:255 255 255;
+  --ink:#1b232c; --ink2:#38424d; --ink-sub:#63707c; --ink-faint:#a3b0bb;
+  --line:rgba(27,35,44,.11); --line-soft:rgba(27,35,44,.07);
+  --accent:#3f74ab; --accent-rgb:63 116 171; --on-accent:#fff;
+  --green:#3f8a68; --red:#c06a5c; --amber:#b98a2a; --shadow:rgba(60,90,130,.16);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:'Noto Serif SC',system-ui,-apple-system,sans-serif;color:var(--ink);overflow:hidden;-webkit-font-smoothing:antialiased;}
+.serif{font-family:'Newsreader','Noto Serif SC',serif;}
+button{cursor:pointer;font-family:inherit;color:inherit;}
+
+/* 控制条 */
+.ctrl{position:fixed;top:0;left:0;right:0;height:50px;z-index:300;display:flex;align-items:center;gap:12px;padding:0 16px;background:rgba(16,16,18,.85);backdrop-filter:blur(10px);color:#eee;font-family:system-ui,sans-serif;}
+.ctrl b{font-size:12px;color:#fff;}
+.ctrl .grp{display:flex;gap:4px;align-items:center;}
+.ctrl .lab{font-size:10.5px;color:#8b8b90;margin-right:1px;}
+.ctrl button{border:1px solid rgba(255,255,255,.16);background:transparent;color:#d8d8dc;font-size:11.5px;padding:5px 9px;border-radius:7px;transition:.15s;white-space:nowrap;}
+.ctrl button.on{background:#fff;color:#111;border-color:#fff;font-weight:600;}
+.ctrl button:hover:not(.on){border-color:rgba(255,255,255,.45);}
+.ctrl .sep{width:1px;height:22px;background:rgba(255,255,255,.15);}
+.ctrl .note{margin-left:auto;font-size:10.5px;color:#8b8b90;}
+.ctrl label.up{border:1px dashed rgba(255,255,255,.3);padding:5px 9px;border-radius:7px;font-size:11.5px;color:#d8d8dc;cursor:pointer;}
+
+.stage{position:absolute;inset:50px 0 0 0;overflow:hidden;}
+.scene{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center;transition:opacity .5s;}
+.grain{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:.45;mix-blend-mode:soft-light;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+.fx{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;}
+.fx-p{position:absolute;top:-24px;will-change:transform;}
+@keyframes fall{to{transform:translateY(112vh) rotate(340deg);}}
+@keyframes sway{0%,100%{margin-left:0;}50%{margin-left:28px;}}
+
+.app{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;}
+.header{height:56px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:rgb(var(--glass)/.34);backdrop-filter:blur(18px) saturate(1.3);border-bottom:1px solid var(--line);}
+.brand{display:flex;align-items:center;gap:11px;}
+.brand-dot{width:11px;height:11px;border-radius:3px;background:var(--accent);box-shadow:0 0 12px rgb(var(--accent-rgb)/.6);}
+.brand-name{font-family:'Newsreader',serif;font-size:18px;font-weight:600;}
+.avatar{width:31px;height:31px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;}
+.body{flex:1;display:flex;min-height:0;}
+
+.nav{width:200px;flex:0 0 auto;padding:16px 12px;display:flex;flex-direction:column;background:rgb(var(--glass)/.3);backdrop-filter:blur(20px) saturate(1.25);border-right:1px solid var(--line);}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;background:transparent;border:none;width:100%;text-align:left;transition:.15s;}
+.nav-item:hover{background:rgb(var(--glass)/.5);}
+.nav-item.active{background:rgb(var(--accent-rgb)/.16);}
+.nav-ic{width:18px;font-size:14px;color:var(--ink-sub);}
+.nav-item.active .nav-ic{color:var(--accent);}
+.nav-lb{flex:1;font-size:13.5px;color:var(--ink-sub);font-weight:500;}
+.nav-item.active .nav-lb{color:var(--accent);font-weight:600;}
+.nav-bot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line-soft);}
+
+.main{flex:1;min-width:0;overflow-y:auto;}
+.main-in{max-width:1240px;margin:0 auto;padding:22px 26px 60px;}
+.ptitle{font-family:'Newsreader',serif;font-size:24px;font-weight:600;}
+.psub{font-size:13px;color:var(--ink-sub);margin-top:4px;}
+
+.hero{position:relative;overflow:hidden;border-radius:16px;margin:16px 0;padding:22px 24px;min-height:150px;border:1px solid var(--line);box-shadow:0 12px 34px var(--shadow);background-size:cover;background-position:center;}
+.hero::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgb(var(--card)/.94) 0%,rgb(var(--card)/.76) 46%,rgb(var(--card)/.14) 82%,transparent 100%);}
+.hero>*{position:relative;z-index:1;}
+.hero-t{font-family:'Newsreader',serif;font-size:19px;font-weight:600;color:var(--ink);}
+.hero-d{font-size:13px;color:var(--ink-sub);margin:6px 0 14px;max-width:54%;line-height:1.6;}
+.hero-row{display:flex;gap:10px;max-width:62%;}
+.hero-row input{flex:1;padding:11px 15px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:rgb(var(--card)/.72);color:var(--ink2);backdrop-filter:blur(8px);}
+.hero-row input::placeholder{color:var(--ink-faint);}
+
+.glass{background:rgb(var(--card)/.62);backdrop-filter:blur(16px) saturate(1.2);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 26px var(--shadow);}
+.brief{padding:16px 18px;margin-bottom:18px;}
+.brief-t{font-family:'Newsreader',serif;font-size:16px;font-weight:600;margin-bottom:4px;}
+.brief-lb{font-size:10.5px;letter-spacing:1px;color:var(--amber);font-weight:600;margin-bottom:9px;}
+.focus{border-radius:10px;overflow:hidden;border:1px solid var(--line-soft);}
+.frow{display:flex;align-items:center;gap:12px;padding:10px 13px;border-bottom:1px solid var(--line-soft);background:rgb(var(--card)/.35);}
+.frow:last-child{border-bottom:none;}
+.fnum{font-family:'Newsreader',serif;font-size:14px;color:var(--ink-faint);width:12px;}
+.ftitle{flex:1;font-size:13.5px;font-weight:500;color:var(--ink2);}
+.fcount{font-size:11px;color:var(--ink-sub);}
+.btn{border:none;background:var(--accent);color:var(--on-accent);font-size:13px;font-weight:600;padding:10px 18px;border-radius:10px;box-shadow:0 4px 14px rgb(var(--accent-rgb)/.4);}
+.btn-clip{width:44px;border:1px solid var(--line);border-radius:10px;background:rgb(var(--card)/.72);color:var(--ink-sub);font-size:19px;}
+.feedbar{display:flex;align-items:center;gap:12px;margin:22px 0 10px;font-size:12.5px;color:var(--ink-sub);}
+.feedbar b{color:var(--ink);font-weight:600;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+.card{padding:14px 16px;transition:transform .16s,box-shadow .16s;}
+.card:hover{transform:translateY(-2px);box-shadow:0 14px 34px var(--shadow);}
+.chead{display:flex;align-items:center;gap:8px;}
+.cauthor{font-size:13px;font-weight:600;color:var(--ink);}
+.cplat{font-size:11.5px;color:var(--ink-sub);}
+.cscore{margin-left:auto;font-size:12px;color:var(--ink-sub);}
+.cscore b{font-family:'Newsreader',serif;font-size:15px;color:var(--accent);}
+.ctitle{font-family:'Newsreader',serif;font-size:16px;line-height:1.34;font-weight:600;margin:7px 0 5px;color:var(--ink);}
+.csum{font-size:12.5px;line-height:1.6;color:var(--ink2);}
+.chips{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap;}
+.chip{font-size:11px;color:var(--accent);background:rgb(var(--accent-rgb)/.12);padding:3px 9px;border-radius:20px;}
+.heat{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;border-radius:7px;padding:3px 9px;}
+.heat.ready{color:var(--green);border:1px solid rgb(var(--accent-rgb)/.2);}
+.heat.hot{color:var(--red);}
+.heat.stale{color:var(--amber);}
+
+.panel{width:326px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;background:rgb(var(--glass)/.3);backdrop-filter:blur(20px) saturate(1.25);border-left:1px solid var(--line);}
+.phead{padding:16px 18px 13px;border-bottom:1px solid var(--line-soft);}
+.ptitle2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ink-sub);font-weight:600;}
+.psub2{font-size:12px;color:var(--ink-sub);margin-top:3px;}
+.pbody{flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:10px;}
+.msg{max-width:92%;font-size:12.5px;line-height:1.6;border-radius:12px;padding:9px 13px;}
+.msg.ai{align-self:flex-start;background:rgb(var(--card)/.55);color:var(--ink2);border:1px solid var(--line-soft);}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--on-accent);}
+.plabel{font-size:11px;color:var(--ink-sub);font-weight:600;margin:6px 0 2px;}
+.qchip{display:block;width:100%;text-align:left;background:rgb(var(--card)/.5);border:1px solid var(--line-soft);border-radius:10px;padding:10px 13px;font-size:12.5px;color:var(--accent);}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgb(var(--accent-rgb)/.28);border-radius:4px;}
+
+/* ============ 版式 A 全沉浸：默认即是（卡片浮在壁纸上） ============ */
+
+/* ============ 版式 B 阅读画布：中栏内容坐进一块磨砂画布，读得清 ============ */
+[data-layout="canvas"] .content{background:rgb(var(--card)/.82);backdrop-filter:blur(24px) saturate(1.15);border:1px solid var(--line);border-radius:20px;padding:18px 20px 22px;box-shadow:0 16px 44px var(--shadow);}
+[data-layout="canvas"] .content .glass{background:rgb(var(--card)/.5);box-shadow:none;backdrop-filter:none;}
+[data-layout="canvas"] .content .frow{background:rgb(var(--card)/.4);}
+
+/* ============ 版式 C 顶部氛围带：壁纸只在 Hero，其余干净可读 ============ */
+[data-layout="band"] .main{background:rgb(var(--card)/.97);}
+[data-layout="band"] .nav,[data-layout="band"] .panel{background:rgb(var(--glass)/.92);}
+[data-layout="band"] .content .glass{box-shadow:0 4px 16px var(--shadow);}
+[data-layout="band"] .scene{opacity:.5;}
+
+/* 背景模式：纯氛围渐变时用 --scene，照片时用 --photo（JS 切换 body class 更简单，这里用属性） */
+</style>
+</head>
+<body data-season="autumn" data-layout="canvas" data-bg="photo" data-fx="off">
+
+<div class="ctrl">
+  <b>四季皮肤</b>
+  <div class="grp"><span class="lab">季</span>
+    <button onclick="setSeason('spring',this)">🌱春</button>
+    <button onclick="setSeason('summer',this)">🌊夏</button>
+    <button class="on" onclick="setSeason('autumn',this)">🍂秋</button>
+    <button onclick="setSeason('winter',this)">❄️冬·夜</button>
+    <button onclick="setSeason('winter-light',this)">❄️冬·雪</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp"><span class="lab">背景</span>
+    <button class="on" onclick="setBg('photo',this)">照片壁纸</button>
+    <button onclick="setBg('gradient',this)">氛围渐变</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp"><span class="lab">版式</span>
+    <button onclick="setLayout('immersive',this)">A 全沉浸</button>
+    <button class="on" onclick="setLayout('canvas',this)">B 阅读画布 ★</button>
+    <button onclick="setLayout('band',this)">C 氛围带</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp"><span class="lab">动效</span>
+    <button class="on" onclick="setFx('off',this)">静</button>
+    <button onclick="setFx('on',this)">落物</button>
+  </div>
+  <label class="up">⬆︎我的照片<input type="file" accept="image/*" style="display:none" onchange="loadPhoto(event)"></label>
+  <span class="note">背景 × 版式 随意组合对比 · ★ 是我推荐的稳妥版</span>
+</div>
+
+<div class="stage">
+  <div class="scene" id="scene"></div>
+  <div class="grain"></div>
+  <div class="fx" id="fx"></div>
+
+  <div class="app">
+    <div class="header">
+      <div class="brand"><div class="brand-dot"></div><div class="brand-name">知识工作台</div></div>
+      <div class="avatar">禾</div>
+    </div>
+    <div class="body">
+      <nav class="nav">
+        <button class="nav-item active"><span class="nav-ic">📰</span><span class="nav-lb">资讯</span></button>
+        <button class="nav-item"><span class="nav-ic">💡</span><span class="nav-lb">灵感库</span></button>
+        <button class="nav-item"><span class="nav-ic">🗂️</span><span class="nav-lb">素材库</span></button>
+        <button class="nav-item"><span class="nav-ic">🔗</span><span class="nav-lb">信源</span></button>
+        <button class="nav-item"><span class="nav-ic">🧵</span><span class="nav-lb">主题</span></button>
+        <button class="nav-item"><span class="nav-ic">✍️</span><span class="nav-lb">创作台</span></button>
+        <button class="nav-item"><span class="nav-ic">📊</span><span class="nav-lb">周报</span></button>
+        <div class="nav-bot"><button class="nav-item"><span class="nav-ic">⚙️</span><span class="nav-lb">设置</span></button></div>
+      </nav>
+
+      <main class="main"><div class="main-in">
+        <div class="ptitle serif">资讯</div>
+        <div class="psub">今天的信源更新与即时分析入口</div>
+
+        <div class="hero" id="hero">
+          <div class="hero-t serif">即时分析</div>
+          <div class="hero-d">丢一个链接或音频，马上出中文结构化解读——把今天的心情也带进工作台。</div>
+          <div class="hero-row">
+            <input placeholder="粘贴链接，或拖入音频文件…">
+            <button class="btn-clip">📎</button>
+            <button class="btn">分析</button>
+          </div>
+        </div>
+
+        <div class="content">
+          <div class="glass brief">
+            <div class="brief-t serif">行业简报 · 今日焦点</div>
+            <div class="brief-lb">FOCUS</div>
+            <div class="focus">
+              <div class="frow"><span class="fnum serif">1</span><span class="ftitle">Anthropic 发布 Claude 5 系列，长上下文成本再降</span><span class="fcount">6 篇</span></div>
+              <div class="frow"><span class="fnum serif">2</span><span class="ftitle">本地向量层成为产品团队新标配</span><span class="fcount">4 篇</span></div>
+              <div class="frow"><span class="fnum serif">3</span><span class="ftitle">AI 产品的「信息管道」范式讨论升温</span><span class="fcount">3 篇</span></div>
+            </div>
+          </div>
+
+          <div class="feedbar"><b>12</b> 篇更新 · 关注的 5 个信源</div>
+          <div class="grid">
+            <div class="glass card">
+              <div class="chead"><span class="cauthor">Simon Willison</span><span class="cplat">· 博客</span><span class="cscore">相关 <b>92</b></span></div>
+              <div class="ctitle serif">我如何用本地模型跑完整个 RAG 管道</div>
+              <div class="csum">很扎实的实践复盘：从嵌入选型到召回评测，作者把每步取舍都摊开讲了……</div>
+              <div class="chips"><span class="chip"># RAG</span><span class="chip"># 本地模型</span><span class="heat ready">✓ 可成文</span></div>
+            </div>
+            <div class="glass card">
+              <div class="chead"><span class="cauthor">Lenny's Newsletter</span><span class="cplat">· 邮件</span><span class="cscore">相关 <b>88</b></span></div>
+              <div class="ctitle serif">给 AI 产品人的每日信息管道设计</div>
+              <div class="csum">把「获取—消化—产出」拆成三段，作者提出信息管道应默认增量、默认翻译……</div>
+              <div class="chips"><span class="chip"># 产品</span><span class="heat hot">🔥 在热点上</span></div>
+            </div>
+            <div class="glass card">
+              <div class="chead"><span class="cauthor">硬地骇客</span><span class="cplat">· 播客</span><span class="cscore">相关 <b>81</b></span></div>
+              <div class="ctitle serif">独立开发者的一人公司如何做内容</div>
+              <div class="csum">聊到用一套模板体系批量产出，但守住「读者更好懂」这条唯一尺子……</div>
+              <div class="chips"><span class="chip"># 内容</span><span class="heat stale">◔ 放久了</span></div>
+            </div>
+          </div>
+        </div>
+      </div></main>
+
+      <aside class="panel">
+        <div class="phead"><div class="ptitle2">AI 助手</div><div class="psub2">基于选中素材问答</div></div>
+        <div class="pbody">
+          <div class="msg ai">选了 3 篇素材，想从哪个角度切？我可以帮你比对观点冲突。</div>
+          <div class="msg user">帮我把这三篇里「本地向量层」的论据整理成一段</div>
+          <div class="msg ai">好的——三篇都指向「成本」与「隐私」两条主线，其中播客那篇提供了反例……</div>
+          <div class="plabel">快捷</div>
+          <button class="qchip">＋ 整理成素材卡</button>
+          <button class="qchip">＋ 生成一条选题</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<script>
+const body=document.body, scene=document.getElementById('scene'), hero=document.getElementById('hero');
+let custom=null;
+function css(v){return getComputedStyle(body).getPropertyValue(v).trim();}
+function applyBg(){
+  const isPhoto=body.dataset.bg==='photo';
+  const img = custom ? `url(${custom})` : css('--photo');
+  const grad = css('--scene');
+  const bg = isPhoto ? img : grad;
+  scene.style.backgroundImage = bg;
+  hero.style.backgroundImage = bg;   // hero::before 提供 scrim
+}
+function setSeason(s,btn){body.dataset.season=s;mark(btn,2);custom=null;applyBg();buildFx();}
+function setBg(v,btn){body.dataset.bg=v;mark(btn,4);applyBg();}
+function setLayout(v,btn){body.dataset.layout=v;mark(btn,6);}
+function setFx(v,btn){body.dataset.fx=v;mark(btn,8);buildFx();}
+function loadPhoto(e){const f=e.target.files[0];if(!f)return;custom=URL.createObjectURL(f);body.dataset.bg='photo';applyBg();}
+function mark(btn,grpIndex){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+
+const FX={spring:['🌸','🌷','🍃'],summer:['·','•','∘'],autumn:['🍂','🍁'],winter:['❄','❅','•'],'winter-light':['❄','❅','•']};
+function buildFx(){
+  const fx=document.getElementById('fx');fx.innerHTML='';
+  if(body.dataset.fx!=='on')return;
+  const s=body.dataset.season, chars=FX[s]||FX.autumn, n=(s.includes('winter')||s==='summer')?26:14;
+  for(let i=0;i<n;i++){
+    const el=document.createElement('div');el.className='fx-p';el.textContent=chars[i%chars.length];
+    el.style.left=(i*100/n+(i*13%6))+'%';el.style.fontSize=(10+i*7%14)+'px';el.style.opacity=0.35+(i%5)*0.11;
+    const dur=9+i*7%9;el.style.animation=`fall ${dur}s linear ${-(i*7%dur)}s infinite, sway ${3+i%4}s ease-in-out infinite`;
+    if(s==='summer')el.style.color='var(--accent)';
+    if(s==='winter')el.style.color='rgba(225,238,255,.85)';
+    if(s==='winter-light')el.style.color='rgba(63,116,171,.5)';
+    fx.appendChild(el);
+  }
+}
+applyBg();buildFx();
+</script>
+</body>
+</html>

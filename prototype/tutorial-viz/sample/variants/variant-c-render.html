@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>variant-c render</title>
+<style>
+  :root{
+    --paper:#f6f1e7;
+    --ink:#4a4540;
+    --sub:#6c655c;
+    --indigo:#3d5a80;
+    --terra:#c9784e;
+    --terra2:#d89a74;
+    --card:#fbf8f2;
+    --line:#e3d6c7;
+    --bar:#22303f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#111}
+  body{
+    width:1024px;height:1536px;overflow:hidden;
+    font-family:"PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink);
+  }
+  .canvas{
+    width:1024px;height:1536px;position:relative;overflow:hidden;
+    background:
+      radial-gradient(circle at 8% 7%, rgba(61,90,128,.05) 0 2px, transparent 3px) 0 0/42px 42px,
+      radial-gradient(circle at 92% 10%, rgba(201,120,78,.05) 0 2px, transparent 3px) 0 0/52px 52px,
+      var(--paper);
+  }
+  .frame{
+    position:absolute;inset:28px 30px 22px 30px;border-radius:28px;
+    border:2px solid rgba(74,69,64,.08);
+    background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0));
+    padding:24px 24px 18px;
+  }
+  .top{
+    height:225px;border-radius:24px;background:#f7f2ea;border:1px solid var(--line);
+    box-shadow:0 1px 0 rgba(255,255,255,.6) inset;
+    display:flex;gap:20px;align-items:flex-start;padding:22px 22px 16px;position:relative;
+  }
+  .title{font-size:50px;line-height:1.1;font-weight:700;letter-spacing:0;color:var(--ink);margin:0 0 10px}
+  .title .n{color:var(--terra)}
+  .sub{font-size:21px;line-height:1.35;color:#5b6f89;font-weight:600}
+  .story{font-size:15px;line-height:1.5;color:#534d46;margin-top:11px;max-width:520px}
+  .illus{
+    position:absolute;right:12px;top:12px;width:335px;height:195px;
+  }
+  .call{
+    position:absolute;top:16px;padding:8px 18px;border:3px solid; border-radius:24px;
+    font-size:28px;line-height:1;color:#b96f45;background:#f6efe6;
+  }
+  .call.a{left:24px;border-color:#c9784e;color:#c9784e}
+  .call.b{right:28px;border-color:#94b1b0;color:#94b1b0}
+  .car{
+    position:absolute;left:54px;top:44px;width:250px;height:118px;border:4px solid #5e554a;border-radius:24px 24px 30px 30px;
+    background:#efe6d8;
+  }
+  .car:before,.car:after{
+    content:"";position:absolute;bottom:-30px;width:56px;height:56px;border:4px solid #5e554a;border-radius:50%;background:#f6f1e7;
+  }
+  .car:before{left:16px}.car:after{right:16px}
+  .roof{
+    position:absolute;left:56px;top:12px;width:138px;height:72px;background:#cfd5cf;border:4px solid #5e554a;border-bottom:none;
+    clip-path:polygon(12% 100%,30% 20%,70% 20%,88% 100%);
+  }
+  .roof.r{left:138px;top:12px;width:138px;height:72px;background:#d9d8cd}
+  .head{
+    position:absolute;width:28px;height:28px;border-radius:50%;background:#e8d1be;border:4px solid #5e554a;
+  }
+  .head.h1{left:104px;top:62px}
+  .head.h2{left:204px;top:62px}
+  .body1,.body2{
+    position:absolute;width:34px;height:46px;border-radius:8px 8px 3px 3px;
+    background:#d9a76f;border:4px solid #5e554a;border-top:none;
+  }
+  .body1{left:99px;top:86px}
+  .body2{left:199px;top:86px;background:#94b3ab}
+  .arm{
+    position:absolute;width:60px;height:5px;background:#c9784e;top:80px;left:148px;transform:rotate(-27deg);border-radius:3px;
+  }
+  .arm:after{
+    content:"";position:absolute;right:-10px;top:-8px;width:18px;height:18px;border-right:4px solid #c9784e;border-top:4px solid #c9784e;transform:rotate(18deg);
+  }
+  .illus-note{
+    position:absolute;left:0;right:0;bottom:4px;font-size:13px;line-height:1.5;color:#6d6459;
+    text-align:left;padding:0 6px 0 4px;
+  }
+  .cards{margin-top:16px;display:flex;flex-direction:column;gap:12px}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:22px;
+    min-height:126px;padding:18px 18px 14px;display:flex;gap:16px;align-items:flex-start;
+    box-shadow:0 1px 0 rgba(255,255,255,.65) inset;
+  }
+  .num{
+    width:64px;height:64px;border-radius:50%;border:3px solid #e1cfbc;background:#f8f3ea;
+    display:flex;align-items:center;justify-content:center;
+    font-size:29px;color:#cf875f;font-family:Georgia,serif;font-weight:700;flex:0 0 auto;
+  }
+  .ic{
+    width:52px;height:52px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;margin-top:3px;
+  }
+  .ic svg{width:100%;height:100%;stroke:var(--indigo);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .card.hot{background:#f8eeea}
+  .card.hot .ic svg,.card.hot .title2{stroke:var(--terra)}
+  .content{flex:1 1 auto;padding-top:1px}
+  .title2{font-size:28px;line-height:1.15;font-weight:700;margin-bottom:7px;color:var(--ink)}
+  .q{font-size:26px;line-height:1.28;font-weight:700;margin-bottom:4px;color:var(--ink)}
+  .desc{font-size:18px;line-height:1.48;color:var(--sub);font-weight:600}
+  .bottom{
+    margin-top:16px;height:132px;border-radius:22px;background:var(--bar);color:#f2ece0;
+    padding:18px 20px;display:flex;align-items:flex-start;gap:14px;
+  }
+  .target{width:48px;height:48px;flex:0 0 auto}
+  .target svg{width:100%;height:100%;stroke:#e8c97f;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .bottom p{margin:3px 0 0;font-size:27px;line-height:1.38;font-weight:700}
+  .bottom b{color:#e8c97f}
+  .sign{position:absolute;right:54px;bottom:40px;font-size:15px;color:#9d9282;font-weight:600}
+  .corner{position:absolute;font-size:18px;color:#d2b8a0}
+  .corner.c1{left:42px;top:42px}.corner.c2{right:48px;top:46px}
+  .corner.c3{left:42px;bottom:44px}.corner.c4{right:48px;bottom:44px}
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="frame">
+      <div class="corner c1">☆</div>
+      <div class="corner c2">☆</div>
+      <div class="corner c3">☆</div>
+      <div class="corner c4">☆</div>
+
+      <section class="top">
+        <div style="max-width:520px;position:relative;z-index:2">
+          <h1 class="title">用 <span class="n">5</span> 个问题，<br>穿透自己的判断</h1>
+          <div class="sub">来自孟岩老师分享的一个小故事 · 方法教程体</div>
+          <div class="story">朋友重仓一只票，我问了他 5 个问题——问到第 3 个他就答不上来了。</div>
+        </div>
+        <div class="illus" aria-hidden="true">
+          <div class="call a">我到底知道什么？</div>
+          <div class="call b">嗯…</div>
+          <div class="car">
+            <div class="roof"></div>
+            <div class="roof r"></div>
+            <div class="head h1"></div><div class="head h2"></div>
+            <div class="body1"></div><div class="body2"></div>
+            <div class="arm"></div>
+          </div>
+          <div class="illus-note">两个青年坐在车里对话，一个提问、另一个被问住（简笔人物）</div>
+        </div>
+      </section>
+
+      <section class="cards">
+        <div class="card">
+          <div class="num">01</div>
+          <div class="ic">
+            <svg viewBox="0 0 24 24">
+              <circle cx="10" cy="10" r="6"></circle>
+              <line x1="14.5" y1="14.5" x2="20" y2="20"></line>
+            </svg>
+          </div>
+          <div class="content">
+            <div class="title2">事实依据</div>
+            <div class="q">我到底知道什么？</div>
+            <div class="desc">分清一手事实，还是推测／感觉／听来的。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">02</div>
+          <div class="ic">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"></path>
+            </svg>
+          </div>
+          <div class="content">
+            <div class="title2">推理链条</div>
+            <div class="q">我是怎么得出这个结论的？</div>
+            <div class="desc">逻辑链条有没有跳跃。</div>
+          </div>
+        </div>
+
+        <div class="card hot">
+          <div class="num">03</div>
+          <div class="ic">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6z"></path>
+              <path d="M9.5 9.5l5 5M14.5 9.5l-5 5"></path>
+            </svg>
+          </div>
+          <div class="content">
+            <div class="title2" style="color:var(--terra)">反方证据</div>
+            <div class="q">如果我是错的，最强反证是什么？</div>
+            <div class="desc">是否选择性忽略。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">04</div>
+          <div class="ic">
+            <svg viewBox="0 0 24 24">
+              <line x1="4" y1="8" x2="20" y2="8"></line>
+              <circle cx="15" cy="8" r="2.4"></circle>
+              <line x1="4" y1="16" x2="20" y2="16"></line>
+              <circle cx="9" cy="16" r="2.4"></circle>
+            </svg>
+          </div>
+          <div class="content">
+            <div class="title2">关键变量</div>
+            <div class="q">决定成败的那个变量，我是否真正理解它。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">05</div>
+          <div class="ic">
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="4" x2="12" y2="20"></line>
+              <line x1="6" y1="7" x2="18" y2="7"></line>
+              <path d="M6 7l-3 6h6zM18 7l-3 6h6z"></path>
+            </svg>
+          </div>
+          <div class="content">
+            <div class="title2">下注代价</div>
+            <div class="q">我愿意投入多少？</div>
+            <div class="desc">代价是否匹配我的认知深度。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bottom">
+        <div class="target">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="8"></circle>
+            <circle cx="12" cy="12" r="3.5"></circle>
+            <path d="M4 20L20 4"></path>
+          </svg>
+        </div>
+        <p><b>核心心法：</b>不是为了证明自己对，而是接近真相、降低代价，做出更好的决策。</p>
+      </section>
+
+      <div class="sign">你的知识工作台</div>
+    </div>
+  </div>
+</body>
+</html>

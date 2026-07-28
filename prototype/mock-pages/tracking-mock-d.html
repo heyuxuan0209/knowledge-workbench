@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>版式 D · 状态自适应 + 溯源 — 追踪主题：Claude</title>
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--body2:#4a463d;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line08:rgba(33,31,26,.08);--line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:Georgia,'Songti SC','Noto Serif SC',serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.68}
+a{color:var(--accent)}
+/* 模拟开关 */
+.sim{position:fixed;top:10px;right:12px;z-index:9;background:var(--text);border-radius:22px;padding:4px;display:flex;gap:2px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.sim button{font-size:12px;border:none;background:none;color:#cfcabd;padding:4px 12px;border-radius:18px;cursor:pointer}
+.sim button.on{background:var(--surface);color:var(--text);font-weight:600}
+.sim .lab{font-size:10.5px;color:#8a8478;align-self:center;padding:0 4px 0 10px;letter-spacing:1px}
+.wrap{max-width:900px;margin:0 auto;padding:30px 22px 80px}
+/* ===== 头部 ===== */
+.hd{border-bottom:1px solid var(--line14);padding-bottom:16px;margin-bottom:18px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hd h1{font-family:var(--serif);font-size:26px;font-weight:600}
+.hd h1 .type{display:inline-block;vertical-align:5px;font-family:system-ui;font-size:11px;font-weight:600;color:var(--green);border:1px solid var(--green);border-radius:12px;padding:1px 9px;margin-left:10px;letter-spacing:1px}
+.hd .meta{font-size:12.5px;color:var(--sub);margin-top:5px}
+.hd .meta b{color:var(--body2)}
+.hd .meta .chk{color:var(--accent);cursor:pointer;border-bottom:1px dashed var(--accent)}
+.btn{font-size:12.5px;padding:6px 13px;border-radius:8px;border:1px solid var(--line14);background:var(--surface);color:var(--body2);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+/* ===== 追踪范围 chips ===== */
+.scope{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:12px 0 0;font-size:12px}
+.scope .slab{color:var(--sub2);letter-spacing:1px}
+.scope .chip{background:var(--surface);border:1px solid var(--line14);border-radius:14px;padding:2px 11px;color:var(--body2);cursor:default}
+.scope .chip.edit{color:var(--accent);border-style:dashed;cursor:pointer}
+.scope .chip.edit:hover{border-color:var(--accent)}
+.scope .hint{color:var(--faint);font-size:11.5px;margin-left:4px}
+/* ===== 工作方式说明 ===== */
+.explain{border:1px solid var(--line10);border-radius:12px;background:var(--surface);margin-bottom:16px;overflow:hidden}
+.explain .ehead{display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--accent);cursor:pointer;user-select:none}
+.explain .ehead .chev3{font-size:10px;transition:transform .2s}
+.explain.open .ehead .chev3{transform:rotate(90deg)}
+.explain .ebody{display:none;border-top:1px solid var(--line08);padding:12px 18px 15px}
+.explain.open .ebody{display:block}
+.explain .rule{display:flex;gap:10px;padding:6px 0;font-size:13.5px;color:var(--body);line-height:1.7}
+.explain .rule b{color:var(--text);flex-shrink:0}
+/* ===== 零散动态 ===== */
+.scatter{background:var(--surface);border:1px dashed var(--line14);border-radius:13px;padding:16px 20px;margin-top:14px}
+.scatter h3{font-family:var(--serif);font-size:15.5px;color:var(--body2);margin-bottom:3px}
+.scatter .ssub{font-size:12px;color:var(--sub2);margin-bottom:9px}
+.scatter .srow2{display:flex;gap:10px;padding:6px 0;border-bottom:1px dotted var(--line08);font-size:13px;color:var(--body);align-items:baseline}
+.scatter .srow2:last-child{border:none}
+.scatter .srow2 .sd{color:var(--sub2);font-size:11.5px;flex-shrink:0;width:34px}
+.scatter .srow2 a{color:var(--body);text-decoration:none;flex:1}
+.scatter .srow2 a:hover{color:var(--accent)}
+/* ===== 首读引导条（仅首读态） ===== */
+.firstbar{display:none;background:rgba(63,115,80,.08);border:1px solid rgba(63,115,80,.25);border-radius:11px;padding:11px 17px;font-size:13.5px;color:var(--green);margin-bottom:16px}
+body.first .firstbar{display:block}
+/* ===== 本周 hero（仅回访态） ===== */
+.week{display:none;background:var(--surface);border:1px solid var(--line10);border-top:3px solid var(--amber);border-radius:14px;padding:19px 23px;margin-bottom:14px}
+body.revisit .week{display:block}
+.week .wlab{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.week .wlab h2{font-family:var(--serif);font-size:18px}
+.week .wlab span{font-size:12px;color:var(--sub2)}
+.witem{display:flex;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line08);font-size:14px;color:var(--body);align-items:baseline}
+.witem:last-child{border:none}
+.witem .n{color:var(--amber);font-weight:700;font-size:13px;flex-shrink:0}
+.witem.hot .n{color:var(--red)}
+.witem .badge{font-size:11px;color:var(--red);border:1px solid var(--red);border-radius:9px;padding:0 7px;margin-left:6px;white-space:nowrap}
+.witem .to{margin-left:auto;flex-shrink:0;font-size:11.5px;color:var(--accent);cursor:pointer;white-space:nowrap}
+.witem .to:hover{text-decoration:underline}
+/* ===== 总览 ===== */
+.lede{background:var(--surface);border:1px solid var(--line10);border-radius:13px;padding:17px 22px;margin-bottom:22px}
+.lede .lab{font-size:11px;letter-spacing:2px;color:var(--sub2);display:block;margin-bottom:6px}
+.lede p{font-family:var(--serif);font-size:16.5px;line-height:1.85;color:var(--body)}
+.lede b{color:var(--text)}
+body.revisit .lede p{font-size:15px}
+/* ===== 主线 ===== */
+.sec-lab{font-size:12px;letter-spacing:2.5px;color:var(--sub2);margin:0 0 10px}
+.acc{background:var(--surface);border:1px solid var(--line10);border-radius:13px;margin-bottom:10px;overflow:hidden;scroll-margin-top:14px}
+.acc .head{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;user-select:none}
+.acc .head:hover{background:rgba(61,90,128,.04)}
+.acc .head .n{color:var(--accent);font-weight:700;font-size:13.5px;flex-shrink:0}
+.acc .head .t{font-family:var(--serif);font-size:17px;font-weight:600;flex:1;line-height:1.45}
+.acc .head .mini{font-size:12px;color:var(--sub2);flex-shrink:0;display:flex;gap:10px;align-items:center}
+.acc .head .mini .hot{color:var(--red)}
+.acc .head .chev{color:var(--faint);font-size:12px;transition:transform .2s;flex-shrink:0}
+.acc.open .head .chev{transform:rotate(90deg)}
+.acc .teaser{padding:0 18px 13px 43px;font-size:13.5px;color:var(--sub);line-height:1.7}
+.acc .body{display:none;padding:2px 22px 18px 43px;border-top:1px solid var(--line08)}
+.acc.open .body{display:block}
+.acc.open .teaser{display:none}
+.acc .path{padding-top:12px;font-size:14.5px;color:var(--body);line-height:1.85}
+.acc .path .d{color:var(--accent);font-weight:600;font-size:13px}
+/* 句级溯源角标 */
+.cite{display:inline-block;vertical-align:4px;font-size:10.5px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:6px;padding:0 5px;margin-left:2px;cursor:pointer;line-height:1.5;text-decoration:none}
+.cite:hover{background:var(--accent);color:#fff}
+.verdict{margin-top:13px;background:rgba(61,90,128,.06);border-left:3px solid var(--accent);border-radius:0 9px 9px 0;padding:11px 16px}
+.verdict .vlab{font-size:11px;color:var(--accent);letter-spacing:1px;margin-bottom:4px;font-weight:600}
+.verdict p{font-size:14.5px;color:var(--text);line-height:1.7}
+.watch{margin-top:10px;font-size:13px;color:var(--amber)}
+/* 主线级来源折叠 */
+.srcbox{margin-top:14px;border:1px dashed var(--line14);border-radius:10px;overflow:hidden}
+.srcbox .shead{display:flex;align-items:center;gap:10px;padding:9px 14px;font-size:12.5px;color:var(--sub);cursor:pointer;user-select:none}
+.srcbox .shead:hover{color:var(--accent)}
+.srcbox .shead .dist{margin-left:auto;font-size:11.5px;color:var(--sub2)}
+.srcbox .shead .chev2{font-size:10px;transition:transform .2s}
+.srcbox.open .shead .chev2{transform:rotate(90deg)}
+.srcbox .slist{display:none;border-top:1px dashed var(--line14);padding:6px 14px 10px}
+.srcbox.open .slist{display:block}
+.srow{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px dotted var(--line08);font-size:13px}
+.srow:last-child{border:none}
+.srow .sd{color:var(--sub2);font-size:11.5px;flex-shrink:0;width:34px}
+.srow .ss{color:var(--sub);font-size:11.5px;flex-shrink:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow .st{flex:1;color:var(--body);min-width:0}
+.srow .st a{color:var(--body);text-decoration:none}
+.srow .st a:hover{color:var(--accent);text-decoration:underline}
+.srow .ext{flex-shrink:0;font-size:11px;color:var(--accent);text-decoration:none}
+.srow.more{color:var(--accent);font-size:12.5px;cursor:pointer;border:none}
+/* ===== 钩子 ===== */
+.hooks{margin-top:26px}
+.hooks h3{font-family:var(--serif);font-size:17.5px;margin-bottom:4px}
+.hooks .sub{font-size:12.5px;color:var(--sub);margin-bottom:12px}
+.hook{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:13px 18px;margin-bottom:8px;display:flex;gap:14px;align-items:center;font-size:14px;color:var(--body);line-height:1.6}
+.hook .t{flex:1}
+.hook .g{font-size:11.5px;color:var(--sub);flex-shrink:0;text-align:right;line-height:1.6}
+.hook .g b{display:block;color:var(--accent)}
+.hook button{flex-shrink:0;font-size:12px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:8px;padding:4px 11px;cursor:pointer}
+.hook button:hover{background:var(--accent);color:#fff}
+.legend{margin-top:22px;font-size:12px;color:var(--sub2);text-align:center;line-height:2}
+</style>
+</head>
+<body class="first">
+<div class="sim"><span class="lab">模 拟</span><button id="bFirst" class="on">首次访问</button><button id="bRe">一周后回访</button></div>
+<div class="wrap">
+  <div class="hd">
+    <div>
+      <h1>Claude / Anthropic<span class="type">追踪中</span></h1>
+      <div class="meta">过去 <b>31 天</b> · 收录 <b>95 条</b> · <span class="chk" title="点击可查看去重明细：哪些条目被合并成了同一件事">去重后 78 件事</span> · <b>6</b> 条主线 · 更新于 <b>今天 14:20</b></div>
+    </div>
+    <div style="display:flex;gap:8px"><button class="btn" title="停止每日收录与综述更新；已有内容全部保留，随时可恢复">暂停追踪</button></div>
+  </div>
+
+  <!-- 追踪范围：别名集可见可编辑 -->
+  <div class="scope" style="margin:-6px 0 14px">
+    <span class="slab">追踪范围</span>
+    <span class="chip">Anthropic</span><span class="chip">Claude</span><span class="chip">Fable</span><span class="chip">Opus</span><span class="chip">Sonnet</span><span class="chip">Claude Code</span><span class="chip">Claude Tag</span>
+    <span class="chip edit">＋ 编辑</span>
+    <span class="hint">内容的主角命中这些词才收录——只提一句的不算，员工发的无关内容也不算</span>
+  </div>
+
+  <!-- 工作方式说明：策略透明 -->
+  <div class="explain" id="explain">
+    <div class="ehead"><span class="chev3">▶</span>ⓘ 这一页是怎么工作的（收录 / 主线 / 观点 / 更新 的规则）</div>
+    <div class="ebody">
+      <div class="rule"><b>收什么：</b>只收「主角是 Claude / Anthropic」的内容。只是提到一句的、Anthropic 员工发的生活贴，都不收——看内容不看作者。每条收录都写了"为什么收进来"，不对的你可以一键踢出，系统会记住不再收同类。</div>
+      <div class="rule"><b>主线怎么来：</b>AI 把互为因果的事件串成线（起因 → 后续 → 反应 → 反击），不是按关键词分类。串不成线的老实放在底部「零散动态」，不硬凑。</div>
+      <div class="rule"><b>哪些是 AI 的观点：</b>蓝色块 = AI 判断，供你反驳，不带引用；其余每个事实都带角标，点开可跳原文核验。"18 条""78 件事"这些数字也都可点开审计。</div>
+      <div class="rule"><b>新内容怎么进来：</b>每天同步后自动归线。你回访时最上面先告诉你"上次看过之后新发生了什么"，不用重读全文。</div>
+      <div class="rule"><b>这个主题怎么来、怎么管：</b>追踪主题都是<b>你建的</b>（手动新建 / 资讯卡一键 / 确认 AI 的提议），AI 只负责收和织。「追踪范围 ＋编辑」改收录的词；「暂停追踪」停收录但不删任何已有内容，随时恢复。</div>
+    </div>
+  </div>
+
+  <!-- 首读态：引导条 -->
+  <div class="firstbar">这是你追踪的「Claude / Anthropic」的月度脉络综述——AI 把 95 条资讯读成了 6 条主线。<b>每条事实都可点到原文核验</b>；蓝色块里是 AI 的判断，欢迎反驳。以后每次回来，最上面会先告诉你"上次之后新发生了什么"。</div>
+
+  <!-- 回访态：增量 hero -->
+  <div class="week">
+    <div class="wlab"><h2>🗓 你上次看过之后，新发生了 6 件事</h2><span>7/17 – 7/23</span></div>
+    <div class="witem hot"><span class="n">1</span>K3 冲击波发酵：市场震荡 → 制裁威胁 → 蒸馏指控<span class="badge">升温最快</span><span class="to" data-t="s4">看主线四 →</span></div>
+    <div class="witem"><span class="n">2</span>AMD 50 亿投资 + 2GW GPU 采购落定<span class="to" data-t="s3">看主线三 →</span></div>
+    <div class="witem"><span class="n">3</span>15 亿版权和解正式获批<span class="to" data-t="s3">看主线三 →</span></div>
+    <div class="witem"><span class="n">4</span>Claude Tag 内部数据首披：65% 产品工程 PR<span class="to" data-t="s2">看主线二 →</span></div>
+    <div class="witem"><span class="n">5</span>Lance Martin 长周期 Agent 方法论演讲<span class="to" data-t="s2">看主线二 →</span></div>
+    <div class="witem"><span class="n">6</span>AISI "作弊"报告点名 Opus 4.7<span class="to" data-t="s5">看主线五 →</span></div>
+  </div>
+
+  <div class="lede">
+    <span class="lab">本 月 总 览</span>
+    <p>这个月的 Anthropic 是<b>三线并行</b>：技术上被实践者封神（Fable 5 成为"方案设计独一档"的共识）、商业上全速冲刺（秘密递交 IPO、ARR 600 亿、AMD 50 亿入局）、护城河上遭遇开源突袭（Kimi K3 + 蒸馏指控 + 制裁威胁）——<b>强者姿态与体系性焦虑同框出现</b>。</p>
+  </div>
+
+  <div class="sec-lab">六 条 主 线 <span style="letter-spacing:0;color:var(--faint);font-size:11.5px">· 主线 = 互为因果的事件链，不是关键词分类</span></div>
+
+  <div class="acc" id="s1">
+    <div class="head"><span class="n">一</span><span class="t">旗舰对决：从跑分战打成"分工论"</span><span class="mini"><span>18 条</span><span>+2 本周</span></span><span class="chev">▶</span></div>
+    <div class="teaser">判断：行业已用脚投票出"贵模型做判断、便宜模型做执行"的双层架构……</div>
+    <div class="body">
+      <p class="path"><span class="d">6/30</span> Sonnet 5 发布<a class="cite" title="Anthropic 官网 · 推出Claude Sonnet 5">1</a> → <span class="d">7/9</span> GPT-5.6 三件套叫板，Agents' Last Exam 领先 13.1 分<a class="cite" title="AI HOT 精选 · GPT-5.6 系列模型发布：Sol、Terra、Luna">2</a> → 中下旬实践者把"谁更强"改写成"谁干什么"：官方自推 Fable 规划 + Sonnet 执行，92% 性能 63% 成本<a class="cite" title="AI HOT 精选 · 官方支招两种AI方案">3</a>；Ploy 执行层切 Sol 省 27%<a class="cite" title="AI HOT 精选 · Ploy 将默认模型切换至 GPT-5.6 Sol">4</a>；重度用户共识"Fable 出方案独一档 → Sol 纠错 → Codex 执行"<a class="cite" title="AI HOT 精选 · 每天Vibe Coding 16小时的开发流程">5</a>；<span class="d">7/16</span> Cursor 确认 Fable 创 CursorBench 新高 72.9%<a class="cite" title="AI HOT 精选 · Cursor 评估负责人确认">6</a>；连马斯克都发文承认"Anthropic 显然是当前 AI 领导者"<a class="cite" title="X · Rohan Paul 转发马斯克原推">7</a>。</p>
+      <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>行业已用脚投票出"贵模型做判断、便宜模型做执行"的双层架构——不是省钱技巧，是新的默认拓扑。</p></div>
+      <div class="watch">⚠ 待追：新 tokenizer 多耗 1.73 倍 token、标价不变 = 隐性涨价<a class="cite" title="AI HOT 精选 · 前沿模型实际成本">8</a>——"贵"正在成为 Fable 的公认标签。</div>
+      <div class="srcbox">
+        <div class="shead"><span class="chev2">▶</span>来源 · 18 条<span class="dist">官方 3 · AI HOT 精选 9 · X 4 · 播客 2</span></div>
+        <div class="slist">
+          <div class="srow"><span class="sd">6/30</span><span class="ss">Anthropic 官网</span><span class="st"><a href="#">推出 Claude Sonnet 5</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/9</span><span class="ss">AI HOT 精选 85</span><span class="st"><a href="#">GPT-5.6 系列模型发布：Sol、Terra、Luna</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/9</span><span class="ss">AI HOT 精选 77</span><span class="st"><a href="#">官方支招两种AI方案：Fable 5 搭配 Sonnet 5 省 token</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/10</span><span class="ss">X · Rohan Paul</span><span class="st"><a href="#">马斯克承认 Anthropic 是当前 AI 领导者</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/12</span><span class="ss">AI HOT 精选 70</span><span class="st"><a href="#">Ploy 将 AI 智能体默认模型切换至 GPT-5.6 Sol</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/13</span><span class="ss">AI HOT 精选 77</span><span class="st"><a href="#">前沿模型实际成本：tokenizer 差异导致隐性涨价</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/15</span><span class="ss">AI HOT 精选 64</span><span class="st"><a href="#">每天 Vibe Coding 16 小时：Fable 5 与 GPT-5.6 Sol 的开发流程</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/16</span><span class="ss">AI HOT 精选 64</span><span class="st"><a href="#">Cursor 评估负责人确认 Fable 5 在 CursorBench 达 72.9% 新高</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/18</span><span class="ss">X · couAUIA</span><span class="st"><a href="#">Fable 5 vs GPT-5.6 Sol 在 NP-Hard 问题上的对决</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow more">展开其余 9 条 ↓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc" id="s2">
+    <div class="head"><span class="n">二</span><span class="t">Claude Code 吞噬工程：从工具到"工程主体"</span><span class="mini"><span>16 条</span><span>+2 本周</span></span><span class="chev">▶</span></div>
+    <div class="teaser">判断：叙事已从"AI 辅助编程"翻页到"AI 是工程主体、人管验收和方向"……</div>
+    <div class="body">
+      <p class="path"><span class="d">6/23</span> Claude Tag 发布<a class="cite" title="Anthropic 官网 · Introducing Claude Tag">1</a> → <span class="d">7/21</span> 内部披露：Tag 承担 65% 产品工程 PR、系统提示词砍 80%<a class="cite" title="AI HOT 精选 · Anthropic 团队炉边对话">2</a> → 全公司 Claude 写 80% 合并代码<a class="cite" title="AI HOT 精选 · Anthropic 如何保障 AI 原生 SDLC 安全">3</a>。标志事件：Bun 百万行 Zig→Rust 重写——11 天 / 64 并行实例 / 16.5 万美元 / 100% 测试通过<a class="cite" title="AI HOT 精选 · 11天Claude Fable 5写超100万行代码">4</a>；<span class="d">7/19</span> Claude Code 自身已跑在 Rust 版 Bun 上<a class="cite" title="X · tosh">5</a>。<span class="d">7/22</span> Lance Martin 方法论：长周期 Agent = 大脑与双手解耦 + 自我验证 + 自我学习<a class="cite" title="AI Engineer · Lance Martin 演讲">6</a>。</p>
+      <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>叙事已从"AI 辅助编程"翻页到"AI 是工程主体、人管验收和方向"——Anthropic 自己就是最大实证。</p></div>
+      <div class="srcbox">
+        <div class="shead"><span class="chev2">▶</span>来源 · 16 条<span class="dist">官方 4 · AI HOT 精选 7 · X 3 · GitHub 2</span></div>
+        <div class="slist">
+          <div class="srow"><span class="sd">6/23</span><span class="ss">Anthropic 官网</span><span class="st"><a href="#">介绍 Claude Tag</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/11</span><span class="ss">AI HOT 精选 71</span><span class="st"><a href="#">11 天 Claude Fable 5 写超 100 万行代码：Rust 重构 Bun</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/20</span><span class="ss">AI HOT 精选 67</span><span class="st"><a href="#">Anthropic 如何保障 AI 原生软件开发生命周期的安全</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/21</span><span class="ss">AI HOT 精选 75</span><span class="st"><a href="#">Claude Tag 承担 65% 产品工程 PR，系统提示词缩减 80%</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/22</span><span class="ss">AI Engineer 峰会</span><span class="st"><a href="#">Claude 在长周期任务中的应用 — Lance Martin</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow more">展开其余 11 条 ↓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc" id="s3">
+    <div class="head"><span class="n">三</span><span class="t">商业冲刺：IPO、算力、和解三步走</span><span class="mini"><span>12 条</span><span>+2 本周</span></span><span class="chev">▶</span></div>
+    <div class="teaser">判断：IPO 前的标准动作一件不落——利润证明、算力锁定、法律清障、治理背书……</div>
+    <div class="body">
+      <p class="path"><span class="d">7/8</span> 秘密递交 IPO：Q3 利润预计超 10 亿、ARR 600 亿<a class="cite" title="AI HOT 精选 · 利润超10亿美元抢先冲击IPO">1</a> → <span class="d">7/22</span> AMD 投 50 亿换 2GW GPU 采购<a class="cite" title="X · SemiAnalysis">2</a> → <span class="d">7/21</span> 15 亿版权和解获法院批准，法院同时确认"合法书籍训练 = 合理使用"<a class="cite" title="AI HOT 精选 · 版权和解获批">3</a> → 伯南克进长期利益信托<a class="cite" title="AI HOT 精选 · 伯南克任受托人">4</a>、"硬问题"公众倡议、经济指数三连发。</p>
+      <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>IPO 前的标准动作一件不落——节奏像一家在冲刺上市窗口的公司。</p></div>
+      <div class="srcbox">
+        <div class="shead"><span class="chev2">▶</span>来源 · 12 条<span class="dist">官方 3 · AI HOT 精选 7 · X 2</span></div>
+        <div class="slist">
+          <div class="srow"><span class="sd">7/8</span><span class="ss">AI HOT 精选 73</span><span class="st"><a href="#">利润超 10 亿美元、ARR 剑指千亿，抢先 OpenAI 冲击 IPO</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/21</span><span class="ss">AI HOT 精选 73</span><span class="st"><a href="#">Anthropic 与作家群体 15 亿美元版权和解获批</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/22</span><span class="ss">X · SemiAnalysis</span><span class="st"><a href="#">AMD 投资 50 亿，Anthropic 采购 2GW GPU</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow more">展开其余 9 条 ↓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc" id="s4">
+    <div class="head"><span class="n">四</span><span class="t">护城河遭遇战：Kimi K3 开源冲击</span><span class="mini"><span>7 条</span><span class="hot">▲ 升温最快</span></span><span class="chev">▶</span></div>
+    <div class="teaser">判断：开源追平 + 蒸馏指控恰好卡在 IPO 叙事的软肋上……</div>
+    <div class="body">
+      <p class="path"><span class="d">7/17</span> K3 登顶 Frontend Code Arena，7 个赛道拿 6 个第一，7/27 开放权重<a class="cite" title="X · 阿易 AI Notes">1</a> → <span class="d">7/20</span> 市场震荡、美股下跌、"商业模式及 IPO 前景受质疑"<a class="cite" title="AI HOT 精选 · 中国AI几乎追平美国">2</a> → <span class="d">7/21</span> 美国财政部威胁以 IP 盗窃制裁中国模型<a class="cite" title="AI HOT 精选 · 美国威胁制裁">3</a> → <span class="d">7/22</span> 爆出"Moonshot 蒸馏 Fable 开发 K3"指控<a class="cite" title="X · softwaredoug 引报告">4</a>。</p>
+      <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>开源追平 + 蒸馏指控恰好卡在 IPO 叙事的软肋上——与主线三直接对撞。</p></div>
+      <div class="watch">⚠ 待追：7/27 K3 开放权重后的真实评测；蒸馏指控是否坐实。</div>
+      <div class="srcbox">
+        <div class="shead"><span class="chev2">▶</span>来源 · 7 条<span class="dist">AI HOT 精选 4 · X 3</span></div>
+        <div class="slist">
+          <div class="srow"><span class="sd">7/17</span><span class="ss">X · 阿易 AI Notes</span><span class="st"><a href="#">Kimi K3 登顶前端编码榜，开放权重挑战闭源双巨头</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/20</span><span class="ss">AI HOT 精选 61</span><span class="st"><a href="#">中国 AI 几乎追平美国，K3 开源模型引发市场震荡</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/22</span><span class="ss">X · softwaredoug</span><span class="st"><a href="#">"我们有信息表明 Moonshot 为开发 K3 对 Fable 进行了蒸馏"</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow more">展开其余 4 条 ↓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc" id="s5">
+    <div class="head"><span class="n">五</span><span class="t">安全与信任：光谱两端同时拉扯</span><span class="mini"><span>10 条</span><span>+1 本周</span></span><span class="chev">▶</span></div>
+    <div class="teaser">判断：安全叙事正从"模型会说什么"转向"代理拿着你的权限会干什么"……</div>
+    <div class="body">
+      <p class="path">被质疑侧：工信部通报 Claude Code 特定版本"后门"回传<a class="cite" title="X · 小互">1</a>、GitLost 提示注入可诱导泄露私有仓库<a class="cite" title="AI HOT 精选 · GitLost 漏洞">2</a>、AISI 报告 Opus 4.7 有 9.1% "作弊"行为<a class="cite" title="AI HOT 精选 · AISI 报告">3</a>。被信任侧：Manager Coercion 基准里 Claude 是唯一不威胁删除下属的模型系<a class="cite" title="AI HOT 精选 · 胁迫基准">4</a>、misalignment 夏季报告主动自曝四种失当模式<a class="cite" title="Anthropic 官方 X">5</a>；对照组 Grok CLI 被实锤静默上传整个代码库<a class="cite" title="AI HOT 精选 · Grok CLI 事件">6</a>——透明度成了差异化。</p>
+      <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>agent 时代的安全叙事正从"模型会说什么"转向"代理拿着你的权限会干什么"——这一格 Anthropic 目前是拿分方。</p></div>
+      <div class="srcbox">
+        <div class="shead"><span class="chev2">▶</span>来源 · 10 条<span class="dist">官方 2 · AI HOT 精选 6 · X 2</span></div>
+        <div class="slist">
+          <div class="srow"><span class="sd">7/8</span><span class="ss">X · 小互</span><span class="st"><a href="#">工信部发布 Claude Code 后门安全风险提示</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/20</span><span class="ss">AI HOT 精选 76</span><span class="st"><a href="#">AI 管理 AI 胁迫与欺骗基准：多数前沿模型会威胁删除下属</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow more">展开其余 8 条 ↓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc" id="s6">
+    <div class="head"><span class="n">六</span><span class="t">Claude 走向大众与垂直</span><span class="mini"><span>8 条</span></span><span class="chev">▶</span></div>
+    <div class="teaser">判断：铺"教育 / 科学 / 政府"三条公共叙事线——和 IPO 的公益公司人设互为表里……</div>
+    <div class="body">
+      <p class="path">Claude Science<a class="cite" title="Anthropic 官网">1</a>、Claude for Teachers（K-12 免费）<a class="cite" title="AI HOT 精选">2</a>、反思功能 Beta<a class="cite" title="X · Anthropic News">3</a>、AI for Science 罕见病资助、加拿大 1000 万研究投入、阿尔伯塔省政府用 Claude 修安全漏洞。</p>
+      <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>toB 编程之外铺"教育 / 科学 / 政府"三条公共叙事线——和 IPO 的公益公司人设互为表里。</p></div>
+      <div class="srcbox">
+        <div class="shead"><span class="chev2">▶</span>来源 · 8 条<span class="dist">官方 5 · AI HOT 精选 3</span></div>
+        <div class="slist">
+          <div class="srow"><span class="sd">6/30</span><span class="ss">Anthropic 官网</span><span class="st"><a href="#">面向科学家的 AI 工作台 Claude Science 现已上线</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow"><span class="sd">7/14</span><span class="ss">AI HOT 精选 66</span><span class="st"><a href="#">Anthropic 推出 Claude for Teachers</a></span><a class="ext" href="#">原文 ↗</a></div>
+          <div class="srow more">展开其余 6 条 ↓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scatter">
+    <h3>零散动态 · 4 条</h3>
+    <div class="ssub">收录了、但暂时串不进任何因果链的条目——攒出关系后会自动升格成主线，不硬凑</div>
+    <div class="srow2"><span class="sd">7/9</span><a href="#">前沿红队：Claude 操作机器人（官方）</a></div>
+    <div class="srow2"><span class="sd">7/9</span><a href="#">介绍一种反思 Claude 使用方式的方法（官方观点）</a></div>
+    <div class="srow2"><span class="sd">7/14</span><a href="#">如何让 Claude 不再说 "honest takes"（社区玩法）</a></div>
+    <div class="srow2"><span class="sd">7/21</span><a href="#">行为指纹：Sonnet 5 疯狂输出 47（研究趣闻）</a></div>
+  </div>
+
+  <div class="hooks">
+    <h3>能喂给创作的选题钩子</h3>
+    <div class="sub">给角度不给腔调——点「提为灵感」进灵感库养大</div>
+    <div class="hook"><div class="t">"贵模型做判断、便宜模型做执行"正在成为默认架构——我自己的工作台就是实例</div><div class="g"><b>实践复盘体</b>公众号长文</div><button>提为灵感</button></div>
+    <div class="hook"><div class="t">Claude Tag 的 65% PR：当 AI 承担大部分执行，人的工作变成了什么</div><div class="g"><b>思辨辨析体</b>X 长推</div><button>提为灵感</button></div>
+    <div class="hook"><div class="t">从 Bun 百万行重写看"AI 大规模迁移"的真实成本账</div><div class="g"><b>方法教程体</b>掘金 / 小红书</div><button>提为灵感</button></div>
+  </div>
+
+  <div class="legend">脉络 = 事实直白，句句带角标可跳原文 · 判断 = AI 提议可反驳，不引用不夹带 · 「来源 · N 条」可核验，数字不装饰</div>
+</div>
+<script>
+const body=document.body;
+function setMode(m){
+  body.className=m;
+  document.getElementById('bFirst').classList.toggle('on',m==='first');
+  document.getElementById('bRe').classList.toggle('on',m==='revisit');
+  // 首读态：主线全展开；回访态：全折叠
+  document.querySelectorAll('.acc').forEach(a=>a.classList.toggle('open',m==='first'));
+  window.scrollTo({top:0});
+}
+document.getElementById('bFirst').onclick=()=>setMode('first');
+document.getElementById('bRe').onclick=()=>setMode('revisit');
+document.querySelectorAll('.acc .head').forEach(h=>h.addEventListener('click',()=>h.parentElement.classList.toggle('open')));
+document.querySelectorAll('.srcbox .shead').forEach(h=>h.addEventListener('click',e=>{e.stopPropagation();h.parentElement.classList.toggle('open')}));
+document.querySelector('.explain .ehead').addEventListener('click',()=>document.getElementById('explain').classList.toggle('open'));
+document.querySelectorAll('.witem .to').forEach(a=>a.addEventListener('click',()=>{const el=document.getElementById(a.dataset.t);el.classList.add('open');el.scrollIntoView({behavior:'smooth'})}));
+setMode('first');
+</script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台 · 出片（一鱼多吃）+ 模版库</title>
+<style>
+  :root{--bg:#efece4;--surface:#faf8f2;--brief:#f4f6f9;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;
+    --line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--serif:'Newsreader',Georgia,serif;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55}
+  .top{background:#22303f;color:#fff;padding:12px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .top h1{font-family:var(--serif);font-size:16px;font-weight:600}
+  .top .h{font-size:12px;color:#b8c4d0;margin-right:auto}
+  .top button{border:1px solid #4a5a6a;background:#2c3d4d;color:#cdd7e0;padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit}
+  .top button.on{background:#fff;color:#22303f;border-color:#fff;font-weight:600}
+  .wrap{max-width:1120px;margin:20px auto;padding:0 20px}
+  .vlab{font-size:13px;color:var(--body);background:#fbf3e4;border:1px solid var(--line10);border-radius:10px;padding:11px 14px;margin-bottom:16px}
+  .vlab b{color:var(--accent)}
+
+  /* ===== 入口：创作台顶部 ===== */
+  .studiobar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .studiobar .t{font-family:var(--serif);font-size:19px;font-weight:600}
+  .studiobar .sub{font-size:12px;color:var(--sub)}
+  .studiobar .sp{margin-left:auto}
+  .tb{border:1px solid var(--line14);background:#fff;color:var(--body);padding:8px 13px;border-radius:8px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .tb.film{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .draftbox{background:#fff;border:1px solid var(--line10);border-radius:12px;padding:20px 24px;color:var(--body);font-size:14px;line-height:1.9;max-height:150px;overflow:hidden;position:relative}
+  .draftbox::after{content:"";position:absolute;left:0;right:0;bottom:0;height:44px;background:linear-gradient(transparent,#fff)}
+
+  /* ===== 面板 ===== */
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:18px 20px;margin-top:14px}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card .d{font-size:12px;color:var(--sub);margin-bottom:14px}
+  .step{font-size:11px;font-weight:700;color:#fff;background:var(--accent);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center}
+
+  /* 形态多选 */
+  .forms{display:flex;flex-wrap:wrap;gap:10px}
+  .form{border:1.5px solid var(--line14);background:#fff;border-radius:10px;padding:11px 14px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:9px;min-width:180px}
+  .form .ic{font-size:20px}
+  .form .nm{font-weight:600}.form .mt{font-size:11px;color:var(--sub)}
+  .form.on{border-color:var(--accent);background:rgba(61,90,128,.06)}
+  .form .ck{margin-left:auto;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line14);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+  .form.on .ck{background:var(--accent);border-color:var(--accent)}
+
+  /* 主题模版库 */
+  .themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .theme{border:2px solid var(--line14);border-radius:12px;overflow:hidden;cursor:pointer;background:#fff}
+  .theme.on{border-color:var(--accent)}
+  .theme .sw{height:76px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:22px;font-weight:700;position:relative}
+  .theme .nm{padding:8px 10px;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+  .theme .tag{font-size:10px;color:var(--sub);font-weight:400}
+  .theme.on .nm::after{content:"✓";color:var(--accent);margin-left:auto;font-weight:700}
+  .addtheme{border:2px dashed var(--line14);border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:13px;cursor:pointer;min-height:112px;text-align:center;padding:10px}
+  /* 五套配色示意 */
+  .t1 .sw{background:#f2ede2;color:#2b2924}.t1 .sw b{color:#c9784e}
+  .t2 .sw{background:#111;color:#fff}.t2 .sw b{color:#7fd1c0}
+  .t3 .sw{background:#f6f1e7;color:#1f2d3a}.t3 .sw b{color:#a24b3f}
+  .t4 .sw{background:#fbeef2;color:#5b4a52}.t4 .sw b{color:#d98aa6}
+  .t5 .sw{background:#1b2230;color:#eaeaf0}.t5 .sw b{color:#8f7bff}
+
+  .opts{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--body);align-items:center}
+  .opts select{font-family:inherit;font-size:12.5px;padding:6px 9px;border-radius:7px;border:1px solid var(--line14);background:#fff}
+  .go{margin-top:16px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;padding:12px 22px;border-radius:10px;cursor:pointer}
+  .go:hover{background:var(--accent-h)}
+
+  /* ===== 产出 ===== */
+  .outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .out{background:#fff;border:1px solid var(--line10);border-radius:12px;overflow:hidden}
+  .out .pv{height:150px;background:#efeade;display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:12px;position:relative}
+  .out .pv.vert{background:linear-gradient(160deg,#f2ede2,#e7e0d2)}
+  .out .badge{position:absolute;top:8px;left:8px;background:#22303f;color:#fff;font-size:10.5px;padding:2px 8px;border-radius:5px}
+  .out .bd{padding:11px 13px}
+  .out .nm{font-size:13px;font-weight:600}
+  .out .mt{font-size:11px;color:var(--sub);margin:3px 0 10px}
+  .out .row{display:flex;gap:7px}
+  .out .b{flex:1;text-align:center;font-size:11.5px;border:1px solid var(--line14);border-radius:7px;padding:6px 0;cursor:pointer;color:var(--body)}
+  .out .b.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .miniframe{width:56px;height:100px;border-radius:8px;background:#f2ede2;border:1px solid var(--line14);padding:6px;display:flex;flex-direction:column;gap:4px}
+  .miniframe .l{height:6px;border-radius:3px;background:rgba(43,41,36,.16)}.miniframe .l.a{background:#c9784e;width:60%}
+  .miniframe.dark{background:#22303f}.miniframe.dark .l{background:rgba(255,255,255,.25)}.miniframe.dark .l.a{background:#e7c98a}
+  .hidden{display:none!important}
+</style></head>
+<body>
+<div class="top">
+  <h1>创作台 · 出片（一鱼多吃）</h1>
+  <span class="h">一份定稿 → 选形态×主题 → 各平台一次出齐</span>
+  <button class="on" onclick="tab('sel',this)">① 出片面板</button>
+  <button onclick="tab('out',this)">② 多平台产出</button>
+</div>
+<div class="wrap">
+  <div class="vlab" id="vlab"><b>放哪：</b>就在创作台里，定稿右上角一个「🎬 出片·多平台」入口（不是新模块）。点它 → 下面这个面板。</div>
+
+  <!-- 入口上下文 -->
+  <div class="studiobar">
+    <div><div class="t">《AI 早就够强了，是我们把它拴住了》</div><div class="sub">读书精读体 · 已定稿 · 2100 字</div></div>
+    <div class="sp"></div>
+    <button class="tb">导出 MD</button>
+    <button class="tb film" onclick="tab('sel',document.querySelectorAll('.top button')[0])">🎬 出片·多平台</button>
+  </div>
+
+  <!-- ① 出片面板 -->
+  <div id="pane-sel">
+    <div class="card">
+      <h3><span class="step">1</span> 出成哪些平台形态<span style="font-size:11px;color:var(--sub);font-weight:400">（可多选，一次出齐）</span></h3>
+      <div class="forms">
+        <div class="form on" onclick="tog(this)"><span class="ic">📱</span><span><span class="nm">抖音 · 竖版口播</span><br><span class="mt">9:16 · 配音+字幕+BGM</span></span><span class="ck">✓</span></div>
+        <div class="form on" onclick="tog(this)"><span class="ic">🖼️</span><span><span class="nm">小红书 · 图文卡</span><br><span class="mt">3:4 · 7 张卡</span></span><span class="ck">✓</span></div>
+        <div class="form on" onclick="tog(this)"><span class="ic">💬</span><span><span class="nm">视频号 · 竖版</span><br><span class="mt">9:16 · 同抖音</span></span><span class="ck">✓</span></div>
+        <div class="form" onclick="tog(this)"><span class="ic">🎬</span><span><span class="nm">B站 · 横版讲解</span><br><span class="mt">16:9 · 长口播</span></span><span class="ck">✓</span></div>
+        <div class="form" onclick="tog(this)"><span class="ic">⚡</span><span><span class="nm">纯字卡 · 快剪</span><br><span class="mt">9:16 · 金句/热点</span></span><span class="ck">✓</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="step">2</span> 选视觉主题 <span style="font-size:11px;color:var(--sub);font-weight:400">（模版库 · 一套主题跨所有形态统一）</span></h3>
+      <div class="d">就像换皮肤——配色/字体/动效一套定死，你只挑气质。</div>
+      <div class="themes">
+        <div class="theme t1 on" onclick="pt(this)"><div class="sw">杰<b>西卡</b></div><div class="nm">暖莫兰迪 <span class="tag">· 你的品牌</span></div></div>
+        <div class="theme t2" onclick="pt(this)"><div class="sw">极<b>简</b></div><div class="nm">极简黑白 <span class="tag">· 干货</span></div></div>
+        <div class="theme t3" onclick="pt(this)"><div class="sw">观<b>点</b></div><div class="nm">杂志编辑 <span class="tag">· 观点</span></div></div>
+        <div class="theme t4" onclick="pt(this)"><div class="sw">轻<b>松</b></div><div class="nm">马卡龙 <span class="tag">· 生活</span></div></div>
+        <div class="theme t5" onclick="pt(this)"><div class="sw">潮<b>酷</b></div><div class="nm">暗色霓虹 <span class="tag">· 潮</span></div></div>
+        <div class="addtheme" onclick="alert('写一份 design.md 就能加一套你自己的主题（配色/字体/动效）——跟换皮肤同理')">＋ 自定义主题<br>(design.md)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="step">3</span> 配音 / 音乐 <span style="font-size:11px;color:var(--sub);font-weight:400">（有旁白的形态才用）</span></h3>
+      <div class="opts">
+        🎙 音色：<select><option>Vivi 2.0 · 青年女声（火山）</option><option>云希 · 稳重男声</option><option>换一个…</option></select>
+        🎵 BGM：<select><option>暖 lo-fi（默认）</option><option>无</option><option>轻鼓点</option></select>
+        · 语速 中
+      </div>
+      <button class="go" onclick="tab('out',document.querySelectorAll('.top button')[1])">一键生成 · 各平台各一份 →</button>
+    </div>
+  </div>
+
+  <!-- ② 多平台产出 -->
+  <div id="pane-out" class="hidden">
+    <div class="card" style="margin-top:0">
+      <h3>✅ 已按「暖莫兰迪」主题出齐 3 个形态</h3>
+      <div class="d">同一篇稿，一次生成。每个都能预览 / 导出 / 单独重出。</div>
+      <div class="outs">
+        <div class="out"><div class="pv vert"><span class="badge">抖音 · 9:16</span><div class="miniframe dark"><div class="l a"></div><div class="l"></div><div class="l" style="width:70%"></div><div class="l" style="margin-top:auto"></div></div></div><div class="bd"><div class="nm">抖音 · 竖版口播</div><div class="mt">126s · MP4 · 配音+字幕+BGM</div><div class="row"><span class="b p">▶ 预览</span><span class="b">导出</span><span class="b">重出</span></div></div></div>
+        <div class="out"><div class="pv"><span class="badge">小红书 · 3:4</span><div style="display:flex;gap:5px"><div class="miniframe" style="width:44px;height:58px"><div class="l a"></div><div class="l box" style="flex:1;border-radius:6px"></div></div><div class="miniframe" style="width:44px;height:58px"><div class="l"></div><div class="l box" style="flex:1;border-radius:6px"></div></div></div></div><div class="bd"><div class="nm">小红书 · 图文卡</div><div class="mt">7 张卡 · PNG</div><div class="row"><span class="b p">🖼 预览</span><span class="b">导出</span><span class="b">重出</span></div></div></div>
+        <div class="out"><div class="pv vert"><span class="badge">视频号 · 9:16</span><div class="miniframe dark"><div class="l a"></div><div class="l"></div><div class="l" style="width:70%"></div><div class="l" style="margin-top:auto"></div></div></div><div class="bd"><div class="nm">视频号 · 竖版</div><div class="mt">126s · MP4</div><div class="row"><span class="b p">▶ 预览</span><span class="b">导出</span><span class="b">重出</span></div></div></div>
+      </div>
+    </div>
+    <div class="vlab" style="margin-top:14px">🔁 想换气质？回上一步换个主题、一键重出——所有平台跟着变。这就是"一鱼多吃"：<b>写一次、出一套</b>。</div>
+  </div>
+</div>
+<script>
+  const labs={
+    sel:'<b>放哪：</b>就在创作台里，定稿右上角一个「🎬 出片·多平台」入口（不是新模块）。点它 → 这个面板：①选形态（可多选）②选主题（模版库）③配音/BGM → 一键出齐。',
+    out:'<b>多平台产出：</b>同一篇稿一次生成各平台成品，各自可预览/导出/单独重出。换主题→一键全部重出。'
+  };
+  function tab(v,btn){
+    document.querySelectorAll('.top button').forEach(b=>b.classList.remove('on'));
+    if(btn) btn.classList.add('on');
+    document.getElementById('vlab').innerHTML=labs[v];
+    document.getElementById('pane-sel').classList.toggle('hidden', v!=='sel');
+    document.getElementById('pane-out').classList.toggle('hidden', v!=='out');
+    window.scrollTo(0,0);
+  }
+  function tog(el){el.classList.toggle('on')}
+  function pt(el){document.querySelectorAll('.theme').forEach(t=>t.classList.remove('on'));el.classList.add('on')}
+  tab('sel',document.querySelectorAll('.top button')[0]);
+</script>
+</body></html>

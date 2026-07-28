@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>variant-d</title>
+<style>
+  :root{
+    --paper:#f5efe4;
+    --ink:#25221e;
+    --sub:#6f685e;
+    --indigo:#395a7c;
+    --indigo-deep:#22303f;
+    --sage:#7a9a93;
+    --terra:#c9784e;
+    --terra-soft:#d99170;
+    --card:#fbf7f0;
+    --line:rgba(37,34,30,.16);
+    --line-strong:rgba(37,34,30,.42);
+    --shadow:0 14px 36px rgba(44,33,21,.16);
+    --serif:"STSong","Songti SC","Noto Serif SC","Source Han Serif SC",serif;
+    --sans:"PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#ddd6c8}
+  body{
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;font-family:var(--sans);color:var(--ink);
+  }
+  .canvas{
+    position:relative;
+    width:1024px;height:1536px;
+    background:
+      radial-gradient(circle at 18% 14%, rgba(255,255,255,.38) 0 1px, transparent 1.5px) 0 0/18px 18px,
+      radial-gradient(circle at 82% 22%, rgba(255,255,255,.28) 0 1px, transparent 1.5px) 0 0/22px 22px,
+      linear-gradient(180deg, #f6f0e6 0%, #f4ede1 100%);
+    border-radius:34px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .grain::before{
+    content:"";
+    position:absolute;inset:0;
+    background:
+      linear-gradient(90deg, rgba(37,34,30,.03) 1px, transparent 1px) 0 0/7px 7px,
+      linear-gradient(rgba(37,34,30,.025) 1px, transparent 1px) 0 0/7px 7px;
+    opacity:.22;
+    mix-blend-mode:multiply;
+    pointer-events:none;
+  }
+  .inner{
+    position:absolute;inset:0;
+    padding:58px 56px 42px;
+    display:flex;flex-direction:column;
+  }
+  .title{
+    font-family:var(--serif);
+    font-weight:800;
+    font-size:64px;
+    line-height:1.06;
+    letter-spacing:0;
+    margin:0;
+    max-width:760px;
+  }
+  .title .accent{color:var(--terra)}
+  .subtitle{
+    margin-top:14px;
+    font-size:23px;
+    color:var(--sub);
+    letter-spacing:0;
+  }
+  .corner{
+    position:absolute;
+    width:36px;height:36px;
+    color:var(--indigo);
+    opacity:.9;
+  }
+  .corner.left{left:36px;top:38px}
+  .corner.right{right:36px;top:38px;transform:scaleX(-1)}
+  .top{
+    margin-top:20px;
+    display:grid;
+    grid-template-columns:1.05fr .95fr;
+    gap:22px;
+    align-items:stretch;
+  }
+  .scene, .story{
+    position:relative;
+    background:rgba(255,251,245,.54);
+    border:2px dashed var(--line-strong);
+    border-radius:24px;
+  }
+  .scene{
+    min-height:220px;
+    padding:14px 16px 16px;
+    overflow:hidden;
+  }
+  .scene-label{
+    position:absolute;left:16px;top:10px;
+    font-size:15px;color:var(--sub);letter-spacing:0;
+  }
+  .scene svg{width:100%;height:100%}
+  .caption{
+    margin-top:10px;
+    font-size:20px;
+    line-height:1.55;
+    color:var(--ink);
+    padding:16px 18px;
+    background:rgba(255,255,255,.34);
+    border-radius:20px;
+    border:1.5px solid rgba(121,103,82,.22);
+  }
+  .caption b{color:var(--terra)}
+  .cards{
+    margin-top:18px;
+    display:flex;
+    flex-direction:column;
+    gap:13px;
+  }
+  .card{
+    position:relative;
+    display:grid;
+    grid-template-columns:90px 58px 1fr;
+    gap:14px;
+    align-items:start;
+    background:var(--card);
+    border:2px solid rgba(52,41,29,.14);
+    border-radius:22px;
+    padding:18px 18px 16px 18px;
+  }
+  .card::after{
+    content:"";
+    position:absolute;left:18px;right:18px;top:-9px;height:1px;
+    border-top:2px dotted rgba(77,66,54,.18);
+  }
+  .num{
+    font-family:var(--serif);
+    font-size:42px;
+    line-height:1;
+    color:var(--terra);
+    font-weight:800;
+    padding-top:4px;
+  }
+  .icon{
+    width:50px;height:50px;
+    color:var(--indigo);
+    margin-top:2px;
+  }
+  .card.card-03 .icon,
+  .card.card-03 .question,
+  .card.card-03 .num{color:var(--terra)}
+  .text{padding-top:3px}
+  .question{
+    font-size:30px;
+    font-weight:800;
+    line-height:1.14;
+    margin:0 0 6px;
+    letter-spacing:0;
+    color:var(--ink);
+  }
+  .answer{
+    font-size:20px;
+    line-height:1.45;
+    color:var(--sub);
+    margin:0;
+  }
+  .bar{
+    margin-top:auto;
+    background:var(--indigo-deep);
+    color:#f4ead8;
+    border-radius:22px;
+    padding:18px 22px;
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    min-height:114px;
+  }
+  .bar .target{
+    width:32px;height:32px;flex:none;
+    color:#e8ca8d;
+    margin-top:1px;
+  }
+  .bar .copy{
+    font-size:24px;
+    line-height:1.55;
+    letter-spacing:0;
+  }
+  .bar strong{color:#e8ca8d}
+  .signature{
+    position:absolute;right:60px;bottom:34px;
+    font-family:var(--serif);
+    font-size:18px;
+    color:#a59682;
+    letter-spacing:0;
+  }
+  .wavy{
+    position:absolute;left:50%;transform:translateX(-50%);
+    width:200px;height:16px;bottom:396px;color:rgba(69,58,43,.22);
+  }
+  .wavy.two{bottom:270px}
+  .top-doodle{
+    position:absolute;right:54px;top:294px;width:56px;height:56px;color:var(--terra-soft);opacity:.9;
+  }
+  .small-star{
+    position:absolute;left:64px;bottom:268px;width:28px;height:28px;color:var(--sage);opacity:.9;
+  }
+  .house{
+    position:absolute;right:72px;bottom:320px;width:28px;height:28px;color:var(--indigo);opacity:.75;
+  }
+  svg{display:block}
+  .st{fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+  .st-thin{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .fill{fill:currentColor}
+</style>
+</head>
+<body>
+<div class="canvas grain">
+  <svg class="corner left" viewBox="0 0 40 40" aria-hidden="true">
+    <path class="st" d="M7 14c6-4 11-4 16 0M7 26c6-4 11-4 16 0M7 14v12M23 14v12"/>
+  </svg>
+  <svg class="corner right" viewBox="0 0 40 40" aria-hidden="true">
+    <path class="st" d="M7 14c6-4 11-4 16 0M7 26c6-4 11-4 16 0M7 14v12M23 14v12"/>
+  </svg>
+  <svg class="top-doodle" viewBox="0 0 64 64" aria-hidden="true">
+    <path class="st" d="M16 36c7-13 25-20 32-6 5 9 1 18-8 21-10 4-21 0-24-9"/>
+    <path class="st-thin" d="M19 19l5 7M12 25l8 1M45 17l-1 8"/>
+  </svg>
+  <svg class="small-star" viewBox="0 0 40 40" aria-hidden="true">
+    <path class="st" d="M20 6l2.8 8.1L31 17l-8.2 2.1L20 27l-2.8-7.9L9 17l8.2-2.9z"/>
+  </svg>
+  <svg class="house" viewBox="0 0 32 32" aria-hidden="true">
+    <path class="st" d="M6 15l10-8 10 8M9 13v12h14V13"/>
+    <path class="st-thin" d="M14 25v-6h4v6"/>
+  </svg>
+
+  <div class="inner">
+    <h1 class="title">用 <span class="accent">5</span> 个问题，<br>穿透自己的判断</h1>
+    <div class="subtitle">来自孟岩老师分享的一个小故事 · 方法教程体</div>
+
+    <div class="top">
+      <div class="scene">
+        <div class="scene-label">顶部小故事插画</div>
+        <svg viewBox="0 0 520 230" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <defs>
+            <filter id="s" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".08"/>
+            </filter>
+          </defs>
+          <path d="M35 180c60-30 119-35 178-27 78 10 160 9 272-4" fill="none" stroke="rgba(37,34,30,.12)" stroke-width="3" stroke-linecap="round"/>
+          <g filter="url(#s)">
+            <path d="M116 68c62-13 137-13 222 0 16 3 26 13 29 29l8 48c2 11-4 20-16 22-72 10-147 10-221 0-16-2-25-13-23-29l5-44c2-15 10-24 26-26z" fill="#7d8ea1" opacity=".14"/>
+            <path d="M110 74c54-12 122-12 201 0 14 2 22 11 24 24l6 40c2 10-3 18-13 20-66 9-133 9-200 0-14-2-21-10-19-23l4-37c2-13 9-21 19-24z" fill="#44596d" opacity=".18"/>
+            <path d="M108 78c53-11 120-11 197 0 13 2 20 9 22 22l5 38c2 10-3 17-12 19-64 8-129 8-193 0-13-2-19-9-18-22l4-35c1-11 7-20 15-22z" fill="#f3d9bd" stroke="rgba(37,34,30,.16)" stroke-width="2"/>
+            <path d="M117 91c56-8 116-8 184 0" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M133 112c45-4 95-4 150 0" fill="none" stroke="rgba(37,34,30,.12)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M126 136h180" fill="none" stroke="rgba(37,34,30,.16)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M130 78l11-12h50l9 12M216 79l7-8h33l6 8" fill="none" stroke="rgba(37,34,30,.16)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M129 75c-5 0-9 4-9 9v29c0 6 4 11 10 11h49M214 74h47c5 0 9 4 9 9v27c0 5-4 10-10 10h-47" fill="none" stroke="rgba(37,34,30,.16)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M184 111c9-12 21-16 34-12 12 4 17 13 16 26" fill="none" stroke="rgba(37,34,30,.16)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M217 123c11-10 23-14 36-11" fill="none" stroke="rgba(37,34,30,.16)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M145 108c-7 1-14 5-20 13" fill="none" stroke="rgba(37,34,30,.18)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="151" cy="112" r="8" fill="#f0efe8" stroke="rgba(37,34,30,.14)" stroke-width="2"/>
+            <circle cx="247" cy="118" r="8" fill="#f0efe8" stroke="rgba(37,34,30,.14)" stroke-width="2"/>
+            <path d="M168 107c2 15-1 27-10 35" fill="none" stroke="rgba(37,34,30,.18)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M236 111c-4 12-12 22-24 29" fill="none" stroke="rgba(37,34,30,.18)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M168 113c10-2 19 1 27 8" fill="none" stroke="rgba(37,34,30,.18)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M228 117c-8 1-16 4-23 9" fill="none" stroke="rgba(37,34,30,.18)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M161 149c5 0 9-2 13-6M227 146c6 0 11-2 15-5" fill="none" stroke="rgba(37,34,30,.18)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M154 100c4-4 9-6 15-7M221 104c4-5 10-8 17-8" fill="none" stroke="rgba(37,34,30,.18)" stroke-width="2" stroke-linecap="round"/>
+          </g>
+          <g transform="translate(75,62)">
+            <circle cx="0" cy="24" r="18" fill="#f3cfaf" stroke="rgba(37,34,30,.22)" stroke-width="2"/>
+            <path d="M-10 20c8-5 17-5 24 0" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M-8 31c4 4 13 4 17 0" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M-13 58c3-9 7-15 13-18 7 3 11 9 14 18" fill="none" stroke="rgba(37,34,30,.22)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M-2 43l-4 24" fill="none" stroke="rgba(37,34,30,.22)" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M6 44l8 24" fill="none" stroke="rgba(37,34,30,.22)" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M17 54l17 3" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M25 49c8-6 14-9 19-10" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M25 49c9 4 15 10 18 18" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2.2" stroke-linecap="round"/>
+          </g>
+          <g transform="translate(370,66)">
+            <circle cx="0" cy="24" r="18" fill="#efc09b" stroke="rgba(37,34,30,.22)" stroke-width="2"/>
+            <path d="M-9 20c5-4 11-5 19-2" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M-9 29c5-2 10-2 17 0" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M-11 58c3-10 8-15 13-18 6 3 10 9 13 18" fill="none" stroke="rgba(37,34,30,.22)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M0 43l-1 24" fill="none" stroke="rgba(37,34,30,.22)" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M9 45l4 22" fill="none" stroke="rgba(37,34,30,.22)" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M19 57c10 0 18 2 26 7" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M21 48c9-6 18-7 27-4" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M21 48c9 5 14 12 16 20" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M33 58c7 2 11 5 16 10" fill="none" stroke="rgba(37,34,30,.2)" stroke-width="2.2" stroke-linecap="round"/>
+          </g>
+          <path d="M0 185c60-35 116-45 176-39 70 7 146 8 229-3 21-3 51-8 90-15" fill="none" stroke="rgba(37,34,30,.12)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="story">
+        <div class="caption">朋友重仓一只票，我问了他 <b>5</b> 个问题——问到第 <b>3</b> 个他就答不上来了。</div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="num">01</div>
+        <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+          <circle class="st" cx="27" cy="27" r="14"></circle>
+          <path class="st" d="M37 37l13 13"></path>
+          <path class="st-thin" d="M18 27c1-5 5-9 10-10"></path>
+        </svg>
+        <div class="text">
+          <div class="question">事实依据</div>
+          <p class="answer">我到底知道什么？分清一手事实，还是推测、感觉、听来的。</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="num">02</div>
+        <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+          <circle class="st" cx="32" cy="32" r="8"></circle>
+          <path class="st" d="M32 12v8M32 44v8M12 32h8M44 32h8M20 20l6 6M38 38l6 6M44 20l-6 6M20 44l6-6"></path>
+          <path class="st-thin" d="M22 14c4 2 9 3 10 3s6-1 10-3"></path>
+        </svg>
+        <div class="text">
+          <div class="question">推理链条</div>
+          <p class="answer">我是怎么得出这个结论的？逻辑链条中间有没有跳跃。</p>
+        </div>
+      </div>
+
+      <div class="card card-03">
+        <div class="num">03</div>
+        <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+          <path class="st" d="M32 10l16 6v11c0 10-6 18-16 21-10-3-16-11-16-21V16z"></path>
+          <path class="st" d="M25 25l14 14M39 25L25 39"></path>
+          <path class="st-thin" d="M20 18c4-2 8-3 12-3s8 1 12 3"></path>
+        </svg>
+        <div class="text">
+          <div class="question">反方证据</div>
+          <p class="answer">如果我是错的，最强反证是什么？是否选择性忽略。</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="num">04</div>
+        <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+          <path class="st" d="M12 20h40"></path>
+          <circle class="st" cx="39" cy="20" r="6"></circle>
+          <path class="st" d="M12 40h40"></path>
+          <circle class="st" cx="24" cy="40" r="6"></circle>
+          <path class="st-thin" d="M24 14v12M39 34v12"></path>
+        </svg>
+        <div class="text">
+          <div class="question">关键变量</div>
+          <p class="answer">决定成败的那个变量，我是否真正理解它。</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="num">05</div>
+        <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+          <path class="st" d="M32 10v38"></path>
+          <path class="st" d="M18 18h28"></path>
+          <path class="st" d="M18 18l-6 12h12z"></path>
+          <path class="st" d="M46 18l-6 12h12z"></path>
+          <path class="st-thin" d="M24 48h16"></path>
+        </svg>
+        <div class="text">
+          <div class="question">下注代价</div>
+          <p class="answer">我愿意投入多少？代价是否匹配我的认知深度。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bar">
+      <svg class="target" viewBox="0 0 40 40" aria-hidden="true">
+        <circle class="st" cx="20" cy="20" r="14"></circle>
+        <circle class="st-thin" cx="20" cy="20" r="6"></circle>
+        <path class="st-thin" d="M20 6v5M34 20h-5M20 34v-5M6 20h5"></path>
+      </svg>
+      <div class="copy"><strong>核心心法：</strong>不是为了证明自己对，而是接近真相、降低代价，做出更好的决策。</div>
+    </div>
+  </div>
+
+  <div class="wavy">
+    <svg viewBox="0 0 200 16" aria-hidden="true">
+      <path class="st-thin" d="M4 8c10-5 20-5 30 0s20 5 30 0 20-5 30 0 20 5 30 0 20-5 30 0"></path>
+    </svg>
+  </div>
+  <div class="wavy two">
+    <svg viewBox="0 0 200 16" aria-hidden="true">
+      <path class="st-thin" d="M4 8c10-5 20-5 30 0s20 5 30 0 20-5 30 0 20 5 30 0 20-5 30 0"></path>
+    </svg>
+  </div>
+
+  <div class="signature">你的知识工作台</div>
+</div>
+</body>
+</html>

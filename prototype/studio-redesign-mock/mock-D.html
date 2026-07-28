@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台重构 · 方案D 融合版</title>
+<style>
+  :root{--bg:#efece4;--surface:#faf8f2;--brief:#f4f6f9;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;
+    --line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--serif:'Newsreader',Georgia,serif;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+  .top{background:#22303f;color:#fff;padding:11px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .top h1{font-family:var(--serif);font-size:16px;font-weight:600}.top .h{font-size:12px;color:#b8c4d0;margin-right:auto}
+  .vlab{padding:9px 20px;background:#fbf3e4;border-bottom:1px solid var(--line10);font-size:12.5px;color:var(--body)}.vlab b{color:var(--accent)}
+  /* 工作台四区 */
+  .app{display:grid;grid-template-columns:54px 196px 1fr 300px;height:calc(100vh - 78px);min-height:620px}
+  .nav{background:var(--surface);border-right:1px solid var(--line10);padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .nav .it{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--sub);cursor:default}
+  .nav .it.on{background:rgba(61,90,128,.1);color:var(--accent)}
+  /* 素材台（常驻左） */
+  .mats{background:var(--surface);border-right:1px solid var(--line10);padding:14px 13px;overflow:auto}
+  .mats h3{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:10px}
+  .mats .add{margin-left:auto;font-size:10.5px;color:var(--accent);border:1px solid var(--line14);border-radius:5px;padding:1px 6px;cursor:pointer}
+  .mat{background:#fff;border:1px solid var(--line10);border-radius:7px;padding:8px 9px;margin-bottom:7px;font-size:11.5px}
+  .mat.sel{border-color:var(--accent);background:rgba(61,90,128,.05)}
+  .mat .ins{float:right;font-size:10px;color:var(--accent);border:1px solid var(--line14);border-radius:4px;padding:0 5px;cursor:pointer}
+  .lbl{font-size:10.5px;color:var(--sub);margin:14px 0 6px;font-weight:600}
+  /* 中栏 */
+  .main{background:var(--bg);padding:14px 18px;overflow:auto}
+  .mtab{display:inline-flex;background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:3px;margin-bottom:12px}
+  .mtab button{border:none;background:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;color:var(--sub);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px}
+  .mtab button.on{background:var(--accent);color:#fff}
+  .mtab .step{width:19px;height:19px;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.25)}
+  .mtab button:not(.on) .step{background:#e6e0d3;color:var(--sub)}
+  .tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .tb{border:1px solid var(--line14);background:#fff;color:var(--body);padding:6px 11px;border-radius:7px;font-size:12px;cursor:pointer}
+  .draft{background:#fff;border:1px solid var(--line10);border-radius:11px;padding:18px 22px;font-size:13.5px;line-height:1.9;color:var(--body);min-height:340px}
+  .draft h4{font-family:var(--serif);font-size:18px;margin-bottom:9px;color:var(--text)}
+  .mut{font-size:11.5px;color:var(--sub)}
+  /* 出片面板（占中栏，不动左右） */
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:15px 16px;margin-bottom:12px}
+  .card h4{font-size:13px;font-weight:600;margin-bottom:3px}.card .d{font-size:11px;color:var(--sub);margin-bottom:11px}
+  .pf{border:1.4px solid var(--line14);background:#fff;border-radius:9px;padding:9px 11px;cursor:pointer;display:flex;align-items:center;gap:9px;font-size:12.5px;margin-bottom:7px}
+  .pf .nm{font-weight:600}.pf .rend{font-size:9.5px;color:var(--faint)}.pf .mt{font-size:10.5px;color:var(--sub)}
+  .pf .ck{margin-left:auto;width:17px;height:17px;border-radius:5px;border:1.4px solid var(--line14);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center}
+  .pf.on{border-color:var(--accent);background:rgba(61,90,128,.06)}.pf.on .ck{background:var(--accent);border-color:var(--accent)}
+  .themes{display:flex;gap:8px;flex-wrap:wrap}
+  .th{border:2px solid var(--line14);border-radius:9px;overflow:hidden;cursor:pointer;width:80px}
+  .th .sw{height:38px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:14px;font-weight:700}.th .nm{font-size:10px;padding:4px;text-align:center;color:var(--body)}
+  .th.on{border-color:var(--accent)}.th.on .nm{color:var(--accent);font-weight:700}
+  .m1 .sw{background:#f2ede2;color:#c9784e}.m2 .sw{background:#111;color:#7fd1c0}.m3 .sw{background:#f6f1e7;color:#a24b3f}.m4 .sw{background:#fbeef2;color:#d98aa6}
+  .btn{border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:9px;cursor:pointer}
+  .outs{display:flex;gap:10px;flex-wrap:wrap}
+  .out{background:#fff;border:1px solid var(--line10);border-radius:10px;overflow:hidden;width:140px}
+  .out .pv{height:82px;background:#efeade;display:flex;align-items:center;justify-content:center;position:relative}
+  .out .badge{position:absolute;top:6px;left:6px;background:#22303f;color:#fff;font-size:9px;padding:1px 6px;border-radius:4px}
+  .out .bd{padding:8px 9px}.out .nm{font-size:11.5px;font-weight:600}.out .mt{font-size:10px;color:var(--sub);margin:2px 0 7px}
+  .out .row{display:flex;gap:5px}.out .b{flex:1;text-align:center;font-size:10.5px;border:1px solid var(--line14);border-radius:6px;padding:4px 0;cursor:pointer}.out .b.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .mini{width:34px;height:56px;border-radius:6px;background:#f2ede2;border:1px solid var(--line14);padding:4px;display:flex;flex-direction:column;gap:3px}.mini .l{height:4px;border-radius:2px;background:rgba(43,41,36,.16)}.mini .l.a{background:#c9784e;width:60%}.mini.dark{background:#22303f}.mini.dark .l{background:rgba(255,255,255,.25)}.mini.dark .l.a{background:#e7c98a}
+  /* 右：AI 助手（常驻） */
+  .ai{background:var(--surface);border-left:1px solid var(--line10);padding:14px 14px;overflow:auto}
+  .ai h3{font-size:12.5px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .ai .grp{font-size:10.5px;color:var(--sub);font-weight:600;margin:14px 0 7px}
+  .ai .at{border:1px solid var(--line14);background:#fff;border-radius:7px;padding:7px 10px;font-size:12px;margin-bottom:6px;cursor:pointer}
+  .ai .say{border:1px solid var(--line14);border-radius:9px;background:#fff;padding:9px 11px;font-size:12px;color:var(--sub)}
+  .rankmat{background:#fff;border:1px solid var(--line10);border-radius:7px;padding:7px 9px;margin-bottom:6px;font-size:11.5px;display:flex;align-items:center;gap:6px}
+  .rankmat .ins{margin-left:auto;font-size:10px;color:var(--accent);border:1px solid var(--line14);border-radius:4px;padding:1px 6px;cursor:pointer}
+  .hidden{display:none!important}.tag{font-size:10px;background:var(--accent);color:#fff;padding:1px 7px;border-radius:4px;margin-left:6px}
+</style></head>
+<body>
+<div class="top"><h1>创作台重构 · 方案 D（融合版）</h1><span class="h">保留你现有 素材/母稿/AI助手 三区 · 只在中间加「定稿｜出片」切换</span></div>
+<div class="vlab" id="vlab"><b>现在是「② 定稿」</b>：中间是母稿编辑器。左边素材台常驻、右边 AI 助手常驻。点中间的「③ 出片」切过去——左右不动。</div>
+
+<div class="app">
+  <!-- 左导航 -->
+  <nav class="nav"><div class="it">📰</div><div class="it">📝</div><div class="it">🗂️</div><div class="it">💡</div><div class="it on">✍️</div></nav>
+
+  <!-- 素材台（常驻，回答"素材怎么找"） -->
+  <div class="mats">
+    <h3>📎 素材台 <span class="add" onclick="alert('从飞书 / +新增')">+新增</span></h3>
+    <div class="mat sel">vibecoding 半年经验 <span class="ins">插入</span></div>
+    <div class="mat sel">html mock 踩坑 <span class="ins">插入</span></div>
+    <div class="mat">密度开关·手感 <span class="ins">插入</span></div>
+    <div class="mat">梁文锋十问·护城河 <span class="ins">插入</span></div>
+    <div class="lbl">本文引用（2）· 可溯源</div>
+    <div class="mat" style="font-size:11px;color:var(--sub)">[素材1] vibecoding 原文 ↗</div>
+    <div class="mat" style="font-size:11px;color:var(--sub)">[素材2] html 踩坑 ↗</div>
+  </div>
+
+  <!-- 中栏：定稿｜出片 切换 -->
+  <div class="main">
+    <div class="mtab">
+      <button id="tb-edit" class="on" onclick="mode('edit')"><span class="step">2</span>定稿（母稿）</button>
+      <button id="tb-film" onclick="mode('film')"><span class="step">3</span>出片 · 多平台</button>
+    </div>
+
+    <!-- 定稿 -->
+    <div id="pane-edit">
+      <div class="tools"><span class="tb">↻ 重新起稿</span><span class="tb">✨ 润色</span><span class="tb">🔎 审稿</span><span class="tb">🏷 标题</span><span class="tb">↩ 撤销</span><span class="tb" style="margin-left:auto">草稿箱(3)</span></div>
+      <div class="draft"><h4>AI 早就够强了，是我们把它拴住了</h4>
+        <p>所有人都在学怎么把提示词写得更好。我做产品做了大半年，越来越怀疑：这个方向，可能一开始就错了。</p>
+        <p>我描述一个按钮怎么摆，改来改去，一整天就过去了。后来我换了种说法：别写，先做几个能点的 html mock，我来选。三下点击就定了。这大半年七八个产品，几乎每个关键决定，都是这么定的。</p>
+        <p style="color:var(--faint)">（母稿＝最厚那版；出片时各平台从它适配。左边可插素材、右边可让 AI 改。）</p>
+      </div>
+    </div>
+
+    <!-- 出片 -->
+    <div id="pane-film" class="hidden">
+      <div class="card">
+        <h4>选平台形态 <span class="mut" style="font-weight:400">· 可多选，一次出齐（母稿 → 各自适配文案 + 渲染）</span></h4>
+        <div class="pf on" onclick="tog(this)"><span>📄</span><span><span class="nm">公众号长文</span> <span class="rend">· 排版</span><br><span class="mt">母稿直接排版</span></span><span class="ck">✓</span></div>
+        <div class="pf on" onclick="tog(this)"><span>🖼️</span><span><span class="nm">小红书图文卡</span> <span class="rend">· 图卡渲染器（你现有）</span><br><span class="mt">适配成 7 张收藏卡</span></span><span class="ck">✓</span></div>
+        <div class="pf on" onclick="tog(this)"><span>📱</span><span><span class="nm">抖音竖版口播</span> <span class="rend">· 视频渲染器（新）</span><br><span class="mt">适配成分镜口播稿</span></span><span class="ck">✓</span></div>
+        <div class="pf" onclick="tog(this)"><span>💬</span><span><span class="nm">视频号竖版</span> <span class="rend">· 视频渲染器</span></span><span class="ck">✓</span></div>
+        <div class="pf" onclick="tog(this)"><span>🎬</span><span><span class="nm">B站横版讲解</span> <span class="rend">· 视频渲染器</span></span><span class="ck">✓</span></div>
+      </div>
+      <div class="card">
+        <h4>视觉主题 <span class="mut" style="font-weight:400">· 一套跨所有形态统一（换主题=一键全部重出）</span></h4>
+        <div class="themes"><div class="th m1 on" onclick="pt(this)"><div class="sw">杰</div><div class="nm">暖莫兰迪</div></div><div class="th m2" onclick="pt(this)"><div class="sw">极</div><div class="nm">极简黑白</div></div><div class="th m3" onclick="pt(this)"><div class="sw">观</div><div class="nm">杂志编辑</div></div><div class="th m4" onclick="pt(this)"><div class="sw">轻</div><div class="nm">马卡龙</div></div></div>
+        <div class="mut" style="margin-top:11px">🎙 配音 <span style="color:var(--accent);cursor:pointer" onclick="alert('▶ 现合成一句短样试听（火山~1秒）')">Vivi 2.0 ▶试听</span> · 换音色 · 🎵 暖 lo-fi</div>
+      </div>
+      <button class="btn" onclick="document.getElementById('outbox').classList.remove('hidden')">⚡ 一键出片 · 各平台各一份 →</button>
+      <div class="card hidden" id="outbox" style="margin-top:12px">
+        <h4>产出（同一母稿 · 各自适配）</h4>
+        <div class="outs">
+          <div class="out"><div class="pv"><span class="badge">公众号</span><div class="mini" style="width:44px;height:60px"><div class="l" style="width:80%"></div><div class="l"></div><div class="l" style="width:90%"></div></div></div><div class="bd"><div class="nm">长文</div><div class="mt">2100 字</div><div class="row"><span class="b p">预览</span><span class="b">导出</span></div></div></div>
+          <div class="out"><div class="pv"><span class="badge">小红书</span><div style="display:flex;gap:4px"><div class="mini" style="width:34px;height:48px"><div class="l a"></div><div class="l" style="flex:1;border-radius:5px"></div></div><div class="mini" style="width:34px;height:48px"><div class="l"></div><div class="l" style="flex:1;border-radius:5px"></div></div></div></div><div class="bd"><div class="nm">图文 7 卡</div><div class="mt">PNG</div><div class="row"><span class="b p">预览</span><span class="b">导出</span></div></div></div>
+          <div class="out"><div class="pv"><span class="badge">抖音</span><div class="mini dark"><div class="l a"></div><div class="l"></div><div class="l" style="margin-top:auto"></div></div></div><div class="bd"><div class="nm">竖版口播</div><div class="mt">126s MP4</div><div class="row"><span class="b p">▶预览</span><span class="b">导出</span></div></div></div>
+        </div>
+        <div class="mut" style="margin-top:10px">图卡/视频都是"渲染器"，你只看到统一的预览/导出/重出。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右：AI 助手（常驻，两种模式跟着中栏变） -->
+  <div class="ai">
+    <h3>🤖 创作助手</h3>
+    <!-- 定稿模式：改稿 -->
+    <div id="ai-edit">
+      <div class="grp">改稿工具</div>
+      <div class="at">✨ 润色（整篇）</div><div class="at">🔎 审稿（找问题）</div><div class="at">✂ 改一段（选中）</div>
+      <div class="grp">跟它说怎么改</div>
+      <div class="say">如「开头更狠」「压到 5 条」「加一个反方观点」→ 它直接改左边母稿</div>
+      <div class="grp">可插入素材（按相关度）</div>
+      <div class="rankmat">密度开关·手感 <span class="ins">插入</span></div>
+      <div class="rankmat">梁文锋·护城河 <span class="ins">插入</span></div>
+    </div>
+    <!-- 出片模式：助手变成"适配审校" -->
+    <div id="ai-film" class="hidden">
+      <div class="grp">出片助手</div>
+      <div class="say" style="margin-bottom:10px">各平台文案由母稿自动适配。想调某个平台的稿？在这跟它说，例如「抖音钩子再狠点」「小红书封面换一句」。</div>
+      <div class="grp">适配预览</div>
+      <div class="rankmat">📱 抖音口播稿 <span class="ins">看/改</span></div>
+      <div class="rankmat">🖼️ 小红书 7 卡文案 <span class="ins">看/改</span></div>
+      <div class="rankmat">📄 公众号长文 <span class="ins">看/改</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function mode(v){
+    document.getElementById('tb-edit').classList.toggle('on',v==='edit');
+    document.getElementById('tb-film').classList.toggle('on',v==='film');
+    document.getElementById('pane-edit').classList.toggle('hidden',v!=='edit');
+    document.getElementById('pane-film').classList.toggle('hidden',v!=='film');
+    document.getElementById('ai-edit').classList.toggle('hidden',v!=='edit');
+    document.getElementById('ai-film').classList.toggle('hidden',v!=='film');
+    document.getElementById('vlab').innerHTML = v==='edit'
+      ? '<b>现在是「② 定稿」</b>：中间是母稿编辑器；右边 AI 助手＝改稿工具。左右都在。'
+      : '<b>现在是「③ 出片」</b>：中间变成出片面板（多平台+主题）；<b>左边素材台没走、右边 AI 助手切成"适配审校"（也没走）</b>。这就是融合版的关键。';
+  }
+  function tog(el){el.classList.toggle('on')}
+  function pt(el){document.querySelectorAll('.th').forEach(t=>t.classList.remove('on'));el.classList.add('on')}
+</script>
+</body></html>

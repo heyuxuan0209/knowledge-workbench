@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>随手记：分开 vs 合并</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;--body2:#4a463d;
+  --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+  --line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-hover:#2c456a;--green:#3f7350;--red:#a24b3f;--serif:'Newsreader',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding:24px 0 80px}
+.wrap{max-width:940px;margin:0 auto;padding:0 24px}
+h1{font-family:var(--serif);font-size:22px;font-weight:600}
+.sub{font-size:12.5px;color:var(--sub2);margin:3px 0 22px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.col-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:5px;color:var(--accent);background:rgba(61,90,128,.1)}
+.tag.rec{color:var(--green);background:rgba(63,115,80,.12)}
+.col-h .t{font-size:13.5px;font-weight:600}
+
+.sec{font-size:11.5px;font-weight:700;color:var(--sub2);margin:14px 2px 8px}
+/* 分开：绿色随手记 lane */
+.lane{border:1px solid rgba(63,115,80,.22);background:rgba(63,115,80,.035);border-radius:11px;padding:12px 13px}
+.lane-ttl{font-family:var(--serif);font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.lane-lab{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;color:var(--green);background:rgba(63,115,80,.12)}
+.lane-cap{font-size:11px;color:var(--sub2);margin-top:5px}
+.row{display:flex;gap:7px;align-items:flex-end;margin-top:9px}
+.inp,.ta{flex:1;min-width:0;border:1px solid var(--line10);border-radius:8px;padding:9px 11px;font-size:12.5px;background:var(--surface);color:var(--text);font-family:inherit;resize:none;line-height:1.55}
+.inp:focus,.ta:focus{outline:none;border-color:var(--accent)}
+.btn{border:none;background:var(--accent);color:#fff;border-radius:8px;padding:8px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--accent-hover)}
+.btn.ghost{background:transparent;border:1px solid var(--line10);color:var(--sub)}
+.arrow{font-size:11px;color:var(--faint);text-align:center;margin:8px 0;font-family:'IBM Plex Mono',monospace}
+
+/* card */
+.card{border:1px solid var(--line10);border-radius:12px;background:var(--surface);padding:13px 14px;margin-bottom:10px}
+.card-top{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:12px;color:var(--green);background:rgba(63,115,80,.12)}
+.ago{color:var(--faint);font-size:11px;margin-left:auto}
+.title{font-family:var(--serif);font-size:15.5px;font-weight:600;line-height:1.4}
+.bodyprev{font-size:12px;color:var(--body2);line-height:1.6;background:rgba(33,31,26,.03);border-radius:8px;padding:8px 10px;margin-top:8px}
+.bodyempty{font-size:11.5px;color:var(--faint);border:1px dashed var(--line14);border-radius:8px;padding:7px 10px;margin-top:8px;cursor:text}
+.bodyempty:hover{border-color:var(--accent);color:var(--accent)}
+.foot{display:flex;align-items:center;gap:10px;margin-top:11px}
+.mini{padding:4px 11px;font-size:11.5px}
+.link{font-size:11.5px;color:var(--sub);background:none;border:none;cursor:pointer}
+
+/* 合并：幽灵新建卡 */
+.ghost{border:1px dashed var(--line14);border-radius:12px;background:transparent;padding:14px;color:var(--faint);font-size:13px;cursor:text;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ghost:hover{border-color:var(--accent);color:var(--accent);background:rgba(61,90,128,.03)}
+.livecard{border:1px solid var(--accent);box-shadow:0 0 0 1px var(--accent);border-radius:12px;background:var(--surface);padding:13px 14px;margin-bottom:10px}
+.tinput{width:100%;border:none;background:none;font-family:var(--serif);font-size:15.5px;font-weight:600;color:var(--text);resize:none;line-height:1.4}
+.tinput:focus{outline:none}
+.tinput::placeholder{color:var(--faint)}
+.binput{width:100%;border:none;background:none;font-size:12.5px;color:var(--body2);resize:none;line-height:1.6;margin-top:6px;font-family:inherit;display:none}
+.binput:focus{outline:none}
+.addbody{font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;margin-top:8px;padding:0}
+.livefoot{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line08)}
+.saved{font-size:10.5px;color:var(--green);font-weight:600;opacity:0;transition:opacity .3s}
+.saved.on{opacity:1}
+.hint{font-size:10.5px;color:var(--faint)}
+
+.notes{margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.notes{grid-template-columns:1fr}}
+.nb{border:1px solid var(--line10);border-radius:10px;background:var(--surface);padding:14px}
+.nb h3{font-size:13px;margin-bottom:8px}
+.nb .p{font-size:12px;color:var(--green);font-weight:700;margin:8px 0 3px}
+.nb .m{font-size:12px;color:var(--red);font-weight:700;margin:8px 0 3px}
+.nb ul{margin:0;padding-left:16px}
+.nb li{font-size:12px;color:var(--sub);line-height:1.65;margin-bottom:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>随手记 · 分开（1A + 2A） vs 合并成一张卡</h1>
+  <div class="sub">左边＝你已定的方案；右边＝把"新建"和"养大"合成同一张卡。都可点着试。</div>
+
+  <div class="grid">
+    <!-- 左：分开 -->
+    <div>
+      <div class="col-h"><span class="tag rec">你已选</span><span class="t">分开：绿框输入 → 生成卡片</span></div>
+      <div class="sec">主动 · 即时</div>
+      <div class="lane">
+        <div class="lane-ttl"><span class="lane-lab">闪念</span>随手记</div>
+        <div class="lane-cap">冒出一句话、或粘一大段 → 首行标题、其余正文</div>
+        <div class="row">
+          <textarea class="ta" id="laneTa" rows="1" placeholder="随手记一句…" oninput="grow(this)"></textarea>
+          <button class="btn" onclick="laneSave()">＋ 记</button>
+        </div>
+      </div>
+      <div class="arrow">▼ 记下后跳到下面列表 ▼</div>
+      <div class="sec">你的灵感</div>
+      <div id="laneList">
+        <div class="card">
+          <div class="card-top"><span class="pill">我记的</span><span class="ago">昨天</span></div>
+          <div class="title">AI 产品的信息管道</div>
+          <div class="bodyprev">痛点不是信息少，是没有替我筛→读→喂的管道……</div>
+          <div class="foot"><button class="btn mini">带我的稿去创作 →</button><button class="link">养成主题</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：合并 -->
+    <div>
+      <div class="col-h"><span class="tag">进一步</span><span class="t">合并：一张卡从生到长</span></div>
+      <div class="sec">你的灵感</div>
+      <div id="mergeList">
+        <div class="ghost" id="ghostCard" onclick="birth()">＋ 记一条灵感…（点开就在这张卡里写，写完它就留在这）</div>
+        <div class="card">
+          <div class="card-top"><span class="pill">我记的</span><span class="ago">昨天</span></div>
+          <div class="title">AI 产品的信息管道</div>
+          <div class="bodyprev">痛点不是信息少，是没有替我筛→读→喂的管道……</div>
+          <div class="foot"><button class="btn mini">带我的稿去创作 →</button><button class="link">养成主题</button></div>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:4px">↑ 点幽灵卡，它就地变可写的卡；输入框和卡片是同一个东西，没有"跳到列表"这步。</div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="nb">
+      <h3>分开（1A + 2A）</h3>
+      <div class="p">好处</div>
+      <ul>
+        <li>「随手记一句」有个专属、显眼的绿框，快速捕捉一句话最顺手（点框→打字→回车→走）</li>
+        <li>和顶部「即时分析」凑成"主动·即时 双入口"，版面语义清楚</li>
+        <li>列表干净，没有常驻的半成品空卡</li>
+      </ul>
+      <div class="m">代价</div>
+      <ul>
+        <li>有个小接缝：在绿框写 → 记下 → 内容"跳"到下面变成卡，两块界面</li>
+        <li>刚记的想接着补正文，得先找到它那张卡再展开（2A）</li>
+      </ul>
+    </div>
+    <div class="nb">
+      <h3>合并成一张卡</h3>
+      <div class="p">好处</div>
+      <ul>
+        <li>一个心智模型、一个组件：永远在"编辑一张卡"，新建=养大，代码也更省</li>
+        <li>没有"跳到列表"的接缝，粘一大段后自然接着往下写，不用再找它</li>
+      </ul>
+      <div class="m">代价</div>
+      <ul>
+        <li>丢了"随手记一句"那个专属绿框，纯快速捕捉时反而多一步（先点空卡）</li>
+        <li>打破顶部「即时分析 + 随手记」双入口的版面对仗</li>
+        <li>列表顶常驻一张空卡，观感上像有个没写完的东西</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+function grow(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,160)+'px'}
+function laneSave(){
+  var ta=document.getElementById('laneTa');var v=ta.value.trim();if(!v)return;
+  var lines=v.split('\n');var title=lines[0];var body=lines.slice(1).join('\n').trim();
+  var c=document.createElement('div');c.className='card';
+  c.innerHTML='<div class="card-top"><span class="pill">我记的</span><span class="ago">刚刚</span></div>'+
+    '<div class="title">'+esc(title)+'</div>'+
+    (body?'<div class="bodyprev">'+esc(body)+'</div>':'<div class="bodyempty">＋ 展开写…</div>')+
+    '<div class="foot"><button class="btn mini">'+(body?'带我的稿去创作 →':'直接写 →')+'</button></div>';
+  var list=document.getElementById('laneList');list.insertBefore(c,list.firstChild);
+  ta.value='';ta.style.height='auto';
+}
+function birth(){
+  var g=document.getElementById('ghostCard');
+  var d=document.createElement('div');d.className='livecard';
+  d.innerHTML='<textarea class="tinput" rows="1" placeholder="标题：一句话说清要写什么…" oninput="grow(this);flagSave(this)"></textarea>'+
+    '<button class="addbody" onclick="this.previousElementSibling && showBody(this)">＋ 展开写正文</button>'+
+    '<textarea class="binput" rows="2" placeholder="接着把想法写下来，随时来补…" oninput="grow(this);flagSave(this)"></textarea>'+
+    '<div class="livefoot"><span class="hint">首行标题，边写边自动存</span><span class="saved">✓ 已自动保存</span></div>';
+  g.replaceWith(d);d.querySelector('.tinput').focus();
+}
+function showBody(btn){var b=btn.nextElementSibling;b.style.display='block';btn.style.display='none';b.focus()}
+var t;
+function flagSave(el){
+  var card=el.closest('.livecard');var s=card.querySelector('.saved');
+  clearTimeout(t);t=setTimeout(function(){s.classList.add('on');setTimeout(function(){s.classList.remove('on')},1200)},400);
+}
+function esc(s){return s.replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+</script>
+</body>
+</html>

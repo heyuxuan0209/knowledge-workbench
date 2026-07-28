@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>导航图标 · 三组并排</title>
+<style>
+  :root{
+    --bg:#efece4; --rail:#e7e3d9; --surface:#faf8f2;
+    --body:#332f27; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line10:rgba(33,31,26,.1); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--body);font:14px/1.6 -apple-system,'PingFang SC',sans-serif;padding:26px 40px 80px}
+  h1{font:600 22px/1.3 var(--serif);margin:0 0 2px}
+  .lead{color:var(--sub);font-size:13px;margin-bottom:6px;max-width:820px}
+  .lead b{color:var(--body)}
+  .row{display:flex;gap:26px;margin-top:22px;flex-wrap:wrap}
+  .opt{background:var(--surface);border:1px solid var(--line10);border-radius:14px;padding:0;overflow:hidden;width:250px}
+  .opt.win{border:2px solid var(--accent);box-shadow:0 6px 20px rgba(61,90,128,.14)}
+  .cap{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--line10);font-size:12.5px;color:var(--sub)}
+  .cap b{color:var(--body);font-weight:600}
+  .pick{margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:var(--accent);padding:2px 8px;border-radius:6px}
+  .rail{background:var(--rail);padding:14px 10px}
+  .nav{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:var(--sub);font-size:13.5px}
+  .nav.act{background:var(--surface);color:var(--body);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .nav svg{flex:none}
+  .diff{padding:11px 16px;font-size:11.5px;color:var(--sub2);border-top:1px solid var(--line10);background:rgba(0,0,0,.015)}
+  .diff b{color:var(--body)}
+</style></head>
+<body>
+<h1>导航图标 · 三组并排</h1>
+<div class="lead">问题：<b>资讯</b>和<b>素材</b>原来的图标太像（都是纸/文档系），侧栏一眼分不清。把三组候选画进<b>真实侧栏</b>里挑——不描述"一个广播波纹、一个书签"，直接看。</div>
+
+<div class="row">
+  <!-- 方案 A（选中）-->
+  <div class="opt win">
+    <div class="cap"><b>方案 A</b> · RSS 波纹 × 书签 × 开卷<span class="pick">✓ 选中</span></div>
+    <div class="rail">
+      <div class="nav"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4" cy="12" r="1"/><path d="M4 8.5a3.5 3.5 0 0 1 3.5 3.5"/><path d="M4 5a7 7 0 0 1 7 7"/></svg>资讯</div>
+      <div class="nav act"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>素材</div>
+      <div class="nav"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 4C6.5 3 4.5 3 2.5 3.5V13c2-.5 4-.5 5.5.5 1.5-1 3.5-1 5.5-.5V3.5C11.5 3 9.5 3 8 4z"/><path d="M8 4v9.5"/></svg>主题</div>
+    </div>
+    <div class="diff"><b>资讯=广播波纹</b>（RSS/持续推送）· <b>素材=书签</b>（收藏留存）· <b>主题=开卷</b>（AI 帮你写的综述）。三个隐喻互不撞。</div>
+  </div>
+
+  <!-- 方案 B -->
+  <div class="opt">
+    <div class="cap"><b>方案 B</b> · 闪电 × 文件夹 × 标签</div>
+    <div class="rail">
+      <div class="nav"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 2 4 9h3l-1 5 5-7H8z"/></svg>资讯</div>
+      <div class="nav act"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 4.5h4l1.5 1.5H14v7H2z"/></svg>素材</div>
+      <div class="nav"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2.5 13 7.5l-5 5-5-5z"/><circle cx="6" cy="5.5" r=".8" fill="currentColor"/></svg>主题</div>
+    </div>
+    <div class="diff">闪电偏"快讯"味太冲；文件夹和素材的"未整理"气质不符——素材已是被留下的东西。</div>
+  </div>
+
+  <!-- 方案 C -->
+  <div class="opt">
+    <div class="cap"><b>方案 C</b> · 报纸 × 方块 × 网格</div>
+    <div class="rail">
+      <div class="nav"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3.5" width="11" height="9" rx="1"/><path d="M5 6.5h4M5 9h6"/></svg>资讯</div>
+      <div class="nav act"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="10" height="10" rx="1.5"/></svg>素材</div>
+      <div class="nav"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="4" height="4"/><rect x="9" y="3" width="4" height="4"/><rect x="3" y="9" width="4" height="4"/><rect x="9" y="9" width="4" height="4"/></svg>主题</div>
+    </div>
+    <div class="diff">报纸 vs 方块区分度够，但方块/网格太"抽象通用"，没传达"收藏"和"综述"的语义。</div>
+  </div>
+</div>
+</body></html>

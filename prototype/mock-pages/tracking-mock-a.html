@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>版式 A · 报告式 — 追踪主题：Claude</title>
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--body2:#4a463d;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line08:rgba(33,31,26,.08);--line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:Georgia,'Songti SC','Noto Serif SC',serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.7}
+.tag-mock{position:fixed;top:12px;right:14px;background:var(--accent);color:#fff;font-size:12px;padding:4px 10px;border-radius:20px;z-index:9;letter-spacing:.5px}
+.wrap{max-width:1060px;margin:0 auto;padding:36px 24px 80px;display:flex;gap:40px}
+main{flex:1;min-width:0}
+/* ===== 头部 ===== */
+.hd{border-bottom:1px solid var(--line14);padding-bottom:22px;margin-bottom:26px}
+.hd .crumb{font-size:13px;color:var(--sub2);margin-bottom:10px}
+.hd .crumb a{color:var(--accent);text-decoration:none}
+.hd h1{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:.3px}
+.hd h1 .type{display:inline-block;vertical-align:6px;font-family:system-ui;font-size:11px;font-weight:600;color:var(--green);border:1px solid var(--green);border-radius:12px;padding:1px 9px;margin-left:10px;letter-spacing:1px}
+.hd .meta{margin-top:10px;font-size:13.5px;color:var(--sub);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.hd .meta b{color:var(--body2);font-weight:600}
+.hd .actions{margin-top:14px;display:flex;gap:10px}
+.btn{font-size:13px;padding:6px 14px;border-radius:8px;border:1px solid var(--line14);background:var(--surface);color:var(--body2);cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:hover{border-color:var(--accent)}
+/* ===== 总览 ===== */
+.lede{background:var(--surface);border:1px solid var(--line10);border-radius:14px;padding:22px 26px;margin-bottom:34px}
+.lede .lab{font-size:12px;letter-spacing:2px;color:var(--sub2);margin-bottom:8px}
+.lede p{font-family:var(--serif);font-size:18.5px;line-height:1.85;color:var(--body)}
+.lede p b{color:var(--text)}
+/* ===== 主线 ===== */
+.sec-lab{font-size:12.5px;letter-spacing:2.5px;color:var(--sub2);margin:38px 0 6px}
+.story{padding:26px 0;border-bottom:1px solid var(--line08)}
+.story h2{font-family:var(--serif);font-size:21px;font-weight:600;line-height:1.5}
+.story h2 .n{color:var(--accent);font-size:15px;margin-right:8px;font-family:system-ui;font-weight:700}
+.story h2 .ct{font-size:13px;color:var(--faint);font-weight:400;margin-left:8px;font-family:system-ui}
+.story .path{margin-top:12px;font-size:15px;color:var(--body);line-height:1.85}
+.story .path .d{color:var(--accent);font-weight:600;font-size:13.5px}
+.verdict{margin-top:16px;background:rgba(61,90,128,.06);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 18px}
+.verdict .vlab{font-size:11.5px;color:var(--accent);letter-spacing:1px;margin-bottom:5px;font-weight:600}
+.verdict p{font-size:15.5px;color:var(--text);line-height:1.75}
+.watch{margin-top:12px;font-size:13.5px;color:var(--amber)}
+.watch b{font-weight:600}
+/* ===== 增量 ===== */
+.week{margin-top:40px;background:var(--surface);border:1px solid var(--line10);border-radius:14px;padding:22px 26px}
+.week h3{font-family:var(--serif);font-size:18px;margin-bottom:14px}
+.week h3 span{font-size:12.5px;color:var(--sub2);font-family:system-ui;font-weight:400;margin-left:10px}
+.week ol{list-style:none}
+.week li{display:flex;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line08);font-size:14.5px;color:var(--body)}
+.week li:last-child{border:none}
+.week li .n{color:var(--accent);font-weight:700;font-size:13px;flex-shrink:0;padding-top:2px}
+.week li .to{margin-left:auto;flex-shrink:0;font-size:12px;color:var(--sub2);background:var(--bg);padding:2px 9px;border-radius:10px;align-self:center}
+.week li.hot .to{color:var(--red)}
+/* ===== 钩子 ===== */
+.hooks{margin-top:26px}
+.hooks h3{font-family:var(--serif);font-size:18px;margin-bottom:6px}
+.hooks .sub{font-size:13px;color:var(--sub);margin-bottom:14px}
+.hook{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:16px 20px;margin-bottom:10px;display:flex;gap:16px;align-items:center}
+.hook .t{flex:1;font-size:14.5px;color:var(--body);line-height:1.65}
+.hook .g{font-size:12px;color:var(--sub);flex-shrink:0;text-align:right;line-height:1.7}
+.hook .g b{display:block;color:var(--accent);font-weight:600}
+.hook button{flex-shrink:0;font-size:12.5px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:8px;padding:5px 12px;cursor:pointer}
+.hook button:hover{background:var(--accent);color:#fff}
+/* ===== 右侧目录 ===== */
+aside{width:190px;flex-shrink:0;position:sticky;top:36px;align-self:flex-start;font-size:13px}
+aside .alab{font-size:11.5px;letter-spacing:2px;color:var(--sub2);margin-bottom:10px}
+aside a{display:block;color:var(--sub);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line10);line-height:1.5}
+aside a:hover,aside a.on{color:var(--accent);border-left-color:var(--accent)}
+aside .foot{margin-top:22px;padding-top:14px;border-top:1px solid var(--line08);color:var(--sub2);font-size:12px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="tag-mock">版式 A · 报告式</div>
+<div class="wrap">
+<main>
+  <div class="hd">
+    <div class="crumb"><a href="#">主题库</a> / 追踪型主题</div>
+    <h1>Claude / Anthropic<span class="type">追踪中</span></h1>
+    <div class="meta">
+      <span>过去 <b>31 天</b></span><span>收录 <b>95 条</b> · 去重后 <b>78 件事</b></span><span><b>6</b> 条主线</span><span>综述更新于 <b>今天 14:20</b></span>
+    </div>
+    <div class="actions">
+      <button class="btn pri">看本周新进展</button>
+      <button class="btn">调整追踪词</button>
+      <button class="btn">暂停追踪</button>
+    </div>
+  </div>
+
+  <div class="lede">
+    <div class="lab">本 月 总 览</div>
+    <p>这个月的 Anthropic 是<b>三线并行</b>：技术上被实践者封神（Fable 5 成为"方案设计独一档"的共识）、商业上全速冲刺（秘密递交 IPO、ARR 600 亿、AMD 50 亿入局）、护城河上遭遇开源突袭（Kimi K3 + 蒸馏指控 + 制裁威胁）——<b>强者姿态与体系性焦虑同框出现</b>。</p>
+  </div>
+
+  <div class="sec-lab">六 条 主 线</div>
+
+  <div class="story" id="s1">
+    <h2><span class="n">一</span>旗舰对决：Fable 5 vs GPT-5.6 Sol，从跑分战打成"分工论"<span class="ct">18 条</span></h2>
+    <p class="path"><span class="d">6/30</span> Sonnet 5 发布 → <span class="d">7/9</span> OpenAI 推出 GPT-5.6 三件套正面叫板（Agents' Last Exam 领先 13.1 分）→ 整个中下旬，实践者把"谁更强"改写成"谁干什么"：官方自推 Fable 规划 + Sonnet 执行（92% 性能 63% 成本）；Ploy 把执行层切到 Sol 省 27%；重度用户共识成型"Fable 出方案独一档 → Sol 审查纠错 → Codex 全自动执行"；<span class="d">7/16</span> Cursor 确认 Fable 创 CursorBench 新高（72.9%）；连马斯克都发文承认"Anthropic 显然是当前 AI 领导者"。</p>
+    <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>行业已经用脚投票出"贵模型做判断、便宜模型做执行"的双层架构——这不是临时省钱技巧，是新的默认拓扑。</p></div>
+    <div class="watch">⚠ 待追：新 tokenizer 比 GPT 多耗 1.73 倍 token、标价不变 = <b>隐性涨价</b>——"贵"正在成为 Fable 的公认标签。</div>
+  </div>
+
+  <div class="story" id="s2">
+    <h2><span class="n">二</span>Claude Code 吞噬工程：从工具到"工程主体"<span class="ct">16 条</span></h2>
+    <p class="path"><span class="d">6/23</span> Claude Tag 发布 → <span class="d">7/21</span> 内部数据披露：Claude Tag 已承担 Claude Code 团队 65% 的产品工程 PR、系统提示词砍掉 80% → <span class="d">7/20</span> 副 CISO 披露全公司 Claude 写了 80% 合并代码。标志性事件（本月被报道最多）：Bun 百万行 Zig→Rust 重写——11 天、64 个并行实例、16.5 万美元 API 费、100% 测试通过；<span class="d">7/19</span> Claude Code 自身已跑在这个 Rust 版 Bun 上。<span class="d">7/22</span> Lance Martin 演讲给出方法论：长周期 Agent = 大脑与双手解耦 + 自我验证 + 自我学习。</p>
+    <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>叙事已从"AI 辅助编程"翻页到"AI 是工程主体、人管验收和方向"——Anthropic 自己就是最大实证。</p></div>
+  </div>
+
+  <div class="story" id="s3">
+    <h2><span class="n">三</span>商业冲刺：IPO、算力、和解三步走<span class="ct">12 条</span></h2>
+    <p class="path"><span class="d">7/8</span> 秘密递交 IPO：Q3 利润预计超 10 亿美元、ARR 600 亿 → <span class="d">7/22</span> AMD 投 50 亿美元换 2GW GPU 采购，算力多供应商布局成型 → <span class="d">7/21</span> 15 亿美元版权和解获法院批准（美国史上最大版权赔偿，法院同时确认"合法书籍训练 = 合理使用"）→ 治理侧：伯南克进长期利益信托、"硬问题"公众倡议、经济指数连发三期。</p>
+    <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>IPO 前的标准动作一件不落——利润证明、算力锁定、法律清障、治理背书，节奏像一家在冲刺上市窗口的公司。</p></div>
+  </div>
+
+  <div class="story" id="s4">
+    <h2><span class="n">四</span>护城河遭遇战：Kimi K3 开源冲击<span class="ct">7 条</span></h2>
+    <p class="path"><span class="d">7/17</span> Kimi K3 登顶 Frontend Code Arena（7 个赛道拿 6 个第一，7/27 开放权重）→ <span class="d">7/20</span> 市场震荡，美股下跌，"商业模式及 IPO 前景受质疑" → <span class="d">7/21</span> 美国财政部威胁以 IP 盗窃制裁中国模型 → <span class="d">7/22</span> 爆出"Moonshot 蒸馏 Fable 开发 K3"的指控。</p>
+    <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>这是与商业冲刺直接对撞的一条线——开源追平 + 蒸馏指控恰好卡在 IPO 叙事的软肋上。</p></div>
+    <div class="watch">⚠ 待追：7/27 K3 开放权重后的真实评测；蒸馏指控是否坐实。</div>
+  </div>
+
+  <div class="story" id="s5">
+    <h2><span class="n">五</span>安全与信任：光谱两端同时拉扯<span class="ct">10 条</span></h2>
+    <p class="path">被质疑侧：工信部通报 Claude Code 特定版本"后门"回传（<span class="d">7/8</span>）、GitLost 提示注入、AISI 报告 Opus 4.7 有 9.1% "作弊"行为（<span class="d">7/23</span>）。被信任侧：Manager Coercion 基准里 Claude 是唯一不威胁删除下属的模型系（<span class="d">7/20</span>）、agentic misalignment 夏季报告主动自曝四种失当模式；对照组 xAI Grok CLI 被实锤静默上传整个代码库——同类指控下 Anthropic 的透明度成了差异化。</p>
+    <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>agent 时代的安全叙事正从"模型会不会说坏话"转向"代理拿着你的权限会干什么"——这一格上 Anthropic 目前是拿分方。</p></div>
+  </div>
+
+  <div class="story" id="s6" style="border-bottom:none">
+    <h2><span class="n">六</span>Claude 走向大众与垂直<span class="ct">8 条</span></h2>
+    <p class="path">Claude Science（科学家工作台）、Claude for Teachers（K-12 免费）、反思功能 Beta、AI for Science 罕见病资助、加拿大 1000 万研究投入、阿尔伯塔省政府用 Claude 修安全漏洞。</p>
+    <div class="verdict"><div class="vlab">AI 判断 · 供你反驳</div><p>toB 编程之外，Anthropic 在铺"教育 / 科学 / 政府"三条公共叙事线——和 IPO 的公益公司人设互为表里。</p></div>
+  </div>
+
+  <div class="week" id="week">
+    <h3>本周新进展<span>7/17 – 7/23 · 上次看过之后新增 6 件事</span></h3>
+    <ol>
+      <li><span class="n">1</span>AMD 50 亿投资 + 2GW GPU 采购落定<span class="to">主线三</span></li>
+      <li><span class="n">2</span>15 亿版权和解正式获批<span class="to">主线三</span></li>
+      <li class="hot"><span class="n">3</span>K3 冲击波发酵：市场震荡 → 制裁威胁 → 蒸馏指控<span class="to">主线四 · 升温最快</span></li>
+      <li><span class="n">4</span>Claude Tag 内部数据首次披露：65% 产品工程 PR<span class="to">主线二</span></li>
+      <li><span class="n">5</span>Lance Martin 长周期 Agent 方法论演讲<span class="to">主线二</span></li>
+      <li><span class="n">6</span>AISI "作弊"报告点名 Opus 4.7<span class="to">主线五</span></li>
+    </ol>
+  </div>
+
+  <div class="hooks">
+    <h3>能喂给创作的选题钩子</h3>
+    <div class="sub">给角度不给腔调——点「提为灵感」进灵感库养大</div>
+    <div class="hook"><div class="t">"贵模型做判断、便宜模型做执行"正在成为默认架构——我自己的工作台就是实例（Fable 设计 + Opus 执行 + DeepSeek 加工）</div><div class="g"><b>实践复盘体</b>公众号长文</div><button>提为灵感</button></div>
+    <div class="hook"><div class="t">Claude Tag 的 65% PR：当 AI 承担大部分执行，人的工作变成了什么（分诊、裁决、验收）</div><div class="g"><b>思辨辨析体</b>X 长推</div><button>提为灵感</button></div>
+    <div class="hook"><div class="t">从 Bun 百万行重写看"AI 大规模迁移"的真实成本账（16.5 万美元、19 个回归、两周）</div><div class="g"><b>方法教程体</b>掘金 / 小红书</div><button>提为灵感</button></div>
+  </div>
+</main>
+
+<aside>
+  <div class="alab">目 录</div>
+  <a href="#s1" class="on">一 · 旗舰对决打成分工论</a>
+  <a href="#s2">二 · Claude Code 吞噬工程</a>
+  <a href="#s3">三 · 商业冲刺三步走</a>
+  <a href="#s4">四 · K3 开源冲击</a>
+  <a href="#s5">五 · 安全光谱两端</a>
+  <a href="#s6">六 · 走向大众与垂直</a>
+  <a href="#week" style="margin-top:8px;color:var(--amber);border-left-color:var(--amber)">🗓 本周新进展</a>
+  <div class="foot">脉络 = 事实直白<br>判断 = AI 提议·可反驳<br>钩子 = 给角度不给腔调</div>
+</aside>
+</div>
+<script>
+document.querySelectorAll('aside a').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('aside a').forEach(x=>x.classList.remove('on'));a.classList.add('on')}));
+</script>
+</body>
+</html>

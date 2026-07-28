@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mock A · 三栏｜精读降维梯 + 伴读批判预设</title>
+<style>
+  :root{
+    --bg:#f6f5f3; --card:#fff; --ink:#1c1c1e; --sub:#86868b; --line:#e9e8e5;
+    --accent:#6f8a86; --accent-soft:#e7efed; --warn:#a9805a; --warn-soft:#f3ebe2;
+    --blue:#5f7896; --blue-soft:#e9eef4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif;}
+  .top{height:52px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--card);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .logo{font-weight:700;letter-spacing:.5px}
+  .src{color:var(--sub);font-size:13px}
+  .tier{background:var(--accent-soft);color:var(--accent);font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600}
+  .wrap{display:grid;grid-template-columns:1fr 1.35fr .85fr;gap:0;height:calc(100vh - 52px)}
+  .col{overflow-y:auto;padding:26px 30px}
+  .col.orig{background:#fbfaf8;border-right:1px solid var(--line)}
+  .col.mid{background:var(--card);border-right:1px solid var(--line)}
+  .col.aside{background:#fbfaf8}
+  h1{font-size:22px;line-height:1.4;margin:.2em 0 .1em}
+  .en-sub{color:var(--sub);font-size:13px;margin-bottom:18px}
+  .label{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--sub);text-transform:uppercase;margin:0 0 12px}
+  /* 下潜控件 */
+  .depth{display:flex;gap:4px;background:#efeee9;border-radius:11px;padding:4px;margin-bottom:22px;position:sticky;top:0}
+  .depth button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:8px;font-size:13px;color:var(--sub);cursor:pointer;font-weight:600}
+  .depth button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .depth .n{font-size:10px;display:block;opacity:.6;font-weight:500}
+  .view{display:none;animation:fade .25s ease}
+  .view.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  .lead{font-size:17px;line-height:1.75;background:var(--accent-soft);border-radius:12px;padding:16px 18px;margin-bottom:4px}
+  .facts{list-style:none;padding:0;margin:0}
+  .facts li{padding:11px 0;border-bottom:1px dashed var(--line);display:flex;gap:10px}
+  .facts .i{color:var(--accent);font-weight:700;flex:none}
+  .cite{display:inline-block;background:var(--blue-soft);color:var(--blue);font-size:10px;padding:1px 6px;border-radius:20px;
+    margin-left:6px;cursor:help;vertical-align:middle;font-weight:600;position:relative}
+  .cite:hover .pop{display:block}
+  .pop{display:none;position:absolute;bottom:130%;left:0;width:270px;background:#2b2b2e;color:#f2f2f2;font-size:12px;
+    line-height:1.6;padding:10px 12px;border-radius:9px;z-index:30;font-weight:400;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  h3.sec{font-size:15px;margin:22px 0 8px;padding-left:9px;border-left:3px solid var(--accent)}
+  .plain p{margin:.4em 0}
+  .note{color:var(--sub);font-size:13px;background:#f4f3ef;border-radius:9px;padding:10px 12px;margin-top:6px}
+  .act{background:var(--warn-soft);border-radius:11px;padding:14px 16px;margin-top:16px}
+  .act .h{font-weight:700;color:var(--warn);font-size:13px;margin-bottom:6px}
+  .en{white-space:pre-wrap;font-size:14px;line-height:1.8;color:#33332f;
+    font-family:ui-serif,Georgia,"Times New Roman",serif}
+  .en mark{background:#fff3d6;padding:0 2px}
+  /* 出口 */
+  .exits{position:sticky;bottom:0;background:linear-gradient(transparent,var(--card) 22%);padding:20px 0 4px;margin-top:24px}
+  .exits .row{display:flex;gap:8px;flex-wrap:wrap}
+  .exit{flex:1;min-width:120px;border:1px solid var(--line);background:var(--card);border-radius:11px;padding:11px 12px;
+    cursor:pointer;text-align:left;transition:.15s}
+  .exit:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .exit b{display:block;font-size:13px}
+  .exit span{font-size:11px;color:var(--sub)}
+  .exit.pub{border-color:var(--accent);background:var(--accent-soft)}
+  /* 伴读 */
+  .presets{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+  .presets button{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:6px 13px;font-size:12.5px;
+    cursor:pointer;color:var(--ink)}
+  .presets button:hover{border-color:var(--blue);color:var(--blue)}
+  .presets button.crit{border-color:var(--warn);color:var(--warn)}
+  .ai-out{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 15px;font-size:13.5px;line-height:1.7;min-height:60px}
+  .ai-out .tag{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px}
+  .ai-out.crit .tag{color:var(--warn)}
+  .muted-hint{color:var(--sub);font-size:12px;margin-top:14px;line-height:1.6}
+  .k{color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+  <div class="top">
+    <span class="logo">工作台 · 精读器</span>
+    <span class="src">Simon Willison's Weblog</span>
+    <span class="tier">一手 T2</span>
+    <span class="src">· 2 小时前 · 英文源</span>
+  </div>
+
+  <div class="wrap">
+    <!-- 左：原文常驻 -->
+    <div class="col orig">
+      <p class="label">原文 · 可随时核查</p>
+      <div class="en">Introducing Claude Opus 5
+
+I've been offline kayaking with sea otters for much of today so I haven't had a chance to put Anthropic's new model Claude Opus 5 through its paces yet. The buzz is positive, and Anthropic's description of it as a <mark>"thoughtful and proactive model that comes close to the frontier intelligence of Claude Fable 5 at half the price"</mark> sounds promising. It's currently leading the Artificial Analysis leaderboard, in front of even Fable 5.
+
+It's priced the same as Opus 4.8, and continues to offer a "fast mode" at twice the cost of the base model.
+
+<mark>On one Frontier-Bench task, Opus 5 was given a drawing of a machine part and asked to write code to rebuild it as a 3D FreeCAD model. However, the model was intentionally given no way to directly view the drawing. Opus 5 responded by writing its own computer vision pipeline to pull the geometry from the raw pixels, then reconstructed the full machine part.</mark>
+
+As with its predecessor, Opus 4.8, we've intentionally avoided training Opus 5 on cyber tasks... it comes close to Mythos 5 at finding cybersecurity vulnerabilities. However, it remains substantially behind Mythos 5 on the exploitation of those vulnerabilities.
+
+Anthropic have published a prompting guide for Claude Opus 5. Thariq Shihipar has also written The new rules of context engineering for Claude 5 generation models.</div>
+    </div>
+
+    <!-- 中：降维梯 -->
+    <div class="col mid">
+      <div class="depth">
+        <button class="on" onclick="dv(0,this)">扫一眼<span class="n">一句话</span></button>
+        <button onclick="dv(1,this)">读要点<span class="n">事实清单</span></button>
+        <button onclick="dv(2,this)">吃透<span class="n">结构精读</span></button>
+      </div>
+
+      <h1>Claude Opus 5 发布：价格不变，"会自己补位"是最大变化</h1>
+      <p class="en-sub">Introducing Claude Opus 5 · 降维解读 · deepseek（可回原文核查）</p>
+
+      <!-- L0 一句话 -->
+      <div class="view on" id="v0">
+        <div class="lead">Anthropic 发布 Opus 5，价格和 4.8 一样、登顶 Artificial Analysis 榜。真正值得注意的不是分数——是它<span class="k">"没被要求，也会自己判断该做什么并动手做"</span>。</div>
+        <p class="muted-hint">想再往下走：点上面「读要点」看可核查的事实清单，或「吃透」看拆解 + 该怎么用。</p>
+      </div>
+
+      <!-- L1 事实清单 -->
+      <div class="view" id="v1">
+        <p class="label">五条事实 · 每条可回原文核查</p>
+        <ul class="facts">
+          <li><span class="i">1</span><span>定价与 Opus 4.8 相同；保留"快速模式"，价格是基础版 2 倍。<span class="cite">原文<span class="pop">"priced the same as Opus 4.8, and continues to offer a fast mode at twice the cost of the base model."</span></span></span></li>
+          <li><span class="i">2</span><span>官方说法："接近 Fable 5 的前沿智能，价格只要一半"；当前 Artificial Analysis 榜领先，排在 Fable 5 之前。<span class="cite">原文<span class="pop">"comes close to the frontier intelligence of Claude Fable 5 at half the price... currently leading the Artificial Analysis leaderboard, in front of even Fable 5."</span></span></span></li>
+          <li><span class="i">3</span><span>一个实例：任务给了零件图纸但故意不让模型看图，Opus 5 自己写了套计算机视觉流程，从像素里提几何、重建了整个零件。<span class="cite">原文<span class="pop">"given no way to directly view the drawing. Opus 5 responded by writing its own computer vision pipeline to pull the geometry from the raw pixels."</span></span></span></li>
+          <li><span class="i">4</span><span>安全：和 4.8 一样刻意没训练网络攻击任务；找漏洞接近 Mythos 5，但"把漏洞变成实际攻击"明显更弱。<span class="cite">原文<span class="pop">"comes close to Mythos 5 at finding vulnerabilities... remains substantially behind on the exploitation of those vulnerabilities."</span></span></span></li>
+          <li><span class="i">5</span><span>配套发了 Opus 5 提示词指南；Thariq 另写《Claude 5 代模型的上下文工程新规则》。<span class="cite">原文<span class="pop">"published a prompting guide... Thariq Shihipar has also written The new rules of context engineering."</span></span></span></li>
+        </ul>
+      </div>
+
+      <!-- L2 结构精读 -->
+      <div class="view" id="v2">
+        <div class="plain">
+          <h3 class="sec">这次的"主动性"到底指什么</h3>
+          <p><span class="k">relentlessly proactive</span> = 说人话：你没让它做的、它判断该做，也会自己动手。对开发者是双刃——能少写指令，也可能在你没盯着时自作主张。</p>
+          <div class="note">⚠️ 保留原作者的克制：Simon 本人还没上手实测，只转述了官方 buzz，<b>没有下"这很惊人"的结论</b>。降维如实保留这份分寸——不替他加戏、不替他下判断。</div>
+          <h3 class="sec">安全上的一个矛盾信号</h3>
+          <p>官方特意区分了两件事：<b>发现</b>漏洞（已接近顶尖）和<b>利用</b>漏洞（明显更弱）。这是刻意设的能力边界还是训练副产物，原文没说死——<span style="color:var(--warn)">此处存疑，见右侧"待验证点"</span>。</p>
+
+          <div class="act">
+            <div class="h">对你有用（行动 · 供你判断）</div>
+            <p style="margin:.2em 0">· 在用 Claude 做开发/研究：去读那两份提示词/上下文工程指南，旧 prompt 模板可能过时。</p>
+            <p style="margin:.2em 0">· 关键任务给 Opus 5 设明确边界和确认步骤——因为它会自作主张。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 出口三条 -->
+      <div class="exits">
+        <p class="label" style="margin-bottom:8px">这篇读完，去哪</p>
+        <div class="row">
+          <button class="exit" onclick="toast('已存入素材库（原料，待深加工）')"><b>＋ 存为素材</b><span>当原料，喂日后创作</span></button>
+          <button class="exit" onclick="toast('已提为选题：AI「主动性」对创作工作流意味着什么')"><b>💡 提为选题</b><span>攒成你要写的题</span></button>
+          <button class="exit pub" onclick="toast('已带这份降维稿进创作台，去加你的判断/发布')"><b>✍️ 降维成稿 · 去发布</b><span>润色/加你的视角 → 直接发</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：伴读批判预设 -->
+    <div class="col aside">
+      <p class="label">AI 伴读 · 给判断的脚手架（不替你下结论）</p>
+      <div class="presets">
+        <button onclick="ai('sum',this)">总结要点</button>
+        <button onclick="ai('struct',this)">结构拆解</button>
+        <button onclick="ai('facts',this)">事实清单</button>
+        <button class="crit" onclick="ai('verify',this)">待验证点</button>
+        <button class="crit" onclick="ai('against',this)">反方观点</button>
+      </div>
+      <div class="ai-out" id="aiout">
+        <div class="tag">点上面任一预设</div>
+        「总结/拆解/事实」帮你更快读懂；「待验证点 / 反方观点」逼你批判地读——但都不替你下结论。判断留给你。
+      </div>
+      <p class="muted-hint">伴读走你自己的 API Key（成本自控）。它的活儿是<b>搭脚手架</b>，不是替你判断——这条边界守 ADR-044。</p>
+    </div>
+  </div>
+
+  <div id="toast" style="position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:#2b2b2e;color:#fff;padding:11px 20px;border-radius:24px;font-size:13.5px;transition:.3s;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.3)"></div>
+
+<script>
+  function dv(i,el){document.querySelectorAll('.depth button').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+    document.querySelectorAll('.view').forEach((v,k)=>v.classList.toggle('on',k===i));}
+  const AI={
+    sum:['总结要点','Opus 5：价格同 4.8、登顶 AA 榜；亮点是"主动性"——会自己补齐没被要求的步骤；安全上能发现漏洞但不擅利用；配套出了新提示词指南。'],
+    struct:['结构拆解','① 定价与定位 → ② 主动性实例（CV 重建零件）→ ③ 安全的发现/利用之分 → ④ 提示词方法要更新。原文是一篇转述型 link-blog，非亲测。'],
+    facts:['事实清单','· 价格=4.8，fast mode 2×\n· 领先 AA 榜、在 Fable 5 前\n· 未训 cyber 任务\n· 发现漏洞≈Mythos 5，利用<<Mythos 5'],
+    verify:['待验证点 ⚠','· "登顶 AA 榜"——榜单口径/时间点是否稳定？换个榜还成立吗？\n· "半价接近 Fable 5"是官方话，缺第三方评测印证。\n· CV 重建零件是精选案例，能否稳定复现未知。',1],
+    against:['反方观点 ⚡','· 榜单领先 ≠ 真实能力提升（Gary Marcus 式质疑）。\n· "主动性"在生产环境可能是<b>风险</b>而非卖点——会自作主张=更难预期。\n· 原作者自己都还没实测，热度先行。',1]
+  };
+  function ai(k,el){const o=document.getElementById('aiout');const d=AI[k];o.className='ai-out'+(d[2]?' crit':'');
+    o.innerHTML='<div class="tag">'+d[0]+'</div>'+d[1].replace(/\n/g,'<br>');}
+  let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';
+    clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2200);}
+</script>
+</body>
+</html>

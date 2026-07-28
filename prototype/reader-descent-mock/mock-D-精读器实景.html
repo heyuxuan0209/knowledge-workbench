@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mock D · 精读器实景（穿你产品的皮）</title>
+<style>
+  /* —— 复刻 workbench.css 真实 token —— */
+  :root{
+    --bg:#efece4; --card:#faf8f3; --ink:#211f1a; --body2:#3a382f; --sub2:#8a8478;
+    --line08:rgba(33,31,26,.08); --line10:rgba(33,31,26,.1); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --accent-hover:#2c456a; --accent-soft:rgba(61,90,128,.08);
+    --warn:#a9791f; --warn-soft:rgba(169,121,31,.1);
+    --serif:"Songti SC","Noto Serif SC",Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif;color:var(--ink)}
+  /* 背后虚化的 feed（示意工作台在后面） */
+  .backdrop{position:fixed;inset:0;padding:26px 40px;opacity:.5;filter:blur(1.5px);pointer-events:none}
+  .bd-row{display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line08);font-size:13.5px;color:var(--sub2)}
+  .bd-row b{color:var(--body2);font-weight:500}
+  .bd-h{font-family:var(--serif);font-size:19px;color:var(--ink);margin:6px 0 16px}
+  /* —— 模态 —— */
+  .mask{position:fixed;inset:0;background:rgba(20,18,14,.42);display:flex;align-items:center;justify-content:center;z-index:10}
+  .modal{width:720px;max-width:94vw;max-height:86vh;background:var(--card);border-radius:16px;
+    box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+  .head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line08)}
+  .title{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.35;flex:1}
+  .close{border:0;background:none;font-size:22px;color:var(--sub2);cursor:pointer;line-height:1}
+  /* 下潜 seg（就是把你现有的「精读稿|原文译文」升级成三档梯） */
+  .seg{display:flex;background:rgba(33,31,26,.05);border-radius:9px;padding:3px}
+  .seg button{border:0;background:transparent;padding:6px 13px;font-size:13px;color:var(--sub2);cursor:pointer;border-radius:7px;font-weight:600}
+  .seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .body{overflow-y:auto;padding:20px 24px}
+  h1.zt{font-family:var(--serif);font-size:22px;line-height:1.45;margin:2px 0 3px}
+  .ensub{color:var(--sub2);font-size:12.5px;margin-bottom:16px}
+  .view{display:none}.view.on{display:block;animation:f .22s ease}
+  @keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  .lead{font-size:16.5px;line-height:1.75;background:var(--accent-soft);border-radius:11px;padding:15px 17px}
+  .lead .k{color:var(--accent);font-weight:600}
+  .hint{color:var(--sub2);font-size:13px;margin-top:12px}
+  .facts{list-style:none;padding:0;margin:0}
+  .facts li{padding:11px 0;border-bottom:1px dashed var(--line10);display:flex;gap:11px}
+  .facts .i{width:21px;height:21px;background:var(--accent-soft);color:var(--accent);border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;margin-top:3px}
+  /* 复用你追踪页真实的 tk-cite 溯源角标 */
+  .tk-cite{display:inline-block;vertical-align:3px;font-size:10.5px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:6px;padding:0 5px;margin-left:3px;cursor:help;line-height:1.5;position:relative}
+  .tk-cite:hover{background:var(--accent);color:#fff}
+  .tk-cite:hover .pop{display:block}
+  .pop{display:none;position:absolute;bottom:150%;left:0;width:260px;background:#2b2820;color:#f2efe6;font-size:12px;line-height:1.6;padding:9px 11px;border-radius:8px;z-index:30;cursor:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  h3.sec{font-size:15px;margin:20px 0 7px;padding-left:9px;border-left:3px solid var(--accent)}
+  .note{color:#5f5c50;font-size:13px;background:rgba(33,31,26,.04);border-radius:9px;padding:10px 12px;margin:8px 0}
+  /* 追踪页同款判断块 */
+  .verdict{margin-top:12px;background:rgba(169,121,31,.07);border-left:3px solid var(--warn);border-radius:0 9px 9px 0;padding:11px 15px;font-size:13.5px}
+  .verdict .vt{font-size:11px;font-weight:700;color:var(--warn);margin-bottom:4px}
+  .act{background:var(--warn-soft);border-radius:10px;padding:13px 15px;margin-top:14px}
+  .act .h{font-weight:700;color:var(--warn);font-size:13px;margin-bottom:5px}
+  .en{white-space:pre-wrap;font-size:14px;line-height:1.85;color:var(--body2);font-family:var(--serif)}
+  /* 伴读 chips（底部，不占右栏） */
+  .airow{margin-top:20px;padding-top:14px;border-top:1px solid var(--line08)}
+  .airow .lbl{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--sub2);margin-bottom:8px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chips button{border:1px solid var(--line14);background:#fff;border-radius:18px;padding:5px 12px;font-size:12.5px;cursor:pointer;color:var(--body2)}
+  .chips button:hover{border-color:var(--accent);color:var(--accent)}
+  .chips button.crit{border-color:rgba(169,121,31,.4);color:var(--warn)}
+  .aiout{margin-top:10px;background:#fff;border:1px solid var(--line10);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.7;display:none}
+  .aiout.on{display:block}
+  .aiout .tag{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:5px}
+  .aiout.crit .tag{color:var(--warn)}
+  /* 底部出口（复刻 wb footer，从 2 条补到 4 条） */
+  .foot{display:flex;gap:9px;align-items:center;padding:13px 24px;border-top:1px solid var(--line08);background:rgba(33,31,26,.015);flex-wrap:wrap}
+  .btn-outline{border:1px solid var(--line14);background:#fff;color:var(--body2);border-radius:9px;padding:8px 13px;font-size:13px;cursor:pointer}
+  .btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-pri{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9px;padding:8px 14px;font-size:13px;cursor:pointer}
+  .btn-pri:hover{background:var(--accent-hover)}
+  .link{color:var(--accent);font-size:13px;text-decoration:none;margin-left:auto}
+  .callout{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#2b2820;color:#f4f1e8;font-size:12.5px;padding:7px 15px;border-radius:20px;z-index:20;opacity:.92}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2820;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;transition:.3s;z-index:40}
+</style>
+</head>
+<body>
+  <div class="callout">↓ 这是「精读」弹出的模态——你现在的精读器，加了下潜梯 + 伴读 + 溯源角标</div>
+
+  <!-- 背后示意 feed -->
+  <div class="backdrop">
+    <div class="bd-h">📌 官方一手</div>
+    <div class="bd-row"><span>2 小时前</span><b>Simon Willison's Weblog</b><span>· 介绍 Claude Opus 5</span></div>
+    <div class="bd-row"><span>3 小时前</span><b>Anthropic</b><span>· Claude Tag 发布</span></div>
+    <div class="bd-row"><span>4 小时前</span><b>Import AI</b><span>· 本周 AI 政策要点</span></div>
+    <div class="bd-h" style="margin-top:22px">🎯 你关注的人</div>
+    <div class="bd-row"><span>5 小时前</span><b>Dwarkesh Patel</b><span>· 与研究者的长访谈</span></div>
+  </div>
+
+  <div class="mask">
+    <div class="modal">
+      <div class="head">
+        <div class="title">Claude Opus 5 发布：价格不变，"会自己补位"是最大变化</div>
+        <div class="seg">
+          <button class="on" onclick="dv(0,this)">速览</button>
+          <button onclick="dv(1,this)">精读</button>
+          <button onclick="dv(2,this)">原文译文</button>
+        </div>
+        <button class="close">×</button>
+      </div>
+
+      <div class="body">
+        <p class="ensub">Simon Willison's Weblog · 英文源 · 降维解读（可回原文核查）</p>
+
+        <!-- 速览：一句话 + 事实清单 -->
+        <div class="view on" id="v0">
+          <div class="lead">Anthropic 发布 Opus 5，价格和 4.8 一样、登顶 Artificial Analysis 榜。真正看点不是分数——是它<span class="k">"没被要求，也会自己判断该做什么并动手"</span>。</div>
+          <ul class="facts" style="margin-top:14px">
+            <li><span class="i">1</span><span>价格与 4.8 相同（含 2× 快速模式）；登顶 AA 榜、在 Fable 5 之前。<span class="tk-cite">原文<span class="pop">"priced the same as Opus 4.8... leading the Artificial Analysis leaderboard, in front of even Fable 5."</span></span></span></li>
+            <li><span class="i">2</span><span>安全被拆两半：找漏洞接近 Mythos 5，但把漏洞变成实际攻击明显更弱。<span class="tk-cite">原文<span class="pop">"close to Mythos 5 at finding vulnerabilities... substantially behind on the exploitation."</span></span></span></li>
+          </ul>
+          <p class="hint">想更深 → 点上面「精读」看拆解和怎么用；想验真 → 点「原文译文」。</p>
+        </div>
+
+        <!-- 精读：拆解 + 行动 -->
+        <div class="view" id="v1">
+          <h3 class="sec">"主动性"到底指什么</h3>
+          <p><span style="color:var(--accent);font-weight:600">relentlessly proactive</span> = 说人话：你没让它做的、它判断该做也会自己动手。一个实例：任务给了零件图纸但故意不让它看图，Opus 5 自己写了套计算机视觉流程、从像素里重建了整个零件。<span class="tk-cite">原文<span class="pop">"no way to directly view the drawing... wrote its own computer vision pipeline to pull the geometry from the raw pixels."</span></span></p>
+          <div class="note">⚠️ 保留原作者的克制：Simon 本人还没实测，只转述官方 buzz、<b>没喊"惊人"</b>。降维如实保留分寸，不加戏、不替他编判断。</div>
+          <div class="verdict">
+            <div class="vt">AI 判断 · 供你反驳</div>
+            "发现漏洞 ≠ 会利用漏洞"是刻意设的能力边界，还是训练副产物？原文没说死——别当结论收下，见下方「待验证点」。
+          </div>
+          <div class="act">
+            <div class="h">对你有用（行动 · 供你判断）</div>
+            <p style="margin:.2em 0">· 用 Claude 做开发/研究：去读那两份提示词/上下文工程指南，旧模板可能过时。</p>
+            <p style="margin:.2em 0">· 关键任务给它设明确边界和确认步骤——因为它会自作主张。</p>
+          </div>
+        </div>
+
+        <!-- 原文 -->
+        <div class="view" id="v2">
+          <div class="en">Introducing Claude Opus 5
+
+The buzz is positive, and Anthropic's description of it as "thoughtful and proactive... close to the frontier intelligence of Claude Fable 5 at half the price". It's currently leading the Artificial Analysis leaderboard, in front of even Fable 5.
+
+On one Frontier-Bench task, Opus 5 was given a drawing of a machine part... intentionally given no way to directly view the drawing. Opus 5 responded by writing its own computer vision pipeline to pull the geometry from the raw pixels, then reconstructed the full machine part.
+
+...it comes close to Mythos 5 at finding cybersecurity vulnerabilities. However, it remains substantially behind on the exploitation of those vulnerabilities.</div>
+        </div>
+
+        <!-- 伴读 chips（底部，不占右栏，装得进你 720 模态） -->
+        <div class="airow">
+          <div class="lbl">AI 伴读 · 给判断的脚手架（不替你下结论 · 走你自己的 Key）</div>
+          <div class="chips">
+            <button onclick="ai('sum',this)">总结要点</button>
+            <button onclick="ai('struct',this)">结构拆解</button>
+            <button class="crit" onclick="ai('verify',this)">待验证点</button>
+            <button class="crit" onclick="ai('against',this)">反方观点</button>
+          </div>
+          <div class="aiout" id="aiout"></div>
+        </div>
+      </div>
+
+      <!-- 底部出口：你现在只有前 1 个+跳原文，补齐成 4 条 -->
+      <div class="foot">
+        <button class="btn-outline" onclick="toast('已存入素材库')">存为素材</button>
+        <button class="btn-outline" onclick="toast('已提为选题')">提为选题</button>
+        <button class="btn-pri" onclick="toast('已带这份降维稿进创作台')">降维成稿 · 去发布</button>
+        <a class="link" href="#" onclick="return false">跳转原文 ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+<script>
+  function dv(i,el){document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+    document.querySelectorAll('.view').forEach((v,k)=>v.classList.toggle('on',k===i));}
+  const AI={
+    sum:['总结要点','Opus 5：价格同 4.8、登顶 AA 榜；亮点是"主动性"；能发现漏洞但不擅利用；出了新提示词指南。',0],
+    struct:['结构拆解','① 定价定位 → ② 主动性实例（CV 重建零件）→ ③ 安全的发现/利用之分 → ④ 提示词方法要更新。原文是转述型 link-blog。',0],
+    verify:['待验证点 ⚠','· "登顶 AA 榜"口径/时间点是否稳定？· "半价接近 Fable 5"是官方话，缺第三方评测。· CV 重建是精选案例，能否复现未知。',1],
+    against:['反方观点 ⚡','· 榜单领先≠真实能力（Gary Marcus 式质疑）。· "主动性"在生产环境可能是风险而非卖点。· 作者自己都还没实测。',1]
+  };
+  function ai(k,el){const o=document.getElementById('aiout'),d=AI[k];o.className='aiout on'+(d[2]?' crit':'');o.innerHTML='<div class="tag">'+d[0]+'</div>'+d[1].replace(/·/g,'<br>·');}
+  let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2000);}
+</script>
+</body>
+</html>

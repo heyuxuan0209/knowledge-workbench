@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>飞书接入·简化版 — 可点方案 v2</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2; --brief-bg:#f4f6f9;
+    --text:#211f1a; --body:#332f27; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line08:rgba(33,31,26,.08); --line07:rgba(33,31,26,.07); --line10:rgba(33,31,26,.1); --line14:rgba(33,31,26,.14); --line16:rgba(33,31,26,.16);
+    --accent:#3d5a80; --amber:#a9791f; --green:#3f7350; --fs:#2a6fb5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--body);font-family:-apple-system,"PingFang SC",system-ui,sans-serif;font-size:14px;line-height:1.6}
+  .wrap{max-width:900px;margin:0 auto;padding:20px 22px 90px}
+  h1{font-size:19px;color:var(--text);margin:0 0 3px;font-weight:650}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:16px}
+  .model{background:rgba(63,115,80,.06);border:1px solid rgba(63,115,80,.18);border-radius:10px;padding:11px 14px;font-size:12.5px;color:var(--body);margin-bottom:18px;line-height:1.75}
+  .model b{color:var(--green)}
+  .switch{display:flex;gap:8px;margin:0 0 6px;flex-wrap:wrap;align-items:center}
+  .switch .q{font-size:12px;color:var(--sub2);flex-basis:100%;margin-bottom:2px}
+  .switch button{border:1px solid var(--line14);background:var(--surface);color:var(--sub);border-radius:22px;padding:7px 14px;font-size:12.5px;cursor:pointer}
+  .switch button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .vnote{font-size:12px;color:var(--sub);margin:8px 0 16px;padding:7px 12px;background:rgba(61,90,128,.06);border:1px solid rgba(61,90,128,.14);border-radius:8px}
+  .layertag{font-size:11.5px;color:var(--sub2);letter-spacing:.03em;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+  .layertag::before{content:"";height:1px;flex:1;background:var(--line08)}
+  .layertag::after{content:"";height:1px;flex:4;background:var(--line08)}
+  .fi{width:22px;height:22px;border-radius:6px;background:var(--fs);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+  .fi-sm{width:17px;height:17px;border-radius:4px;font-size:10px}
+  .row{display:flex;align-items:center;gap:10px}
+  .ttl{font-size:14px;color:var(--text);font-weight:600}
+  .ttl b{color:var(--fs)}
+  .cap{color:var(--sub);font-size:12.5px}
+  .btn{border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+  .btn-p{background:var(--accent);color:#fff}
+  .btn-g{background:none;color:var(--sub);border:1px solid var(--line14)}
+  .btn-mini{background:none;color:var(--fs);border:1px solid rgba(42,111,181,.3);border-radius:20px;padding:3px 11px;font-size:12px;cursor:pointer}
+  .pill{font-size:11px;border-radius:20px;padding:1px 8px}
+  .pill-idea{color:var(--green);background:rgba(63,115,80,.12)}
+  .pill-ask{color:var(--amber);background:rgba(169,121,31,.13)}
+  /* 即时分析框 */
+  .hero{background:var(--surface);border:1px dashed var(--line16);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .lane-ttl{font-size:14px;color:var(--text);font-weight:600;margin-bottom:3px}
+  .lab{font-size:11px;border-radius:6px;padding:1px 7px;margin-right:7px;background:rgba(61,90,128,.12);color:var(--accent)}
+  .heroin{display:flex;gap:8px;margin:10px 0}
+  .heroin .plus{width:38px;border:1px solid var(--line14);background:var(--bg);border-radius:9px;font-size:18px;color:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .heroin .fsbtn{width:38px;border:1px solid rgba(42,111,181,.3);background:rgba(42,111,181,.06);border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .heroin input{flex:1;border:1px solid var(--line14);background:var(--bg);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit}
+  .fmt{font-size:12px;color:var(--sub);line-height:1.7}
+  .fmt b{color:var(--body)}
+  .fslink{margin-top:9px;font-size:12.5px;color:var(--fs);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  /* 飞书找源展开区 */
+  .fspanel{margin-top:10px;border-top:1px solid var(--line08);padding-top:11px}
+  .seg{display:inline-flex;border:1px solid var(--line14);border-radius:8px;overflow:hidden;margin:0 0 8px}
+  .seg button{border:none;background:var(--surface);color:var(--sub);font-size:12px;padding:5px 12px;cursor:pointer}
+  .seg button.on{background:rgba(42,111,181,.1);color:var(--fs)}
+  .take-row{display:flex;gap:8px}
+  .take-row input{flex:1;border:1px solid var(--line14);background:var(--bg);border-radius:9px;padding:8px 11px;font-size:13px;font-family:inherit}
+  .res{display:flex;align-items:center;gap:9px;padding:7px 10px;border-bottom:1px solid var(--line08);font-size:13px;cursor:pointer;border-radius:6px}
+  .res:hover{background:rgba(42,111,181,.05)}
+  .res .ty{font-size:11px;color:var(--sub2);background:var(--line07);border-radius:20px;padding:1px 7px;flex-shrink:0}
+  .res .nm{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .res .go{margin-left:auto;color:var(--fs);font-size:11.5px;flex-shrink:0}
+  /* 浮层（V2/V3） */
+  .pop{border:1px solid var(--line14);background:var(--surface);border-radius:10px;padding:12px;margin-top:8px;box-shadow:0 4px 16px rgba(33,31,26,.08)}
+  .pop .h{font-size:12.5px;color:var(--fs);font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  /* 收件箱 */
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .hint{font-size:12px;color:var(--sub2);background:rgba(42,111,181,.06);border:1px solid rgba(42,111,181,.16);border-radius:8px;padding:8px 11px;line-height:1.6;margin-top:10px}
+  .hint b{color:var(--fs)}
+  .cap-item{border:1px solid var(--line10);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .cap-item .top{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  .cap-item .txt{font-size:13.5px;color:var(--text);line-height:1.5}
+  .cap-item .reply{font-size:12px;color:var(--sub);border-left:2px solid rgba(169,121,31,.4);padding-left:8px;margin-top:6px}
+  .cap-item .acts{display:flex;gap:7px;margin-top:9px;align-items:center}
+  .time{color:var(--faint);font-size:11px;margin-left:auto}
+  /* 创作台左栏片段 */
+  .studio{display:grid;grid-template-columns:200px 1fr;gap:0;border:1px solid var(--line10);border-radius:12px;overflow:hidden;background:var(--surface)}
+  .studio .left{background:var(--brief-bg);border-right:1px solid var(--line08);padding:12px}
+  .studio .left h4{font-size:12px;color:var(--sub2);margin:0 0 8px;font-weight:600}
+  .studio .matbtn{width:100%;text-align:left;border:1px dashed var(--line16);background:var(--surface);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--sub);cursor:pointer;margin-bottom:7px}
+  .studio .fsmat{border:1px solid rgba(42,111,181,.28);background:rgba(42,111,181,.06);color:var(--fs)}
+  .studio .right{padding:14px;color:var(--faint);font-size:12px}
+  .studio .matlist{font-size:12px;color:var(--body);margin-top:4px}
+  .studio .matlist div{padding:5px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line08);margin-bottom:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>飞书接入 · 简化版（可点对比 v2）</h1>
+  <div class="sub">上一版把"取料"画成独立一块——多余了。这版把它<b>并进即时分析</b>（飞书只是它的一个源），整个模块就剩两件事：</div>
+  <div class="model">
+    ① <b>随手记（捕获）</b>：飞书<b>私信</b>机器人一句 → 自动进「灵感·待整理」，你回头挑。默认静默不花钱；<b>@它 或 ？结尾</b> 才回一句（DeepSeek）。<br>
+    ② <b>消化一篇（即时分析）</b>：要读/存某篇 → 有链接就粘、没链接就"从飞书找" → 读懂存素材。<b>不再有单独的"取料"</b>。
+  </div>
+
+  <div class="switch">
+    <div class="q">唯一要选的：即时分析里「从飞书找源」怎么露出？（发现性 ↔ 清爽 的取舍）</div>
+    <button class="on" data-v="1">V1 · 框内常驻展开区</button>
+    <button data-v="2">V2 · ＋旁加"飞书"源按钮</button>
+    <button data-v="3">V3 · 极简·一条文字链</button>
+  </div>
+  <div class="vnote" id="vnote"></div>
+
+  <!-- ===== 主动侧：即时分析（三版只有这块不同） ===== -->
+  <div class="layertag">主动 · 消化一篇（你此刻要读/存一个东西）</div>
+
+  <!-- V1 -->
+  <div class="hero vbox" data-v="1">
+    <div class="lane-ttl"><span class="lab">消化</span>即时分析</div>
+    <div class="cap">丢一个东西进来 → AI 读懂 → 存成素材</div>
+    <div class="heroin"><div class="plus">＋</div><input placeholder="粘链接，或粘大段文字…"><button class="btn btn-p" style="padding:9px 14px">读懂它</button></div>
+    <div class="fmt">
+      <div>🔗 <b>粘链接</b>：网页 · 公众号 · YouTube · B站 · <b>飞书文档/妙记链接</b>（粘进去直接读）</div>
+      <div>📎 <b>传文件</b>：音频 · PDF · Word · Markdown</div>
+    </div>
+    <div class="fspanel">
+      <div class="row" style="margin-bottom:8px"><span class="fi fi-sm">飞</span><b style="font-size:12.5px;color:var(--fs)">从飞书找一篇</b><span class="cap" style="font-size:11.5px">— 不知道链接时，搜/挑一篇拉来读</span></div>
+      <div class="seg"><button class="on">🔍 关键词</button><button>💡 按意思</button><button>🔗 粘链接</button></div>
+      <div class="take-row"><input placeholder="搜飞书文档/妙记/知识库…搜不到切「按意思」"><button class="btn btn-p" style="padding:8px 13px">搜</button></div>
+      <div style="margin-top:7px">
+        <div class="res"><span class="ty">云文档</span><span class="nm">达人推进全流程自动化系统设计</span><span class="go">拉来读 →</span></div>
+        <div class="res"><span class="ty">知识库</span><span class="nm">BD 投放 SOP · 沟通话术库</span><span class="go">拉来读 →</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- V2 -->
+  <div class="hero vbox" data-v="2" style="display:none">
+    <div class="lane-ttl"><span class="lab">消化</span>即时分析</div>
+    <div class="cap">丢一个东西进来 → AI 读懂 → 存成素材</div>
+    <div class="heroin">
+      <div class="plus" title="传文件">＋</div>
+      <div class="fsbtn" title="从飞书找一篇"><span class="fi fi-sm">飞</span></div>
+      <input placeholder="粘链接（含飞书文档/妙记），或粘大段文字…"><button class="btn btn-p" style="padding:9px 14px">读懂它</button>
+    </div>
+    <div class="fmt">
+      <div>🔗 <b>粘链接</b>：网页 · 公众号 · YouTube · B站 · <b>飞书文档/妙记</b> ｜ 📎 <b>＋</b> 传文件 ｜ <span class="fi fi-sm" style="vertical-align:-3px">飞</span> <b>从飞书找一篇</b></div>
+    </div>
+    <div class="pop">
+      <div class="h"><span class="fi fi-sm">飞</span>从飞书找一篇（点了"飞"弹出）</div>
+      <div class="seg"><button class="on">🔍 关键词</button><button>💡 按意思</button><button>🔗 粘链接</button></div>
+      <div class="take-row"><input placeholder="搜飞书文档/妙记/知识库…"><button class="btn btn-p" style="padding:8px 13px">搜</button></div>
+      <div style="margin-top:7px">
+        <div class="res"><span class="ty">云文档</span><span class="nm">达人推进全流程自动化系统设计</span><span class="go">拉来读 →</span></div>
+        <div class="res"><span class="ty">知识库</span><span class="nm">BD 投放 SOP · 沟通话术库</span><span class="go">拉来读 →</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- V3 -->
+  <div class="hero vbox" data-v="3" style="display:none">
+    <div class="lane-ttl"><span class="lab">消化</span>即时分析</div>
+    <div class="cap">丢一个东西进来 → AI 读懂 → 存成素材</div>
+    <div class="heroin"><div class="plus">＋</div><input placeholder="粘链接（含飞书文档/妙记），或粘大段文字…"><button class="btn btn-p" style="padding:9px 14px">读懂它</button></div>
+    <div class="fmt">
+      <div>🔗 <b>粘链接</b>：网页 · 公众号 · YouTube · B站 · <b>飞书文档/妙记</b></div>
+      <div>📎 <b>传文件</b>：音频 · PDF · Word · Markdown</div>
+    </div>
+    <div class="fslink">🔍 从飞书找一篇 →<span class="cap" style="font-size:11.5px">（不知道链接时点这，弹出搜/挑）</span></div>
+    <div class="pop" style="margin-top:9px">
+      <div class="h"><span class="fi fi-sm">飞</span>从飞书找一篇（点文字链弹出，不常驻）</div>
+      <div class="seg"><button class="on">🔍 关键词</button><button>💡 按意思</button><button>🔗 粘链接</button></div>
+      <div class="take-row"><input placeholder="搜飞书文档/妙记/知识库…"><button class="btn btn-p" style="padding:8px 13px">搜</button></div>
+      <div style="margin-top:7px">
+        <div class="res"><span class="ty">云文档</span><span class="nm">达人推进全流程自动化系统设计</span><span class="go">拉来读 →</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 被动侧：私信捕获收件箱（三版相同） ===== -->
+  <div class="layertag">被动 · 随手记（系统替你收，你挑）</div>
+  <div class="card">
+    <div class="row"><span class="fi">飞</span><span class="ttl">飞书私信 · <b>你随手丢的</b> → 待挑进灵感</span><button class="btn-mini" style="margin-left:auto">↻ 收一下</button></div>
+    <div class="hint">私信这个机器人＝往工作台记一笔，<b>默认不吭声、不花钱</b>。想让它帮你想想，消息里 <b>@它</b> 或用 <b>？</b> 结尾，它才回一句（DeepSeek），照样收进来。</div>
+    <div style="margin-top:12px">
+      <div class="cap-item">
+        <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="time">2 分钟前</span></div>
+        <div class="txt">BD 达人投放这套流程，能写成"个人如何把重复沟通自动化"的方法文</div>
+        <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+      </div>
+      <div class="cap-item">
+        <div class="top"><span class="pill pill-idea">待挑进灵感</span><span class="pill pill-ask">🗨 你问过它·已回</span><span class="time">1 小时前</span></div>
+        <div class="txt">@达人跟进助手 飞书多维表格当数据中枢靠谱吗？帮我想想坑</div>
+        <div class="reply">它回：能当 SoT，但别指望它自动登录平台抓数——平台→表那跳还是手动导出或 cookie…</div>
+        <div class="acts"><button class="btn btn-p">采纳为灵感</button><button class="btn btn-g">忽略</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 创作台复用入口（固定，说明"写作时也能拉飞书料"，不全局置顶） ===== -->
+  <div class="layertag">写作时也能拉飞书料 · 创作台左栏复用同一能力（不全局置顶）</div>
+  <div class="studio">
+    <div class="left">
+      <h4>素材台</h4>
+      <button class="matbtn fsmat"><span class="fi fi-sm" style="vertical-align:-3px">飞</span> 从飞书取料</button>
+      <button class="matbtn">⬆ 上传文件</button>
+      <div class="matlist">
+        <div>📄 达人自动化系统设计</div>
+        <div>📄 BD 投放话术库</div>
+      </div>
+    </div>
+    <div class="right">（创作台正文区…）<br><br>左栏「从飞书取料」= 即时分析里那套搜/挑的复用，写作中随手拉一篇飞书文档进素材台，不用切回灵感页。</div>
+  </div>
+
+</div>
+<script>
+  const VN={ '1':'V1 · 框内常驻展开区：搜/挑面板一直摆在即时分析框里。最容易发现"能从飞书找"，代价是框子高一点。',
+             '2':'V2 · ＋旁加"飞书"源按钮：和 ＋传文件 并排一个"飞"，点了才弹搜/挑。干净，但"能从飞书找"要靠你注意到那个小按钮。',
+             '3':'V3 · 极简一条文字链：平时只有一句"🔍 从飞书找一篇 →"，点开才出面板。最清爽，发现性最弱。' };
+  const nb=document.getElementById('vnote'); nb.textContent=VN['1'];
+  const btns=document.querySelectorAll('.switch button[data-v]');
+  btns.forEach(b=>b.onclick=()=>{
+    btns.forEach(x=>x.classList.remove('on')); b.classList.add('on');
+    nb.textContent=VN[b.dataset.v];
+    document.querySelectorAll('.hero.vbox').forEach(h=>h.style.display=(h.dataset.v===b.dataset.v)?'block':'none');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+  document.querySelectorAll('.seg').forEach(s=>s.querySelectorAll('button').forEach(b=>b.onclick=()=>{s.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on')}));
+  document.addEventListener('click',e=>{
+    if(e.target.classList.contains('btn-p')&&e.target.textContent.includes('采纳')){const it=e.target.closest('.cap-item');it.style.opacity=.4;it.querySelector('.acts').innerHTML='<span style="color:var(--green);font-size:12px">✓ 已进灵感库</span>'}
+    if(e.target.classList.contains('btn-g')&&e.target.textContent==='忽略'){const it=e.target.closest('.cap-item');it.style.opacity=.35;it.querySelector('.acts').innerHTML='<span style="color:var(--faint);font-size:12px">已忽略</span>'}
+  });
+</script>
+</body>
+</html>

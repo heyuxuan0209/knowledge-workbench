@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mock B · 单栏沉浸下潜</title>
+<style>
+  :root{
+    --bg:#f4f3ef; --paper:#fffdf9; --ink:#23231f; --sub:#8a8a82; --line:#eae8e2;
+    --accent:#6f8a86; --accent-soft:#e7efed; --warn:#a9805a; --warn-soft:#f4ece2; --blue:#5f7896;--blue-soft:#eaeef4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif}
+  .stage{max-width:720px;margin:0 auto;padding:0 24px 160px}
+  .bar{position:sticky;top:0;z-index:20;background:rgba(244,243,239,.86);backdrop-filter:blur(12px);
+    padding:16px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+  .meta{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--sub);margin-bottom:12px}
+  .tier{background:var(--accent-soft);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+  /* 下潜滑条 */
+  .slider{display:flex;align-items:center;gap:0;background:var(--paper);border:1px solid var(--line);border-radius:13px;padding:5px;position:relative}
+  .slider button{flex:1;border:0;background:transparent;padding:9px 4px;font-size:13px;color:var(--sub);cursor:pointer;
+    font-weight:600;z-index:2;position:relative;transition:color .2s;text-align:center}
+  .slider button .n{display:block;font-size:10px;font-weight:500;opacity:.65}
+  .slider button.on{color:#fff}
+  .glide{position:absolute;top:5px;bottom:5px;left:5px;width:calc(25% - 3px);background:var(--accent);border-radius:9px;
+    transition:transform .32s cubic-bezier(.5,.05,.2,1),background .3s;z-index:1}
+  h1{font-size:27px;line-height:1.42;margin:26px 0 4px;letter-spacing:-.3px}
+  .ensub{color:var(--sub);font-size:14px;margin-bottom:8px;font-style:italic}
+  .depthtag{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--accent);text-transform:uppercase;margin:26px 0 4px}
+  .view{display:none}.view.on{display:block;animation:rise .35s ease}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
+  .lead{font-size:20px;line-height:1.7;font-weight:500}
+  .lead .k{color:var(--accent)}
+  .facts{list-style:none;padding:0;margin:14px 0}
+  .facts li{padding:13px 0;border-bottom:1px dashed var(--line);display:flex;gap:12px}
+  .facts .i{width:22px;height:22px;background:var(--accent-soft);color:var(--accent);border-radius:50%;
+    font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;margin-top:3px}
+  .cite{display:inline-block;background:var(--blue-soft);color:var(--blue);font-size:10px;padding:1px 6px;border-radius:20px;margin-left:5px;cursor:help;font-weight:600;position:relative}
+  .cite:hover .pop{display:block}
+  .pop{display:none;position:absolute;bottom:135%;left:0;width:280px;background:#2b2b2e;color:#f1f1f1;font-size:12px;line-height:1.6;padding:10px 12px;border-radius:9px;z-index:30;font-weight:400;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  h3.sec{font-size:17px;margin:26px 0 8px;padding-left:11px;border-left:3px solid var(--accent)}
+  .note{color:#6a6a62;font-size:14px;background:#f0efe9;border-radius:10px;padding:12px 14px;margin:10px 0}
+  .act{background:var(--warn-soft);border-radius:12px;padding:16px 18px;margin:18px 0}
+  .act .h{font-weight:700;color:var(--warn);margin-bottom:6px}
+  .en{white-space:pre-wrap;font-family:ui-serif,Georgia,serif;font-size:15px;line-height:1.9;color:#3a3a34;
+    background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+  .en mark{background:#fff2d0}
+  /* 底部出口条 */
+  .dock{position:fixed;left:0;right:0;bottom:0;background:rgba(255,253,249,.94);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);padding:13px 24px;z-index:40}
+  .dock .in{max-width:720px;margin:0 auto;display:flex;gap:9px}
+  .exit{flex:1;border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;cursor:pointer;transition:.15s;text-align:left}
+  .exit:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .exit b{display:block;font-size:13px}.exit span{font-size:11px;color:var(--sub)}
+  .exit.pub{border-color:var(--accent);background:var(--accent-soft)}
+  /* 伴读悬浮 */
+  .fab{position:fixed;right:26px;bottom:92px;width:52px;height:52px;border-radius:50%;background:var(--blue);color:#fff;
+    border:0;font-size:20px;cursor:pointer;box-shadow:0 8px 24px rgba(95,120,150,.4);z-index:45}
+  .drawer{position:fixed;top:0;right:-400px;width:380px;max-width:88vw;height:100%;background:var(--paper);
+    border-left:1px solid var(--line);box-shadow:-10px 0 40px rgba(0,0,0,.1);z-index:60;transition:right .3s;padding:24px;overflow-y:auto}
+  .drawer.open{right:0}
+  .drawer h4{margin:0 0 4px}.drawer .x{position:absolute;top:18px;right:20px;border:0;background:none;font-size:20px;cursor:pointer;color:var(--sub)}
+  .presets{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}
+  .presets button{border:1px solid var(--line);background:#fff;border-radius:20px;padding:6px 13px;font-size:12.5px;cursor:pointer}
+  .presets button.crit{border-color:var(--warn);color:var(--warn)}
+  .ai-out{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:13.5px;line-height:1.7;min-height:70px}
+  .ai-out .tag{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px}
+  .ai-out.crit .tag{color:var(--warn)}
+  .toast{position:fixed;bottom:150px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2b2e;color:#fff;padding:11px 20px;border-radius:24px;font-size:13.5px;transition:.3s;z-index:70}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="bar">
+      <div class="meta"><b>工作台 · 精读器</b> · Simon Willison's Weblog <span class="tier">一手 T2</span> · 英文源 · 2 小时前</div>
+      <div class="slider">
+        <span class="glide" id="glide"></span>
+        <button class="on" onclick="dv(0,this)">扫一眼<span class="n">一句话</span></button>
+        <button onclick="dv(1,this)">读要点<span class="n">事实清单</span></button>
+        <button onclick="dv(2,this)">吃透<span class="n">结构精读</span></button>
+        <button onclick="dv(3,this)">核查<span class="n">原文对照</span></button>
+      </div>
+    </div>
+
+    <h1>Claude Opus 5 发布：价格不变，"会自己补位"是最大变化</h1>
+    <p class="ensub">Introducing Claude Opus 5 — Simon Willison</p>
+
+    <div class="view on" id="v0">
+      <p class="depthtag">扫一眼</p>
+      <p class="lead">Anthropic 发布 Opus 5，价格和 4.8 一样、登顶 Artificial Analysis 榜。真正的看点不是分数——是它<span class="k">"没被要求，也会自己判断该做什么并动手"</span>。往下滑，越读越深。</p>
+    </div>
+
+    <div class="view" id="v1">
+      <p class="depthtag">读要点 · 五条事实，可回原文核查</p>
+      <ul class="facts">
+        <li><span class="i">1</span><span>定价与 Opus 4.8 相同；保留"快速模式"，价格是基础版 2 倍。<span class="cite">原文<span class="pop">"priced the same as Opus 4.8... a fast mode at twice the cost."</span></span></span></li>
+        <li><span class="i">2</span><span>官方："接近 Fable 5 的前沿智能，价格只要一半"；当前 AA 榜领先，排在 Fable 5 前。<span class="cite">原文<span class="pop">"close to the frontier intelligence of Fable 5 at half the price... leading the Artificial Analysis leaderboard."</span></span></span></li>
+        <li><span class="i">3</span><span>实例：给了零件图纸但故意不让它看图，Opus 5 自己写了套计算机视觉流程，从像素提几何、重建了整个零件。<span class="cite">原文<span class="pop">"no way to directly view the drawing... wrote its own computer vision pipeline to pull the geometry from the raw pixels."</span></span></span></li>
+        <li><span class="i">4</span><span>安全：刻意没训网络攻击；找漏洞接近 Mythos 5，但"把漏洞变成实际攻击"明显更弱。<span class="cite">原文<span class="pop">"close to Mythos 5 at finding vulnerabilities... substantially behind on the exploitation."</span></span></span></li>
+        <li><span class="i">5</span><span>配套发了提示词指南；Thariq 另写《Claude 5 代模型的上下文工程新规则》。<span class="cite">原文<span class="pop">"published a prompting guide... The new rules of context engineering."</span></span></span></li>
+      </ul>
+    </div>
+
+    <div class="view" id="v2">
+      <p class="depthtag">吃透 · 拆解 + 怎么用</p>
+      <h3 class="sec">"主动性"到底指什么</h3>
+      <p><span style="color:var(--accent);font-weight:600">relentlessly proactive</span> = 说人话：你没让它做的、它判断该做也会自己动手。对开发者是双刃——能少写指令，也可能在你没盯着时自作主张。</p>
+      <div class="note">⚠️ 保留原作者的克制：Simon 本人还没上手实测，只转述官方 buzz，<b>没下"这很惊人"的结论</b>。降维如实保留分寸——不加戏、不替他编判断。</div>
+      <h3 class="sec">安全上的矛盾信号</h3>
+      <p>官方特意区分：<b>发现</b>漏洞（接近顶尖）vs <b>利用</b>漏洞（明显更弱）。是刻意设的边界还是训练副产物，原文没说死——<span style="color:var(--warn)">存疑，见伴读"待验证点"</span>。</p>
+      <div class="act">
+        <div class="h">对你有用（行动 · 供你判断）</div>
+        <p style="margin:.2em 0">· 用 Claude 做开发/研究：去读那两份提示词/上下文工程指南，旧模板可能过时。</p>
+        <p style="margin:.2em 0">· 关键任务给它设明确边界和确认步骤——因为它会自作主张。</p>
+      </div>
+    </div>
+
+    <div class="view" id="v3">
+      <p class="depthtag">核查 · 英文原文</p>
+      <div class="en">Introducing Claude Opus 5
+
+The buzz is positive, and Anthropic's description of it as a <mark>"thoughtful and proactive model that comes close to the frontier intelligence of Claude Fable 5 at half the price"</mark> sounds promising. It's currently leading the Artificial Analysis leaderboard, in front of even Fable 5.
+
+It's priced the same as Opus 4.8, and continues to offer a "fast mode" at twice the cost.
+
+<mark>Opus 5 was given a drawing of a machine part... intentionally given no way to directly view the drawing. Opus 5 responded by writing its own computer vision pipeline to pull the geometry from the raw pixels, then reconstructed the full machine part.</mark>
+
+...it comes close to Mythos 5 at finding cybersecurity vulnerabilities. However, it remains substantially behind Mythos 5 on the exploitation of those vulnerabilities.</div>
+    </div>
+  </div>
+
+  <button class="fab" onclick="document.getElementById('dr').classList.toggle('open')">✦</button>
+  <div class="drawer" id="dr">
+    <button class="x" onclick="document.getElementById('dr').classList.remove('open')">×</button>
+    <h4>AI 伴读</h4>
+    <p style="color:var(--sub);font-size:12.5px;margin:2px 0 0">给判断的脚手架，不替你下结论（走你自己的 Key）</p>
+    <div class="presets">
+      <button onclick="ai('sum',this)">总结要点</button>
+      <button onclick="ai('struct',this)">结构拆解</button>
+      <button onclick="ai('facts',this)">事实清单</button>
+      <button class="crit" onclick="ai('verify',this)">待验证点</button>
+      <button class="crit" onclick="ai('against',this)">反方观点</button>
+    </div>
+    <div class="ai-out" id="aiout"><div class="tag">点任一预设</div>「待验证点 / 反方观点」逼你批判地读，但都不替你下结论。</div>
+  </div>
+
+  <div class="dock"><div class="in">
+    <button class="exit" onclick="toast('已存入素材库（原料，待深加工）')"><b>＋ 存为素材</b><span>当原料，喂日后创作</span></button>
+    <button class="exit" onclick="toast('已提为选题')"><b>💡 提为选题</b><span>攒成你要写的题</span></button>
+    <button class="exit pub" onclick="toast('已带降维稿进创作台')"><b>✍️ 降维成稿 · 去发布</b><span>润色/加你的视角 → 直接发</span></button>
+  </div></div>
+
+  <div class="toast" id="toast"></div>
+<script>
+  const glide=document.getElementById('glide');
+  function dv(i,el){document.querySelectorAll('.slider button').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+    glide.style.transform='translateX('+(i*100)+'%)';
+    glide.style.background=i>=2?(i===3?'#8a8a82':'#6f8a86'):'#6f8a86';
+    document.querySelectorAll('.view').forEach((v,k)=>v.classList.toggle('on',k===i));
+    window.scrollTo({top:0,behavior:'smooth'});}
+  const AI={
+    sum:['总结要点','Opus 5：价格同 4.8、登顶 AA 榜；亮点是"主动性"——会自己补齐没被要求的步骤；能发现漏洞但不擅利用；出了新提示词指南。'],
+    struct:['结构拆解','① 定价定位 → ② 主动性实例（CV 重建零件）→ ③ 安全的发现/利用之分 → ④ 提示词方法要更新。原文是转述型 link-blog，非亲测。'],
+    facts:['事实清单','· 价格=4.8，fast 2×\n· 领先 AA 榜、在 Fable 5 前\n· 未训 cyber\n· 发现漏洞≈Mythos5，利用<<Mythos5'],
+    verify:['待验证点 ⚠','· "登顶 AA 榜"——口径/时间点是否稳定？\n· "半价接近 Fable 5"是官方话，缺第三方评测。\n· CV 重建是精选案例，能否稳定复现未知。',1],
+    against:['反方观点 ⚡','· 榜单领先≠真实能力（Gary Marcus 式质疑）。\n· "主动性"在生产环境可能是风险而非卖点。\n· 作者自己都还没实测，热度先行。',1]
+  };
+  function ai(k){const o=document.getElementById('aiout'),d=AI[k];o.className='ai-out'+(d[2]?' crit':'');o.innerHTML='<div class="tag">'+d[0]+'</div>'+d[1].replace(/\n/g,'<br>');}
+  let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2200);}
+</script>
+</body>
+</html>

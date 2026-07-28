@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>即时分析 × 随手记 × 飞书 · 层级</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;
+    --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+    --accent:#3d5a80;--green:#3f7350;--amber:#a9791f;--feishu:#2a6fb5;--serif:'Newsreader',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:860px;margin:0 auto;padding:24px 22px 80px;}
+  .intro{font-size:13px;color:var(--sub);margin-bottom:18px;line-height:1.75;background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:14px 16px;}
+  .intro b{color:var(--text);}
+  .intro .k{color:var(--feishu);font-weight:600;}
+  .layer-tag{display:inline-block;font-size:11px;font-weight:700;color:var(--sub2);letter-spacing:.03em;margin:0 0 8px 2px;}
+  .frame{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:16px 18px;}
+  .h-title{font-family:var(--serif);font-size:20px;font-weight:600;}
+  .h-sub{font-size:12.5px;color:var(--sub2);margin:3px 0 12px;}
+  .viewsw{display:inline-flex;border:1px solid var(--line10);border-radius:8px;overflow:hidden;margin-bottom:16px;}
+  .viewsw span{font-size:12.5px;font-weight:600;padding:6px 13px;color:var(--sub);}
+  .viewsw span.on{background:var(--accent);color:#fff;}
+  .btn-p{border:none;background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .plus{width:34px;height:34px;border:1px solid var(--line10);border-radius:8px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--sub);flex-shrink:0;}
+  .inp{flex:1;border:1px solid var(--line10);border-radius:8px;padding:9px 12px;font-size:12.5px;color:var(--faint);background:var(--surface);}
+  .lab{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;}
+  .lab.deep{color:var(--accent);background:rgba(61,90,128,.1);}
+  .lab.quick{color:var(--green);background:rgba(63,115,80,.12);}
+  .cap{font-size:11.5px;color:var(--sub2);margin-top:6px;line-height:1.5;}
+
+  /* 主动 · 双入口 */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .lane{border:1px solid var(--line10);border-radius:11px;padding:13px 14px;}
+  .lane.deep{background:rgba(61,90,128,.04);border-color:rgba(61,90,128,.22);}
+  .lane.quick{background:rgba(63,115,80,.035);border-color:rgba(63,115,80,.22);}
+  .lane .ttl{font-family:var(--serif);font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .lane .row{display:flex;gap:7px;align-items:center;margin-top:10px;}
+  .fromfeishu{font-size:11px;color:var(--feishu);margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+  .fromfeishu:hover{text-decoration:underline;}
+
+  /* 被动 · 飞书收件箱 */
+  .inbox-bar{display:flex;align-items:center;gap:10px;border:1px solid rgba(42,111,181,.28);background:rgba(42,111,181,.05);border-radius:10px;padding:11px 14px;cursor:pointer;}
+  .inbox-bar .fi{width:22px;height:22px;border-radius:6px;background:var(--feishu);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+  .inbox-bar .txt{font-size:13px;color:var(--body);}
+  .inbox-bar .txt b{color:var(--feishu);}
+  .inbox-bar .cnt{background:var(--feishu);color:#fff;font-size:11px;font-weight:700;border-radius:20px;padding:1px 8px;}
+  .inbox-bar .arw{margin-left:auto;color:var(--sub2);font-size:12px;}
+  .inbox-body{border:1px solid rgba(42,111,181,.2);border-top:none;border-radius:0 0 10px 10px;background:var(--surface);padding:4px 0;margin-top:-6px;display:none;}
+  .inbox-body.open{display:block;}
+  .tri{display:flex;align-items:center;gap:9px;padding:10px 14px;border-top:1px solid var(--line08);}
+  .tri:first-child{border-top:none;}
+  .tri .kind{font-size:10.5px;font-weight:600;color:var(--feishu);background:rgba(42,111,181,.1);border-radius:5px;padding:1.5px 7px;white-space:nowrap;}
+  .tri .nm{flex:1;font-size:12.5px;color:var(--body);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tri .acts{display:flex;gap:6px;flex-shrink:0;}
+  .a-mat{border:1px solid rgba(169,121,31,.4);background:rgba(169,121,31,.08);color:var(--amber);font-size:11px;padding:2px 9px;border-radius:6px;cursor:pointer;}
+  .a-idea{border:1px solid rgba(63,115,80,.4);background:rgba(63,115,80,.08);color:var(--green);font-size:11px;padding:2px 9px;border-radius:6px;cursor:pointer;}
+  .a-x{border:1px solid var(--line10);background:none;color:var(--faint);font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;}
+  .inbox-foot{font-size:11.5px;color:var(--sub2);padding:9px 14px 6px;}
+
+  .sec{display:flex;align-items:center;gap:8px;margin:18px 2px 8px;font-size:12px;color:var(--sub2);font-weight:600;}
+  .sec .line{flex:1;height:1px;background:var(--line08);}
+  .empty{font-size:12.5px;color:var(--faint);padding:8px 2px;}
+  .spacer{height:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    <b>两类入口，别混：</b>「主动·即时」= 你此刻丢一个进来（<b>即时分析</b> / <b>随手记</b>，方案1 双入口）；
+    「被动·持续」= 系统替你不断收、你事后挑（<b class="k">飞书收件箱</b>）。
+    飞书是<b class="k">来源</b>不是打字框——它在两处露出：即时分析里「从飞书选」＋ 下方的<b class="k">待整理收件箱</b>。
+    <br><span style="color:var(--faint)">（飞书部分是接入后的样子；真接需要你的飞书 App 凭证。点收件箱那条能展开看分诊。）</span>
+  </div>
+
+  <div class="frame">
+    <div class="h-title">💡 灵感库</div>
+    <div class="h-sub">要写什么的种子 · 素材是料、灵感是要写什么</div>
+    <div class="viewsw"><span class="on">收集视图</span><span>写作看板</span></div>
+
+    <!-- 主动 · 即时 -->
+    <div class="layer-tag">主动 · 即时（你丢一个进来）</div>
+    <div class="duo">
+      <div class="lane deep">
+        <div class="ttl"><span class="lab deep">消化</span>即时分析</div>
+        <div class="cap">丢链接 / 音频 / PDF / 会议纪要 → AI 读懂 → 存成素材，可提为灵感</div>
+        <div class="row"><div class="plus">＋</div><input class="inp" placeholder="粘链接，或粘大段文字…"><button class="btn-p">读懂它 →</button></div>
+        <div class="fromfeishu">🔗 或从飞书选一篇文档 / 妙记消化…</div>
+      </div>
+      <div class="lane quick">
+        <div class="ttl"><span class="lab quick">闪念</span>随手记</div>
+        <div class="cap">脑里冒出的一句话、一个角度 → 直接成一条灵感（自动找贴合素材）</div>
+        <div class="row"><input class="inp" placeholder="随手记一句…"><button class="btn-p">＋ 记</button></div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- 被动 · 持续 -->
+    <div class="layer-tag">被动 · 持续（系统替你收，你挑）</div>
+    <div class="inbox-bar" onclick="var e=document.getElementById('ib');e.classList.toggle('open');this.querySelector('.arw').textContent=e.classList.contains('open')?'收起 ▴':'展开分诊 ▾'">
+      <div class="fi">飞</div>
+      <div class="txt"><b>飞书 · 待整理</b> —— 妙记 / 纪要 / 群聊 / 云文档 里的新内容</div>
+      <div class="cnt">8</div>
+      <div class="arw">展开分诊 ▾</div>
+    </div>
+    <div class="inbox-body" id="ib">
+      <div class="tri">
+        <span class="kind">妙记</span>
+        <span class="nm">产品周会：关于灵感库火候排序的讨论纪要</span>
+        <span class="acts"><button class="a-mat">采纳为素材</button><button class="a-idea">提为灵感</button><button class="a-x">忽略</button></span>
+      </div>
+      <div class="tri">
+        <span class="kind">群聊</span>
+        <span class="nm">「AI 工作台的真正壁垒是流程理解，不是模型」——群里聊到的观点</span>
+        <span class="acts"><button class="a-mat">采纳为素材</button><button class="a-idea">提为灵感</button><button class="a-x">忽略</button></span>
+      </div>
+      <div class="tri">
+        <span class="kind">云文档</span>
+        <span class="nm">竞品调研：内容工作台们的复盘功能对比</span>
+        <span class="acts"><button class="a-mat">采纳为素材</button><button class="a-idea">提为灵感</button><button class="a-x">忽略</button></span>
+      </div>
+      <div class="inbox-foot">文档 / 纪要 → 多是「料」采纳为素材；群聊 / 灵感一句 → 「提为灵感」。忽略的不再出现。</div>
+    </div>
+
+    <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+    <div class="empty">（这里是你的灵感卡片）</div>
+  </div>
+</div>
+</body>
+</html>

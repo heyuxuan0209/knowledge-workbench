@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台重构 · 方案D2（对齐真实布局）</title>
+<style>
+  :root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--sub:#706b60;--faint:#b0a894;
+    --line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--green:#3f7350;--amber:#a9791f;--red:#a24b3f;--serif:'Newsreader',Georgia,serif;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+  .top{background:#22303f;color:#fff;padding:11px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .top h1{font-family:var(--serif);font-size:16px;font-weight:600}.top .h{font-size:12px;color:#b8c4d0;margin-right:auto}
+  .vlab{padding:9px 20px;background:#fbf3e4;border-bottom:1px solid var(--line10);font-size:12.5px;color:var(--body)}.vlab b{color:var(--accent)}
+  .app{display:grid;grid-template-columns:52px 200px 1fr 296px;height:calc(100vh - 78px);min-height:640px}
+  .nav{background:var(--surface);border-right:1px solid var(--line10);padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:13px}
+  .nav .it{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--sub)}
+  .nav .it.on{background:rgba(61,90,128,.1);color:var(--accent)}
+  /* 左·素材台（全部素材都在这） */
+  .mats{background:var(--surface);border-right:1px solid var(--line10);padding:13px 12px;overflow:auto}
+  .mats h3{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:9px}
+  .mats .btn2{font-size:10.5px;color:var(--accent);border:1px solid var(--line14);border-radius:5px;padding:1px 6px;cursor:pointer}
+  .fs{color:#2a6fb5;border-color:rgba(42,111,181,.35)}
+  .mat{background:#fff;border:1px solid var(--line10);border-radius:7px;padding:8px 9px;margin-bottom:6px;font-size:11.5px}
+  .mat.sel{border-color:var(--accent);background:rgba(61,90,128,.05)}
+  .mat .ins{float:right;font-size:10px;color:var(--accent);border:1px solid var(--line14);border-radius:4px;padding:0 5px;cursor:pointer}
+  .lbl{font-size:10.5px;color:var(--sub);margin:13px 0 6px;font-weight:600}
+  /* 中栏 */
+  .main{background:var(--bg);padding:13px 16px;overflow:auto}
+  .mtab{display:inline-flex;background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:3px;margin-bottom:11px}
+  .mtab button{border:none;background:none;padding:8px 17px;border-radius:8px;font-size:13px;font-weight:600;color:var(--sub);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px}
+  .mtab button.on{background:var(--accent);color:#fff}
+  .mtab .step{width:18px;height:18px;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;background:#e6e0d3;color:var(--sub)}
+  .mtab button.on .step{background:rgba(255,255,255,.25);color:#fff}
+  .tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+  .tools .g{font-size:10px;color:var(--faint);margin-right:2px}
+  .tb{border:1px solid var(--line14);background:#fff;color:var(--body);padding:6px 11px;border-radius:7px;font-size:12px;cursor:pointer}
+  .tb.pri{border-color:var(--accent);color:var(--accent)}
+  .sepv{width:1px;height:20px;background:var(--line14);margin:0 4px}
+  .draft{background:#fff;border:1px solid var(--line10);border-radius:11px;padding:18px 22px;font-size:13.5px;line-height:1.9;color:var(--body);min-height:330px}
+  .draft h4{font-family:var(--serif);font-size:18px;margin-bottom:9px;color:var(--text)}
+  .mut{font-size:11.5px;color:var(--sub)}
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:14px 15px;margin-bottom:11px}
+  .card h4{font-size:13px;font-weight:600;margin-bottom:3px}.card .d{font-size:11px;color:var(--sub);margin-bottom:10px}
+  .pf{border:1.4px solid var(--line14);background:#fff;border-radius:9px;padding:8px 11px;cursor:pointer;display:flex;align-items:center;gap:9px;font-size:12.5px;margin-bottom:6px}
+  .pf .nm{font-weight:600}.pf .rend{font-size:9.5px;color:var(--faint)}.pf .ck{margin-left:auto;width:17px;height:17px;border-radius:5px;border:1.4px solid var(--line14);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center}
+  .pf.on{border-color:var(--accent);background:rgba(61,90,128,.06)}.pf.on .ck{background:var(--accent);border-color:var(--accent)}
+  .themes{display:flex;gap:8px;flex-wrap:wrap}.th{border:2px solid var(--line14);border-radius:9px;overflow:hidden;cursor:pointer;width:78px}
+  .th .sw{height:36px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:13px;font-weight:700}.th .nm{font-size:10px;padding:4px;text-align:center;color:var(--body)}
+  .th.on{border-color:var(--accent)}.th.on .nm{color:var(--accent);font-weight:700}
+  .m1 .sw{background:#f2ede2;color:#c9784e}.m2 .sw{background:#111;color:#7fd1c0}.m3 .sw{background:#f6f1e7;color:#a24b3f}.m4 .sw{background:#fbeef2;color:#d98aa6}
+  /* 适配稿（看/改） */
+  .adp{border:1px solid var(--line14);border-radius:9px;background:#fff;margin-bottom:8px;overflow:hidden}
+  .adp .ah{padding:9px 12px;display:flex;align-items:center;gap:9px;font-size:12.5px;cursor:pointer}
+  .adp .ah .nm{font-weight:600}.adp .ah .st{font-size:10px;color:var(--green);margin-left:6px}
+  .adp .ah .op{margin-left:auto;font-size:11px;color:var(--accent);border:1px solid var(--line14);border-radius:6px;padding:2px 9px}
+  .adp .ab{padding:0 14px 13px;border-top:1px solid var(--line10);font-size:12px;color:var(--body);line-height:1.7}
+  .adp .ab .seg{background:#f7f4ee;border-radius:7px;padding:9px 11px;margin-top:10px}
+  .adp .ab .seg b{color:var(--accent)}
+  .adp .ab .edit{margin-top:10px;display:flex;gap:6px}.adp .ab .edit .e{font-size:11px;border:1px solid var(--line14);border-radius:6px;padding:3px 9px;cursor:pointer}.adp .ab .edit .e.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn{border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:9px;cursor:pointer}
+  .outs{display:flex;gap:10px;flex-wrap:wrap}.out{background:#fff;border:1px solid var(--line10);border-radius:10px;overflow:hidden;width:132px}
+  .out .pv{height:76px;background:#efeade;display:flex;align-items:center;justify-content:center;position:relative}.out .badge{position:absolute;top:6px;left:6px;background:#22303f;color:#fff;font-size:9px;padding:1px 6px;border-radius:4px}
+  .out .bd{padding:8px 9px}.out .nm{font-size:11.5px;font-weight:600}.out .mt{font-size:10px;color:var(--sub);margin:2px 0 6px}.out .row{display:flex;gap:5px}.out .b{flex:1;text-align:center;font-size:10.5px;border:1px solid var(--line14);border-radius:6px;padding:4px 0;cursor:pointer}.out .b.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .mini{width:32px;height:52px;border-radius:5px;background:#f2ede2;border:1px solid var(--line14);padding:4px;display:flex;flex-direction:column;gap:3px}.mini .l{height:4px;border-radius:2px;background:rgba(43,41,36,.16)}.mini .l.a{background:#c9784e;width:60%}.mini.dark{background:#22303f}.mini.dark .l{background:rgba(255,255,255,.25)}.mini.dark .l.a{background:#e7c98a}
+  /* 右·创作助手（只有指令改写） */
+  .ai{background:var(--surface);border-left:1px solid var(--line10);padding:14px 14px;overflow:auto}
+  .ai h3{font-size:12.5px;font-weight:600;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+  .ai .sub{font-size:11px;color:var(--sub);margin-bottom:12px}
+  .ai .say{border:1px solid var(--line14);border-radius:9px;background:#fff;padding:10px 11px;font-size:12px;color:var(--body);min-height:80px}
+  .ai .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.ai .chip{font-size:11px;border:1px solid var(--line14);border-radius:14px;padding:4px 10px;color:var(--body);cursor:pointer;background:#fff}
+  .ai .send{margin-top:10px;width:100%;border:none;background:var(--accent);color:#fff;border-radius:8px;padding:9px 0;font-size:12.5px;font-weight:600;cursor:pointer}
+  .ai .ctx{font-size:11px;color:var(--sub);background:rgba(61,90,128,.06);border-radius:7px;padding:7px 9px;margin-bottom:10px}
+  .hidden{display:none!important}.tag{font-size:10px;background:var(--accent);color:#fff;padding:1px 7px;border-radius:4px;margin-left:6px}
+</style></head>
+<body>
+<div class="top"><h1>创作台重构 · D2（对齐你真实布局）</h1><span class="h">左素材(含飞书)｜中母稿/出片｜右创作助手(只指令改写) · 改稿贴中间</span></div>
+<div class="vlab" id="vlab"></div>
+
+<div class="app">
+  <nav class="nav"><div class="it">📰</div><div class="it">📝</div><div class="it">🗂️</div><div class="it">💡</div><div class="it on">✍️</div></nav>
+
+  <!-- 左·素材台：全部素材 + 飞书 + 溯源 -->
+  <div class="mats">
+    <h3>📎 素材台 <span style="margin-left:auto;display:flex;gap:5px"><span class="btn2 fs">飞 从飞书</span><span class="btn2">+新增</span></span></h3>
+    <div class="mat sel">vibecoding 半年经验 <span class="ins">插入</span></div>
+    <div class="mat sel">html mock 踩坑 <span class="ins">插入</span></div>
+    <div class="mat">密度开关·手感 <span class="ins">插入</span></div>
+    <div class="mat">梁文锋十问·护城河 <span class="ins">插入</span></div>
+    <div class="lbl">本文引用（2）· 可溯源</div>
+    <div class="mat" style="color:var(--sub)">[素材1] vibecoding 原文 ↗</div>
+    <div class="mat" style="color:var(--sub)">[素材2] html 踩坑 ↗</div>
+  </div>
+
+  <!-- 中栏 -->
+  <div class="main">
+    <div class="mtab">
+      <button id="tb-edit" class="on" onclick="mode('edit')"><span class="step">2</span>定稿（母稿）</button>
+      <button id="tb-film" onclick="mode('film')"><span class="step">3</span>出片 · 多平台</button>
+    </div>
+
+    <!-- 定稿：改稿都在中间（贴草稿），产出分开 -->
+    <div id="pane-edit">
+      <div class="tools">
+        <span class="g">改稿</span><span class="tb pri">✨ 去 AI 味</span><span class="tb pri">🔎 审稿</span><span class="tb pri">✂ 改一段</span>
+        <span class="sepv"></span>
+        <span class="g">产出</span><span class="tb">🏷 标题</span><span class="tb">💾 存草稿</span><span class="tb">⬇ 导出 MD</span><span class="tb">📋 复制</span>
+        <span class="tb" style="margin-left:auto">草稿箱(3)</span>
+      </div>
+      <div class="draft"><h4>AI 早就够强了，是我们把它拴住了</h4>
+        <p>所有人都在学怎么把提示词写得更好。我做产品做了大半年，越来越怀疑：这个方向，可能一开始就错了。</p>
+        <p>我描述一个按钮怎么摆，改来改去，一整天就过去了。后来我换了种说法：别写，先做几个能点的 html mock，我来选。三下点击就定了。这大半年七八个产品，几乎每个关键决定，都是这么定的。</p>
+        <p style="color:var(--faint)">（母稿＝最厚那版。左边插素材、右边跟助手说怎么改。）</p>
+      </div>
+    </div>
+
+    <!-- 出片：选平台 → 适配稿(看/改) → 主题/配音 → 出 -->
+    <div id="pane-film" class="hidden">
+      <div class="card">
+        <h4>① 选平台形态 <span class="mut" style="font-weight:400">· 可多选（每个自带合适文体，自动从母稿适配）</span></h4>
+        <div class="pf on" onclick="tog(this)"><span>📄</span><span><span class="nm">公众号长文</span> <span class="rend">· 长文体 · 排版</span></span><span class="ck">✓</span></div>
+        <div class="pf on" onclick="tog(this)"><span>🖼️</span><span><span class="nm">小红书图文卡</span> <span class="rend">· 卡片体 · 图卡渲染器</span></span><span class="ck">✓</span></div>
+        <div class="pf on" onclick="tog(this)"><span>📱</span><span><span class="nm">抖音竖版口播</span> <span class="rend">· 口播体 · 视频渲染器</span></span><span class="ck">✓</span></div>
+        <div class="pf" onclick="tog(this)"><span>💬</span><span><span class="nm">视频号竖版</span> <span class="rend">· 口播体 · 视频渲染器</span></span><span class="ck">✓</span></div>
+      </div>
+
+      <div class="card">
+        <h4>② 适配稿 · 看 / 改 <span class="mut" style="font-weight:400">· 母稿已自动适配成各平台稿，渲染前你过一眼、可改</span></h4>
+        <!-- 抖音适配稿：展开 -->
+        <div class="adp">
+          <div class="ah" onclick="this.parentElement.querySelector('.ab').classList.toggle('hidden')"><span>📱</span><span class="nm">抖音口播稿</span><span class="st">✓ 已适配</span><span class="op">看 / 改 ▾</span></div>
+          <div class="ab">
+            <div class="seg"><b>钩子</b>：都说跟 AI 干活关键是把需求说清楚——就是这句话，害我返了很多次工。</div>
+            <div class="seg"><b>踩坑</b>：一个按钮布局改了七八轮、白搭一整天；换成"做几个 html 我来选"，三下点击就定。</div>
+            <div class="seg"><b>金句/CTA</b>：别急着聊，让它先做出来给你看。你也踩过坑吗？评论区聊聊。</div>
+            <div class="edit"><span class="e">✎ 直接改文字</span><span class="e p" onclick="alert('去右边跟助手说，如「钩子再狠点」')">🤖 让助手改</span><span class="mut" style="margin-left:auto;align-self:center">母稿→口播体，压到 ~90 秒</span></div>
+          </div>
+        </div>
+        <!-- 小红书适配稿：折叠 -->
+        <div class="adp"><div class="ah" onclick="this.parentElement.querySelector('.ab').classList.toggle('hidden')"><span>🖼️</span><span class="nm">小红书 7 卡文案</span><span class="st">✓ 已适配</span><span class="op">看 / 改 ▾</span></div>
+          <div class="ab hidden"><div class="seg"><b>封面卡</b>：AI 早就够强了，是我们把它拴住了</div><div class="seg"><b>卡1–6</b>：每卡一个反常识点 + 一句话…</div><div class="edit"><span class="e">✎ 改文字</span><span class="e p">🤖 让助手改</span></div></div>
+        </div>
+        <!-- 公众号适配稿：折叠 -->
+        <div class="adp"><div class="ah" onclick="this.parentElement.querySelector('.ab').classList.toggle('hidden')"><span>📄</span><span class="nm">公众号长文</span><span class="st">= 母稿本身</span><span class="op">看 ▾</span></div>
+          <div class="ab hidden"><div class="mut">长文＝母稿直接用（最厚那版），无需压缩。</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>③ 视觉主题 + 配音</h4>
+        <div class="themes"><div class="th m1 on" onclick="pt(this)"><div class="sw">杰</div><div class="nm">暖莫兰迪</div></div><div class="th m2" onclick="pt(this)"><div class="sw">极</div><div class="nm">极简黑白</div></div><div class="th m3" onclick="pt(this)"><div class="sw">观</div><div class="nm">杂志编辑</div></div><div class="th m4" onclick="pt(this)"><div class="sw">轻</div><div class="nm">马卡龙</div></div></div>
+        <div class="mut" style="margin-top:10px">🎙 <span style="color:var(--accent);cursor:pointer" onclick="alert('▶ 现合成一句短样试听（火山~1秒），满意再用')">Vivi 2.0 ▶试听</span> · 换音色 · 🎵 暖 lo-fi</div>
+      </div>
+      <button class="btn" onclick="document.getElementById('outbox').classList.remove('hidden')">⚡ 一键出片 · 各平台各一份 →</button>
+      <div class="card hidden" id="outbox" style="margin-top:11px">
+        <h4>产出</h4>
+        <div class="outs">
+          <div class="out"><div class="pv"><span class="badge">公众号</span><div class="mini" style="width:42px;height:56px"><div class="l" style="width:80%"></div><div class="l"></div><div class="l" style="width:90%"></div></div></div><div class="bd"><div class="nm">长文</div><div class="row"><span class="b p">预览</span><span class="b">导出</span></div></div></div>
+          <div class="out"><div class="pv"><span class="badge">小红书</span><div style="display:flex;gap:4px"><div class="mini" style="width:32px;height:46px"><div class="l a"></div><div class="l" style="flex:1;border-radius:5px"></div></div></div></div><div class="bd"><div class="nm">图文 7 卡</div><div class="row"><span class="b p">预览</span><span class="b">导出</span></div></div></div>
+          <div class="out"><div class="pv"><span class="badge">抖音</span><div class="mini dark"><div class="l a"></div><div class="l"></div><div class="l" style="margin-top:auto"></div></div></div><div class="bd"><div class="nm">竖版 126s</div><div class="row"><span class="b p">▶预览</span><span class="b">导出</span></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右·创作助手：只有指令改写（两模式改的对象不同） -->
+  <div class="ai">
+    <h3>🤖 创作助手</h3>
+    <div class="sub" id="ai-sub">指令改写 · 直接改左边母稿（素材/引用都在左栏）</div>
+    <div class="ctx" id="ai-ctx" style="display:none">当前在改：📱 抖音口播稿（不是母稿）</div>
+    <div class="say" contenteditable="true" id="ai-say">跟它说怎么改，如「开头更狠」「压到 5 条」「加一个反方观点」…</div>
+    <div class="chips" id="ai-chips">
+      <span class="chip">开头更狠</span><span class="chip">压到 5 条</span><span class="chip">加反方观点</span><span class="chip">去掉说教</span>
+    </div>
+    <button class="send">发送 · 直接改</button>
+  </div>
+</div>
+<script>
+  function mode(v){
+    document.getElementById('tb-edit').classList.toggle('on',v==='edit');
+    document.getElementById('tb-film').classList.toggle('on',v==='film');
+    document.getElementById('pane-edit').classList.toggle('hidden',v!=='edit');
+    document.getElementById('pane-film').classList.toggle('hidden',v!=='film');
+    // 右栏助手：定稿=改母稿；出片=改当前选中的适配稿
+    document.getElementById('ai-ctx').style.display = v==='film'?'block':'none';
+    document.getElementById('ai-sub').textContent = v==='film' ? '指令改写 · 改当前适配稿（如抖音口播稿）' : '指令改写 · 直接改左边母稿（素材/引用都在左栏）';
+    document.getElementById('ai-chips').innerHTML = v==='film'
+      ? '<span class="chip">钩子再狠点</span><span class="chip">压到 60 秒</span><span class="chip">换个 CTA</span>'
+      : '<span class="chip">开头更狠</span><span class="chip">压到 5 条</span><span class="chip">加反方观点</span><span class="chip">去掉说教</span>';
+    document.getElementById('vlab').innerHTML = v==='edit'
+      ? '<b>② 定稿</b>：改稿工具（去AI味/审稿/改一段）都<b>贴在中间草稿上方</b>；右栏助手＝<b>指令改写</b>。左素材、右助手都在。'
+      : '<b>③ 出片</b>：①选平台 → <b>②适配稿（看/改：展开能看到抖音口播稿的钩子/踩坑/CTA，可改）</b> → ③主题+配音 → 出片。右栏助手此时改的是<b>当前适配稿</b>。';
+  }
+  function tog(el){el.classList.toggle('on')}
+  function pt(el){document.querySelectorAll('.th').forEach(t=>t.classList.remove('on'));el.classList.add('on')}
+  mode('edit');
+</script>
+</body></html>

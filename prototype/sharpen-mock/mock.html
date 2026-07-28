@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创作台 · 「磨利」输出选型</title>
+<style>
+  :root{--bg:#efece4;--surface:#faf8f2;--brief:#f4f6f9;--text:#211f1a;--body:#332f27;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;
+    --line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:'Newsreader',Georgia,serif;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+  .pick{position:sticky;top:0;z-index:50;background:#22303f;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .pick h1{font-family:var(--serif);font-size:16px;font-weight:600}
+  .pick .h{font-size:12px;color:#b8c4d0;margin-right:auto}
+  .pick button{border:1px solid #4a5a6a;background:#2c3d4d;color:#cdd7e0;padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit}
+  .pick button.on{background:#fff;color:#22303f;border-color:#fff;font-weight:600}
+  .vlab{padding:10px 20px;background:#fbf3e4;border-bottom:1px solid var(--line10);font-size:13px;color:var(--body)}
+  .vlab b{color:var(--accent)}
+  /* 创作台外壳 */
+  .studio{display:grid;grid-template-columns:1fr 340px;gap:18px;max-width:1180px;margin:22px auto;padding:0 22px;align-items:start}
+  .col{min-width:0}
+  .head{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:3px}
+  .sub{font-size:12px;color:var(--sub);margin-bottom:14px}
+  .toolbar{display:flex;gap:7px;flex-wrap:wrap;padding:9px 11px;background:var(--surface);border:1px solid var(--line10);border-bottom:none;border-radius:10px 10px 0 0}
+  .tb{border:1px solid var(--line14);background:#fff;color:var(--body);padding:7px 13px;border-radius:8px;font-size:12.5px;cursor:pointer;font-family:inherit;display:inline-flex;gap:6px;align-items:center}
+  .tb:hover{border-color:var(--accent);color:var(--accent)}
+  .tb.sharp{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .tb.sharp:hover{background:var(--accent-h);color:#fff}
+  .editor{border:1px solid var(--line10);border-top:none;border-radius:0 0 10px 10px;background:#fff;padding:24px 28px;min-height:360px;font-size:15px;line-height:1.95;color:var(--body)}
+  .editor p{margin:0 0 15px}
+  /* diff 标记 */
+  del{color:var(--faint);text-decoration:line-through;text-decoration-color:var(--red)}
+  ins{color:var(--body);text-decoration:none;background:rgba(63,115,80,.14);border-radius:3px;padding:0 2px}
+  .add{background:rgba(63,115,80,.14);border-radius:3px;padding:0 3px}
+  .gap{background:rgba(169,121,31,.16);border-bottom:2px dashed var(--amber);border-radius:3px;padding:0 4px;color:var(--amber);cursor:pointer;font-weight:600}
+  .why{display:inline-block;font-size:11px;color:var(--accent);border:1px solid var(--line14);border-radius:10px;padding:1px 7px;margin-left:6px;cursor:pointer;vertical-align:1px}
+  /* 右栏面板 */
+  .panel{background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:14px 15px}
+  .panel h3{font-size:13px;font-weight:600;color:var(--body);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  .ch{border:1px solid var(--line10);border-radius:9px;background:#fff;padding:10px 12px;margin-bottom:9px;font-size:12px}
+  .ch .tag{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:5px;margin-bottom:7px}
+  .tag.d{background:rgba(63,115,80,.14);color:var(--green)}   /* 补证据/Δ */
+  .tag.p{background:rgba(162,75,63,.13);color:var(--red)}     /* 删泛词 */
+  .tag.s{background:rgba(61,90,128,.12);color:var(--accent)} /* 磨利判断 */
+  .ch .o{color:var(--faint);text-decoration:line-through;text-decoration-color:var(--red);margin-bottom:2px}
+  .ch .n{color:var(--body)}
+  .matbox{border:1px dashed var(--amber);border-radius:9px;background:#fdf6e7;padding:11px 12px;margin-bottom:9px}
+  .matbox .lab{font-size:11.5px;color:var(--amber);font-weight:600;margin-bottom:8px}
+  .mat{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line10);border-radius:7px;padding:7px 9px;margin-bottom:6px;font-size:11.5px;color:var(--body)}
+  .mat .k{font-size:10px;color:#fff;background:var(--accent);border-radius:4px;padding:1px 6px;flex:0 0 auto}
+  .mat .ins{margin-left:auto;border:1px solid var(--accent);color:var(--accent);background:#fff;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer}
+  .mut{font-size:11.5px;color:var(--sub);line-height:1.6}
+  /* 底部抽屉（C） */
+  .drawer{margin-top:12px;background:var(--surface);border:1px solid var(--line10);border-radius:10px;overflow:hidden}
+  .drawer .dh{padding:11px 15px;background:#eee7d8;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .drawer .db{padding:14px 15px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hidden{display:none!important}
+  .flag{display:inline-block;font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:600}
+</style></head>
+<body>
+<div class="pick">
+  <h1>创作台 · 「磨利」输出怎么呈现</h1>
+  <span class="h">同一段稿子被磨利 → 三种呈现，点上面切换比较</span>
+  <button class="on" onclick="pick('A',this)">A · 右栏清单</button>
+  <button onclick="pick('B',this)">B · 行内 diff</button>
+  <button onclick="pick('C',this)">C · 底部抽屉</button>
+</div>
+<div class="vlab" id="vlab"></div>
+
+<div class="studio">
+  <div class="col">
+    <div class="head">创作台 · 磨利</div>
+    <div class="sub">读书精读体 · 公众号 · 已点「磨利」（改劲不改文风）</div>
+    <div class="toolbar">
+      <button class="tb">↻ 重新生成</button>
+      <button class="tb">✨ 润色</button>
+      <button class="tb">🔎 审稿</button>
+      <button class="tb sharp">⚡ 磨利</button>
+      <button class="tb" style="margin-left:auto">↩ 撤销磨利</button>
+    </div>
+
+    <!-- 编辑器：A/C 用改后稿(高亮)，B 用行内diff -->
+    <div class="editor" id="ed-clean">
+      <p>跟 AI 协作，关键是把需求说清楚——<span class="add">这句话害我返了很多次工。</span></p>
+      <p><span class="add">我描述一个按钮布局改了七八轮、白搭一整天；换成"做几个 html mock 我来选"，三下点击就定。</span></p>
+      <p>后来我发现，<span class="gap" onclick="alert('缺一手料：这里需要第二个真实例子来支撑“不是巧合”。右侧已从你的素材库找了候选。')">这不是巧合 —— 待补第二个例子</span>。</p>
+    </div>
+
+    <div class="editor hidden" id="ed-diff">
+      <p>跟 AI 协作，关键是把需求说清楚。<del>这一点很多人都认同。</del><ins>这句话害我返了很多次工。</ins><span class="why" onclick="alert('删泛词+态度中立“很多人都认同”，换成一个反预期判断（补Δ）')">为什么改</span></p>
+      <p><del>我用了一段时间，感觉效率提升明显，</del><ins>我描述一个按钮布局改了七八轮、白搭一整天；换成"做几个 html mock 我来选"，三下点击就定。</ins><span class="why" onclick="alert('“效率提升明显”是泛词无证据 → 换成具体数字与场景（证据拉满）')">为什么改</span></p>
+      <p><del>可能是未来的趋势。</del><span class="gap" onclick="alert('缺一手料：删掉空泛的“可能是趋势”，此处应补第二个真实例子撑住“规律”。右侧有素材候选。')">【此处需真料：第二个例子】</span></p>
+    </div>
+
+    <!-- C 底部抽屉 -->
+    <div class="drawer hidden" id="drawerC">
+      <div class="dh">⚡ 磨利报告 · 改了 3 处 · 1 处缺料待你补</div>
+      <div class="db">
+        <div class="ch"><span class="tag p">删泛词</span><div class="o">这一点很多人都认同。</div><div class="n">→ 换成反预期判断：<b>这句话害我返了很多次工</b>（补 Δ）</div></div>
+        <div class="ch"><span class="tag d">证据拉满</span><div class="o">感觉效率提升明显</div><div class="n">→ <b>改了七八轮、白搭一整天 / 三下点击就定</b></div></div>
+        <div class="ch"><span class="tag s">敢下判断</span><div class="o">可能是未来的趋势</div><div class="n">→ 删（别中立 hedge）</div></div>
+        <div class="matbox"><div class="lab">⚠ 缺一手料：撑住"不是巧合" · 从你素材库找到</div>
+          <div class="mat"><span class="k">素材</span>资讯流密度开关·踩坑复盘<span class="ins" onclick="alert('插入到第3段，带溯源')">插入</span></div>
+          <div class="mat"><span class="k">主题</span>vibecoding 半年经验<span class="ins" onclick="alert('插入到第3段，带溯源')">插入</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右栏 -->
+  <div class="col">
+    <!-- A: 改动清单 + 素材建议都在右栏 -->
+    <div id="panelA">
+      <div class="panel" style="margin-bottom:12px">
+        <h3>⚡ 磨利改动 <span class="flag">3 处</span></h3>
+        <div class="ch"><span class="tag p">删泛词</span><div class="o">这一点很多人都认同。</div><div class="n">→ 换成反预期判断：<b>害我返了很多次工</b>（补 Δ）</div></div>
+        <div class="ch"><span class="tag d">证据拉满</span><div class="o">感觉效率提升明显</div><div class="n">→ <b>改了七八轮、白搭一整天 / 三下点击就定</b></div></div>
+        <div class="ch"><span class="tag s">敢下判断</span><div class="o">可能是未来的趋势</div><div class="n">→ 删（别 hedge）</div></div>
+      </div>
+      <div class="panel">
+        <h3>⚠ 缺一手料 · 素材建议</h3>
+        <p class="mut" style="margin-bottom:10px">第 3 段"不是巧合"缺第二个例子——从你素材库找到：</p>
+        <div class="mat"><span class="k">素材</span>资讯流密度开关·踩坑<span class="ins" onclick="alert('插入到第3段')">插入</span></div>
+        <div class="mat"><span class="k">主题</span>vibecoding 半年经验<span class="ins" onclick="alert('插入到第3段')">插入</span></div>
+      </div>
+    </div>
+    <!-- B/C: 右栏只放简版，改动看正文 -->
+    <div id="panelBC" class="hidden">
+      <div class="panel">
+        <h3>⚡ 磨利完成</h3>
+        <p class="mut">改动直接标在左边正文里，点<b>「为什么改」</b>看理由；黄色<b>【需真料】</b>是要你补的地方。</p>
+        <p class="mut" style="margin-top:12px">缺料处素材建议：</p>
+        <div class="mat" style="margin-top:8px"><span class="k">素材</span>密度开关踩坑<span class="ins" onclick="alert('插入')">插入</span></div>
+        <div class="mat"><span class="k">主题</span>vibecoding 经验<span class="ins" onclick="alert('插入')">插入</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const labs={
+    A:'<b>A · 右栏清单</b>：草稿区显示改后稿（新增处淡绿高亮、缺料处黄标）；<b>改动清单</b>和<b>素材建议</b>都收在右栏。看稿干净、复盘集中——右栏信息多。',
+    B:'<b>B · 行内 diff</b>：正文里直接 <del>原</del><ins>改</ins> 对照，点「为什么改」看理由，黄色【需真料】就地提示。改哪一眼看清、最有"手感"——正文略花。',
+    C:'<b>C · 底部抽屉</b>：草稿区是干净的改后稿；下方拉出<b>磨利报告</b>（改动表格 + 缺料素材建议）。上看成品、下查依据，分区清爽——多占一块高度。'
+  };
+  function pick(v,btn){
+    document.querySelectorAll('.pick button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+    document.getElementById('vlab').innerHTML=labs[v];
+    // 编辑器
+    document.getElementById('ed-clean').classList.toggle('hidden', v==='B');
+    document.getElementById('ed-diff').classList.toggle('hidden', v!=='B');
+    document.getElementById('drawerC').classList.toggle('hidden', v!=='C');
+    // 右栏
+    document.getElementById('panelA').classList.toggle('hidden', v!=='A');
+    document.getElementById('panelBC').classList.toggle('hidden', v==='A');
+  }
+  pick('A',document.querySelector('.pick button'));
+</script>
+</body></html>

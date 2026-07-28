@@ -75,3 +75,16 @@ reference/platform-playbooks/
 reference/series-template/INTEGRATION-SPEC.md
 reference/series-template/SERIES-SPEC.md
 reference/series-template/vendor/VENDOR.md
+
+# 系列样例/封面样张含真实文章内容（创作产物，只留本地——ADR-057 / github-publish-policy）
+reference/series-template/covers/
+reference/series-template/samples/
+
+# feed-digest skill 的运行时状态（已见文章指纹，非代码）
+.claude/skills/feed-digest/data/
+
+# hyperframes 研究整目录：外部仓 clone + 创作视频/配音/品牌页成品（创作产物留本地——ADR-057）
+prototype/tutorial-viz/hyperframes-研究/
+
+# .agents 镜像里 feed-digest 的运行时状态（同 .claude 侧规则）
+.agents/skills/feed-digest/data/

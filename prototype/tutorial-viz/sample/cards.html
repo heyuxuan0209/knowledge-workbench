@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>《AI 画图为什么总不听话》· 小红书 7 卡</title>
+<style>
+  :root{
+    --paper:#f2ede2; --paper2:#f8f4ea; --ink:#2b2924; --sub:#6f6a60;
+    --indigo:#3d5a80; --teal:#7ba3a8; --terra:#c9784e; --terra-d:#b0623a;
+    --card:#fbf8f2; --line:rgba(43,41,36,.13); --navy:#22303f;
+    --serif:'Songti SC','Noto Serif SC',serif; --sans:'PingFang SC','Noto Sans SC',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#cfc9bd;font-family:var(--sans);color:var(--ink);padding:24px}
+  h1.doc{font-family:var(--serif);font-size:20px;color:#3a352c;margin-bottom:4px}
+  p.doc{font-size:13px;color:#5a5448;margin-bottom:18px}
+  .gallery{display:flex;flex-wrap:wrap;gap:22px}
+  /* 缩放预览：真实 1080x1440，scale 0.33 */
+  .scaler{width:356px;height:633px;overflow:hidden;border-radius:20px;box-shadow:0 12px 34px rgba(0,0,0,.28)}
+  .card{width:1080px;height:1920px;transform:scale(.3296);transform-origin:top left;
+    background:radial-gradient(130% 55% at 50% 0%,#f8f4ea,var(--paper) 62%);
+    padding:90px 84px 72px;display:flex;flex-direction:column;position:relative;font-size:16px}
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .brand{display:flex;align-items:center;gap:12px;font-family:var(--serif);font-weight:700;font-size:36px;color:var(--terra-d)}
+  .brand .dot{width:26px;height:26px;border-radius:50%;background:var(--terra)}
+  .pg{font-family:var(--serif);font-size:34px;color:#b8ac97}
+  .h{font-family:var(--serif);font-weight:700;line-height:1.24;letter-spacing:1px}
+  .h .n{color:var(--terra)}
+  .h.xl{font-size:116px}
+  .h.lg{font-size:104px}
+  .lead{font-size:42px;color:var(--sub);line-height:1.6;margin-top:32px}
+  .lead b{color:var(--terra-d)}
+  /* 插画位 */
+  .ill{flex:1;margin:42px 0;border-radius:36px;background:linear-gradient(180deg,#efeade,#e9e3d5);
+    border:1px solid var(--line);position:relative;overflow:hidden;min-height:120px}
+  .ill img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:26px}
+  .ill .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#a89f8c;font-size:36px;font-family:var(--serif);text-align:center;padding:36px}
+  /* 四招列表 */
+  .four{display:flex;flex-direction:column;gap:30px;margin-top:36px}
+  .fit{background:var(--card);border:1.5px solid var(--line);border-radius:24px;padding:44px 48px;display:flex;gap:26px;align-items:baseline}
+  .fit .fn{font-family:var(--serif);font-size:68px;color:var(--terra);min-width:68px;line-height:1}
+  .fit .ft{font-size:48px;line-height:1.45}
+  .fit .ft b{color:var(--ink);font-weight:700}
+  .fit.warn{background:#f7ebe3;border-color:#e2bfab}
+  .fit.warn .fn{color:var(--terra-d)}
+  /* 底部条 / 落款 */
+  .foot{margin-top:auto}
+  .bar{background:var(--navy);color:#f3ede0;border-radius:26px;padding:38px 42px;font-size:42px;line-height:1.5}
+  .bar b{color:#e7c98a}
+  .sign{margin-top:24px;text-align:right;font-family:var(--serif);font-weight:700;font-size:40px;color:var(--terra-d);display:flex;align-items:center;justify-content:flex-end;gap:14px}
+  .sign .dot{width:26px;height:26px;border-radius:50%;background:var(--terra)}
+  .tag{font-size:28px;color:var(--teal);font-weight:600;letter-spacing:2px}
+  /* 封面（纯文字） */
+  .cover{justify-content:center}
+  .cover .kicker{font-size:36px;color:var(--teal);font-weight:600;letter-spacing:4px;margin-bottom:36px}
+  .cover .ct{font-family:var(--serif);font-weight:700;font-size:140px;line-height:1.2;letter-spacing:2px}
+  .cover .ct .n{color:var(--terra)}
+  .cover .csub{font-size:48px;color:var(--ink);margin-top:48px;line-height:1.5;font-weight:600}
+  .cover .csub b{color:var(--terra-d)}
+  .cover .dotrow{display:flex;gap:16px;align-items:center;margin:80px 0 0}
+  .cover .dotrow i{height:20px;border-radius:10px;background:var(--terra);opacity:.9}
+  .cover .cta{margin-top:68px;display:inline-block;align-self:flex-start;background:var(--navy);color:#f3ede0;font-size:42px;font-weight:600;padding:28px 46px;border-radius:22px}
+  .cover .cta b{color:#e7c98a}
+  .cover .fill{flex:1}
+</style>
+</head>
+<body>
+  <h1 class="doc">《AI 画图为什么总不听话？》· 抖音图文 7 卡（预览，真实 1080×1920）</h1>
+  <p class="doc">文字全走 HTML（清晰·标点正）· 插画暖莫兰迪手绘透明 PNG · 图文强绑定 · 落款「杰西卡聊AI」</p>
+  <div class="gallery">
+
+    <!-- 卡1 封面（纯文字） -->
+    <div class="scaler"><div class="card cover">
+      <div class="top"><div class="brand"><span class="dot"></span>杰西卡聊AI</div><div class="pg">1 / 7</div></div>
+      <div class="fill"></div>
+      <div class="kicker">AI 绘画 · 使用心法</div>
+      <div class="ct">AI 画图<br>为什么<br><span class="n">总不听话</span>？</div>
+      <div class="dotrow"><i style="width:120px;opacity:.25"></i><i style="width:80px;opacity:.5"></i><i style="width:48px;opacity:.8"></i></div>
+      <div class="csub">不是它笨，<b>是你还不懂它怎么"画"。</b></div>
+      <div class="cta">搞懂原理，<b>6 张图讲明白 →</b></div>
+      <div class="fill"></div>
+    </div></div>
+
+    <!-- 卡2 反常识 -->
+    <div class="scaler"><div class="card">
+      <div class="top"><div class="brand"><span class="dot"></span>杰西卡聊AI</div><div class="pg">2 / 7</div></div>
+      <div class="h lg">它根本不是<br>"照着画"</div>
+      <div class="ill"><img src="cards/assets/card2.png" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="ph" style="display:none">［三格 · 雪花噪点→显形→清晰画］</div></div>
+      <div class="lead">AI 画图，是从<b>一整屏随机雪花点</b>开始的——就像老电视没信号那种噪点。</div>
+    </div></div>
+
+    <!-- 卡3 去噪 -->
+    <div class="scaler"><div class="card">
+      <div class="top"><div class="brand"><span class="dot"></span>杰西卡聊AI</div><div class="pg">3 / 7</div></div>
+      <div class="h lg">画，是被<br>"<span class="n">擦</span>"出来的</div>
+      <div class="ill"><img src="cards/assets/card3.png" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="ph" style="display:none">［雕塑家从噪点大理石凿出人像］</div></div>
+      <div class="lead">模型盯着那团噪点，按你打的字，一点点把不相关的擦掉——像雕塑家凿掉多余的石头，人像自己就浮出来了。</div>
+    </div></div>
+
+    <!-- 卡4 每次不一样 -->
+    <div class="scaler"><div class="card">
+      <div class="top"><div class="brand"><span class="dot"></span>杰西卡聊AI</div><div class="pg">4 / 7</div></div>
+      <div class="h lg">同一句话<br>为什么<span class="n">每次都不一样</span>？</div>
+      <div class="ill"><img src="cards/assets/card4.png" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="ph" style="display:none">［一句话→分叉出4只不同的猫］</div></div>
+      <div class="lead">因为每次都从<b>不同的一团噪点</b>起步。起点不同，擦出来的画自然不同——它没有"标准答案"。</div>
+    </div></div>
+
+    <!-- 卡5 抽卡 -->
+    <div class="scaler"><div class="card">
+      <div class="top"><div class="brand"><span class="dot"></span>杰西卡聊AI</div><div class="pg">5 / 7</div></div>
+      <div class="h lg">AI 出图是"<span class="n">抽卡</span>"<br>不是"画准"</div>
+      <div class="ill"><img src="cards/assets/card5.png" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="ph" style="display:none">［扭蛋机 · 手举最满意的一张］</div></div>
+      <div class="lead">别指望一句话一次到位。<b>多抽几张、挑最顺眼的那张</b>，才是正确用法。</div>
+    </div></div>
+
+    <!-- 卡6 四招 -->
+    <div class="scaler"><div class="card">
+      <div class="top"><div class="brand"><span class="dot"></span>杰西卡聊AI</div><div class="pg">6 / 7</div></div>
+      <div class="h lg" style="margin-bottom:10px">记住这 <span class="n">4</span> 条<br>立刻上手</div>
+      <div class="four">
+        <div class="fit"><div class="fn">①</div><div class="ft"><b>不满意就重抽</b>——换一次，就是换一团新噪点</div></div>
+        <div class="fit"><div class="fn">②</div><div class="ft"><b>描述越具体越听话</b>——"一只橘猫，坐着，逆光"好过"一只猫"</div></div>
+        <div class="fit"><div class="fn">③</div><div class="ft"><b>给它一张参考图</b>——锁住风格和构图</div></div>
+        <div class="fit warn"><div class="fn">④</div><div class="ft"><b>别让它写字！</b>——它一定写错，标点还乱跑</div></div>
+      </div>
+    </div></div>
+
+    <!-- 卡7 收尾 -->
+    <div class="scaler"><div class="card">
+      <div class="top"><div class="brand"><span class="dot"></span>杰西卡聊AI</div><div class="pg">7 / 7</div></div>
+      <div class="h lg">看懂了，AI 就从<br>"玄学"变"<span class="n">手艺</span>"</div>
+      <div class="ill"><img src="cards/assets/card7.png" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="ph" style="display:none">［同一个人 · 自信地用 AI 出好图］</div></div>
+      <div class="foot">
+        <div class="bar">它不是不听话，<b>是你还没懂它怎么听。</b></div>
+        <div class="sign"><span class="dot"></span>杰西卡聊AI</div>
+      </div>
+    </div></div>
+
+  </div>
+</body>
+</html>

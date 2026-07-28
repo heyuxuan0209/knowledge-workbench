@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灵感库 · 即时分析放法 + 两个修正</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#efece4;--surface:#faf8f2;--brief-bg:#f4f6f9;--text:#211f1a;--body:#332f27;
+    --sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line10:rgba(33,31,26,.1);--line08:rgba(33,31,26,.08);
+    --accent:#3d5a80;--accent-hover:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:'Newsreader',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:840px;margin:0 auto;padding:24px 22px 80px;}
+  .intro{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.7;background:var(--surface);border:1px solid var(--line10);border-radius:10px;padding:14px 16px;}
+  .intro b{color:var(--text);}
+  h3.q{font-family:var(--serif);font-size:18px;font-weight:600;margin:26px 2px 6px;}
+  .qd{font-size:12.5px;color:var(--sub2);margin:0 2px 12px;}
+  .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .tab{border:1px solid var(--line10);background:var(--surface);color:var(--sub);border-radius:9px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;}
+  .tab.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .tab small{display:block;font-weight:400;font-size:11px;opacity:.85;margin-top:2px;}
+  .panel{display:none} .panel.on{display:block}
+  .verdict{font-size:12.5px;color:var(--sub);margin:0 2px 14px;line-height:1.7;}
+  .verdict .g{color:var(--green);font-weight:600;} .verdict .b{color:var(--red);font-weight:600;}
+
+  .frame{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:16px 18px;}
+  .h-title{font-family:var(--serif);font-size:20px;font-weight:600;}
+  .h-sub{font-size:12.5px;color:var(--sub2);margin:3px 0 12px;}
+  .viewsw{display:inline-flex;border:1px solid var(--line10);border-radius:8px;overflow:hidden;margin-bottom:14px;}
+  .viewsw span{font-size:12.5px;font-weight:600;padding:6px 13px;color:var(--sub);}
+  .viewsw span.on{background:var(--accent);color:#fff;}
+
+  .quick{display:flex;gap:8px;margin:10px 0;}
+  .quick input{flex:1;border:1px solid var(--line10);background:var(--surface);border-radius:8px;padding:9px 13px;font-size:13px;color:var(--faint);}
+  .btn-p{border:none;background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn-o{border:1px solid var(--line10);background:var(--surface);color:var(--body);font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn-mini{border:1px solid var(--line10);background:var(--surface);color:var(--body);font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;}
+
+  /* 大 hero */
+  .hero{background:rgba(61,90,128,.04);border:1px dashed rgba(61,90,128,.28);border-radius:11px;padding:15px 16px;margin-bottom:10px;}
+  .hero .t{font-family:var(--serif);font-size:15px;font-weight:600;}
+  .hero .d{font-size:12px;color:var(--sub2);margin:3px 0 10px;}
+  .hero-row{display:flex;gap:8px;align-items:center;}
+  .hero-row .plus{width:34px;height:34px;border:1px solid var(--line10);border-radius:8px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--sub);}
+  .hero-row input{flex:1;border:1px solid var(--line10);border-radius:8px;padding:9px 12px;font-size:12.5px;color:var(--faint);background:var(--surface);}
+  /* 折叠条 */
+  .foldbar{display:flex;align-items:center;gap:8px;background:var(--brief-bg);border:1px solid var(--line08);border-radius:9px;padding:10px 14px;font-size:12.5px;color:var(--sub);cursor:pointer;margin-bottom:10px;}
+  .foldbar .arw{margin-left:auto;color:var(--sub2);}
+  /* 紧凑入口 */
+  .intake-chip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--line10);background:var(--surface);border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--sub);cursor:pointer;}
+
+  .sec{display:flex;align-items:center;gap:8px;margin:16px 2px 10px;font-size:12px;color:var(--sub2);font-weight:600;}
+  .sec .line{flex:1;height:1px;background:var(--line08);}
+  .empty{font-size:12.5px;color:var(--faint);padding:10px 2px;}
+
+  /* 卡片 */
+  .card{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:13px 15px;margin-bottom:10px;}
+  .ctop{display:flex;align-items:center;gap:7px;margin-bottom:7px;}
+  .pill{font-size:10.5px;padding:1.5px 8px;border-radius:20px;font-weight:600;}
+  .p-user{color:var(--green);background:rgba(63,115,80,.12);}
+  .ago{color:var(--faint);font-size:10.5px;margin-left:auto;}
+  .ctitle{font-family:var(--serif);font-size:15.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px;}
+  .edit{font-size:12px;color:var(--faint);cursor:pointer;}
+  .edit:hover{color:var(--accent);}
+  .relbox{margin-top:10px;background:rgba(61,90,128,.045);border:1px solid rgba(61,90,128,.14);border-radius:8px;padding:9px 11px;}
+  .relbox .lab{font-size:11.5px;color:var(--sub);margin-bottom:7px;}
+  .relrow{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;}
+  .relrow .nm{flex:1;color:var(--body);}
+  .adopt{border:1px solid rgba(63,115,80,.4);background:rgba(63,115,80,.08);color:var(--green);font-size:11px;padding:2px 9px;border-radius:6px;cursor:pointer;}
+  .need{font-size:11.5px;color:var(--sub);margin-top:9px;}
+  .foot{display:flex;align-items:center;gap:11px;margin-top:11px;}
+  .tag{display:inline-block;font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;}
+  .tag.stay{color:var(--amber);background:rgba(169,121,31,.12);}
+  .note{font-size:11.5px;color:var(--sub);margin-top:8px;line-height:1.6;}
+  .note b{color:var(--text);}
+  .cross{color:var(--red);} .check{color:var(--green);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    两块：上半是 <b>Q1 即时分析放哪</b>（3 个放法，点标签切换、点面板里的入口能展开看效果）；下半是 <b>Q3 可编辑</b> 和 <b>Q4b 火候修正</b> 长什么样（这俩是修正、给你确认，不是多选）。
+  </div>
+
+  <h3 class="q">Q1 · 即时分析放在收集视图哪里？</h3>
+  <div class="qd">即时分析是"漏斗入口"（丢链接/音频/PDF 消化），块头不该盖过你的灵感。选一个放法：</div>
+  <div class="tabs">
+    <button class="tab on" data-p="A" onclick="pick('A')">A 紧凑入口<small>推荐</small></button>
+    <button class="tab" data-p="B" onclick="pick('B')">B 折叠条</button>
+    <button class="tab" data-p="C" onclick="pick('C')">C 维持现状</button>
+  </div>
+
+  <!-- A 紧凑入口 -->
+  <div class="panel on" id="A">
+    <div class="verdict"><span class="g">最干净</span>：随手记是主入口，即时分析收成旁边一个「＋消化」按钮，点开才出面板。进来一眼是你的灵感。<span class="b">代价</span>：即时分析不那么显眼（但它本就是偶尔用的入口）。</div>
+    <div class="frame">
+      <div class="h-title">💡 灵感库</div>
+      <div class="h-sub">要写什么的种子 · 素材是料、灵感是要写什么</div>
+      <div class="viewsw"><span class="on">收集视图</span><span>写作看板</span></div>
+      <div class="quick">
+        <input placeholder="随手记一句：一个观点、一个角度…（存后自动找贴合素材）">
+        <button class="btn-p">＋ 记一条</button>
+      </div>
+      <div style="margin:2px 0 6px"><span class="intake-chip" onclick="document.getElementById('exA').style.display=document.getElementById('exA').style.display==='block'?'none':'block'">＋ 丢链接 / 音频 / PDF 进来消化 ▾</span></div>
+      <div id="exA" style="display:none">
+        <div class="hero">
+          <div class="t">丢一个链接 / 会议纪要 / 音频 / PDF，AI 帮你读懂——料存进素材，顺手提成灵感</div>
+          <div class="hero-row"><div class="plus">＋</div><input placeholder="粘贴链接，或直接粘贴大段文字…"><button class="btn-p">读懂它 →</button></div>
+        </div>
+      </div>
+      <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+      <div class="empty">（这里是你的灵感卡片）</div>
+    </div>
+  </div>
+
+  <!-- B 折叠条 -->
+  <div class="panel" id="B">
+    <div class="verdict"><span class="g">两入口都在、都不占地</span>：即时分析是独立一条折叠 bar，随手记单独一行。<span class="b">代价</span>：比 A 多一个横条。</div>
+    <div class="frame">
+      <div class="h-title">💡 灵感库</div>
+      <div class="h-sub">要写什么的种子 · 素材是料、灵感是要写什么</div>
+      <div class="viewsw"><span class="on">收集视图</span><span>写作看板</span></div>
+      <div class="foldbar" onclick="var e=document.getElementById('exB');e.style.display=e.style.display==='block'?'none':'block'">
+        🔍 <b style="color:var(--text);font-weight:600">即时分析</b>：丢链接 / 会议纪要 / 音频 / PDF 进来消化 <span class="arw">展开 ▾</span>
+      </div>
+      <div id="exB" style="display:none">
+        <div class="hero">
+          <div class="hero-row"><div class="plus">＋</div><input placeholder="粘贴链接，或直接粘贴大段文字…"><button class="btn-p">读懂它 →</button></div>
+        </div>
+      </div>
+      <div class="quick">
+        <input placeholder="随手记一句：一个观点、一个角度…">
+        <button class="btn-p">＋ 记一条</button>
+      </div>
+      <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+      <div class="empty">（这里是你的灵感卡片）</div>
+    </div>
+  </div>
+
+  <!-- C 维持现状 -->
+  <div class="panel" id="C">
+    <div class="verdict"><span class="g">即时分析最显眼</span>：大 hero 常驻顶部（就是现在的样子）。<span class="b">代价</span>：每次进来先看到一个大输入框，你的灵感被压到下面。</div>
+    <div class="frame">
+      <div class="h-title">💡 灵感库</div>
+      <div class="h-sub">要写什么的种子 · 素材是料、灵感是要写什么</div>
+      <div class="viewsw"><span class="on">收集视图</span><span>写作看板</span></div>
+      <div class="hero">
+        <div class="t">丢一个链接 / 会议纪要 / 音频 / PDF，AI 帮你读懂——料存进素材，顺手提成灵感</div>
+        <div class="d">从「别人的东西」到「你要写的东西」的入口——出精读稿 → 存为素材 → 一键提为灵感</div>
+        <div class="hero-row"><div class="plus">＋</div><input placeholder="粘贴链接，或直接粘贴大段文字…"><button class="btn-p">读懂它 →</button></div>
+        <div class="d" style="margin:9px 0 0">支持：网页 / 公众号 / YouTube / 小宇宙 / B站 · 会议纪要 · 音频 / PDF / Word</div>
+      </div>
+      <div class="quick"><input placeholder="随手记一句…"><button class="btn-p">＋ 记一条</button></div>
+      <div class="sec">你的灵感 <span style="color:var(--faint);font-weight:400">3</span><span class="line"></span></div>
+      <div class="empty">（这里是你的灵感卡片）</div>
+    </div>
+  </div>
+
+  <!-- ===== Q3 + Q4b 修正预览 ===== -->
+  <h3 class="q">Q3 + Q4b · 两个修正长这样（确认，不是多选）</h3>
+  <div class="qd">拿你刚踩的例子「一个和 AI 协作的好方法」——还没写内容，就该老实待在"攒着"，而不是"料够了"。</div>
+
+  <div class="card">
+    <div class="ctop"><span class="pill p-user">我记的</span><span class="ago">刚刚</span></div>
+    <div class="ctitle">一个和 AI 协作的好方法 <span class="edit" title="点这里改标题/内容">✏️ 编辑</span></div>
+
+    <div class="relbox">
+      <div class="lab">🔍 相关素材（AI 找的 · 供参考，点「采纳」才算你的料）</div>
+      <div class="relrow"><span class="nm">《和 Claude 结对写代码的心得》</span><button class="adopt">采纳为料</button></div>
+      <div class="relrow"><span class="nm">《AI 辅助工作流的三个原则》</span><button class="adopt">采纳为料</button></div>
+    </div>
+
+    <div class="need">还差你的料：<b>0 条</b>已采纳 —— 采纳几条相关素材，或写点内容，火候够了会自动升到「可以写了」</div>
+
+    <div class="foot">
+      <span class="tag stay">🌱 待在「攒着」</span>
+      <button class="btn-mini">✨ 再找找相关素材</button>
+      <button class="btn-o" style="padding:4px 12px;font-size:12px">直接写</button>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="cross">✗ 现在（bug）</span>：自动补料把沾边素材直接算成"料" → 空灵感就显示 <b>🔥 料够了</b>、误进「可以写了」。<br>
+    <span class="check">✓ 修正后</span>：自动补料的结果变成 <b>「相关素材（建议）」</b>，你点「采纳」才算料；火候只数你确认的料 + 主题贴合。空灵感老实待「攒着」。<br>
+    <span class="check">✓ Q3</span>：标题旁 <b>✏️ 编辑</b>，随时改标题/内容（改完可选重新找料）。
+  </div>
+</div>
+<script>
+function pick(p){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
+  document.querySelectorAll('.panel').forEach(el=>el.classList.toggle('on',el.id===p));
+}
+</script>
+</body>
+</html>

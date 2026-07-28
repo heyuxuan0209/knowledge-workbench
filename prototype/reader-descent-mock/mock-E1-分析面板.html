@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>E1 · 精读稿 + 分析面板（两种镜头分区）</title>
+<style>
+:root{--bg:#efece4;--card:#faf8f3;--ink:#211f1a;--body2:#3a382f;--sub2:#8a8478;
+--line08:rgba(33,31,26,.08);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-hover:#2c456a;--accent-soft:rgba(61,90,128,.08);
+--persona:#8a5a3c;--persona-soft:rgba(138,90,60,.09);--warn:#a9791f;--warn-soft:rgba(169,121,31,.1);
+--serif:"Songti SC","Noto Serif SC",Georgia,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.7 -apple-system,"PingFang SC",sans-serif;color:var(--ink)}
+.mask{position:fixed;inset:0;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
+.modal{width:1000px;max-width:96vw;height:88vh;background:var(--card);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line08)}
+.title{font-family:var(--serif);font-size:18px;font-weight:600;flex:1;line-height:1.35}
+.close{border:0;background:none;font-size:22px;color:var(--sub2);cursor:pointer}
+.cols{flex:1;display:grid;grid-template-columns:1.25fr 1fr;overflow:hidden}
+.read{overflow-y:auto;padding:18px 24px;border-right:1px solid var(--line08)}
+.seg{display:inline-flex;background:rgba(33,31,26,.05);border-radius:9px;padding:3px;margin-bottom:14px}
+.seg button{border:0;background:transparent;padding:5px 13px;font-size:13px;color:var(--sub2);cursor:pointer;border-radius:7px;font-weight:600}
+.seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.ensub{color:var(--sub2);font-size:12px;margin-bottom:12px}
+.view{display:none}.view.on{display:block}
+.lead{font-size:16px;line-height:1.75;background:var(--accent-soft);border-radius:11px;padding:14px 16px}
+.lead .k{color:var(--accent);font-weight:600}
+.para{margin:12px 0}
+.hl{background:#fff2cf;cursor:pointer;border-radius:2px;padding:0 1px}
+.tk-cite{display:inline-block;vertical-align:2px;font-size:10px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:6px;padding:0 5px;margin-left:3px;cursor:help;position:relative}
+.tk-cite:hover .pop{display:block}
+.pop{display:none;position:absolute;bottom:150%;left:0;width:250px;background:#2b2820;color:#f2efe6;font-size:11.5px;line-height:1.6;padding:9px 11px;border-radius:8px;z-index:30;cursor:auto}
+.en{white-space:pre-wrap;font-family:var(--serif);font-size:14px;line-height:1.85;color:var(--body2)}
+/* 右：分析面板 */
+.panel{overflow-y:auto;padding:18px 20px;background:#f6f3ec}
+.plbl{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--sub2);margin:2px 0 8px;display:flex;align-items:center;gap:6px}
+.plbl .dot{width:7px;height:7px;border-radius:50%}
+.grp{margin-bottom:18px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips button{border:1px solid var(--line14);background:#fff;border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--body2)}
+.chips.text button:hover{border-color:var(--accent);color:var(--accent)}
+.chips.persona button{border-color:var(--persona-soft);color:var(--persona)}
+.chips.persona button:hover{border-color:var(--persona);background:var(--persona-soft)}
+.out{margin-top:10px;background:#fff;border:1px solid var(--line08);border-radius:11px;padding:12px 14px;font-size:13px;line-height:1.7;position:relative}
+.out .tag{font-size:11px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.out.text .tag{color:var(--accent)}.out.persona .tag{color:var(--persona)}
+.out .persona-badge{background:var(--persona-soft);color:var(--persona);font-size:10px;padding:1px 6px;border-radius:10px}
+.adopt{margin-top:9px;border:1px solid var(--line14);background:#fff;border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer;color:var(--accent)}
+.adopt:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* 认知位移候选 */
+.shift{margin-top:6px;background:var(--warn-soft);border:1px solid rgba(169,121,31,.25);border-radius:12px;padding:14px 15px}
+.shift .st{font-size:11px;font-weight:700;color:var(--warn);margin-bottom:7px;display:flex;justify-content:space-between}
+.shift b{color:var(--ink)}
+.shift .judge{display:flex;gap:6px;margin-top:10px}
+.shift .judge button{flex:1;border:1px solid var(--line14);background:#fff;border-radius:7px;padding:5px;font-size:11.5px;cursor:pointer}
+.shift .judge button.y:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* 划线菜单 */
+.hlmenu{position:fixed;display:none;background:#2b2820;border-radius:10px;padding:6px;gap:3px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.hlmenu.on{display:flex}
+.hlmenu button{border:0;background:transparent;color:#f2efe6;font-size:12px;padding:5px 9px;border-radius:6px;cursor:pointer}
+.hlmenu button:hover{background:rgba(255,255,255,.15)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2820;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;transition:.3s;z-index:70}
+.note-sm{color:var(--sub2);font-size:11.5px;margin-top:4px;line-height:1.5}
+</style></head>
+<body>
+<div class="mask"><div class="modal">
+  <div class="head"><div class="title">Claude Opus 5 发布：价格不变，"会自己补位"是最大变化</div><button class="close">×</button></div>
+  <div class="cols">
+    <!-- 左：精读稿（忠实，不叠观点） -->
+    <div class="read">
+      <div class="seg"><button class="on" onclick="dv(0,this)">速览</button><button onclick="dv(1,this)">精读</button><button onclick="dv(2,this)">原文</button></div>
+      <p class="ensub">Simon Willison · 英文源 · 精读稿＝忠实解读，不叠观点｜划词可标记</p>
+      <div class="view on" id="v0">
+        <div class="lead">Anthropic 发布 Opus 5，价格和 4.8 一样、登顶 Artificial Analysis 榜。真正看点不是分数——是它<span class="k">"没被要求，也会自己判断该做什么并动手"</span>。</div>
+      </div>
+      <div class="view" id="v1">
+        <p class="para">官方定位是"接近 Fable 5 的前沿智能，价格只要一半"，当前领先 Artificial Analysis 榜。<span class="tk-cite">原文<span class="pop">"close to the frontier intelligence of Fable 5 at half the price... leading the leaderboard."</span></span></p>
+        <p class="para">一个实例最能说明"主动性"：<span class="hl">任务给了零件图纸但故意不让它看图，Opus 5 自己写了套计算机视觉流程、从像素里重建了整个零件</span>。<span class="tk-cite">原文<span class="pop">"no way to directly view the drawing... wrote its own computer vision pipeline."</span></span></p>
+        <p class="para">安全上：与 4.8 一样刻意没训网络攻击；找漏洞接近 Mythos 5，但把漏洞变成实际攻击明显更弱。原作者 Simon 还没实测，只转述官方 buzz，<span class="hl">没喊"惊人"</span>——精读稿如实保留这份克制。</p>
+      </div>
+      <div class="view" id="v2"><div class="en">Introducing Claude Opus 5
+
+...described as "thoughtful and proactive... close to the frontier intelligence of Claude Fable 5 at half the price". Leading the Artificial Analysis leaderboard.
+
+Opus 5 was given a drawing of a machine part... no way to directly view the drawing. Opus 5 responded by writing its own computer vision pipeline to pull the geometry from the raw pixels.</div></div>
+    </div>
+    <!-- 右：分析面板（两种镜头分区） -->
+    <div class="panel">
+      <div class="grp">
+        <div class="plbl"><span class="dot" style="background:var(--accent)"></span>文本镜头 · 照文章本身（不穿人设 · 可回原文核查）</div>
+        <div class="chips text">
+          <button onclick="ai('sum',this)">总结要点</button><button onclick="ai('struct',this)">结构拆解</button>
+          <button onclick="ai('facts',this)">事实清单</button><button onclick="ai('verify',this)">待验证点</button><button onclick="ai('against',this)">反方观点</button>
+        </div>
+      </div>
+      <div class="grp">
+        <div class="plbl"><span class="dot" style="background:var(--persona)"></span>迁移镜头 · 照你（穿"AI 内容/产品创作者"人设 · 接创作）</div>
+        <div class="chips persona">
+          <button onclick="ai('product',this)">产品机会</button><button onclick="ai('action',this)">行动建议</button><button onclick="ai('topic',this)">选题钩子</button>
+        </div>
+      </div>
+      <div id="outbox"></div>
+      <div class="grp" style="margin-top:8px">
+        <div class="plbl"><span class="dot" style="background:var(--warn)"></span>认知位移 · 候选洞察（第二期 · 需你验真）</div>
+        <div class="shift">
+          <div class="st"><span>我原本以为 → 现在意识到</span><span class="persona-badge" style="background:var(--warn-soft);color:var(--warn)">AI 推演</span></div>
+          原本以为 AI 落地门槛是"模型够不够强、能不能读到信息"；<b>现在意识到</b>门槛正在移到"你能不能给它划清边界"——Opus 5 越主动，"设边界的判断力"越稀缺。<span class="tk-cite">据<span class="pop">来自：③它自作主张写CV管线 + ④安全"发现≠利用"的刻意边界</span></span>
+          <div class="note-sm">⚠️ 这是 AI 从原文逼出的推演，不是结论。据为己有前请核对原文。</div>
+          <div class="judge"><button class="y" onclick="toast('已据为己有 → 进选题池')">✅ 据为己有</button><button onclick="toast('可改写成你的话')">✂️ 改写</button><button onclick="toast('已标记不认同')">✗ 不认同</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+<div class="hlmenu" id="hlmenu">
+  <button onclick="mark('观点')">💡观点</button><button onclick="mark('疑问')">❓疑问</button><button onclick="mark('行动')">⚡行动</button><button onclick="mark('引用')">❝引用</button><button onclick="mark('资料')">📎资料</button>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function dv(i,el){document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('on'));el.classList.add('on');document.querySelectorAll('.view').forEach((v,k)=>v.classList.toggle('on',k===i));}
+const AI={
+ sum:['总结要点','· 价格同 4.8、登顶 AA 榜 · 亮点是"主动性" · 能发现漏洞但不擅利用 · 出了新提示词指南',0],
+ struct:['结构拆解','问题：新模型强在哪｜证据：CV 重建零件的实例、榜单｜结论：主动性是关键变化｜隐含假设：demo 案例可复现',0],
+ facts:['事实清单','· 价格=4.8，fast 2×｜· 领先 AA 榜、在 Fable 5 前｜· 未训 cyber｜· 发现漏洞≈Mythos5、利用<<Mythos5',0],
+ verify:['待验证点','· "登顶 AA 榜"口径/时间点是否稳定？· "半价接近 Fable 5"是官方话、缺第三方评测 · CV 重建是精选案例、能否复现未知',0],
+ against:['反方观点','· 榜单领先≠真实能力 · "主动性"在生产环境是风险非卖点 · 作者本人还没实测、热度先行 · 安全"发现≠利用"能否长期守住存疑',0],
+ product:['产品机会','· 把"给 AI 设边界/确认步骤"做成创作工作流里可复用组件 · "AI 主动补位"正是你产品"AI 提议·我裁决"的又一佐证 · 精读器可加"AI 自作主张预警"',1],
+ action:['行动建议','· 去读那两份提示词/上下文工程指南、更新你的 prompt 库 · 关键创作任务给 AI 设明确边界和确认步骤',1],
+ topic:['选题钩子','· "少给 AI 指令，多给它判断边界"——一个反直觉的创作者选题 · "AI 越主动，你越要会划线"',1]
+};
+function ai(k,el){const d=AI[k];const box=document.getElementById('outbox');const div=document.createElement('div');
+ div.className='out '+(d[2]?'persona':'text');
+ div.innerHTML='<div class="tag">'+d[0]+(d[2]?' <span class="persona-badge">穿你人设</span>':'')+'</div>'+d[1].replace(/·/g,'<br>·')+'<button class="adopt" onclick="toast(\''+(d[2]?'已提为选题':'已存为素材')+'\')">'+(d[2]?'采纳→选题':'采纳→素材')+'</button>';
+ box.prepend(div);}
+let sel='';
+document.addEventListener('mouseup',e=>{const s=window.getSelection();const t=s.toString().trim();const m=document.getElementById('hlmenu');
+ if(t.length>3&&e.target.closest('.read')){sel=t;m.style.left=Math.min(e.clientX,innerWidth-260)+'px';m.style.top=(e.clientY+12)+'px';m.classList.add('on');}else if(!e.target.closest('.hlmenu'))m.classList.remove('on');});
+function mark(type){document.getElementById('hlmenu').classList.remove('on');toast('已标「'+type+'」→ 进素材库（这篇的收获 +1）');window.getSelection().removeAllRanges();}
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2200);}
+</script>
+</body></html>

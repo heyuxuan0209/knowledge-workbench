@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>版式 E · 主题库列表页 — 追踪与创作共存</title>
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--body2:#4a463d;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line08:rgba(33,31,26,.08);--line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-h:#2c456a;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:Georgia,'Songti SC','Noto Serif SC',serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.65}
+.tag-mock{position:fixed;top:12px;right:14px;background:var(--accent);color:#fff;font-size:12px;padding:4px 10px;border-radius:20px;z-index:9;letter-spacing:.5px}
+.wrap{max-width:1020px;margin:0 auto;padding:32px 24px 80px}
+/* 头部 */
+.hd{margin-bottom:24px}
+.hd h1{font-family:var(--serif);font-size:27px;font-weight:600}
+.hd .sub{font-size:13.5px;color:var(--sub);margin-top:6px}
+/* 分区标题 */
+.zone{display:flex;align-items:baseline;gap:12px;margin:26px 0 4px}
+.zone h2{font-family:var(--serif);font-size:19px;font-weight:600}
+.zone .n{font-size:13px;color:var(--sub2)}
+.zone .what{font-size:12.5px;color:var(--sub2)}
+.zone-note{font-size:12.5px;color:var(--sub);margin-bottom:14px}
+/* 追踪卡 */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.tcard{background:var(--surface);border:1px solid var(--line10);border-top:3px solid var(--accent);border-radius:14px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;position:relative}
+.tcard:hover{box-shadow:0 3px 14px rgba(33,31,26,.08)}
+.tcard .tt{font-family:var(--serif);font-size:17.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.tcard .badge{font-size:10.5px;font-weight:600;color:var(--green);border:1px solid var(--green);border-radius:11px;padding:0 8px;letter-spacing:1px}
+.tcard .stats{font-size:12.5px;color:var(--sub);margin-top:7px}
+.tcard .stats b{color:var(--body2)}
+.tcard .newdot{position:absolute;top:16px;right:16px;font-size:11.5px;color:#fff;background:var(--red);border-radius:12px;padding:1px 9px}
+.tcard .vd{margin-top:11px;font-size:13px;color:var(--body);line-height:1.65;background:rgba(61,90,128,.05);border-left:2px solid var(--accent);padding:8px 12px;border-radius:0 8px 8px 0}
+.tcard .vd .vl{font-size:10.5px;color:var(--accent);letter-spacing:1px;display:block;margin-bottom:2px}
+.tcard .foot{margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tcard .foot .go{font-size:12.5px;color:#fff;background:var(--accent);border:none;border-radius:8px;padding:5px 13px;cursor:pointer}
+.tcard .foot .go:hover{background:var(--accent-h)}
+.tcard .foot .up{font-size:12px;color:var(--sub);background:none;border:1px solid var(--line14);border-radius:8px;padding:4px 11px;cursor:pointer}
+.tcard .foot .up:hover{border-color:var(--accent);color:var(--accent)}
+.tcard.new{border:1px dashed var(--line14);border-top:1px dashed var(--line14);background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:170px;color:var(--sub);gap:8px}
+.tcard.new:hover{border-color:var(--accent);color:var(--accent);box-shadow:none}
+.tcard.new .plus{font-size:26px;line-height:1}
+.tcard.new .hint{font-size:12px;color:var(--faint);text-align:center;line-height:1.7;padding:0 18px}
+/* 创作主题卡 */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.ccard{background:var(--surface);border:1px solid var(--line10);border-radius:14px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s}
+.ccard:hover{box-shadow:0 3px 14px rgba(33,31,26,.08)}
+.ccard .tt{font-family:var(--serif);font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px}
+.ccard .badge{font-size:10.5px;font-weight:600;color:var(--amber);border:1px solid var(--amber);border-radius:11px;padding:0 8px;letter-spacing:1px}
+.ccard .stats{font-size:12.5px;color:var(--sub);margin-top:7px}
+.ccard .stats b{color:var(--body2)}
+.ccard .evo{margin-top:10px;font-size:13px;color:var(--body);line-height:1.65}
+.ccard .evo .el{font-size:10.5px;color:var(--amber);letter-spacing:1px;display:block;margin-bottom:2px}
+.ccard .pend{margin-top:9px;font-size:12px;color:var(--amber)}
+.ccard .foot{margin-top:12px;display:flex;gap:8px}
+.ccard .foot .go{font-size:12.5px;color:#fff;background:var(--amber);border:none;border-radius:8px;padding:5px 13px;cursor:pointer}
+.ccard .foot .go:hover{opacity:.88}
+.ccard .foot .up{font-size:12px;color:var(--sub);background:none;border:1px solid var(--line14);border-radius:8px;padding:4px 11px;cursor:pointer}
+/* 关系说明 */
+.bridge{margin-top:30px;background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:14px 20px;font-size:13px;color:var(--sub);line-height:1.9;text-align:center}
+.bridge b{color:var(--body2)}
+.bridge .arrow{color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+<div class="tag-mock">版式 E · 主题库列表页（共存方案）</div>
+<div class="wrap">
+  <div class="hd">
+    <h1>主题库</h1>
+    <div class="sub">围绕话题的活页——上面是<b>替你盯着外面</b>的追踪主题，下面是<b>你亲手沉淀</b>的创作主题</div>
+  </div>
+
+  <!-- ═══ 分区一：追踪主题 ═══ -->
+  <div class="zone"><h2>追踪中</h2><span class="n">3 个</span><span class="what">· AI 每天把资讯里「以它为主角」的内容归进来，织成脉络综述</span></div>
+  <div class="zone-note"><b style="color:var(--body2)">追踪主题都是你建的，AI 不会自己偷偷建</b>——三个入口：这里手动新建 / 资讯卡上点「追踪这个话题」 / AI 发现你反复关注某话题时<b style="color:var(--body2)">提议、你确认</b>。建好后收录和织脉络才是全自动。有新进展亮红点，点进去先看"上次之后新发生了什么"。</div>
+  <div class="tgrid">
+    <div class="tcard">
+      <span class="newdot">本周 +6 件事</span>
+      <div class="tt">Claude / Anthropic<span class="badge">追踪中</span></div>
+      <div class="stats">31 天 · <b>95 条</b> · 去重后 78 件事 · <b>6</b> 条主线</div>
+      <div class="vd"><span class="vl">本月一句话 · AI 判断</span>技术封神 × 商业冲刺 × 护城河遭遇战——强者姿态与体系性焦虑同框。</div>
+      <div class="foot"><button class="go">看综述 →</button><button class="up">提为灵感</button><button class="up">升为创作主题</button></div>
+    </div>
+    <div class="tcard">
+      <span class="newdot">本周 +9 件事</span>
+      <div class="tt">OpenAI / GPT<span class="badge">追踪中</span></div>
+      <div class="stats">31 天 · <b>113 条</b> · 去重后 90 件事 · <b>6</b> 条主线</div>
+      <div class="vd"><span class="vl">本月一句话 · AI 判断</span>全线开火也全线显形代价——删库、入侵 HF、苹果诉讼、广告开闸，攻与险同源于更强的自主性。</div>
+      <div class="foot"><button class="go">看综述 →</button><button class="up">提为灵感</button><button class="up">升为创作主题</button></div>
+    </div>
+    <div class="tcard">
+      <div class="tt">Loop Engineering<span class="badge" style="color:var(--sub2);border-color:var(--sub2)">刚建 · 攒料中</span></div>
+      <div class="stats">7 天 · <b>4 条</b> · 暂未成线（≥8 条且有因果链才出综述）</div>
+      <div class="vd" style="background:none;border-left-color:var(--line14);color:var(--sub)"><span class="vl" style="color:var(--sub2)">状态</span>还在攒料——条目够了、串得成因果链，综述才会出现，不硬写。</div>
+      <div class="foot"><button class="up">看已收 4 条</button><button class="up">调整追踪词</button></div>
+    </div>
+    <div class="tcard" style="border-top-color:var(--amber);border-style:dashed">
+      <div class="tt" style="font-size:15px;color:var(--body2)">AI 提议 · 供你裁决</div>
+      <div class="stats" style="margin-top:9px;line-height:1.7">发现你近两周<b>精读了 5 篇、星标了 2 篇</b>「AI 视频生成」相关内容——要建个追踪吗？</div>
+      <div class="foot" style="margin-top:14px"><button class="go" style="background:var(--amber)">要，开始追踪</button><button class="up">不要</button></div>
+      <div class="stats" style="margin-top:10px;font-size:11.5px;color:var(--faint)">提议依据你的真实动作（精读/星标），不看你没碰过的内容；「不要」后同话题不再提</div>
+    </div>
+    <div class="tcard new">
+      <div class="plus">＋</div>
+      <div>新建追踪</div>
+      <div class="hint">输入你想盯的实体/话题（如 "Gemini"、"AI 视频生成"），AI 从今天起替你收、替你织脉络<br>也可以在资讯卡上点「追踪这个话题」一键建</div>
+    </div>
+  </div>
+
+  <!-- ═══ 分区二：创作主题 ═══ -->
+  <div class="zone" style="margin-top:36px"><h2>创作主题</h2><span class="n">4 个</span><span class="what">· 你亲手存的素材在这里长成综述，攒够了去创作</span></div>
+  <div class="zone-note">来源三种：你存素材后 <b style="color:var(--body2)">AI 提议聚类、你裁决</b> / 灵感库里「养成主题」升上来 / 手动新建。与追踪主题的区别：<b style="color:var(--body2)">素材是你挑的、观点是你养的</b>，AI 只帮你持续并入和归纳。</div>
+  <div style="background:rgba(169,121,31,.07);border:1px solid rgba(169,121,31,.25);border-radius:11px;padding:10px 16px;font-size:12.5px;color:var(--amber);margin-bottom:14px">🧹 现在的创作主题里混着不少测试期攒下的垃圾主题？——「大扫除」会让 AI 逐个提议「归档 / 合并 / 解散」，由你裁决，归档不删可恢复（P2 排期中，紧随资讯页改造）</div>
+  <div class="cgrid">
+    <div class="ccard">
+      <div class="tt">KW 产品思路<span class="badge">创作主题</span></div>
+      <div class="stats">素材 <b>12</b> 条 · 综述已并入 3 期</div>
+      <div class="evo"><span class="el">最新演进</span>从"工具堆功能"转向"信息降维 + 判断力外包"两条产品主轴……</div>
+      <div class="pend">2 条新素材待归纳 →</div>
+      <div class="foot"><button class="go">开始创作</button><button class="up">看详情</button></div>
+    </div>
+    <div class="ccard">
+      <div class="tt">AI 写作方法<span class="badge">创作主题</span></div>
+      <div class="stats">素材 <b>9</b> 条 · 综述已并入 2 期</div>
+      <div class="evo"><span class="el">最新演进</span>"去 AI 味"的共识正在从事后修改转向生成层接真实语料……</div>
+      <div class="foot"><button class="go">开始创作</button><button class="up">看详情</button></div>
+    </div>
+    <div class="ccard">
+      <div class="tt">知识图谱与代码理解<span class="badge">创作主题</span></div>
+      <div class="stats">素材 <b>6</b> 条 · 综述已并入 1 期</div>
+      <div class="evo"><span class="el">最新演进</span>Graphify 等工具把"AI 全局理解项目"从检索问题变成建图问题……</div>
+      <div class="foot"><button class="go">开始创作</button><button class="up">看详情</button></div>
+    </div>
+    <div class="ccard">
+      <div class="tt">Agent 工作流实践<span class="badge">创作主题</span></div>
+      <div class="stats">素材 <b>8</b> 条 · 综述已并入 2 期</div>
+      <div class="evo"><span class="el">最新演进</span>多 agent 并行的真瓶颈在共享文件协调，不在模型能力……</div>
+      <div class="pend">1 条新素材待归纳 →</div>
+      <div class="foot"><button class="go">开始创作</button><button class="up">看详情</button></div>
+    </div>
+  </div>
+
+  <!-- 两者的关系 -->
+  <div class="bridge">
+    两种主题一条河：<b>追踪主题</b>（AI 替你盯外面）攒出观点 <span class="arrow">→</span> 「提为灵感」进灵感库 或 「升为创作主题」开始沉淀你自己的素材 <span class="arrow">→</span> <b>创作主题</b>攒够了 <span class="arrow">→</span> 去创作台成稿
+  </div>
+</div>
+</body>
+</html>

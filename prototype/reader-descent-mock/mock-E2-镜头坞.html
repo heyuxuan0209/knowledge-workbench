@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>E2 · 单栏 + 底部镜头坞 + 认知位移</title>
+<style>
+:root{--bg:#efece4;--card:#faf8f3;--ink:#211f1a;--body2:#3a382f;--sub2:#8a8478;
+--line08:rgba(33,31,26,.08);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-soft:rgba(61,90,128,.08);
+--persona:#8a5a3c;--persona-soft:rgba(138,90,60,.09);--warn:#a9791f;--warn-soft:rgba(169,121,31,.1);
+--serif:"Songti SC","Noto Serif SC",Georgia,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.75 -apple-system,"PingFang SC",sans-serif;color:var(--ink)}
+.mask{position:fixed;inset:0;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
+.modal{width:720px;max-width:94vw;height:88vh;background:var(--card);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line08)}
+.title{font-family:var(--serif);font-size:18px;font-weight:600;flex:1;line-height:1.35}
+.seg{display:inline-flex;background:rgba(33,31,26,.05);border-radius:9px;padding:3px}
+.seg button{border:0;background:transparent;padding:5px 12px;font-size:12.5px;color:var(--sub2);cursor:pointer;border-radius:7px;font-weight:600}
+.seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.close{border:0;background:none;font-size:22px;color:var(--sub2);cursor:pointer}
+.body{flex:1;overflow-y:auto;padding:18px 26px}
+.ensub{color:var(--sub2);font-size:12px;margin-bottom:12px}
+.lead{font-size:16.5px;line-height:1.75;background:var(--accent-soft);border-radius:11px;padding:15px 17px}
+.lead .k{color:var(--accent);font-weight:600}
+.para{margin:12px 0}
+.hl{background:#fff2cf;border-radius:2px;padding:0 1px;cursor:pointer}
+.tk-cite{display:inline-block;vertical-align:2px;font-size:10px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:6px;padding:0 5px;margin-left:3px;cursor:help;position:relative}
+.tk-cite:hover .pop{display:block}.pop{display:none;position:absolute;bottom:150%;left:0;width:250px;background:#2b2820;color:#f2efe6;font-size:11.5px;line-height:1.6;padding:9px 11px;border-radius:8px;z-index:30;cursor:auto}
+.outcard{margin:12px 0;border-radius:12px;padding:13px 15px;font-size:13.5px;line-height:1.7;animation:rise .25s ease}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+.outcard.text{background:#fff;border:1px solid var(--line08)}
+.outcard.persona{background:var(--persona-soft);border:1px solid rgba(138,90,60,.2)}
+.outcard .tag{font-size:11px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.outcard.text .tag{color:var(--accent)}.outcard.persona .tag{color:var(--persona)}
+.pb{font-size:10px;padding:1px 6px;border-radius:10px;background:var(--persona-soft);color:var(--persona)}
+.adopt{margin-top:8px;border:1px solid var(--line14);background:#fff;border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer;color:var(--accent)}
+.adopt:hover{background:var(--accent);color:#fff}
+/* 认知位移大卡 */
+.shift{margin:16px 0;background:var(--warn-soft);border:1px solid rgba(169,121,31,.28);border-radius:14px;padding:16px 18px}
+.shift .st{font-size:11px;font-weight:700;color:var(--warn);margin-bottom:8px;display:flex;justify-content:space-between}
+.shift .big{font-size:15px;line-height:1.7}.shift b{color:var(--ink)}
+.shift .judge{display:flex;gap:7px;margin-top:12px}
+.shift .judge button{flex:1;border:1px solid var(--line14);background:#fff;border-radius:8px;padding:7px;font-size:12px;cursor:pointer}
+.shift .judge button.y:hover{background:var(--warn);color:#fff;border-color:var(--warn)}
+.note-sm{color:var(--sub2);font-size:11.5px;margin-top:5px}
+/* 底部镜头坞 */
+.dock{border-top:1px solid var(--line08);background:rgba(33,31,26,.02);padding:11px 20px 13px}
+.dockrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.dl{font-size:10.5px;font-weight:700;color:var(--sub2);width:100%;display:flex;align-items:center;gap:5px}
+.dl .dot{width:6px;height:6px;border-radius:50%}
+.chip{border:1px solid var(--line14);background:#fff;border-radius:16px;padding:5px 12px;font-size:12.5px;cursor:pointer;color:var(--body2)}
+.chip.t:hover{border-color:var(--accent);color:var(--accent)}
+.chip.p{border-color:var(--persona-soft);color:var(--persona)}.chip.p:hover{background:var(--persona-soft)}
+.chip.deep{border-color:rgba(169,121,31,.4);color:var(--warn);font-weight:600}
+.foot{display:flex;gap:8px;padding:10px 20px;border-top:1px solid var(--line08)}
+.bo{border:1px solid var(--line14);background:#fff;border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;color:var(--body2)}
+.bp{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:7px 13px;font-size:12.5px;cursor:pointer}
+.hlmenu{position:fixed;display:none;background:#2b2820;border-radius:10px;padding:6px;gap:3px;z-index:60}
+.hlmenu.on{display:flex}.hlmenu button{border:0;background:transparent;color:#f2efe6;font-size:12px;padding:5px 9px;border-radius:6px;cursor:pointer}.hlmenu button:hover{background:rgba(255,255,255,.15)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2820;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;transition:.3s;z-index:70}
+</style></head>
+<body>
+<div class="mask"><div class="modal">
+  <div class="head"><div class="title">Claude Opus 5：价格不变，"会自己补位"是最大变化</div>
+    <div class="seg"><button class="on" onclick="dv(0,this)">速览</button><button onclick="dv(1,this)">精读</button><button onclick="dv(2,this)">原文</button></div>
+    <button class="close">×</button></div>
+  <div class="body" id="body">
+    <p class="ensub">Simon Willison · 英文源 · 精读稿＝忠实解读｜划词可标记 · 下方镜头做分析</p>
+    <div class="view on" id="v0"><div class="lead">Anthropic 发布 Opus 5，价格和 4.8 一样、登顶 AA 榜。看点不是分数——是它<span class="k">"没被要求，也会自己判断该做什么并动手"</span>。</div></div>
+    <div class="view" id="v1" style="display:none">
+      <p class="para">一个实例说明"主动性"：<span class="hl">任务给了零件图纸但故意不让它看图，Opus 5 自己写了套计算机视觉流程重建了零件</span>。<span class="tk-cite">原文<span class="pop">"wrote its own computer vision pipeline to pull the geometry."</span></span> 原作者只摆事实、没喊惊人，精读稿保留这份克制。</p>
+    </div>
+    <div class="view" id="v2" style="display:none"><p class="para" style="font-family:var(--serif);color:var(--body2)">Opus 5 was given a drawing... no way to directly view the drawing. Opus 5 responded by writing its own computer vision pipeline to pull the geometry from the raw pixels.</p></div>
+    <div id="outbox"></div>
+  </div>
+  <div class="dock">
+    <div class="dockrow"><span class="dl"><span class="dot" style="background:var(--accent)"></span>文本镜头（照文章·不穿人设·可核查）</span>
+      <button class="chip t" onclick="ai('sum')">总结要点</button><button class="chip t" onclick="ai('facts')">事实清单</button><button class="chip t" onclick="ai('verify')">待验证点</button><button class="chip t" onclick="ai('against')">反方观点</button></div>
+    <div class="dockrow"><span class="dl"><span class="dot" style="background:var(--persona)"></span>迁移镜头（照你·穿创作者人设·接创作）</span>
+      <button class="chip p" onclick="ai('product')">产品机会</button><button class="chip p" onclick="ai('topic')">选题钩子</button>
+      <button class="chip deep" onclick="shift()">✦ 逼出认知位移</button></div>
+  </div>
+  <div class="foot"><button class="bo" onclick="toast('已存入素材库')">存为素材</button><button class="bo" onclick="toast('已提为选题')">提为选题</button><button class="bp" onclick="toast('已带降维稿进创作台')">降维成稿·去发布</button></div>
+</div></div>
+<div class="hlmenu" id="hlmenu"><button onclick="mark('观点')">💡观点</button><button onclick="mark('疑问')">❓疑问</button><button onclick="mark('行动')">⚡行动</button><button onclick="mark('引用')">❝引用</button><button onclick="mark('资料')">📎资料</button></div>
+<div class="toast" id="toast"></div>
+<script>
+function dv(i,el){document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('on'));el.classList.add('on');document.querySelectorAll('.view').forEach((v,k)=>v.style.display=k===i?'block':'none');}
+const AI={
+ sum:['总结要点','· 价格同 4.8、登顶 AA 榜 · 亮点是主动性 · 能发现漏洞但不擅利用',0],
+ facts:['事实清单','· 价格=4.8，fast 2× · 领先 AA 榜 · 未训 cyber · 发现漏洞≈Mythos5、利用<<Mythos5',0],
+ verify:['待验证点','· "登顶 AA 榜"口径是否稳定 · "半价接近 Fable 5"缺第三方评测 · CV 重建是精选案例、能否复现未知',0],
+ against:['反方观点','· 榜单领先≠真实能力 · "主动性"在生产环境是风险非卖点 · 作者本人还没实测',0],
+ product:['产品机会','· "给 AI 设边界/确认步骤"做成创作工作流可复用组件 · 是你产品"AI 提议·我裁决"的又一佐证',1],
+ topic:['选题钩子','· "少给 AI 指令，多给它判断边界" · "AI 越主动，你越要会划线"',1]
+};
+function ai(k){const d=AI[k];const box=document.getElementById('outbox');const div=document.createElement('div');div.className='outcard '+(d[2]?'persona':'text');
+ div.innerHTML='<div class="tag">'+d[0]+(d[2]?' <span class="pb">穿你人设</span>':' <span style="color:var(--sub2);font-weight:400">· 照文章</span>')+'</div>'+d[1].replace(/·/g,'<br>·')+'<button class="adopt" onclick="toast(\''+(d[2]?'已提为选题':'已存为素材')+'\')">'+(d[2]?'采纳→选题':'采纳→素材')+'</button>';
+ box.prepend(div);box.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function shift(){const box=document.getElementById('outbox');const div=document.createElement('div');div.className='shift';
+ div.innerHTML='<div class="st"><span>认知位移 · 我原本以为→现在意识到</span><span style="background:var(--warn-soft);color:var(--warn);padding:1px 6px;border-radius:10px;font-size:10px">AI 推演·待验真</span></div><div class="big">原本以为 AI 落地门槛是"模型够强、能读到信息"；<b>现在意识到</b>门槛正移到"你能不能给它划清边界"——Opus 5 越主动，"设边界的判断力"越稀缺。<span class="tk-cite">据<span class="pop">③自作主张写CV + ④安全发现≠利用</span></span></div><div class="note-sm">⚠️ AI 从原文逼出的推演，不是结论。据为己有前请核对原文。</div><div class="judge"><button class="y" onclick="toast(\'已据为己有→选题池\')">✅ 据为己有</button><button onclick="toast(\'改写成你的话\')">✂️ 改写</button><button onclick="toast(\'已标不认同\')">✗ 不认同</button></div>';
+ box.prepend(div);box.scrollIntoView({behavior:'smooth',block:'nearest'});}
+document.addEventListener('mouseup',e=>{const t=window.getSelection().toString().trim();const m=document.getElementById('hlmenu');
+ if(t.length>3&&e.target.closest('.body')){m.style.left=Math.min(e.clientX,innerWidth-260)+'px';m.style.top=(e.clientY+12)+'px';m.classList.add('on');}else if(!e.target.closest('.hlmenu'))m.classList.remove('on');});
+function mark(type){document.getElementById('hlmenu').classList.remove('on');toast('已标「'+type+'」→ 进素材库');window.getSelection().removeAllRanges();}
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2200);}
+</script>
+</body></html>

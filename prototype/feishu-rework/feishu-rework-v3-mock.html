@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>飞书接入·一个门 — 推荐版</title>
+<style>
+  :root{
+    --bg:#efece4; --surface:#faf8f2;
+    --text:#211f1a; --body:#332f27; --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line08:rgba(33,31,26,.08); --line07:rgba(33,31,26,.07); --line10:rgba(33,31,26,.1); --line14:rgba(33,31,26,.14); --line16:rgba(33,31,26,.16);
+    --accent:#3d5a80; --amber:#a9791f; --green:#3f7350; --fs:#2a6fb5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--body);font-family:-apple-system,"PingFang SC",system-ui,sans-serif;font-size:14px;line-height:1.6}
+  .wrap{max-width:760px;margin:0 auto;padding:22px 22px 80px}
+  h1{font-size:19px;color:var(--text);margin:0 0 3px;font-weight:650}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:18px}
+  .statetag{font-size:12px;color:var(--sub2);margin:20px 0 8px;font-weight:600}
+  .statetag span{color:var(--fs)}
+  .hero{background:var(--surface);border:1px dashed var(--line16);border-radius:12px;padding:15px 17px}
+  .lane-ttl{font-size:14px;color:var(--text);font-weight:600;margin-bottom:3px}
+  .lab{font-size:11px;border-radius:6px;padding:1px 7px;margin-right:7px;background:rgba(61,90,128,.12);color:var(--accent)}
+  .cap{color:var(--sub);font-size:12.5px}
+  .heroin{display:flex;gap:8px;margin:11px 0}
+  .heroin input{flex:1;border:1px solid var(--line14);background:var(--bg);border-radius:9px;padding:10px 12px;font-size:13px;font-family:inherit}
+  .btn{border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+  .btn-p{background:var(--accent);color:#fff}
+  .btn-g{background:none;color:var(--sub);border:1px solid var(--line14)}
+  /* 三个来源：并列、都带字 */
+  .srcrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:4px}
+  .srcrow .lbl{font-size:11.5px;color:var(--sub2);margin-right:2px}
+  .src{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line14);background:var(--bg);border-radius:9px;padding:7px 13px;font-size:12.5px;color:var(--body);cursor:pointer}
+  .src.on{border-color:rgba(42,111,181,.45);background:rgba(42,111,181,.07);color:var(--fs);font-weight:600}
+  .src .fi{width:17px;height:17px;border-radius:4px;background:var(--fs);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+  .fmt{font-size:11.5px;color:var(--sub2);margin-top:9px}
+  .fmt b{color:var(--sub)}
+  /* 从飞书门·点开态 */
+  .fsdoor{margin-top:12px;border:1px solid rgba(42,111,181,.28);background:rgba(42,111,181,.05);border-radius:10px;padding:12px 14px}
+  .fsdoor .h{font-size:13px;color:var(--fs);font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:9px}
+  .fsdoor .h .fi{width:19px;height:19px;border-radius:5px;background:var(--fs);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .fsdoor .sub2{font-size:11.5px;color:var(--sub2);font-weight:400;margin-left:4px}
+  .seg{display:inline-flex;border:1px solid var(--line14);border-radius:8px;overflow:hidden;margin-bottom:9px;background:var(--surface)}
+  .seg button{border:none;background:none;color:var(--sub);font-size:12px;padding:6px 13px;cursor:pointer}
+  .seg button.on{background:rgba(42,111,181,.12);color:var(--fs)}
+  .take-row{display:flex;gap:8px}
+  .take-row input{flex:1;border:1px solid var(--line14);background:var(--surface);border-radius:9px;padding:8px 11px;font-size:13px;font-family:inherit}
+  .res{display:flex;align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid var(--line08);font-size:13px;cursor:pointer;border-radius:6px}
+  .res:hover{background:rgba(42,111,181,.06)}
+  .res .ty{font-size:11px;color:var(--sub2);background:var(--line07);border-radius:20px;padding:1px 7px;flex-shrink:0}
+  .res .nm{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .res .go{margin-left:auto;color:var(--fs);font-size:11.5px;flex-shrink:0}
+  .note{font-size:12px;color:var(--sub);background:rgba(63,115,80,.06);border:1px solid rgba(63,115,80,.18);border-radius:9px;padding:10px 13px;margin-top:16px;line-height:1.7}
+  .note b{color:var(--green)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>飞书接入 · 推荐版（飞书只给"一个门"）</h1>
+  <div class="sub">来源三选一、都带字：<b>粘链接/文字 · 传文件 · 从飞书</b>。飞书的"搜/挑/粘链接"全在"从飞书"这个门<b>后面</b>，台面上不再有两个飞书入口。下面一张图看全：先是收起态，再是点"从飞书"后的展开态。</div>
+
+  <!-- 收起态 -->
+  <div class="stateltag"></div>
+  <div class="statetag">① 收起态 —— 新用户一眼看到「消化的三个来源」，飞书是其中一个</div>
+  <div class="hero">
+    <div class="lane-ttl"><span class="lab">消化</span>即时分析</div>
+    <div class="cap">要读/消化一个东西 → AI 读懂 → 存成素材</div>
+    <div class="heroin"><input placeholder="粘链接，或粘一大段文字…"><button class="btn btn-p" style="padding:10px 15px">读懂它</button></div>
+    <div class="srcrow">
+      <span class="lbl">来源</span>
+      <span class="src on">🔗 粘链接 / 文字</span>
+      <span class="src">📎 传文件</span>
+      <span class="src"><span class="fi">飞</span> 从飞书</span>
+    </div>
+    <div class="fmt">粘链接支持：网页 · 公众号 · YouTube · B站 <b>（飞书的东西点右边「从飞书」）</b></div>
+  </div>
+
+  <!-- 展开态 -->
+  <div class="statetag">② 点了 <span>「从飞书」</span> 后 —— 一个门里两条路：搜/挑，或直接粘飞书链接</div>
+  <div class="hero">
+    <div class="lane-ttl"><span class="lab">消化</span>即时分析</div>
+    <div class="cap">要读/消化一个东西 → AI 读懂 → 存成素材</div>
+    <div class="heroin"><input placeholder="粘链接，或粘一大段文字…"><button class="btn btn-p" style="padding:10px 15px">读懂它</button></div>
+    <div class="srcrow">
+      <span class="lbl">来源</span>
+      <span class="src">🔗 粘链接 / 文字</span>
+      <span class="src">📎 传文件</span>
+      <span class="src on"><span class="fi">飞</span> 从飞书</span>
+    </div>
+    <div class="fsdoor">
+      <div class="h"><span class="fi">飞</span>从飞书找一篇<span class="sub2">— 知道在哪就搜，搜不到切「按意思」，或直接粘飞书链接</span></div>
+      <div class="seg"><button class="on">🔍 搜索</button><button>💡 按意思找</button><button>🔗 粘飞书链接</button></div>
+      <div class="take-row"><input placeholder="搜你飞书里的 文档 / 妙记 / 知识库…"><button class="btn btn-p" style="padding:8px 14px">搜</button></div>
+      <div style="margin-top:8px">
+        <div class="res"><span class="ty">云文档</span><span class="nm">达人推进全流程自动化系统设计</span><span class="go">拉来读 →</span></div>
+        <div class="res"><span class="ty">知识库</span><span class="nm">BD 投放 SOP · 沟通话术库</span><span class="go">拉来读 →</span></div>
+        <div class="res"><span class="ty">妙记</span><span class="nm">0710 产品方案沟通会（转写）</span><span class="go">拉来读 →</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>为什么这版对新用户最好懂：</b><br>
+    · 台面上永远只有 <b>3 个并列来源</b>（粘链接 / 传文件 / 从飞书），一眼扫完就懂"我要读的东西从哪进"。<br>
+    · 飞书<b>只有一个门</b>——不再"粘链接里也有飞书、旁边又有从飞书"那种撞车。<br>
+    · "有链接粘 / 没链接搜"是门<b>里面</b>的选择，新人不用一上来就决定。<br>
+    · 收起态框子不高（粘链接是最常做的）；只有你要从飞书找时，门才展开。
+  </div>
+</div>
+</body>
+</html>

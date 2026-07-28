@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>E3 · 划线驱动（读→标→素材，直连创作）</title>
+<style>
+:root{--bg:#efece4;--card:#faf8f3;--ink:#211f1a;--body2:#3a382f;--sub2:#8a8478;
+--line08:rgba(33,31,26,.08);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-soft:rgba(61,90,128,.08);
+--persona:#8a5a3c;--persona-soft:rgba(138,90,60,.09);--warn:#a9791f;
+--c-view:#3d5a80;--c-q:#a9791f;--c-act:#7a3f3f;--c-quote:#4a6b4a;--c-src:#5a5a7a;
+--serif:"Songti SC","Noto Serif SC",Georgia,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.8 -apple-system,"PingFang SC",sans-serif;color:var(--ink)}
+.mask{position:fixed;inset:0;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
+.modal{width:940px;max-width:96vw;height:88vh;background:var(--card);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line08)}
+.title{font-family:var(--serif);font-size:18px;font-weight:600;flex:1}
+.close{border:0;background:none;font-size:22px;color:var(--sub2);cursor:pointer}
+.cols{flex:1;display:grid;grid-template-columns:1.5fr 1fr;overflow:hidden}
+.read{overflow-y:auto;padding:20px 26px;border-right:1px solid var(--line08)}
+.ensub{color:var(--sub2);font-size:12px;margin-bottom:6px}
+.tip{background:var(--accent-soft);border-radius:9px;padding:8px 12px;font-size:12.5px;color:var(--accent);margin-bottom:14px}
+.para{margin:13px 0}
+.hl{border-radius:2px;padding:0 1px;cursor:pointer;transition:.15s}
+.hl.观点{background:rgba(61,90,128,.16);border-bottom:2px solid var(--c-view)}
+.hl.疑问{background:rgba(169,121,31,.16);border-bottom:2px solid var(--c-q)}
+.hl.行动{background:rgba(122,63,63,.14);border-bottom:2px solid var(--c-act)}
+.hl.引用{background:rgba(74,107,74,.14);border-bottom:2px solid var(--c-quote)}
+.hl.资料{background:rgba(90,90,122,.14);border-bottom:2px solid var(--c-src)}
+.tk-cite{display:inline-block;vertical-align:2px;font-size:10px;color:var(--accent);background:rgba(61,90,128,.1);border-radius:6px;padding:0 5px;margin-left:3px;cursor:help}
+/* 右：这篇的收获 = 素材预备区 */
+.harvest{display:flex;flex-direction:column;background:#f6f3ec;overflow:hidden}
+.hh{padding:15px 18px 8px;border-bottom:1px solid var(--line08)}
+.hh .t{font-family:var(--serif);font-size:15px;font-weight:600}
+.hh .s{font-size:11.5px;color:var(--sub2);margin-top:2px}
+.hlist{flex:1;overflow-y:auto;padding:12px 16px}
+.empty{color:var(--sub2);font-size:13px;text-align:center;padding:30px 10px;line-height:1.8}
+.hcard{background:#fff;border:1px solid var(--line08);border-left:3px solid var(--sub2);border-radius:8px;padding:9px 11px;margin-bottom:9px;font-size:12.5px;line-height:1.55;animation:rise .2s}
+@keyframes rise{from{opacity:0;transform:translateX(8px)}to{opacity:1}}
+.hcard.观点{border-left-color:var(--c-view)}.hcard.疑问{border-left-color:var(--c-q)}.hcard.行动{border-left-color:var(--c-act)}.hcard.引用{border-left-color:var(--c-quote)}.hcard.资料{border-left-color:var(--c-src)}
+.hcard .ty{font-size:10px;font-weight:700;margin-bottom:3px}
+.hcard.观点 .ty{color:var(--c-view)}.hcard.疑问 .ty{color:var(--c-q)}.hcard.行动 .ty{color:var(--c-act)}.hcard.引用 .ty{color:var(--c-quote)}.hcard.资料 .ty{color:var(--c-src)}
+.hcard .x{float:right;color:var(--sub2);cursor:pointer;font-size:13px}
+.hfoot{padding:12px 16px;border-top:1px solid var(--line08);background:#fff}
+.hfoot .lenses{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.hfoot .lenses button{border:1px solid var(--line14);background:#fff;border-radius:15px;padding:4px 10px;font-size:11.5px;cursor:pointer;color:var(--sub2)}
+.hfoot .lenses button:hover{border-color:var(--accent);color:var(--accent)}
+.bp{width:100%;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9px;padding:10px;font-size:13.5px;cursor:pointer;font-weight:600}
+.bp:disabled{opacity:.4;cursor:default}
+.bp2{width:100%;border:1px solid var(--line14);background:#fff;color:var(--body2);border-radius:9px;padding:8px;font-size:12.5px;cursor:pointer;margin-top:7px}
+.hlmenu{position:fixed;display:none;background:#2b2820;border-radius:10px;padding:6px;gap:2px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.hlmenu.on{display:flex}
+.hlmenu button{border:0;background:transparent;color:#f2efe6;font-size:12px;padding:6px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.hlmenu button:hover{background:rgba(255,255,255,.15)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2820;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;transition:.3s;z-index:70}
+</style></head>
+<body>
+<div class="mask"><div class="modal">
+  <div class="head"><div class="title">Claude Opus 5：价格不变，"会自己补位"是最大变化</div><button class="close">×</button></div>
+  <div class="cols">
+    <div class="read">
+      <p class="ensub">Simon Willison · 英文源 · 精读稿</p>
+      <div class="tip">✎ 划词选一个类型（观点/疑问/行动/引用/资料）→ 自动进右边"这篇的收获"，读完一键成素材。</div>
+      <p class="para">Anthropic 发布 Opus 5，价格和 4.8 一样、登顶 Artificial Analysis 榜。<span class="tk-cite">原文<span></span></span></p>
+      <p class="para">真正的看点不是分数——是它<span class="hl 观点" data-t="观点">"没被要求，也会自己判断该做什么并动手"</span>。一个实例：<span class="hl 引用" data-t="引用">任务给了零件图纸但故意不让它看图，Opus 5 自己写了套计算机视觉流程、从像素里重建了整个零件</span>。</p>
+      <p class="para">安全上有个矛盾信号：<span class="hl 疑问" data-t="疑问">它"发现"漏洞接近顶尖，但"利用"漏洞明显更弱——是刻意设的边界还是训练副产物？</span> 官方没说死。</p>
+      <p class="para"><span class="hl 行动" data-t="行动">该去读那两份提示词/上下文工程指南，旧 prompt 模板可能过时</span>。原作者 Simon 还没实测、只转述官方 buzz，精读稿保留这份克制。相关：<span class="hl 资料" data-t="资料">Thariq《Claude 5 代模型的上下文工程新规则》</span>。</p>
+      <p class="para" style="color:var(--sub2);font-size:13px">（以上高亮为演示：五种类型各标了一条。真实使用中你自己划词选类型。）</p>
+    </div>
+    <div class="harvest">
+      <div class="hh"><div class="t">这篇的收获</div><div class="s">你标记的都在这——它们就是素材的原料（<span id="cnt">0</span> 条）</div></div>
+      <div class="hlist" id="hlist"><div class="empty" id="empty">划词标记后<br>这里会攒下你的收获<br><br>观点=你的 Δ 种子｜资料=论据<br>疑问=待验证选题｜行动=待办</div></div>
+      <div class="hfoot">
+        <div class="lenses"><span style="font-size:10.5px;color:var(--sub2);width:100%;margin-bottom:2px">读完还想深挖？</span>
+          <button onclick="toast('待验证点·照文章')">待验证点</button><button onclick="toast('反方观点·照文章')">反方观点</button><button onclick="toast('产品机会·穿你人设')" style="color:var(--persona);border-color:var(--persona-soft)">产品机会</button></div>
+        <button class="bp" id="save" disabled onclick="toast('已把 '+H.length+' 条收获存入素材库（按类型分好·来源回链本文）')">一键全部进素材库</button>
+        <button class="bp2" onclick="toast('已按收获起草 → 创作台')">用这些收获起草 →</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+<div class="hlmenu" id="hlmenu">
+  <button onclick="mark('观点')" style="color:#9db4d8">💡观点</button><button onclick="mark('疑问')" style="color:#d8b978">❓疑问</button><button onclick="mark('行动')" style="color:#d89a9a">⚡行动</button><button onclick="mark('引用')" style="color:#9ac89a">❝引用</button><button onclick="mark('资料')" style="color:#a9a9d0">📎资料</button>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const H=[];const TY={观点:'💡',疑问:'❓',行动:'⚡',引用:'❝',资料:'📎'};
+function add(type,text){H.push({type,text});render();}
+function render(){const l=document.getElementById('hlist');document.getElementById('empty')&&(H.length&&(document.getElementById('empty').style.display='none'));
+ document.getElementById('cnt').textContent=H.length;document.getElementById('save').disabled=!H.length;
+ l.querySelectorAll('.hcard').forEach(e=>e.remove());
+ H.forEach((h,i)=>{const d=document.createElement('div');d.className='hcard '+h.type;d.innerHTML='<span class="x" onclick="del('+i+')">×</span><div class="ty">'+TY[h.type]+' '+h.type+'</div>'+h.text;l.appendChild(d);});}
+function del(i){H.splice(i,1);if(!H.length)document.getElementById('empty').style.display='block';render();}
+// 预置高亮点击即加入
+document.querySelectorAll('.hl').forEach(el=>el.addEventListener('click',()=>{add(el.dataset.t,el.textContent);toast('已标「'+el.dataset.t+'」→ 收获 +1');}));
+// 自由划词
+let sel='';
+document.addEventListener('mouseup',e=>{const t=window.getSelection().toString().trim();const m=document.getElementById('hlmenu');
+ if(t.length>3&&e.target.closest('.read')){sel=t;m.style.left=Math.min(e.clientX,innerWidth-300)+'px';m.style.top=(e.clientY+12)+'px';m.classList.add('on');}else if(!e.target.closest('.hlmenu'))m.classList.remove('on');});
+function mark(type){document.getElementById('hlmenu').classList.remove('on');if(sel){add(type,sel);toast('已标「'+type+'」→ 收获 +1');}window.getSelection().removeAllRanges();sel='';}
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2200);}
+</script>
+</body></html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Feed · mute 机制 + 归档保质期（方案 mock）</title>
+<style>
+:root{--bg:#efece4;--card:#faf8f3;--ink:#211f1a;--body2:#3a382f;--sub2:#8a8478;
+--line08:rgba(33,31,26,.08);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--accent-soft:rgba(61,90,128,.08);
+--warn:#a9791f;--warn-soft:rgba(169,121,31,.1);--mute:#9a5b5b;--serif:"Songti SC","Noto Serif SC",Georgia,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,"PingFang SC",sans-serif}
+.wrap{max-width:840px;margin:0 auto;padding:26px 22px 80px}
+h1{font-family:var(--serif);font-size:22px;margin:0 0 3px}
+.sub{color:var(--sub2);font-size:13px;margin-bottom:16px}
+.principle{background:var(--card);border:1px solid var(--line08);border-radius:11px;padding:12px 15px;font-size:12.5px;line-height:1.7;margin-bottom:18px}
+.principle b{color:var(--accent)}.principle .r{color:var(--mute);font-weight:600}
+/* 保质期条 */
+.retention{display:flex;align-items:center;gap:10px;background:var(--accent-soft);border:1px solid rgba(61,90,128,.15);border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px}
+.retention b{color:var(--accent)}
+.retention .link{margin-left:auto;color:var(--accent);cursor:pointer;font-size:12.5px;font-weight:600}
+.mutedbar{display:none;align-items:center;gap:8px;background:rgba(154,91,91,.07);border:1px solid rgba(154,91,91,.2);border-radius:9px;padding:7px 13px;margin-bottom:8px;font-size:12.5px;color:var(--mute)}
+.mutedbar.on{display:flex}.mutedbar .link{margin-left:auto;cursor:pointer;font-weight:600}
+/* 组头 */
+.gh{display:flex;align-items:center;gap:7px;margin:16px 0 3px;font-size:12px;font-weight:700;color:var(--sub2)}
+.gh svg{width:13px;height:13px}
+.gh .what{font-weight:400;color:var(--sub2);opacity:.8}
+/* feed 行 */
+.row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:9px;position:relative;transition:background .12s}
+.row:hover{background:var(--card)}
+.row .time{color:var(--sub2);font-size:12px;width:52px;flex:none;padding-top:1px}
+.row .src{color:var(--body2);font-size:12.5px;width:118px;flex:none;padding-top:1px;font-weight:500}
+.row .main{flex:1;min-width:0}
+.row .title{font-size:14px;cursor:pointer}
+.row .title:hover{color:var(--accent)}
+.row .sum{display:none;color:var(--sub2);font-size:12.5px;margin-top:3px;line-height:1.55}
+.row:hover .sum{display:block}
+.row .tier{font-size:10px;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:10px;margin-left:6px;vertical-align:1px}
+/* 行内动作（SVG，非 emoji —— 回应 #3） */
+.acts{display:none;gap:4px;flex:none;padding-top:1px}
+.row:hover .acts{display:flex}
+.acts button{border:1px solid var(--line14);background:var(--card);border-radius:7px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--sub2)}
+.acts button:hover{border-color:var(--accent);color:var(--accent)}
+.acts button.mute:hover{border-color:var(--mute);color:var(--mute)}
+.acts svg{width:14px;height:14px}
+.row.gone{animation:collapse .3s forwards}
+@keyframes collapse{to{opacity:0;height:0;padding:0;margin:0;overflow:hidden}}
+/* mute 菜单 */
+.mm{position:absolute;right:8px;top:34px;z-index:20;background:var(--card);border:1px solid var(--line14);border-radius:11px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:6px;width:260px;display:none}
+.mm.on{display:block}
+.mm .h{font-size:11px;color:var(--sub2);padding:5px 8px 3px}
+.mm button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 9px;border-radius:7px;font-size:13px;cursor:pointer;color:var(--ink)}
+.mm button:hover{background:var(--accent-soft)}
+.mm .ent{display:flex;gap:5px;padding:4px 6px}
+.mm .ent input{flex:1;border:1px solid var(--line14);border-radius:6px;padding:5px 8px;font-size:12.5px}
+.mm .ent button{width:auto;background:var(--mute);color:#fff;padding:5px 10px}
+.mm .no{color:var(--mute);font-weight:600}
+.fold{color:var(--sub2);font-size:12.5px;padding:8px 10px;cursor:pointer}
+.fold:hover{color:var(--accent)}
+/* 静音管理面板 */
+.panel{display:none;background:var(--card);border:1px solid var(--line14);border-radius:12px;padding:14px 16px;margin-top:12px}
+.panel.on{display:block}
+.panel h3{margin:0 0 8px;font-size:14px}
+.mitem{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line08);font-size:13px}
+.mitem .tag{font-size:10px;background:rgba(154,91,91,.1);color:var(--mute);padding:1px 6px;border-radius:10px}
+.mitem .un{margin-left:auto;border:1px solid var(--line14);background:transparent;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--accent)}
+.mitem .un:hover{background:var(--accent);color:#fff}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:#2b2820;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;transition:.3s;z-index:70}
+</style></head>
+<body><div class="wrap">
+  <h1>Feed · mute 机制 ＋ 归档保质期</h1>
+  <div class="sub">方案 mock · 穿产品皮 · 可点：hover 行看动作，点"不感兴趣"看 mute 菜单</div>
+
+  <div class="principle">
+    两条红线（都是你的 ADR）：<br>
+    ① <b>mute 只显式、不自动学</b>：你打 X = 明确"别看这个源/这个话题"，产品照做；<span class="r">绝不偷偷推断"你不喜欢论文"就降权论文</span>（ADR-040 卡兹克反面教训）。<br>
+    ② <b>feed 是路过的河、不是仓库</b>：只呈现"近期 + 你挂账的"，老的自动归档进冷区（可搜可恢复、不删），feed 永不随总量膨胀（ADR-045）。
+  </div>
+
+  <!-- #5 保质期条 -->
+  <div class="retention">
+    <span>本窗口：<b>近 14 天 · 42 条</b></span>
+    <span style="color:var(--sub2)">｜ 更早 <b style="color:var(--sub2)">1455 条</b>已归入冷区（未 star/未精读/未提灵感的）</span>
+    <span class="link" onclick="toast('打开归档冷区（可搜索、可恢复）')">查看冷区 →</span>
+  </div>
+  <div class="mutedbar" id="mutedbar">
+    <span>已静音 <b id="mcount">0</b> 项</span>
+    <span class="link" onclick="togglePanel()">管理静音 →</span>
+  </div>
+
+  <!-- 组2 你关注的一手 -->
+  <div class="gh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>官方一手 <span class="what">· 官方 blog + 官方号</span></div>
+  <div class="feed" id="feed">
+    <div class="row" data-src="Anthropic" data-t="Anthropic"><span class="time">2 小时前</span><span class="src">Anthropic News</span><div class="main"><div class="title">Introducing Claude Opus 5<span class="tier">官方一手</span></div><div class="sum">Anthropic 发布 Opus 5，价格与 4.8 持平、登顶 Artificial Analysis 榜；亮点是"主动性"。</div></div><div class="acts">
+      <button title="精读" onclick="toast('站内精读')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></button>
+      <button title="以后再看" onclick="toast('★ 已挂账')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 27l2-7L2 9h7z" transform="scale(0.8) translate(3 1)"/></svg></button>
+      <button class="mute" title="不感兴趣" onclick="openMute(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
+
+    <div class="row" data-src="Simon Willison" data-t="Simon Willison"><span class="time">3 小时前</span><span class="src">Simon Willison</span><div class="main"><div class="title">介绍 Claude Opus 5<span class="tier">一手</span></div><div class="sum">Simon 转述官方 buzz：Opus 5 半价接近 Fable 5，一个自己写 CV 管线重建零件的例子显示它"relentlessly proactive"。</div></div><div class="acts">
+      <button title="精读" onclick="toast('站内精读')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></button>
+      <button title="以后再看" onclick="toast('★ 已挂账')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>
+      <button class="mute" title="不感兴趣" onclick="openMute(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
+
+    <div class="row" data-src="Construction Physics" data-t="制造/建筑"><span class="time">5 小时前</span><span class="src">Construction Physics</span><div class="main"><div class="title">美国造船业为什么衰落<span class="tier" style="background:var(--warn-soft);color:var(--warn)">与 AI 无关</span></div><div class="sum">一篇讲二战后美国商用造船业衰退的长文——耐读，但和 AI/创作没关系。（这类就是你想打 X 的）</div></div><div class="acts">
+      <button title="精读" onclick="toast('站内精读')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></button>
+      <button title="以后再看" onclick="toast('★ 已挂账')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>
+      <button class="mute" title="不感兴趣" onclick="openMute(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
+
+    <div class="row" data-src="HuggingFace Papers" data-t="论文"><span class="time">6 小时前</span><span class="src">HuggingFace Papers</span><div class="main"><div class="title">一种新的稀疏注意力核函数（arXiv）<span class="tier" style="background:var(--warn-soft);color:var(--warn)">偏艰深</span></div><div class="sum">深度学习底层 kernel 优化论文——技术性极强。若你不想看论文，可 mute 这个源（但注意：这是 mute 源，不是让产品"学会你讨厌论文"）。</div></div><div class="acts">
+      <button title="精读" onclick="toast('站内精读')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></button>
+      <button title="以后再看" onclick="toast('★ 已挂账')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>
+      <button class="mute" title="不感兴趣" onclick="openMute(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
+  </div>
+
+  <div class="fold" onclick="toast('展开近 14 天之前的（默认折叠）')">▸ 更早的（近 14 天之前，已折叠）</div>
+
+  <!-- 静音管理面板 -->
+  <div class="panel" id="panel">
+    <h3>静音管理 <span style="font-size:11px;color:var(--sub2);font-weight:400">· 都是你显式设的，随时解除；产品不会自作主张加项</span></h3>
+    <div id="mlist"><div style="color:var(--sub2);font-size:13px;padding:8px 0">还没有静音项。</div></div>
+  </div>
+
+  <div style="margin-top:26px;padding:14px 16px;background:var(--card);border:1px solid var(--line08);border-radius:11px;font-size:12.5px;line-height:1.75;color:var(--body2)">
+    <b>#5 归档保质期怎么跑（后台，无感）</b>：① feed 默认只查"近 14 天 + ★挂账"；② 每天一个归档 job，把<b>超 30 天且没被 star/精读/提灵感/用过</b>的条目 <code>status→archived</code>（进冷区，可搜可恢复，<b>不删</b>）；③ 一手（组1/2）保质期长些、资讯精选（组3/4）短些；④ 真想留的你会 star/精读/提灵感 → 进<b>素材库</b>（那才是有状态机的资产层）。→ 无论多久，feed 永远只有"最近该看的 + 挂账的"。
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+const muted=[]; let curRow=null;
+function openMute(btn){document.querySelectorAll('.mm').forEach(m=>m.remove());const row=btn.closest('.row');curRow=row;
+  const src=row.dataset.src, ent=row.dataset.t;
+  const mm=document.createElement('div');mm.className='mm on';
+  mm.innerHTML=`<div class="h">不想再看到这条，怎么处理？（你说了算）</div>
+    <button onclick="doMute('源','${src}')"><span class="no">不看</span>「${src}」这个源</button>
+    <div class="ent"><input value="${ent}" id="entinput"/><button onclick="doMute('话题',document.getElementById('entinput').value)">不看这话题</button></div>
+    <button style="color:var(--sub2)" onclick="this.closest('.mm').remove()">取消</button>`;
+  row.appendChild(mm);
+}
+function doMute(kind,val){document.querySelectorAll('.mm').forEach(m=>m.remove());
+  muted.push({kind,val});renderMuted();
+  // 移除该行 + 同源/同话题的其它行（演示）
+  document.querySelectorAll('.row').forEach(r=>{ if((kind==='源'&&r.dataset.src===val)||(kind==='话题'&&r.dataset.t===val)) r.classList.add('gone'); });
+  toast(`已静音${kind}「${val}」——以后不再推；可在"管理静音"里解除`);
+}
+function renderMuted(){document.getElementById('mcount').textContent=muted.length;
+  document.getElementById('mutedbar').classList.toggle('on',muted.length>0);
+  const l=document.getElementById('mlist');
+  l.innerHTML=muted.length?muted.map((m,i)=>`<div class="mitem"><span class="tag">${m.kind}</span>不看「${m.val}」<button class="un" onclick="unmute(${i})">解除</button></div>`).join(''):'<div style="color:var(--sub2);font-size:13px;padding:8px 0">还没有静音项。</div>';
+}
+function unmute(i){const m=muted[i];muted.splice(i,1);renderMuted();
+  document.querySelectorAll('.row.gone').forEach(r=>{ if((m.kind==='源'&&r.dataset.src===m.val)||(m.kind==='话题'&&r.dataset.t===m.val)){r.classList.remove('gone');r.style=''} });
+  toast(`已解除静音「${m.val}」`);}
+function togglePanel(){document.getElementById('panel').classList.toggle('on');}
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(tt);tt=setTimeout(()=>{t.style.opacity=0;t.style.transform='translateX(-50%) translateY(20px)'},2600);}
+document.addEventListener('click',e=>{if(!e.target.closest('.mm')&&!e.target.closest('.mute'))document.querySelectorAll('.mm').forEach(m=>m.remove());});
+</script>
+</body></html>

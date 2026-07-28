@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>密度对比 · 分组信息流（紧凑 vs 舒适）</title>
+<style>
+:root{--bg:#efece4;--surface:#faf8f2;--text:#211f1a;--body:#332f27;--body2:#4a463d;--sub:#706b60;--sub2:#8a8478;--faint:#b0a894;--line08:rgba(33,31,26,.08);--line10:rgba(33,31,26,.1);--line14:rgba(33,31,26,.14);--accent:#3d5a80;--amber:#a9791f;--green:#3f7350;--red:#a24b3f;--serif:Georgia,'Songti SC','Noto Serif SC',serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.6}
+.tag-mock{position:fixed;top:12px;right:14px;background:var(--accent);color:#fff;font-size:12px;padding:4px 10px;border-radius:20px;z-index:9}
+.wrap{max-width:840px;margin:0 auto;padding:26px 22px 80px}
+.hd h1{font-family:var(--serif);font-size:21px;font-weight:600}
+.hd .sub{font-size:12.5px;color:var(--sub);margin:3px 0 14px}
+/* 控件行 */
+.bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.bar .lab{font-size:12px;color:var(--sub2)}
+.pill{font-size:12.5px;padding:5px 14px;border-radius:16px;border:1px solid var(--line14);background:var(--surface);color:var(--body2);cursor:pointer}
+.pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.pill.dis{opacity:.45;cursor:default}
+.densebox{margin-left:auto;display:flex;align-items:center;gap:6px;border:2px solid var(--amber);border-radius:12px;padding:4px 8px}
+.densebox .dlab{font-size:11.5px;color:var(--amber);font-weight:600}
+.hint{font-size:12px;color:var(--amber);background:rgba(169,121,31,.07);border:1px solid rgba(169,121,31,.25);border-radius:10px;padding:8px 14px;margin-bottom:10px}
+.nudge{background:rgba(169,121,31,.07);border:1px solid rgba(169,121,31,.3);border-radius:10px;padding:9px 15px;font-size:13px;color:var(--amber);margin-bottom:16px}
+.nudge a{color:var(--amber);font-weight:600}
+/* 分组 */
+.grp{margin-bottom:20px}
+.ghead{display:flex;align-items:baseline;gap:10px;padding:8px 2px;border-bottom:2px solid var(--line14);margin-bottom:8px}
+.ghead .gt{font-family:var(--serif);font-size:16px;font-weight:600}
+.ghead .gn{font-size:12px;color:var(--sub2)}
+.ghead .gwhat{font-size:11.5px;color:var(--faint);margin-left:auto}
+.grp.g1 .ghead{border-bottom-color:var(--accent)}
+.grp.g2 .ghead{border-bottom-color:var(--green)}
+.grp.g3 .ghead{border-bottom-color:var(--amber)}
+/* ===== 紧凑行 ===== */
+body.comfort .rowmode{display:none}
+body.compact .cardmode{display:none}
+.row{padding:7px 10px;border-radius:8px;cursor:pointer}
+.row:hover{background:var(--surface)}
+.row .l1{display:flex;align-items:baseline;gap:10px}
+.row .tm{font-size:11px;color:var(--faint);flex-shrink:0;width:38px}
+.row .src{font-size:11.5px;flex-shrink:0;width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.row .tt{flex:1;font-size:14px;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .acts{flex-shrink:0;display:flex;gap:6px;opacity:0;transition:opacity .12s}
+.row:hover .acts{opacity:1}
+.abtn{font-size:11.5px;border:1px solid var(--line14);background:none;border-radius:7px;padding:2px 9px;cursor:pointer;color:var(--sub)}
+.abtn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.row .sum{display:none;font-size:12.5px;color:var(--sub);line-height:1.7;padding:5px 0 2px 48px}
+.row:hover .sum{display:block}
+/* ===== 舒适卡 ===== */
+.card{background:var(--surface);border:1px solid var(--line10);border-radius:11px;padding:13px 16px;margin-bottom:8px;cursor:pointer}
+.card:hover{box-shadow:0 3px 12px rgba(33,31,26,.07)}
+.card .l1{display:flex;align-items:baseline;gap:9px;margin-bottom:4px}
+.card .src{font-size:11.5px;font-weight:600}
+.card .tm{font-size:11px;color:var(--faint)}
+.card .tt{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--text);line-height:1.5}
+.card .sum{font-size:12.5px;color:var(--sub);line-height:1.7;margin-top:5px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.card:hover .sum{-webkit-line-clamp:unset}
+.card .acts{display:flex;gap:6px;margin-top:9px}
+.c1 .src{color:var(--accent)}.c2 .src{color:var(--green)}.c3 .src{color:var(--amber)}.c4 .src{color:var(--sub2)}
+/* g4 折叠 */
+.g4head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line10);border-radius:10px;cursor:pointer;font-size:13.5px;color:var(--sub);user-select:none}
+.g4 .g4list{display:none;padding-top:6px}
+.g4.open .g4list{display:block}
+/* 底部统计 */
+.stat{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:var(--text);color:#efece4;font-size:12.5px;padding:7px 18px;border-radius:20px;box-shadow:0 3px 12px rgba(0,0,0,.2)}
+.stat b{color:#fff}
+</style>
+</head>
+<body class="compact">
+<div class="tag-mock">密度对比 mock</div>
+<div class="wrap">
+  <div class="hd">
+    <h1>资讯 · 信息流（分组已定稿，本页只判「密度」）</h1>
+    <div class="sub">右上角琥珀框就是你要裁决的开关——切「紧凑 / 舒适」感受同一批内容的两种密度，其余全部一样</div>
+  </div>
+
+  <div class="bar">
+    <span class="lab">排序</span>
+    <button class="pill on dis">🥇 一手优先</button><button class="pill dis">最新</button><button class="pill dis">最热</button>
+    <div class="densebox"><span class="dlab">判断题 →</span><button class="pill on" id="dCompact">紧凑</button><button class="pill" id="dComfort">舒适</button></div>
+  </div>
+  <div class="hint">两种密度 hover 都能看全摘要：紧凑=行下展开；舒适=常显一行、hover 展开全文。差别只剩「摘要是否常显一行 + 按钮是否常驻 + 同屏条数」。</div>
+
+  <div class="nudge">🕐 本周一手信源还没读的 <a href="#">6 条</a>，最早已搁置 4 天——原料别放凉</div>
+
+  <div id="feed"></div>
+</div>
+<div class="stat" id="stat"></div>
+<script>
+const DATA = [
+ {g:1,tm:'19:55',src:'Anthropic 官网',tt:'Claude 语音模式现已支持 Opus、Sonnet 及连接工具与多语言',sum:'即日起，Claude 语音模式在 Opus、Sonnet 和 Haiku 上运行，并支持连接 Gmail、Slack 等工具及更多语言。用户可在对话中切换模型，语音模式默认沿用上次文本聊天使用的模型。'},
+ {g:1,tm:'19:43',src:'OpenAI 官网',tt:'ChatGPT 桌面版上线语音控制多智能体',sum:'ChatGPT 语音功能现已登陆桌面应用。只需使用语音，即可控制你的电脑，并指挥在 ChatGPT Work 或 Codex 中运行的多个智能体。该功能由 GPT-Live 驱动，能同时说话、聆听与执行。'},
+ {g:1,tm:'17:55',src:'Greg Brockman',tt:'ChatGPT 向美国用户推出健康功能',sum:'OpenAI 宣布向美国用户推出 ChatGPT 健康功能，支持安全连接 Apple Health 及受支持的医疗记录。每周有 3 亿用户使用 ChatGPT 进行健康咨询，新功能可让 ChatGPT 理解个人健康上下文。'},
+ {g:1,tm:'16:31',src:'Satya Nadella',tt:'微软 MAI 模型：以更低成本实现前沿能力规模化',sum:'微软发布 MAI 系列模型，主打以更低成本实现前沿能力规模化，进入自研模型竞争行列。'},
+ {g:1,tm:'12:33',src:'通义千问官方',tt:'通义千问发布 Qwen-Audio-3.0-TTS，登顶 TTS 排行榜',sum:'阿里通义千问推出最新文本转语音模型，提供 Flash（实时交互）和 Plus（高质量生成）两个版本。新功能包括细粒度内联标签控制（如【whisper】【angry】）、自然语言风格控制。'},
+ {g:2,tm:'05:19',src:'AI Engineer 峰会',tt:'训练前沿模型以超越黑客思维 — Uri Rolls & Thom W',sum:'一项前沿模型安全测试：以低权限身份启动模型，使其访问含零日漏洞的生产系统。模型虽深入探查各环节，却未能识破用户名与 ID 校验不一致的漏洞，揭示安全基准演进的必要性。'},
+ {g:2,tm:'00:00',src:'硅谷101',tt:'E245｜藏在大模型背后的新闻人：GPT 们的回复是这样写出来的',sum:'播客访谈揭示 AI 对话中"懂你"瞬间背后来自前记者、编辑的内容工程师。当模型能力趋同，他们对语感与共情的工程化成为产品关键。'},
+ {g:2,tm:'17:45',src:'AI Engineer 峰会',tt:'将任务与模型分离的非凡效果 — Maxime Rivest, DSPy',sum:'通过声明任务的输入和输出，而不预先考虑模型能力，你为后续确定执行方式创造了必要的空间。DSPy 的承诺在于，AI 工程应当超越特定的 Prompt 模板或供应商 API 形态。'},
+ {g:2,tm:'17:30',src:'AI Engineer 峰会',tt:'Notion 的 Token Town — 莎拉·萨克斯，Notion',sum:'每个月都是同样的陷阱：一款推理模型以相同的每 Token 价格升级，然后悄无声息地耗掉三倍的输出 Token。你的业务增长了 40% 吗？Notion 的 AI 工程负责人拆解成本治理。'},
+ {g:2,tm:'16:48',src:'louis030195',tt:'推出 HN：Screenpipe（YC S26）——7x24 屏幕录制赋能你的 Agent',sum:'Screenpipe 是一款本地录制屏幕和音频的应用，为 AI 代理提供可搜索的记忆，用于自动化重复任务和生成 SOP。隐私本地化设计是亮点。'},
+ {g:3,tm:'18:35',src:'AI HOT 精选',tt:'TheNumbers.com 因 AI 爬虫与安全攻击导致网站崩溃重建',badge:'3 源同报',sum:'电影数据权威网站 The Numbers 突然下线，一周后仅以精简版恢复。创始人透露 AI 爬虫的流量冲击与安全攻击是主因——AI 时代小型数据网站的生存样本。'},
+ {g:3,tm:'23:30',src:'AI HOT 精选',tt:'佛州男子因相信 ChatGPT 拒绝就医而险些丧命，起诉 OpenAI',sum:'55 岁男子起诉 OpenAI，称 ChatGPT-4o 多次建议其无需就医，导致其因双肺血栓引发大面积肺栓塞，一度濒临死亡。诉状指控 OpenAI 存在疏忽和"无证行医"。'},
+ {g:3,tm:'昨天',src:'AI HOT 精选',tt:'Anthropic 因盗版书籍支付 15 亿美元和解金，创集体诉讼纪录',badge:'3 源同报',sum:'联邦法院批准 15 亿美元版权和解，约 48.2 万本涉案书籍 91% 已被认领，每本约 3000 美元。法院同时确认合法书籍训练属合理使用。'},
+ {g:4,tm:'18:01',src:'GitHub 趋势',tt:'OmniRoute：免费 MIT AI 网关，一个端点调用 500+ 模型',sum:'支持 278+ 提供商（含 90+ 免费），兼容 Kimi、Claude、GPT 等主流模型，具备智能回退和流量压缩功能，可节省 15-95% tokens。'},
+ {g:4,tm:'20:11',src:'AI HOT',tt:'DARPA 与美国空军试飞 AI 操控的 F-16 战机',sum:'DARPA 与美国空军完成 AI 操控 F-16 的新一轮试飞。'},
+ {g:4,tm:'18:01',src:'GitHub 趋势',tt:'awesome-claude-skills：精选 Claude 技能与工具合集',sum:'收录自定义 Claude 工作流的各类技能、插件和模板，社区持续更新。'},
+];
+const GROUPS = {1:{cls:'g1',t:'📌 官方一手',what:'官方 blog + 官方号/员工号（T1·T1.5）'},2:{cls:'g2',t:'🎯 你关注的人',what:'X builders · YouTube · 播客'},3:{cls:'g3',t:'🔥 精选与热点',what:'AI HOT 精选 + 事件簇主条（已去重）'},4:{cls:'g4',t:'其他',what:''}};
+const ACTS = '<button class="abtn pri">精读</button><button class="abtn">★</button><button class="abtn">💡</button>';
+function render(){
+  const feed=document.getElementById('feed'); feed.innerHTML='';
+  for (const g of [1,2,3,4]){
+    const items = DATA.filter(d=>d.g===g);
+    const G = GROUPS[g];
+    const grp=document.createElement('div'); grp.className='grp '+G.cls+(g===4?' g4':'');
+    if(g===4){
+      grp.innerHTML='<div class="g4head" onclick="this.parentElement.classList.toggle(\'open\')"><span>▶</span>其他 · 今日 27 条（GitHub trending ×12 · 二手报道 ×15）——想逛再点开</div><div class="g4list"></div>';
+      const list=grp.querySelector('.g4list');
+      items.forEach(d=>list.appendChild(makeItem(d,g)));
+    } else {
+      grp.innerHTML='<div class="ghead"><span class="gt">'+G.t+'</span><span class="gn">今日 '+items.length+' 条</span><span class="gwhat">'+G.what+'</span></div>';
+      items.forEach(d=>grp.appendChild(makeItem(d,g)));
+    }
+    feed.appendChild(grp);
+  }
+}
+function makeItem(d,g){
+  const wrap=document.createElement('div');
+  const badge = d.badge? '<span class="abtn" style="border-color:var(--amber);color:var(--amber);cursor:default">'+d.badge+'</span>':'';
+  wrap.innerHTML =
+   '<div class="row rowmode"><div class="l1"><span class="tm">'+d.tm+'</span><span class="src">'+d.src+'</span><span class="tt">'+d.tt+'</span><span class="acts">'+badge+ACTS+'</span></div><div class="sum">'+d.sum+'</div></div>'
+  +'<div class="card cardmode c'+g+'"><div class="l1"><span class="src">'+d.src+'</span><span class="tm">'+d.tm+'</span>'+(d.badge?'<span style="font-size:10.5px;color:var(--amber)">'+d.badge+'</span>':'')+'</div><div class="tt">'+d.tt+'</div><div class="sum">'+d.sum+'</div><div class="acts">'+ACTS+'</div></div>';
+  return wrap;
+}
+const dc=document.getElementById('dCompact'), df=document.getElementById('dComfort'), stat=document.getElementById('stat');
+function setMode(m){
+  document.body.className=m;
+  dc.classList.toggle('on',m==='compact'); df.classList.toggle('on',m==='comfort');
+  stat.innerHTML = m==='compact' ? '紧凑：一屏约可见 <b>13-15 条</b> · 摘要 hover 出 · 按钮 hover 出' : '舒适：一屏约可见 <b>6-7 条</b> · 摘要常显一行 · 按钮常驻';
+}
+dc.onclick=()=>setMode('compact'); df.onclick=()=>setMode('comfort');
+render(); setMode('compact');
+</script>
+</body>
+</html>

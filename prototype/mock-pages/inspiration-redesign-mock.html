@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>灵感页·养大方案 mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#efece4; --surface:#faf8f2; --brief-bg:#f4f6f9;
+  --text:#211f1a; --body:#332f27; --body2:#4a463d;
+  --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+  --line10:rgba(33,31,26,.1); --line08:rgba(33,31,26,.08); --line07:rgba(33,31,26,.07);
+  --line14:rgba(33,31,26,.14); --line16:rgba(33,31,26,.16);
+  --accent:#3d5a80; --accent-hover:#2c456a;
+  --amber:#a9791f; --green:#3f7350; --red:#a24b3f;
+  --serif:'Newsreader',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding:0 0 80px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* top */
+.top{position:sticky;top:0;z-index:9;background:rgba(239,236,228,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line10);padding:16px 0 12px;margin-bottom:24px}
+.top h1{font-family:var(--serif);font-size:22px;font-weight:600}
+.top .sub{font-size:12.5px;color:var(--sub2);margin-top:3px}
+.nav{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.nav a{font-size:12px;color:var(--sub);text-decoration:none;border:1px solid var(--line10);background:var(--surface);border-radius:20px;padding:4px 12px}
+.nav a:hover{border-color:var(--accent);color:var(--accent)}
+
+/* section */
+section{margin-bottom:46px}
+.sh{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.sh .n{font-family:var(--serif);font-size:15px;color:var(--faint)}
+.sh h2{font-size:17px;font-weight:700}
+.pain{font-size:12.5px;color:var(--sub);background:rgba(162,75,63,.07);border-left:2px solid var(--red);padding:6px 11px;border-radius:0 6px 6px 0;margin-bottom:16px}
+.pain b{color:var(--red)}
+
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:820px){.g2,.g3{grid-template-columns:1fr}}
+
+.opt{border:1px solid var(--line10);border-radius:12px;background:var(--surface);padding:14px}
+.opt.pick{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.opt-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.tag{font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:5px;color:var(--accent);background:rgba(61,90,128,.1)}
+.tag.rec{color:var(--green);background:rgba(63,115,80,.12)}
+.opt-h .t{font-size:13.5px;font-weight:600}
+.tk{font-size:11.5px;color:var(--sub2);line-height:1.5;margin:6px 0 12px}
+.tk b{color:var(--body)}
+
+/* ---- product-真实控件 ---- */
+.lane{border:1px solid rgba(63,115,80,.22);background:rgba(63,115,80,.035);border-radius:11px;padding:13px 14px}
+.lane-ttl{font-family:var(--serif);font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.lane-lab{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;color:var(--green);background:rgba(63,115,80,.12)}
+.lane-cap{font-size:11.5px;color:var(--sub2);margin-top:6px;line-height:1.5}
+.row{display:flex;gap:7px;align-items:flex-end;margin-top:10px}
+.inp,.ta{flex:1;min-width:0;border:1px solid var(--line10);border-radius:8px;padding:9px 12px;font-size:12.5px;background:var(--surface);color:var(--text);font-family:inherit;resize:vertical}
+.inp:focus,.ta:focus{outline:none;border-color:var(--accent)}
+.ta{line-height:1.6}
+.btn{border:none;background:var(--accent);color:#fff;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--accent-hover)}
+.btn.ghost{background:transparent;border:1px solid var(--line10);color:var(--sub)}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn.mini{padding:4px 12px;font-size:12px}
+.hintline{display:flex;justify-content:space-between;align-items:center;margin-top:7px;font-size:11px;color:var(--faint)}
+.hintline b{color:var(--sub)}
+.kbd{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid var(--line10);border-radius:4px;padding:0 4px;color:var(--sub2)}
+
+/* insp card */
+.card{border:1px solid var(--line10);border-radius:12px;background:var(--surface);padding:14px}
+.card-top{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.pill{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:12px}
+.pill.mine{color:var(--green);background:rgba(63,115,80,.12)}
+.pill.st{color:#8a8478;background:rgba(33,31,26,.06)}
+.ago{color:var(--faint);font-size:11px;margin-left:auto}
+.title{font-family:var(--serif);font-size:16px;font-weight:600;line-height:1.4;display:flex;gap:6px;align-items:flex-start}
+.title .ed{font-size:11px;opacity:.5;cursor:pointer;background:none;border:none}
+.foot{display:flex;align-items:center;gap:12px;margin-top:12px}
+.link{font-size:12px;color:var(--sub);background:none;border:none;cursor:pointer;padding:0}
+.link:hover{color:var(--accent)}
+.del{margin-left:auto;color:var(--faint);cursor:pointer;background:none;border:none}
+
+/* body-slot on card */
+.bodyslot{margin-top:9px}
+.bodyempty{font-size:12px;color:var(--faint);border:1px dashed var(--line14);border-radius:8px;padding:8px 11px;cursor:text;display:flex;align-items:center;gap:6px}
+.bodyempty:hover{border-color:var(--accent);color:var(--accent)}
+.bodyprev{font-size:12.5px;color:var(--body2);line-height:1.6;background:rgba(33,31,26,.03);border-radius:8px;padding:9px 11px;position:relative;cursor:text}
+.bodyprev .more{color:var(--faint);font-size:11px}
+.bodyedit{border:1px solid var(--accent);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.6;background:var(--surface);color:var(--text);width:100%;font-family:inherit;resize:vertical}
+.editbar{display:flex;align-items:center;gap:8px;margin-top:6px}
+.savehint{font-size:10.5px;color:var(--faint)}
+
+/* upload fork */
+.fork{border:1px solid var(--line10);border-radius:11px;background:var(--surface);padding:0;overflow:hidden}
+.fork-head{padding:12px 14px;border-bottom:1px solid var(--line08);font-size:12.5px;color:var(--sub)}
+.fork-head b{color:var(--body)}
+.fork-opts{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.fork-opt{padding:14px;cursor:pointer;border-right:1px solid var(--line08)}
+.fork-opt:last-child{border-right:none}
+.fork-opt:hover{background:rgba(61,90,128,.04)}
+.fork-opt .ic{font-size:20px}
+.fork-opt .nm{font-size:13px;font-weight:600;margin-top:6px}
+.fork-opt.primary .nm{color:var(--accent)}
+.fork-opt .ds{font-size:11.5px;color:var(--sub2);line-height:1.5;margin-top:3px}
+.fork-opt .badge{font-size:10px;color:var(--green);font-weight:700;margin-left:5px}
+
+.note{font-size:12px;color:var(--sub);background:var(--brief-bg);border-radius:8px;padding:10px 13px;line-height:1.65;margin-top:14px}
+.note b{color:var(--accent)}
+.flow{font-size:12px;color:var(--sub2);font-family:'IBM Plex Mono',monospace;margin-top:8px}
+.flow .k{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="wrap">
+    <h1>灵感页 · 「让灵感养大」方案对比</h1>
+    <div class="sub">走法 A：ideas 加正文 · 卡片内联能写 · 去创作带稿 · 上传直创。文体/平台仍在创作台选。— 这是设计稿，非真代码</div>
+    <div class="nav">
+      <a href="#s1">① 随手记输入</a>
+      <a href="#s2">② 卡片养大</a>
+      <a href="#s3">③ 去创作带稿</a>
+      <a href="#s4">④ 上传岔口</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ========== ① 随手记输入 ========== -->
+<section id="s1">
+  <div class="sh"><span class="n">①</span><h2>随手记输入：单行 → 能长、标题正文分开</h2></div>
+  <div class="pain">痛点：粘贴一大段进随手记会被<b>静默截到 300 字</b>、全塞进标题、标题正文不分。</div>
+
+  <div class="grid g3">
+    <!-- 1A -->
+    <div class="opt pick">
+      <div class="opt-h"><span class="tag rec">方案 1A · 推荐</span><span class="t">一栏自适应</span></div>
+      <div class="tk">默认单行，<b>粘贴多行/变长自动长高</b>成大编辑区，底部实时提示「首行=标题」+字数。零多余控件，最贴近现在的手感。</div>
+      <div class="lane">
+        <div class="lane-ttl"><span class="lane-lab">闪念</span>随手记</div>
+        <div class="lane-cap">冒出的一句话、或粘一大段 → 首行当标题，其余当正文</div>
+        <div class="row">
+          <textarea class="ta" rows="4" style="min-height:88px">拆解「AI 产品的信息管道」这个选题
+
+用户每天被信息淹没，真正的痛点不是信息少，是没有一条「替我筛→替我读→喂给我」的管道……（可继续粘很长，不再被截）</textarea>
+        </div>
+        <div class="hintline"><span>首行 <b>拆解「AI 产品的信息管道」这个选题</b> → 标题，其余 → 正文</span><span>128 字</span></div>
+        <div class="row" style="justify-content:flex-end;margin-top:8px">
+          <span style="font-size:11px;color:var(--faint);margin-right:auto"><span class="kbd">⌘↵</span> 保存</span>
+          <button class="btn ghost mini">仅存标题</button>
+          <button class="btn mini">＋ 记下</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1B -->
+    <div class="opt">
+      <div class="opt-h"><span class="tag">方案 1B</span><span class="t">标题 + 正文两栏</span></div>
+      <div class="tk">显式两个框，边界最清楚，<b>但每次都要面对两个框</b>——闪念场景偏重。适合你更常粘长文而非记一句时。</div>
+      <div class="lane">
+        <div class="lane-ttl"><span class="lane-lab">闪念</span>随手记</div>
+        <div class="lane-cap">标题必填，正文可留空、可很长</div>
+        <div class="row" style="margin-top:10px">
+          <input class="inp" placeholder="标题（一句话说清要写什么）" value="AI 产品的信息管道" />
+        </div>
+        <div class="row" style="margin-top:7px">
+          <textarea class="ta" rows="4" placeholder="正文 / 展开的想法（可留空）" style="min-height:80px">痛点不是信息少，是没有替我筛→读→喂的管道……</textarea>
+        </div>
+        <div class="row" style="justify-content:flex-end;margin-top:8px">
+          <button class="btn mini">＋ 记下</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1C -->
+    <div class="opt">
+      <div class="opt-h"><span class="tag">方案 1C</span><span class="t">单行 + 展开写</span></div>
+      <div class="tk">保持单行不变，右侧一个「展开写 ▾」按需点开正文。<b>改动最小</b>，但「粘长文」时仍要先想起点展开，容易忘。</div>
+      <div class="lane">
+        <div class="lane-ttl"><span class="lane-lab">闪念</span>随手记</div>
+        <div class="lane-cap">脑里冒出的一句话 → 直接成一条灵感</div>
+        <div class="row">
+          <input class="inp" placeholder="随手记一句…" value="AI 产品的信息管道" />
+          <button class="btn ghost mini" onclick="this.closest('.lane').querySelector('.exp').style.display='block';this.style.display='none'">展开写 ▾</button>
+          <button class="btn mini">＋ 记</button>
+        </div>
+        <div class="exp" style="display:none;margin-top:8px">
+          <textarea class="ta" rows="3" placeholder="正文（可长）" style="min-height:66px"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note"><b>共同项（三个方案都做）</b>：去掉正文的 300 字静默截断；标题仍限长但超长会提示而不是偷偷丢；粘贴多行不再毁形。</div>
+</section>
+
+<!-- ========== ② 卡片养大 ========== -->
+<section id="s2">
+  <div class="sh"><span class="n">②</span><h2>灵感卡片：内联能写正文（「养大」的核心）</h2></div>
+  <div class="pain">痛点：写下一句后想接着补两三句，<b>卡片没有正文位</b>，只能跳创作台，一跳你的字还没带过去。</div>
+
+  <div class="grid g2">
+    <!-- 2A -->
+    <div class="opt pick">
+      <div class="opt-h"><span class="tag rec">方案 2A · 推荐</span><span class="t">标题下就地展开写</span></div>
+      <div class="tk">标题下面永远有个「正文位」：空 → 一行虚线占位「＋ 展开写…」；有内容 → 显示 2 行预览。点一下就地变 textarea，失焦自动存。<b>灵感在卡片里长大，不打断。</b></div>
+
+      <!-- 空态卡 -->
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-top"><span class="pill mine">我记的</span><span class="ago">2 分钟前</span></div>
+        <div class="title">AI 产品的信息管道 <button class="ed">✏️</button></div>
+        <div class="bodyslot">
+          <div class="bodyempty" onclick="this.style.display='none';this.nextElementSibling.style.display='block';this.nextElementSibling.querySelector('textarea').focus()">＋ 展开写…（把这个想法养大）</div>
+          <div style="display:none">
+            <textarea class="bodyedit" rows="3" placeholder="接着把想法写下来，随时来补，不丢"></textarea>
+            <div class="editbar"><span class="savehint">失焦自动保存 · <span class="kbd">Esc</span> 收起</span></div>
+          </div>
+        </div>
+        <div class="foot">
+          <button class="link">✨ 补料</button>
+          <button class="btn mini">直接写 →</button>
+          <button class="del">🗑</button>
+        </div>
+      </div>
+
+      <!-- 已有正文卡 -->
+      <div class="card">
+        <div class="card-top"><span class="pill mine">我记的</span><span class="pill st">已起稿</span><span class="ago">昨天</span></div>
+        <div class="title">AI 产品的信息管道 <button class="ed">✏️</button></div>
+        <div class="bodyslot">
+          <div class="bodyprev" onclick="alert('点开变编辑态（mockup 占位）')">
+            痛点不是信息少，是没有一条「替我筛→替我读→喂给我」的管道。三段：现状之痛 / 管道的四层 / 我怎么搭的……
+            <div class="more">共 186 字 · 点开继续写 ▾</div>
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn mini">带我的稿去创作 →</button>
+          <button class="link">养成主题</button>
+          <button class="del">🗑</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2B -->
+    <div class="opt">
+      <div class="opt-h"><span class="tag">方案 2B</span><span class="t">整卡翻成编辑态</span></div>
+      <div class="tk">点「展开」整张卡进入编辑模式，标题+正文一起改，底部「保存 / 取消」。<b>更像正经编辑</b>，但每次要显式进出编辑态，随手补一句偏重。</div>
+
+      <div class="card" style="border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)">
+        <div class="card-top"><span class="pill mine">我记的</span><span class="ago">编辑中</span></div>
+        <input class="inp" style="font-family:var(--serif);font-size:15px;font-weight:600" value="AI 产品的信息管道" />
+        <textarea class="bodyedit" rows="4" style="margin-top:8px" placeholder="正文…">痛点不是信息少，是没有一条替我筛→读→喂的管道。</textarea>
+        <div class="editbar" style="margin-top:10px">
+          <button class="btn mini">保存</button>
+          <button class="btn ghost mini">取消</button>
+          <span class="savehint" style="margin-left:auto">186 字</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== ③ 去创作带稿 ========== -->
+<section id="s3">
+  <div class="sh"><span class="n">③</span><h2>「去创作」带稿：你的字直接进编辑器</h2></div>
+  <div class="pain">痛点：卡片里明明有我的文字，点「去创作」却 <b>draft 置空 + AI 现写</b>，你的字不会带进编辑器。</div>
+
+  <div class="grid g2">
+    <div class="opt">
+      <div class="opt-h"><span class="tag" style="color:var(--red);background:rgba(162,75,63,.1)">现在</span><span class="t">永远 AI 起稿</span></div>
+      <div class="tk">不论卡片里有没有你的文字，按钮都只有一个「去创作 →」，跳过去清空编辑器让 AI 从素材现写。</div>
+      <div class="card">
+        <div class="title" style="font-size:15px">AI 产品的信息管道</div>
+        <div class="bodyprev" style="margin-top:9px">痛点不是信息少，是没有替我筛→读→喂的管道……</div>
+        <div class="foot"><button class="btn mini">去创作 →</button></div>
+      </div>
+      <div class="flow">idea.body ⟶ <span style="color:var(--red)">丢弃</span> ⟶ studio.draft = ''  ⟶ AI 现写</div>
+    </div>
+
+    <div class="opt pick">
+      <div class="opt-h"><span class="tag rec">改后 · 推荐</span><span class="t">按有没有正文分叉</span></div>
+      <div class="tk"><b>有正文</b> → 主按钮「带我的稿去创作」，把 body 灌进编辑器当初稿，AI 降级成台里一个可点按钮。<b>没正文</b> → 维持「AI 起稿」。</div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="title" style="font-size:15px">AI 产品的信息管道 <span class="pill st" style="margin-left:4px">有草稿</span></div>
+        <div class="bodyprev" style="margin-top:9px">痛点不是信息少，是没有替我筛→读→喂的管道……</div>
+        <div class="foot"><button class="btn mini">带我的稿去创作 →</button><button class="link">让 AI 重写</button></div>
+      </div>
+      <div class="card">
+        <div class="title" style="font-size:15px">只有一句、没展开的灵感</div>
+        <div class="foot" style="margin-top:9px"><button class="btn mini">AI 起稿 →</button></div>
+      </div>
+      <div class="flow">有 body ⟶ studio.draft = <span class="k">idea.body</span> ⟶ 直接进编辑器改</div>
+    </div>
+  </div>
+  <div class="note">平台不再写死 <code>thread</code>：带稿进台后，由创作台已有的推荐机制定文体/平台 —— 也就是你选的「卡片只带默认倾向、真正在创作台选」。</div>
+</section>
+
+<!-- ========== ④ 上传岔口 ========== -->
+<section id="s4">
+  <div class="sh"><span class="n">④</span><h2>上传文档：给一个「当素材 / 当初稿」岔口</h2></div>
+  <div class="pain">痛点：飞书/md 文档上传后<b>只能变成素材</b>（被动引用），想直接改成一篇稿没有入口。</div>
+
+  <div class="grid g2">
+    <div class="opt pick">
+      <div class="opt-h"><span class="tag rec">推荐</span><span class="t">抽取后二选一</span></div>
+      <div class="tk">上传 → 抽出正文 → 弹一个岔口。<b>当素材</b>＝现状（入库被引用）；<b>当初稿</b>＝正文直接进创作台编辑器，你在文体/平台镜头下改自己的原文。</div>
+      <div class="fork">
+        <div class="fork-head">已从 <b>产品周报.md</b> 抽出正文 <b>2,140 字</b> —— 拿它来做什么？</div>
+        <div class="fork-opts">
+          <div class="fork-opt">
+            <div class="ic">📚</div>
+            <div class="nm">入库当素材</div>
+            <div class="ds">存进素材库，之后在创作台勾选、被引用溯源。</div>
+          </div>
+          <div class="fork-opt primary">
+            <div class="ic">✍️</div>
+            <div class="nm">作为我的初稿<span class="badge">直接改</span></div>
+            <div class="ds">正文进创作台编辑器当初稿，选文体/平台就地改写。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-h"><span class="tag">配套</span><span class="t">创作台左栏也能上传</span></div>
+      <div class="tk">创作台「＋新增」旁加一个「⬆ 上传文件」，同样两个去向。这样在创作台里也能随手把一份 md 拉进来当初稿或素材。</div>
+      <div class="card">
+        <div style="font-size:12px;font-weight:600;color:var(--sub2);margin-bottom:8px">素材台</div>
+        <div class="row" style="margin-top:0">
+          <button class="btn ghost mini" style="flex:1">＋ 新增（粘贴）</button>
+          <button class="btn ghost mini" style="flex:1">⬆ 上传文件</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.6">支持 .md / .txt / .docx / 飞书导出 —— 抽取后问你「当素材还是当初稿」。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="note" style="margin-top:8px">
+  <b>守住的边界</b>：灵感的正文是「草稿种子」，不是终稿——终稿仍走 drafts 表，ADR-025 三层不破；文体/平台形态选择器不搬进卡片。
+</div>
+
+</div>
+</body>
+</html>

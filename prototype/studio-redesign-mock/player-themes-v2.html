@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>竖版分镜 · 主题选型 v2（16 版·分组）</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;background:#e7e3da;color:#26241f;padding:24px 30px 70px}
+  h1{font-size:21px;font-weight:700}
+  .lead{font-size:13.5px;color:#6b6559;margin:7px 0 6px;line-height:1.6;max-width:960px}
+  .lead b{color:#a8552e}
+  .grp{font-size:14px;font-weight:700;color:#4a453c;margin:28px 0 14px;padding-bottom:7px;border-bottom:1px solid rgba(0,0,0,.1)}
+  .grp span{font-weight:400;color:#8a8478;font-size:12px;margin-left:8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:24px}
+  .cap{display:flex;align-items:baseline;gap:8px;margin:0 2px 9px}
+  .cap .nm{font-size:13.5px;font-weight:700}.cap .no{font-size:11px;color:#8a8478}.cap .desc{font-size:11px;color:#6b6559}
+  .stage{aspect-ratio:9/16;border-radius:19px;overflow:hidden;position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:13% 9% 22%;text-align:center;box-shadow:0 10px 30px rgba(33,31,26,.2)}
+  .badge{position:absolute;top:4%;left:6.5%;font-size:11.5px;font-weight:700;opacity:.85;z-index:3}
+  .brand{position:absolute;bottom:3.4%;right:6.5%;font-size:11.5px;opacity:.68;z-index:3}
+  .kicker{font-size:12px;letter-spacing:.14em;font-weight:700;text-transform:uppercase;margin-bottom:16px;z-index:2}
+  .kw{line-height:1.12;font-weight:800;z-index:2}
+  .sub{margin-top:16px;line-height:1.5;font-size:16.5px;z-index:2}
+  .capbar{position:absolute;left:7%;right:7%;bottom:7.5%;z-index:2}
+  .capline{display:inline-block;line-height:1.45;font-weight:600;font-size:16.5px}
+
+  /* ===== 组A 编辑/刊物 ===== */
+  .t1{background:#f2ece0}
+  .t1 .badge,.t1 .kicker{color:#b06a3c}.t1 .brand{color:#9a9488}
+  .t1 .kw{font-family:'Newsreader',"Songti SC",serif;font-size:56px;color:#2c2820;font-weight:700}
+  .t1 .kw em{font-style:normal;color:#c1633a;box-shadow:inset 0 -12px 0 rgba(193,99,58,.16)}
+  .t1 .sub{color:#7a7264}
+  .t1 .capline{background:rgba(255,255,255,.7);border-radius:12px;padding:9px 15px;color:#3a352c}
+
+  .t2{background:#f4efe6;align-items:flex-start;text-align:left}
+  .t2 .badge{color:#c0392b;left:auto;right:6%;font-size:40px;font-weight:900;top:5%;opacity:.13}
+  .t2 .kicker{color:#c0392b}
+  .t2 .kw{font-size:56px;color:#211d18;font-weight:900;letter-spacing:-.02em}
+  .t2 .kw em{font-style:normal;background:#e8b23a;color:#211d18;padding:0 7px;box-decoration-break:clone}
+  .t2 .sub{color:#6f6656}
+  .t2 .capbar{text-align:left}.t2 .capline{border-left:4px solid #c0392b;padding:3px 0 3px 12px;color:#3a352c}.t2 .brand{color:#9a9488}
+
+  .t3{background:#f6f4ee;align-items:flex-start;text-align:left}
+  .t3 .badge{color:#211d18;border:1px solid #211d18;padding:1px 6px;font-size:9.5px;letter-spacing:.1em}
+  .t3 .kicker{color:#211d18;border-bottom:2px solid #211d18;border-top:2px solid #211d18;padding:5px 0;width:100%;align-self:stretch;text-align:center;font-size:10.5px}
+  .t3 .kw{font-family:'Newsreader',"Songti SC",serif;font-size:54px;color:#16130f;font-weight:700}
+  .t3 .kw em{font-style:italic;color:#16130f}
+  .t3 .sub{color:#4a453c;font-family:'Newsreader',serif}
+  .t3 .capbar{text-align:left}.t3 .capline{font-family:'Newsreader',serif;color:#2a251d}
+  .t3 .brand{color:#8a8478;font-family:'Newsreader',serif;font-style:italic}
+
+  .t4{background:#141518}
+  .t4 .badge,.t4 .kicker{color:#c9a15e}.t4 .brand{color:#7a746a}
+  .t4 .kw{font-family:'Newsreader',"Songti SC",serif;font-size:56px;color:#f3efe6;font-weight:700}
+  .t4 .kw em{font-style:italic;color:#d9b063}
+  .t4 .sub{color:#a49a86}.t4 .brand{color:#7a746a}
+  .t4 .capline{color:#e8e2d4;border-top:1px solid rgba(255,255,255,.18);padding-top:10px}
+
+  /* ===== 组B 暗色/影视 ===== */
+  .t5{background:radial-gradient(120% 90% at 50% 0%,#181b24 0%,#0c0d12 70%)}
+  .t5 .badge,.t5 .kicker{color:#5de3c4}.t5 .brand{color:#6a7080}
+  .t5 .kw{font-size:58px;color:#f4f6fa;font-weight:900}
+  .t5 .kw em{font-style:normal;color:#5de3c4;text-shadow:0 0 20px rgba(93,227,196,.5)}
+  .t5 .sub{color:#aab2c2}
+  .t5 .capline{background:rgba(255,255,255,.08);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:9px 15px;color:#eef1f6}
+
+  .t6{background:#0a0a0c}
+  .t6 .badge,.t6 .kicker{color:#e8e6e0}
+  .t6 .kw{font-size:58px;color:#fff;font-weight:900;position:relative}
+  .t6 .kw em{font-style:normal;color:#ffd24a}
+  .t6 .sub{color:#9a978e}.t6 .brand{color:#6a685f}
+  .t6 .capline{color:#f0eee8}
+  .t6::before{content:"";position:absolute;top:-30%;left:50%;transform:translateX(-50%);width:120%;height:80%;background:radial-gradient(closest-side,rgba(255,220,120,.16),transparent 70%);pointer-events:none}
+
+  .t7{background:#0d1117}
+  .t7 .badge,.t7 .kicker{color:#3fb950;font-family:ui-monospace,Menlo,monospace}
+  .t7 .kw{font-size:50px;color:#e6edf3;font-weight:800;font-family:ui-monospace,Menlo,monospace}
+  .t7 .kw em{font-style:normal;color:#e3b341}
+  .t7 .sub{color:#8b949e;font-family:ui-monospace,monospace}
+  .t7 .capline{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:9px 13px;color:#c9d1d9;font-family:ui-monospace,monospace}
+  .t7 .capline::before{content:"› ";color:#3fb950}.t7 .brand{color:#8b949e;font-family:ui-monospace,monospace}
+
+  .t8{background:#0f2a43;background-image:linear-gradient(rgba(120,190,240,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(120,190,240,.09) 1px,transparent 1px);background-size:22px 22px}
+  .t8 .badge,.t8 .kicker{color:#7cc4f0;font-family:ui-monospace,monospace}
+  .t8 .kw{font-size:54px;color:#eaf4fc;font-weight:800}
+  .t8 .kw em{font-style:normal;color:#7cc4f0;border-bottom:2px dashed #7cc4f0}
+  .t8 .sub{color:#9dbdd6;font-family:ui-monospace,monospace}
+  .t8 .capline{border:1px solid rgba(124,196,240,.4);border-radius:8px;padding:9px 14px;color:#dcecf8;font-family:ui-monospace,monospace}.t8 .brand{color:#7c9fbe}
+
+  /* ===== 组C 甜系/潮流 ===== */
+  .t9{background:linear-gradient(160deg,#ffe3ee 0%,#e9ddff 55%,#dcefff 100%)}
+  .t9 .badge,.t9 .kicker{color:#d1568f}.t9 .brand{color:#a98ab8}
+  .t9 .kw{font-size:54px;color:#3a2b36;font-weight:800}.t9 .kw em{font-style:normal;color:#e0568f}
+  .t9 .sub{color:#7c6b78}
+  .t9 .capline{background:rgba(255,255,255,.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.7);border-radius:15px;padding:9px 16px;color:#4a3a45}
+
+  .t10{background:#fdf6e9}
+  .t10 .badge{color:#e5443b}.t10 .kicker{color:#2a9d8f}.t10 .brand{color:#b0a894}
+  .t10 .kw{font-size:56px;color:#1f2933;font-weight:900}
+  .t10 .kw em{font-style:normal;color:#fff;background:#e5443b;padding:0 6px;border-radius:5px;box-decoration-break:clone}
+  .t10 .sub{color:#5b6672}
+  .t10 .capline{background:#ffd23f;border-radius:12px;padding:9px 15px;color:#1f2933;box-shadow:4px 4px 0 #1f2933}
+  .t10::before{content:"";position:absolute;top:14%;right:11%;width:38px;height:38px;border:5px solid #2a9d8f;border-radius:50%}
+  .t10::after{content:"";position:absolute;bottom:24%;left:9%;width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-bottom:28px solid #4d96ff;transform:rotate(18deg)}
+
+  .t11{background:linear-gradient(135deg,#c8f0ff 0%,#e7d7ff 40%,#ffd6ec 75%,#fff0c9 100%)}
+  .t11 .badge{color:#7a5cff}.t11 .kicker{color:#e0568f}.t11 .brand{color:#8a7bb0}
+  .t11 .kw{font-size:56px;font-weight:900;background:linear-gradient(180deg,#6a5cff,#e0568f);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .t11 .kw em{font-style:normal;-webkit-text-fill-color:#ff3d9a}
+  .t11 .sub{color:#6a5f88}
+  .t11 .capline{background:rgba(255,255,255,.62);backdrop-filter:blur(5px);border-radius:14px;padding:9px 16px;color:#4a3f66;box-shadow:0 4px 14px rgba(120,90,255,.18)}
+
+  .t12{background:#fdf3f4}
+  .t12 .badge{color:#e85d75}.t12 .kicker{color:#e85d75}.t12 .brand{color:#c0a0a6}
+  .t12 .kw{font-size:56px;color:#3a2a2e;font-weight:900}
+  .t12 .kw em{font-style:normal;color:#fff;background:#ff5d73;padding:0 8px;border-radius:30px;box-decoration-break:clone}
+  .t12 .sub{color:#8a6a70}
+  .t12 .capline{background:#fff;border-radius:30px;padding:9px 18px;color:#4a3a3e;box-shadow:0 3px 12px rgba(232,93,117,.2)}
+
+  /* ===== 组D 质感/文化 ===== */
+  .t13{background:#d8c6a4;background-image:radial-gradient(rgba(120,95,55,.09) 1px,transparent 1px);background-size:15px 15px}
+  .t13 .badge{color:#6d4f2a}.t13 .kicker{color:#8a5a2b}.t13 .brand{color:#7a5f37}
+  .t13 .kw{font-family:"Songti SC",serif;font-size:54px;color:#3d2c17;font-weight:800}
+  .t13 .kw em{font-style:normal;position:relative;z-index:1}
+  .t13 .kw em::after{content:"";position:absolute;left:-3px;right:-3px;bottom:5px;height:13px;background:rgba(214,120,60,.45);transform:rotate(-1.4deg);z-index:-1}
+  .t13 .sub{color:#6b543a}
+  .t13 .capline{background:#fbf6ea;border:1px dashed #b79a68;border-radius:10px;padding:8px 14px;color:#4a3a26}
+
+  .t14{background:#f7f6f3}
+  .t14 .badge{color:#b8b3a8}.t14 .kicker{color:#a8a293;font-weight:600;letter-spacing:.24em}.t14 .brand{color:#c0bbb0}
+  .t14 .kw{font-size:52px;color:#26241f;font-weight:700}
+  .t14 .kw em{font-style:normal;border-bottom:3px solid #c98a4e;padding-bottom:2px}
+  .t14 .sub{color:#9a9488}
+  .t14 .capline{color:#6b6559;border-top:1px solid #ddd8cd;padding-top:10px}
+
+  .t15{background:#f4f1e8}
+  .t15 .badge{color:#a24b3f;border:1.5px solid #a24b3f;padding:1px 5px;font-family:"Songti SC",serif}
+  .t15 .kicker{color:#8a7a68;font-family:"Songti SC",serif;letter-spacing:.2em}
+  .t15 .kw{font-family:"Songti SC","STSong",serif;font-size:58px;color:#1a1712;font-weight:800}
+  .t15 .kw em{font-style:normal;color:#a24b3f}
+  .t15 .sub{color:#6a6154;font-family:"Songti SC",serif}
+  .t15 .capline{color:#3a352c;font-family:"Songti SC",serif}
+  .t15 .brand{color:#8a8478;font-family:"Songti SC",serif}
+  .t15::before{content:"";position:absolute;left:-8%;top:8%;width:60%;height:44%;background:radial-gradient(closest-side,rgba(30,25,18,.06),transparent 70%);transform:rotate(-8deg);border-radius:50%}
+
+  .t16{background:#faf6ef}
+  .t16 .badge{color:#c9a44a}.t16 .kicker{color:#b89038}.t16 .brand{color:#c3b48a}
+  .t16 .kw{font-size:54px;color:#2b2416;font-weight:800}
+  .t16 .kw em{font-style:normal;color:#b8892b;position:relative}
+  .t16 .sub{color:#7c6f52}
+  .t16 .capline{background:#fff;border-radius:11px;padding:9px 15px;color:#4a4230;box-shadow:0 4px 16px rgba(180,140,50,.14)}
+  .t16::after{content:"";position:absolute;inset:8px;border:1px solid rgba(184,137,43,.35);border-radius:14px;pointer-events:none}
+</style></head>
+<body>
+  <h1>竖版分镜 · 主题选型 v2 <span style="font-size:13px;font-weight:400;color:#8a8478">· 16 版 · 分 4 组</span></h1>
+  <div class="lead">同一条真分镜，套 16 种主题、按气质分 4 组。<b>报编号告诉我你喜欢哪几个</b>（可多选、可混搭"某版配色+某版字体"、可说"某组都不行"）。选中的我落进播放器 + 出片视觉主题格子，其余删。<b>缩到 2–3 个后</b>我再把它们做成 3 帧连播（钩子/论点/收尾）给你看动起来的样子。</div>
+
+  <div class="grp">组 A · 编辑 / 刊物 <span>衬线、色块、栏线——像杂志/书</span></div>
+  <div class="grid" id="gA"></div>
+  <div class="grp">组 B · 暗色 / 影视 <span>近黑、霓虹、聚光、终端——抖音电影感/技术流</span></div>
+  <div class="grid" id="gB"></div>
+  <div class="grp">组 C · 甜系 / 潮流 <span>渐变、玻璃、孟菲斯、波普——小红书/年轻向</span></div>
+  <div class="grid" id="gC"></div>
+  <div class="grp">组 D · 质感 / 文化 <span>牛皮纸、留白、水墨、描金——手作/东方/高级</span></div>
+  <div class="grid" id="gD"></div>
+<script>
+  const SCENE = { kicker:'AI协作反常识', kwHtml:'改<em>七八版</em><br>都不对', sub:'用文字指挥AI做UI，一天全白费', cap:'一个按钮，我改了七八轮还是不对。' };
+  const THEMES = [
+    ['t1','暖刊','衬线+高亮块，克制','A'],
+    ['t2','杂志拼贴','色块+大镜号','A'],
+    ['t3','报刊黑白','衬线斜体+栏线','A'],
+    ['t4','暗夜杂志','黑底+金衬线，高级','A'],
+    ['t5','午夜霓虹','霓虹词+毛玻璃字幕','B'],
+    ['t6','聚光舞台','黑底+顶光晕，戏剧','B'],
+    ['t7','科技终端','等宽+终端绿','B'],
+    ['t8','工程蓝图','蓝底网格+虚线','B'],
+    ['t9','糖果玻璃','粉紫渐变+玻璃','C'],
+    ['t10','孟菲斯','80s形状+硬阴影','C'],
+    ['t11','荧光渐变','彩虹渐变字，Y2K','C'],
+    ['t12','奶油胶囊','奶油+胶囊高亮，软萌','C'],
+    ['t13','牛皮手账','牛皮纸+马克笔','D'],
+    ['t14','极简禅','留白+一根强调线','D'],
+    ['t15','水墨留白','宋体+墨晕+印章，东方','D'],
+    ['t16','描金雅致','米金+细描边框，精致','D'],
+  ];
+  const cardHtml = ([cls,nm,desc],idx)=>
+    `<div><div class="cap"><span class="no">${idx}</span><span class="nm">${nm}</span><span class="desc">${desc}</span></div>
+      <div class="stage ${cls}">
+        <div class="badge">镜 1/8</div><div class="kicker">${SCENE.kicker}</div>
+        <div class="kw">${SCENE.kwHtml}</div><div class="sub">${SCENE.sub}</div>
+        <div class="capbar"><span class="capline">${SCENE.cap}</span></div>
+        <div class="brand">杰西卡聊AI</div>
+      </div></div>`;
+  let n=0;
+  ['A','B','C','D'].forEach(g=>{
+    document.getElementById('g'+g).innerHTML = THEMES.filter(t=>t[3]===g).map(t=>cardHtml(t, ++n)).join('');
+  });
+</script>
+</body></html>
