@@ -16,6 +16,7 @@
 | upload-fork-mock.html / upload-fork-inpage-mock.html | 上传分叉 | 已过审 → ADR-035 ④上传岔口 |
 | inspiration-merged-mock.html / inspiration-redesign-mock.html | 灵感页改版 | 已过审 → ADR-035（随手记/卡片养大） |
 | icons-hover-mock.html | 导航图标三组选型 | 已定（随 hover 换 SVG 落地） |
+| product-ideas-mock.html | 产品灵感库闭环（V4 阶段3：方案卡/灵感卡 + 问题→方案检索） | 封存 → ADR-060（不先建 UI，转两周无界面试点，08-11 验收） |
 
 均为纯静态 HTML，直接双击（file://）可看，不依赖前端服务。
 

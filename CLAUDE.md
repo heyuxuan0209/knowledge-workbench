@@ -34,6 +34,16 @@
 
 - **后端由 launchd 常驻托管**（`gui/501/com.knowledge-workbench.backend`，`node --watch` 自动热重载）：**禁止手动 `npm start` / `npm run dev`**——会和它抢 3000 端口（已实际冲突过）。另有 sync-sources / daily·weekly·monthly-report / active-query 五个定时服务同样归 launchd 管。
 
+## 产品灵感库·无界面试点（2026-07-28 → 08-11，ADR-060，所有会话生效）
+
+试点期 agent 就是灵感库的界面，两条义务：
+
+1. **捕获**：用户丢来项目/文章并流露"想用/有启发/可以用到产品"，或明说"存一下"——当场攒卡入素材库：`POST /api/notes`，`noteType:'insight'`，excerpt 首行标记定卡型：
+   - 方案卡（需求驱动）：`【方案卡·问题】<用户会用来搜回它的大白话>\n【方案】<名> — <url>\n【要点】…\n【怎么改造进我的产品】…`
+   - 灵感卡（供给驱动）：`【灵感卡·启发】…\n【来源】…\n【对我产品的应用】…`
+   - 「怎么改造/应用」是判断字段：AI 只起草，须向用户明示可裁决（ADR-044）。
+2. **检索**：接到"我想做X / 怎么解决Y"类需求，**动手前先** `GET /api/notes/search-semantic?q=<问题大白话>` 查一遍；命中就明说"你之前存过：…"再干活。**真帮上忙时在 process-log 记一行 `[灵感库捞回]`**（试点就靠这个计数验收，工单见 handoff/）。
+
 ## 内容创作模板（ADR-026）
 
 创作层模板是「文体 × 平台形态」正交组合：`reference/prompts/creation/genres/`（6 文体）× `platform-forms/`（10 平台形态），生成 = `draft-frame + genre + platform-form`。改动守 ADR-025 三层原则、ADR-026 价值优先于爆款；每个模板必须接真实语料（`docs/teardowns/`）。

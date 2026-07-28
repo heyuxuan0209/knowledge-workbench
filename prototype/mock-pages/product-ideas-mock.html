@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>产品灵感库 · 闭环 mock（真数据）</title>
+<style>
+  /* token 取自 frontend/src/styles/workbench.css，与产品同源 */
+  :root {
+    --bg:#efece4; --surface:#faf8f2; --text:#211f1a; --body:#332f27; --body2:#4a463d;
+    --sub:#706b60; --sub2:#8a8478; --faint:#b0a894;
+    --line10:rgba(33,31,26,.1); --line08:rgba(33,31,26,.08); --line14:rgba(33,31,26,.14);
+    --accent:#3d5a80; --accent-hover:#2c456a; --amber:#a9791f; --green:#3f7350; --red:#a24b3f;
+    --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+  button{cursor:pointer;font-family:inherit}
+  .app{display:flex;flex-direction:column;height:100vh}
+  .header{height:56px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:var(--surface);border-bottom:1px solid var(--line10)}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand-dot{width:11px;height:11px;border-radius:3px;background:var(--accent)}
+  .brand-name{font-family:var(--serif);font-size:18px;font-weight:600}
+  .mock-tag{font-size:11px;color:var(--sub2);border:1px dashed var(--line14);border-radius:6px;padding:3px 9px}
+  .layout{flex:1;display:flex;overflow:hidden}
+  .nav{width:170px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--line08);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:13.5px;color:var(--sub);text-decoration:none}
+  .nav a.on{background:var(--bg);color:var(--text);font-weight:600}
+  .nav .new{font-size:9.5px;color:#fff;background:var(--accent);border-radius:4px;padding:1px 5px;margin-left:auto}
+  .main{flex:1;overflow-y:auto;padding:22px 28px 60px}
+  .wrap{max-width:780px;margin:0 auto}
+  h1{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:4px}
+  .subtitle{font-size:12.5px;color:var(--sub2);margin-bottom:18px}
+
+  /* 演示步骤条（仅 mock 存在，产品里没有） */
+  .demo-steps{display:flex;gap:8px;align-items:center;border:1px dashed var(--line14);background:rgba(255,255,255,.4);border-radius:10px;padding:10px 14px;margin-bottom:20px;font-size:12.5px;color:var(--sub)}
+  .demo-steps b{color:var(--body)}
+  .step-dot{width:18px;height:18px;border-radius:50%;background:var(--bg);border:1px solid var(--line14);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--sub)}
+  .step-dot.done{background:var(--green);border-color:var(--green);color:#fff}
+
+  .section-label{font-size:11.5px;font-weight:600;color:var(--sub2);letter-spacing:.06em;margin:26px 0 10px;text-transform:uppercase}
+  .section-label b{color:var(--accent)}
+
+  /* ① 资讯页卡片（复刻 feed 紧凑行 + 动作条版B） */
+  .feed-card{background:var(--surface);border:1px solid var(--line08);border-radius:12px;padding:14px 16px}
+  .feed-type{font-size:10px;color:var(--sub2);border:1px solid var(--line10);border-radius:4px;padding:1px 5px;margin-right:7px}
+  .feed-title{font-size:14.5px;font-weight:600;color:var(--body)}
+  .feed-summary{font-size:12.5px;color:var(--sub);line-height:1.6;margin:7px 0 10px}
+  .actions{display:flex;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);background:none;border:1px solid var(--line10);border-radius:7px;padding:4px 10px}
+  .chip:hover{border-color:var(--line14);color:var(--body)}
+  .chip.primary{color:var(--accent);border-color:var(--accent);font-weight:600}
+  .chip.saved{color:var(--green);border-color:var(--green)}
+
+  /* ③ 问方案 */
+  .ask-box{background:var(--surface);border:1px solid var(--line10);border-radius:12px;padding:16px}
+  .ask-input{width:100%;border:1px solid var(--line14);border-radius:9px;padding:10px 13px;font-size:14px;background:#fff;color:var(--body)}
+  .ask-input:focus{outline:none;border-color:var(--accent)}
+  .preset{margin-top:10px;display:flex;gap:7px;flex-wrap:wrap}
+  .preset button{font-size:12px;color:var(--body2);background:var(--bg);border:1px solid var(--line10);border-radius:14px;padding:5px 12px}
+  .preset button:hover{border-color:var(--accent);color:var(--accent)}
+  .timeline-toggle{margin-top:12px;font-size:12px;color:var(--sub);display:flex;align-items:center;gap:7px}
+  .results{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+  .honest{border:1px solid var(--line10);border-left:3px solid var(--amber);background:rgba(169,121,31,.06);border-radius:9px;padding:11px 14px;font-size:13px;color:var(--body2)}
+  .honest button{margin-left:8px;font-size:12px;color:var(--accent);background:none;border:none;text-decoration:underline}
+  .rel{font-size:10.5px;font-weight:600;border-radius:4px;padding:2px 7px;flex:0 0 auto}
+  .rel.high{color:#fff;background:var(--green)}
+  .rel.mid{color:var(--accent);background:rgba(61,90,128,.12)}
+  .rel.low{color:var(--sub2);background:var(--line08)}
+
+  /* 卡片（方案卡 / 灵感卡） */
+  .card{background:var(--surface);border:1px solid var(--line08);border-radius:12px;padding:15px 17px;animation:up .25s ease}
+  .card.dim{opacity:.55}
+  @keyframes up{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .card-head{display:flex;gap:9px;align-items:flex-start}
+  .badge{flex:0 0 auto;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;margin-top:1px}
+  .badge.q{background:var(--accent)}
+  .badge.i{background:var(--amber)}
+  .card-title{font-size:14.5px;font-weight:600;color:var(--body);line-height:1.5;flex:1}
+  .sol-line{margin:8px 0 0 31px;font-size:13px;color:var(--body2)}
+  .sol-line a{color:var(--accent);font-weight:600;text-decoration:none}
+  .sol-line a:hover{text-decoration:underline}
+  .gist{margin:6px 0 0 31px;font-size:12.5px;color:var(--sub);line-height:1.65}
+  .adapt{margin:10px 0 0 31px;border-left:3px solid var(--amber);background:rgba(169,121,31,.05);border-radius:0 8px 8px 0;padding:9px 12px}
+  .adapt-label{font-size:10.5px;font-weight:600;color:var(--amber);margin-bottom:4px}
+  .adapt-label .ai{font-weight:400;color:var(--sub2)}
+  .adapt-text,.apply-text{font-size:12.5px;color:var(--body2);line-height:1.65}
+  .apply{margin:10px 0 0 31px;border-left:3px solid var(--green);background:rgba(63,115,80,.05);border-radius:0 8px 8px 0;padding:9px 12px}
+  .apply-label{font-size:10.5px;font-weight:600;color:var(--green);margin-bottom:4px}
+  .src-line{margin:6px 0 0 31px;font-size:11.5px;color:var(--sub2)}
+
+  /* 库列表 tabs */
+  .tabs{display:flex;gap:4px;margin-bottom:12px}
+  .tabs button{font-size:12.5px;color:var(--sub);background:none;border:none;border-radius:7px;padding:6px 12px}
+  .tabs button.on{background:var(--surface);color:var(--text);font-weight:600;border:1px solid var(--line08)}
+  .list{display:flex;flex-direction:column;gap:10px}
+
+  /* 存为方案 弹层 */
+  .overlay{position:fixed;inset:0;background:rgba(33,31,26,.35);display:none;align-items:center;justify-content:center;z-index:50}
+  .overlay.show{display:flex}
+  .modal{width:560px;max-height:86vh;overflow-y:auto;background:var(--surface);border-radius:14px;padding:22px 24px;box-shadow:0 18px 50px rgba(33,31,26,.25)}
+  .modal h2{font-family:var(--serif);font-size:17px;margin-bottom:2px}
+  .modal .hint{font-size:12px;color:var(--sub2);margin-bottom:16px}
+  .field{margin-bottom:13px}
+  .field label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--body2);margin-bottom:5px}
+  .field .tag{font-size:10px;font-weight:400;color:var(--amber);border:1px solid rgba(169,121,31,.35);border-radius:4px;padding:1px 6px}
+  .field .tag.you{color:var(--accent);border-color:rgba(61,90,128,.35)}
+  .field input,.field textarea{width:100%;border:1px solid var(--line14);border-radius:8px;padding:8px 11px;font-size:13px;background:#fff;color:var(--body);line-height:1.6;resize:vertical}
+  .field textarea:focus,.field input:focus{outline:none;border-color:var(--accent)}
+  .field .note{font-size:11px;color:var(--sub2);margin-top:4px}
+  .modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
+  .btn{font-size:13px;border-radius:8px;padding:8px 16px;border:1px solid var(--line14);background:none;color:var(--body2)}
+  .btn.go{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btn.go:hover{background:var(--accent-hover)}
+
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:13px;border-radius:9px;padding:10px 18px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:60}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="brand"><div class="brand-dot"></div><div class="brand-name">知识工作台</div></div>
+    <div class="mock-tag">MOCK · 产品灵感库（阶段3）· 数据与检索结果全部来自 07-28 实测</div>
+  </div>
+  <div class="layout">
+    <nav class="nav">
+      <a href="#">📰 资讯</a><a href="#">💡 灵感</a><a href="#">📚 素材库</a><a href="#">🗂 主题库</a>
+      <a href="#" class="on">🧩 产品灵感库<span class="new">NEW</span></a>
+      <a href="#">✍️ 创作台</a><a href="#">📈 报告</a>
+    </nav>
+    <div class="main"><div class="wrap">
+      <h1>产品灵感库</h1>
+      <div class="subtitle">刷到的启发和方案存进来；等你真遇到问题，用一句大白话把它们问回来。</div>
+
+      <div class="demo-steps">
+        <span class="step-dot" id="dot1">1</span> <b>资讯页刷到</b> →
+        <span class="step-dot" id="dot2">2</span> <b>一键存为方案卡</b> →
+        <span class="step-dot" id="dot3">3</span> <b>几周后拿问题来问，捞回来</b>
+        <span style="margin-left:auto;font-size:11px;color:var(--faint)">（此条仅演示用，产品里没有）</span>
+      </div>
+
+      <div class="section-label"><b>①</b> 你在资讯页刷到一个项目（真实卡片）</div>
+      <div class="feed-card">
+        <div><span class="feed-type">GitHub</span><span class="feed-title">ai-xunjian（AI驯剪）：开源 AI 短视频剪辑系统</span></div>
+        <div class="feed-summary">「AI 初剪，你定剪。」把一段口播原片丢进来：自动剪气口、剪重说、1.2x 提速、逐字字幕，LLM 通读字幕自动上章节/弹字/动效卡；剪得不满意的每一处，在五轨时间轴编辑器里直接改。</div>
+        <div class="actions">
+          <button class="chip">⭐ 星标</button>
+          <button class="chip">🔗 原文</button>
+          <button class="chip">📄 存素材</button>
+          <button class="chip primary" id="saveBtn" onclick="openModal()">🧩 存为方案</button>
+        </div>
+      </div>
+
+      <div class="section-label"><b>③</b> 几周后：遇到问题，先问方案库</div>
+      <div class="ask-box">
+        <input class="ask-input" id="ask" placeholder="我要解决什么问题…（大白话就行，不用记它叫什么名字）" onkeydown="if(event.key==='Enter')runQuery(this.value)">
+        <div class="preset">
+          <button onclick="runPreset(0)">我想做自动剪辑口播视频的工具</button>
+          <button onclick="runPreset(1)">让 Claude Code 看懂整个仓库结构</button>
+          <button onclick="runPreset(2)">公众号封面标题怎么排版好看</button>
+        </div>
+        <label class="timeline-toggle">
+          <input type="checkbox" id="savedToggle" onchange="rerun()"> 模拟时间线：ai-xunjian 那张卡<b id="toggleWord">还没存</b>（在上面 ② 存过就自动勾上）
+        </label>
+        <div class="results" id="results"></div>
+      </div>
+
+      <div class="section-label">灵感库（10 张真卡 · 全部来自你的星标）</div>
+      <div class="tabs">
+        <button class="on" onclick="setTab('all',this)">全部</button>
+        <button onclick="setTab('solution',this)">🧩 方案卡 · 我要解决什么</button>
+        <button onclick="setTab('inspiration',this)">💡 灵感卡 · 我看到了什么</button>
+      </div>
+      <div class="list" id="list"></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- 存为方案 弹层 -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>存为方案卡</h2>
+    <div class="hint">来源和要点 AI 已填好；「问题」这句最重要——以后你就是拿它把这张卡搜回来的。</div>
+    <div class="field"><label>来源</label><input value="github.com/fxl1209739475-fxl/ai-xunjian · ai-xunjian（AI驯剪）" readonly style="color:var(--sub)"></div>
+    <div class="field">
+      <label>我要解决什么问题 <span class="tag you">检索就靠这句 · AI 起草，改成你的话</span></label>
+      <textarea rows="2">把一段口播原片自动剪辑成带动效、字幕的成片：剪气口、剪重说、上章节弹字动效，人只做终审微调</textarea>
+    </div>
+    <div class="field">
+      <label>方案要点 <span class="tag">AI 起草</span></label>
+      <textarea rows="3">开源剪辑闭环：firstcut 引擎（静音/重说剪除 + 1.2x + 响度归一 + faster-whisper 逐字字幕 + LLM 自动上动效）＋五轨时间轴编辑器（28 种动效组件，AI 与人改同一份 timeline.json）＋无头渲染出片。</textarea>
+    </div>
+    <div class="field">
+      <label>怎么改造进我的产品 <span class="tag">AI 起草 · 请你裁决</span></label>
+      <textarea rows="3">接创作台口播视频线（ADR-038）：现流程「分镜稿+TTS → 剪映人工收尾」，可用它替换人工收尾。渲染栈同源（HyperFrames 正是 tutorial-viz 在研究的），转写同用 faster-whisper。</textarea>
+      <div class="note">这格是判断，AI 只起草、你说了算（ADR-044）。存入后随时可改。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn go" onclick="saveCard()">存入产品灵感库</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 10 张真卡（07-28 从用户星标手工攒的，字段即拟定的表结构） =====
+const CARDS = [
+  {id:'E7',type:'solution',problem:'把一段口播原片自动剪辑成带动效、字幕的成片：剪气口、剪重说、上动效，人只做终审',solution:'ai-xunjian（AI驯剪）',url:'https://github.com/fxl1209739475-fxl/ai-xunjian',gist:'firstcut 引擎（剪气口/重说 + 逐字字幕 + LLM 自动上动效）＋五轨时间轴编辑器，AI 与人改同一份 timeline.json。',adapt:'接创作台口播视频线（ADR-038）：替换「剪映人工收尾」环节；渲染栈与 tutorial-viz 研究的 HyperFrames 同源。',pending:true},
+  {id:'E1',type:'solution',problem:'让 AI 编程助手全局理解一个大项目的结构，而不是每次现搜文件、只见局部',solution:'graphify',url:'https://github.com/Graphify-Labs/graphify',gist:'把代码/文档/数据一键构建成可查询知识图谱，Claude Code / Cursor 可直接接入。',adapt:'素材库若做宏观关联大图（V4 搁置项），参考它的图谱构建与查询接口。'},
+  {id:'E2',type:'solution',problem:'做新的 LLM 功能时想找能直接跑通的参考实现，少从零造轮子',solution:'awesome-llm-apps',url:'https://github.com/Shubhamsaboo/awesome-llm-apps',gist:'100+ 可运行的 Agent 与 RAG 示例，克隆即可本地跑。',adapt:'新功能动工前先查同型实现，把「问题→现成方案」当默认第一步。'},
+  {id:'E3',type:'solution',problem:'AI 生成的页面和图卡有一股模板味、AI 套路设计，想系统性去掉',solution:'hallmark',url:'https://github.com/Nutlope/hallmark',gist:'anti-AI-slop 设计 skill，适配 Claude Code / Cursor / Codex。',adapt:'过安审后接进出片链路当风格约束层，呼应「别像 AI 味」北极星。'},
+  {id:'E4',type:'solution',problem:'不想打字的时候，把口述的意识流快速变成结构化的笔记和理解',solution:'Karpathy 语音漫谈工作流',url:'https://x.com/karpathy',gist:'对 LLM 语音漫谈 10 分钟，内容混乱也无妨，LLM 从长篇口述整理出结构。',adapt:'飞书记笔记机器人（独立应用重开后）加语音入口：语音→转写→灵感卡。'},
+  {id:'E5',type:'solution',problem:'把自己每周重复做的手工操作教给 AI，变成可以反复执行的自动化技能',solution:'Claude Cowork 技能录制',url:'https://x.com/claudeai',gist:'录屏+边做边讲解，Claude 把演示转化为可重复运行的技能。',adapt:'skill 生产借鉴「演示即定义」：人工走一遍流程留痕，agent 从留痕固化 skill。'},
+  {id:'E6',type:'solution',problem:'输入一个主题或一段内容，直接产出能在线演示、可协作编辑的 PPT',solution:'Vista 的 HTML PPT skill',url:'https://x.com/vista8',gist:'输入内容自动生成可编辑、在线演示、支持协作的 HTML PPT。',adapt:'平台形态库可评估加「演示稿」形态；HTML 出片思路与图卡/视频同源。'},
+  {id:'A1',type:'inspiration',source:'Dex Horthy（HumanLayer）· 软件工厂为何失败',insight:'无人阅读代码的 agent 工厂必然烂掉：故障靠提示词修不了，最后还得人挖进三个月没看的代码库',application:'印证 ADR-044：产品里任何「AI 全自动」环节都必须留人的裁决点，别被全自动诱惑。'},
+  {id:'A2',type:'inspiration',source:'Daniel Chalef（Zep AI）· 引用与溯源',insight:'结论抵达使用者时来源已断链是真实风险（三个来源合成的过敏结论，医生看到时已无从追溯）',application:'RAG 答复已标引用，这条纪律要延伸到报告/话题卡：AI 合成的每个结论都能点回出处。'},
+  {id:'A3',type:'inspiration',source:'Nick Ung（Lyft）· 构建真正重要的评估',insight:'离线评估 90% 通过的 agent 上线即翻车：评估里的「客户」是通用 LLM，不是真实用户',application:'「改完 UI 必让用户亲点」正是此理；过滤器阈值该拿真实误杀样本回归。'},
+];
+
+// ===== 三条预置查询的检索结果（真实跑分映射成人话标签，UI 不露数字） =====
+// high=高度相关(≥.65) mid=相关(.56–.65) low=弱相关(.50–.56)；top<.58 → 诚实提示
+const QUERIES = [
+  {text:'我想做自动剪辑口播视频的工具，一边口播一边有动画效果',
+   after:[['E7','high'],['E5','mid'],['E6','mid']],
+   before:{honest:true,items:[['E5','low'],['E6','low'],['E4','low']]}},
+  {text:'让 Claude Code 一上来就看懂整个仓库的全局结构',
+   after:[['E1','high']], before:{items:[['E1','high']]}},
+  {text:'公众号封面图的标题排版怎么做更好看',
+   after:{honest:true,items:[]}, before:{honest:true,items:[]}},
+];
+
+let saved=false, tab='all';
+const $=id=>document.getElementById(id);
+
+function cardHTML(c,rel,dim){
+  const relChip = rel?`<span class="rel ${rel}">${{high:'高度相关',mid:'相关',low:'弱相关'}[rel]}</span>`:'';
+  if(c.type==='solution') return `<div class="card${dim?' dim':''}">
+    <div class="card-head"><div class="badge q">问</div><div class="card-title">${c.problem}</div>${relChip}</div>
+    <div class="sol-line">方案：<a href="${c.url}" target="_blank">${c.solution}</a></div>
+    <div class="gist">${c.gist}</div>
+    <div class="adapt"><div class="adapt-label">怎么改造进我的产品 <span class="ai">· AI 起草，可改</span></div><div class="adapt-text">${c.adapt}</div></div></div>`;
+  return `<div class="card${dim?' dim':''}">
+    <div class="card-head"><div class="badge i">感</div><div class="card-title">${c.insight}</div>${relChip}</div>
+    <div class="src-line">来源：${c.source}</div>
+    <div class="apply"><div class="apply-label">对我产品的应用</div><div class="apply-text">${c.application}</div></div></div>`;
+}
+
+function renderList(){
+  $('list').innerHTML = CARDS
+    .filter(c=>!(c.pending&&!saved))
+    .filter(c=>tab==='all'||c.type===tab)
+    .map(c=>cardHTML(c)).join('');
+}
+function setTab(t,btn){tab=t;document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderList()}
+
+let activeQ=null;
+function runPreset(i){activeQ=i;$('ask').value=QUERIES[i].text;render(QUERIES[i])}
+function runQuery(v){const i=QUERIES.findIndex(q=>q.text.startsWith(v.slice(0,6)));runPreset(i>=0?i:0)}
+function rerun(){saved=$('savedToggle').checked;$('toggleWord').textContent=saved?'已存入':'还没存';renderList();if(activeQ!=null)render(QUERIES[activeQ])}
+function render(q){
+  const r = saved? q.after : q.before;
+  const items = Array.isArray(r)? r : r.items;
+  const honest = !Array.isArray(r) && r.honest;
+  let html='';
+  if(honest) html+=`<div class="honest">🤔 库里没有和这个问题贴合的方案${items.length?'——最接近的几张也只是弱相关，别硬套':''}。这可能正是一个值得存的新问题。<button onclick="openModal()">顺手立一张方案卡</button></div>`;
+  html+=items.map(([id,rel])=>cardHTML(CARDS.find(c=>c.id===id),rel,rel==='low')).join('');
+  $('results').innerHTML=html;
+}
+
+function openModal(){$('overlay').classList.add('show')}
+function closeModal(){$('overlay').classList.remove('show')}
+function saveCard(){
+  closeModal();saved=true;$('savedToggle').checked=true;$('toggleWord').textContent='已存入';
+  $('dot1').classList.add('done');$('dot2').classList.add('done');
+  $('saveBtn').outerHTML='<button class="chip saved">✓ 已存为方案</button>';
+  toast('已存入产品灵感库——现在去下面用「我想做自动剪辑口播视频的工具」问问看');
+  renderList();if(activeQ!=null)render(QUERIES[activeQ]);
+}
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3600)}
+
+renderList();
+</script>
+</body>
+</html>
