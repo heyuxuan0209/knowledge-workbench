@@ -1,5 +1,28 @@
-import { feishuConfigured, feishuFetch } from './feishu-auth.js';
+import { feishuBase } from './feishu-auth.js';
 import { upsertInboxItem } from '../db/feishu-inbox.js';
+
+// 笔记机器人独立应用（ADR-056：一个飞书应用只许一个长连接消费者）。
+// 主应用 FEISHU_APP_ID 已被 Claude 桥独占事件流，本机器人用 FEISHU_BOT_APP_ID/SECRET（.env）。
+// 未配独立凭证时不回退主应用——回退就是重蹈事件被随机分流的覆辙，宁可不启动。
+const botAppId = () => process.env.FEISHU_BOT_APP_ID || '';
+const botAppSecret = () => process.env.FEISHU_BOT_APP_SECRET || '';
+const botConfigured = () => !!(botAppId() && botAppSecret());
+
+// 本应用自己的 tenant_access_token（缓存到过期前 60s）；不复用 feishu-auth 的缓存（那是主应用的）。
+let botTok = { token: null, exp: 0 };
+async function getBotToken() {
+  const now = Date.now();
+  if (botTok.token && now < botTok.exp - 60_000) return botTok.token;
+  const res = await fetch(`${feishuBase()}/open-apis/auth/v3/tenant_access_token/internal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ app_id: botAppId(), app_secret: botAppSecret() }),
+  });
+  const j = await res.json();
+  if (j.code !== 0 || !j.tenant_access_token) throw new Error(`笔记机器人鉴权失败(${j.code}): ${j.msg || '未知错误'}`);
+  botTok = { token: j.tenant_access_token, exp: now + (j.expire || 7200) * 1000 };
+  return botTok.token;
+}
 
 // 飞书私信捕获机器人（ADR-039，用户拍板：私信直连 + 默认静默 + 问句才回）。
 // 机制：飞书**长连接**（WebSocket）收 im.message.receive_v1 事件——本地后端不用公网 URL。
@@ -18,13 +41,16 @@ function extractText(message) {
 // 问句：全/半角问号结尾 → 想要反馈；否则静默记
 const isQuestion = (t) => /[?？]\s*$/.test(t);
 
-// 发一条文本回私信（需 im:message 发送权限；无权限会抛，捕获不受影响）
+// 发一条文本回私信（用本应用令牌——chat_id 是应用维度的，拿主应用令牌发不进这个会话）
 async function sendText(chatId, text) {
-  await feishuFetch('/open-apis/im/v1/messages', {
+  const token = await getBotToken();
+  const res = await fetch(`${feishuBase()}/open-apis/im/v1/messages?receive_id_type=chat_id`, {
     method: 'POST',
-    query: { receive_id_type: 'chat_id' },
-    body: { receive_id: chatId, msg_type: 'text', content: JSON.stringify({ text }) },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ receive_id: chatId, msg_type: 'text', content: JSON.stringify({ text }) }),
   });
+  const j = await res.json();
+  if (j.code !== 0) throw new Error(`发送失败(${j.code}): ${j.msg || '未知错误'}`);
 }
 
 // 用户背景 + 理解口径——决定回复答不答得对路（改这一处即可，日后可移到设置页）。
@@ -73,13 +99,13 @@ async function handleMessage(data) {
 // 启动长连接监听。幂等；未配置/启动失败只记日志不中断服务。
 export async function startFeishuBot() {
   if (started) return { ok: true, already: true };
-  if (!feishuConfigured()) return { ok: false, error: '飞书未配置，私信机器人未启动' };
+  if (!botConfigured()) return { ok: false, error: '笔记机器人未配置（.env 缺 FEISHU_BOT_APP_ID / FEISHU_BOT_APP_SECRET），未启动' };
   if (process.env.FEISHU_BOT_ENABLED === 'false') return { ok: false, error: 'FEISHU_BOT_ENABLED=false，私信机器人已手动关闭' };
   try {
     const lark = await import('@larksuiteoapi/node-sdk');
     const wsClient = new lark.WSClient({
-      appId: process.env.FEISHU_APP_ID,
-      appSecret: process.env.FEISHU_APP_SECRET,
+      appId: botAppId(),
+      appSecret: botAppSecret(),
     });
     const dispatcher = new lark.EventDispatcher({}).register({
       'im.message.receive_v1': async (d) => { await handleMessage(d); },
