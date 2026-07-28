@@ -842,6 +842,50 @@ app.post('/api/studio/cover', async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
+// 头图常用值 + 期号记忆（app_meta.cover_prefs）：预置+用过即成选项、期号提议不锁死——前端预填、用户可改、出图后以用户实际值回写。
+app.get('/api/studio/cover-prefs', async (req, res) => {
+  try {
+    const { getDatabase } = await import('./db/init.js');
+    const db = getDatabase();
+    const row = db.prepare("SELECT value FROM app_meta WHERE key='cover_prefs'").get();
+    res.json({ success: true, data: row ? JSON.parse(row.value) : { options: {}, last: {} } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/studio/cover-used', async (req, res) => {
+  try {
+    const { name, issue_event, author_html, tag } = req.body || {};
+    const { getDatabase } = await import('./db/init.js');
+    const db = getDatabase();
+    const row = db.prepare("SELECT value FROM app_meta WHERE key='cover_prefs'").get();
+    const prefs = row ? JSON.parse(row.value) : {};
+    const options = prefs.options || {};
+    // 用过即成选项：置顶去重，每字段最多留 6 个
+    const push = (k, v) => { const s = String(v || '').trim(); if (!s) return; options[k] = [s, ...(options[k] || []).filter(x => x !== s)].slice(0, 6); };
+    push('name', name); push('author_html', author_html); push('tag', tag);
+    const next = { options, last: { name, issue_event, author_html, tag } };
+    db.prepare('INSERT OR REPLACE INTO app_meta(key,value) VALUES(?,?)').run('cover_prefs', JSON.stringify(next));
+    res.json({ success: true, data: next });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+// 点睛词建议：让 DeepSeek 从主标题里挑 2-4 个候选（显式按钮触发，¥~0.0001；只回标题里原样出现的词，天然过下划线校验）
+app.post('/api/studio/cover-keyword-suggest', async (req, res) => {
+  try {
+    const { title } = req.body || {};
+    if (!title?.trim()) return res.status(400).json({ success: false, error: '先填主标题' });
+    const { chat } = await import('./services/llm.js');
+    const r = await chat([
+      { role: 'user', content: `从下面这个封面标题里，挑 2-4 个最适合加下划线强调的词。要求：必须是标题里原样连续出现的片段、2-6 个字、优先有张力的动词/名词/反差词；只输出 JSON 数组，例如 ["词1","词2"]，不要任何其他文字。标题：${title.trim()}` }
+    ], 'deepseek', null, { temperature: 0 });
+    if (!r.success) return res.status(500).json({ success: false, error: r.error });
+    let words = [];
+    try { const m = r.content.match(/\[[\s\S]*?\]/); words = m ? JSON.parse(m[0]) : []; } catch { words = []; }
+    words = [...new Set(words.filter(w => typeof w === 'string' && w.trim() && title.includes(w)))].slice(0, 4);
+    res.json({ success: true, data: words });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
 // ADR-052 P2 排版（vendored gzh-design）：可选主题 + 定稿 md → 合规公众号 section HTML（校验 0/0 兜底）。
 app.get('/api/studio/article-themes', async (req, res) => {
   try {

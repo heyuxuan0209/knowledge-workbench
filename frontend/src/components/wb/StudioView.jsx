@@ -1006,7 +1006,8 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName }) {
 }
 
 // 头图字段（模块级组件，稳定 identity——定义在 CoverPanel 内会每次输入就重挂、丢焦点）
-function CoverField({ label, k, ph, area, f, set }) {
+// chips：常用值一键填入（可点可不点，输入框仍自由编辑——预设是提议，不替用户决定）
+function CoverField({ label, k, ph, area, f, set, chips }) {
   const st = { width: '100%', marginTop: 3, padding: '6px 9px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)', boxSizing: 'border-box' }
   return (
     <label style={{ display: 'block', marginBottom: 8 }}>
@@ -1014,8 +1015,27 @@ function CoverField({ label, k, ph, area, f, set }) {
       {area
         ? <textarea value={f[k]} onChange={e => set(k, e.target.value)} placeholder={ph} style={{ ...st, minHeight: 42, resize: 'vertical', fontFamily: 'inherit' }} />
         : <input value={f[k]} onChange={e => set(k, e.target.value)} placeholder={ph} style={st} />}
+      {chips && chips.length > 0 && (
+        <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+          {chips.map(c => (
+            <span key={c} onClick={e => { e.preventDefault(); set(k, c) }}
+              style={{ fontSize: 10.5, padding: '1px 8px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap', border: '1px solid ' + (f[k] === c ? 'var(--accent)' : 'var(--line10)'), color: f[k] === c ? 'var(--accent)' : 'var(--sub2)' }}>
+              {c.replace(/\n/g, ' / ').replace(/<[^>]+>/g, '')}
+            </span>
+          ))}
+        </span>
+      )}
     </label>
   )
+}
+
+// 头图常用值（后端 cover-prefs）：预置 + 用过即成选项；期号自动 +1 只是预填，随时可手改
+const bumpIssue = s => String(s || '').replace(/NO\.(\d+)/i, (_, n) => 'NO.' + String(+n + 1).padStart(2, '0'))
+const uniqVals = a => [...new Set(a.filter(Boolean))]
+const COVER_PRESET_OPTS = {
+  name: ['AI 观察手记', 'AI 踩坑手记'],
+  tag: ['深度精读', '深度复盘', '踩坑复盘', '实践复盘'],
+  author_html: ['杰西卡　<b>独立开发者</b> · AI 产品人'],
 }
 
 // ADR-052 P1 头图面板：选系列风格 + 填期刊字段 → 生成双尺寸 PNG（消息大图 1800×766 + 方图 2000×2000）。
@@ -1024,9 +1044,19 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
   const [presets, setPresets] = useState([])
   const [preset, setPreset] = useState('ticket-brisk')
   const [f, setF] = useState({ name: 'AI 观察手记', issue_event: '', badge: '', kicker: '', title: defaultTitle || '', keyword: '', author_html: '', tag: '深度精读' })
+  const [prefs, setPrefs] = useState({ options: {}, last: {} })  // 常用值 + 上次出图字段（后端 app_meta 存，换浏览器不丢）
+  const [kwSugg, setKwSugg] = useState([])  // 点睛词建议（显式按钮触发）
+  const [kwBusy, setKwBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)  // { wide:{base64,w,h}, square:{...} }
   useEffect(() => { (async () => { try { const j = await api('/api/studio/series-presets'); setPresets(j.data || []) } catch { /* 静默 */ } })() }, [])
+  // 带出上次出图的刊名/作者行/标签，期号预填"上次 +1"（都只是预填，任意可改）
+  useEffect(() => { (async () => { try {
+    const j = await api('/api/studio/cover-prefs'); const p = j.data || {}
+    setPrefs({ options: p.options || {}, last: p.last || {} })
+    const L = p.last || {}
+    setF(s => ({ ...s, name: L.name || s.name, author_html: L.author_html || s.author_html, tag: L.tag || s.tag, issue_event: s.issue_event || bumpIssue(L.issue_event) }))
+  } catch { /* 静默 */ } })() }, [])
   // P4 联动：定稿选了系列风格 → 头图预设跟随（仍可在下面手改=软绑定）
   useEffect(() => { if (boundPreset) setPreset(boundPreset) }, [boundPreset])
   const set = (k, v) => setF(s => ({ ...s, [k]: v }))
@@ -1044,9 +1074,23 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
     const skin = presets.find(p => p.id === preset)?.cover_skin || 'moyu-green'
     const content = { name: f.name, issue_event: f.issue_event.replace(/\n/g, '<br>'), badge: f.badge, kicker: f.kicker, title_html: buildTitleHtml(), author_html: f.author_html, tag: f.tag }
     setBusy(true); showToast('正在渲染头图（双尺寸，约 3–5 秒）…')
-    try { const j = await api('/api/studio/cover', { method: 'POST', body: { skin, content } }); setResult(j.data.shapes); showToast('头图已生成（消息大图 + 方图）') }
+    try {
+      const j = await api('/api/studio/cover', { method: 'POST', body: { skin, content } }); setResult(j.data.shapes); showToast('头图已生成（消息大图 + 方图）')
+      // 出图成功才回写常用值/期号（以用户实际填的为准——重复生成同一期不会误 +1）
+      api('/api/studio/cover-used', { method: 'POST', body: { name: f.name, issue_event: f.issue_event, author_html: f.author_html, tag: f.tag } })
+        .then(r => { const p = r.data || {}; setPrefs({ options: p.options || {}, last: p.last || {} }) })
+        .catch(() => { /* 静默 */ })
+    }
     catch (err) { showToast('头图生成失败：' + err.message) }
     setBusy(false)
+  }
+  const suggestKeyword = async () => {
+    setKwBusy(true)
+    try {
+      const j = await api('/api/studio/cover-keyword-suggest', { method: 'POST', body: { title: f.title } })
+      setKwSugg(j.data || []); if (!(j.data || []).length) showToast('没挑出合适的词，手填一个也行')
+    } catch (err) { showToast('建议失败：' + err.message) }
+    setKwBusy(false)
   }
   const DL_NAME = { combined: '头图母图1800x1986', wide: '公众号封面1800x766', square: '转发方图2000x2000' }
   const dl = (shape) => { const v = result?.[shape]; if (!v) return; const a = document.createElement('a'); a.href = v.base64; a.download = `${DL_NAME[shape] || shape}.png`; a.click() }
@@ -1062,8 +1106,10 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
         ))}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
-        <CoverField f={f} set={set} label="刊名（报头左上）" k="name" ph="AI 观察手记" />
-        <CoverField f={f} set={set} label="期号 + 场合（报头右上·可两行）" k="issue_event" ph="NO.01 · 视频演讲精读&#10;Compile 26 · Cursor 社区" area />
+        <CoverField f={f} set={set} label="刊名（报头左上）" k="name" ph="AI 观察手记"
+          chips={uniqVals([...(prefs.options.name || []), ...COVER_PRESET_OPTS.name])} />
+        <CoverField f={f} set={set} label="期号 + 场合（报头右上·可两行·期号可任意手改）" k="issue_event" ph="NO.01 · 视频演讲精读&#10;Compile 26 · Cursor 社区" area
+          chips={uniqVals(prefs.last.issue_event ? [bumpIssue(prefs.last.issue_event), prefs.last.issue_event] : ['NO.01 · 写给上个月的我'])} />
         <label style={{ display: 'block', marginBottom: 8 }}>
           <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600 }}>来源徽章（可留空隐藏）</span>
           <select value={f.badge} onChange={e => set('badge', e.target.value)} style={{ width: '100%', marginTop: 3, padding: '6px 9px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)' }}>
@@ -1072,9 +1118,27 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
         </label>
         <CoverField f={f} set={set} label="副标（kicker）" k="kicker" ph="一句话副标题" />
         <CoverField f={f} set={set} label="主标题（可换行）" k="title" ph="当造东西不再稀缺，产品人还剩下什么？" area />
-        <CoverField f={f} set={set} label="点睛词（选填·标题里一个词，自动加下划线）" k="keyword" ph="造东西" />
-        <CoverField f={f} set={set} label="作者行（可用 <b>身份</b> 上色）" k="author_html" ph="杰西卡　<b>独立开发者</b> · AI 产品人" />
-        <CoverField f={f} set={set} label="类型标签" k="tag" ph="深度精读" />
+        <label style={{ display: 'block', marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600 }}>点睛词（选填·标题里一个词，自动加下划线）</span>
+          <span style={{ display: 'flex', gap: 6, marginTop: 3 }}>
+            <input value={f.keyword} onChange={e => set('keyword', e.target.value)} placeholder="造东西"
+              style={{ flex: 1, padding: '6px 9px', fontSize: 12.5, border: '1px solid var(--line10)', borderRadius: 6, background: 'var(--surface)', color: 'var(--body)', boxSizing: 'border-box' }} />
+            <button className="wb-btn-ghost" disabled={kwBusy || !f.title.trim()} title={f.title.trim() ? '让 AI 从主标题里挑 2-4 个候选词' : '先填主标题'}
+              onClick={e => { e.preventDefault(); suggestKeyword() }} style={{ whiteSpace: 'nowrap' }}>{kwBusy ? '…' : '✨ 从标题选'}</button>
+          </span>
+          {kwSugg.length > 0 && (
+            <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+              {kwSugg.map(w => (
+                <span key={w} onClick={e => { e.preventDefault(); set('keyword', w) }}
+                  style={{ fontSize: 10.5, padding: '1px 8px', borderRadius: 10, cursor: 'pointer', border: '1px solid ' + (f.keyword === w ? 'var(--accent)' : 'var(--line10)'), color: f.keyword === w ? 'var(--accent)' : 'var(--sub2)' }}>{w}</span>
+              ))}
+            </span>
+          )}
+        </label>
+        <CoverField f={f} set={set} label="作者行（可用 <b>身份</b> 上色）" k="author_html" ph="杰西卡　<b>独立开发者</b> · AI 产品人"
+          chips={uniqVals([...(prefs.options.author_html || []), ...COVER_PRESET_OPTS.author_html])} />
+        <CoverField f={f} set={set} label="类型标签" k="tag" ph="深度精读"
+          chips={uniqVals([...(prefs.options.tag || []), ...COVER_PRESET_OPTS.tag])} />
       </div>
       <button className="wb-btn-primary" style={{ marginTop: 6 }} disabled={busy} onClick={gen}>{busy ? '渲染中…' : (result ? '↻ 重新生成头图' : '🖼 生成头图（双尺寸）')}</button>
 
