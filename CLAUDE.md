@@ -22,6 +22,14 @@
 2. **每条记录开头带会话标记**：如 `[feed]`、`[series]`、`[创作台]`。这样一处看全时间线时能区分谁记的、也能 grep 检索——既保时间线又可追溯。
 3. process-log 新条用 Edit **锚定标题行插入到其下**（最新置顶），DECISIONS 的 ADR **append 到文件末尾**（append 天然不撞）。
 
+## 文件放哪（2026-07-28 整理后的边界，别再乱回去）
+
+- **UI mock / 选型 HTML**：一律进 `prototype/`（单文件放 `prototype/mock-pages/`），**禁止再往 `frontend/public/` 塞**——那里只放正式前端资源。mock 选完型、决策进了 ADR 后，及时在 `prototype/README.md` 索引里标记状态。
+- **交接文档**：只进 `handoff/`（docs/ 里不再放 HANDOFF-*）；被新交接取代或超过 7 天未更新的旧交接，移入 `archive/handoffs/`。
+- **创作类文件**（草稿/成品/发布模板/灵感）：**本仓不收**，一律去独立工作区 `~/Documents/项目/writing/`（纯本地私有仓）。本仓的 process-log/DECISIONS 是它的选题燃料源，只读引用。
+- **实验输出**（cluster dump 之类一次性数据）：进 `archive/experiments/`。
+- 每轮开发收尾跑 `/tidy-closeout`（残留巡检 + 留痕检查 + git 边界检查）。
+
 ## 内容创作模板（ADR-026）
 
 创作层模板是「文体 × 平台形态」正交组合：`reference/prompts/creation/genres/`（6 文体）× `platform-forms/`（10 平台形态），生成 = `draft-frame + genre + platform-form`。改动守 ADR-025 三层原则、ADR-026 价值优先于爆款；每个模板必须接真实语料（`docs/teardowns/`）。

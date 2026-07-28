@@ -29,7 +29,6 @@ yarn-error.log*
 .ai/temp/
 
 # 临时探索（不提交草稿）
-explorations/temp/
 scratch/
 *.draft.md
 
@@ -40,9 +39,7 @@ scratch/
 # iterations=迭代日志 video-digests=第三方视频转写(版权灰色)
 handoff/
 docs/
-drafts/
 archive/
-iterations/
 reference/video-digests/
 
 # IDE
@@ -59,6 +56,7 @@ Thumbs.db
 .cache/
 .temp/
 .parcel-cache/
+__pycache__/
 
 # 测试覆盖率
 coverage/
@@ -68,11 +66,10 @@ backend/data/
 # Claude Code 本地会话配置（含个人权限白名单，永不入库）
 .claude/settings.local.json
 
-# 个人认知资产与工作模板（GitHub 发布原则：只推代码/prompt/skills）
+# 个人认知资产（GitHub 发布原则：只推代码/prompt/skills）
+# 创作类文件（drafts/published/templates）已于 2026-07-28 迁往 ~/Documents/项目/writing/
 reference/opinions.md
 reference/platform-playbooks/
-templates/
-published/
 
 # 系列交接契约/规范（handoff，只留本地——ADR-052 / github-publish-policy）
 reference/series-template/INTEGRATION-SPEC.md
