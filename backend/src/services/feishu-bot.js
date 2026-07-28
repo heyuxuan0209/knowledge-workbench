@@ -58,14 +58,74 @@ const USER_CONTEXT = `你在跟【用户本人】私聊，当他的思考搭子�
 背景：用户是独立 AI 产品人 / 内容创作者，自己在做一个"知识→内容"的工作台（把高价值信息沉淀成认知、再产出多平台内容：公众号/小红书/抖音等）；日常关注 AI 产品与模型、Agent、内容创作、独立开发。
 理解口径（重要）：消息里的术语默认按 **AI / 科技 / 产品 / 内容创作** 领域理解，**不要往金融、炒币、投资标的上带**。例如 "fable5"/"Fable 5" 指 Anthropic 的 Claude Fable 5 模型；"上"多半指"要不要用/接入/上手"，不是"建仓"。拿不准就往 AI/产品/写作 场景靠。`
 
-async function generateReply(text) {
+async function generateReply(text, cardHits = []) {
   const { chat } = await import('./llm.js');
-  const sys = `${USER_CONTEXT}
+  // 命中灵感库时把卡喂进上下文——回复要能接上"你自己存过的方案"，而不是泛泛而谈
+  const ctx = cardHits.length
+    ? `\n他自己的「产品灵感库」里有相关存货，回复时自然引用（这是他之前亲手存的，比外部建议优先）：\n${cardHits.map(n => (n.excerpt || '').slice(0, 220)).join('\n---\n')}`
+    : '';
+  const sys = `${USER_CONTEXT}${ctx}
 回应方式：中文、口语、简短（2-4 句）。是问题就给要点判断 + 一个提醒或反问；是想法就点出值得深挖的角度或一个坑。别客套、别复述原话、别列长清单。`;
   // chat() 返回 { success, content }（不抛错、不返回字符串）——读 content，失败则不回
   const res = await chat([{ role: 'system', content: sys }, { role: 'user', content: text }], 'deepseek');
   if (!res?.success) { console.warn('[feishu-bot] DeepSeek 生成回复失败:', res?.error); return ''; }
   return (res.content || '').trim();
+}
+
+// ===== 产品灵感库·无界面试点（ADR-060）：飞书私信是用户的真实入口 =====
+const apiBase = () => `http://127.0.0.1:${process.env.PORT || 3000}`;
+
+// 查灵感库：只认带卡标记的素材，分数过槛才算命中（沿用实测阈值，宁可空手不硬凑）
+async function searchCards(text) {
+  try {
+    const r = await fetch(`${apiBase()}/api/notes/search-semantic?q=${encodeURIComponent(text.slice(0, 200))}&limit=5`);
+    const j = await r.json();
+    return (j.data || [])
+      .filter(n => (n.score || 0) >= 0.6 && /^【(方案卡|灵感卡)/.test(n.excerpt || ''))
+      .slice(0, 2);
+  } catch (e) { console.warn('[feishu-bot] 查灵感库失败:', e.message); return []; }
+}
+
+function cardBrief(n) {
+  const ex = n.excerpt || '';
+  const head = ex.split('\n')[0].replace(/^【[^】]*】/, '');
+  const sol = ex.match(/【方案】([^\n]+)/)?.[1];
+  return sol ? `「${head}」→ ${sol}` : `「${head}」`;
+}
+
+// 非问句分诊：方案/启发→攒卡；需求→查库；其余→note。
+// 宁漏勿凑：拿不准一律 note（硬凑的卡比没有更毒，同留痕钩子的哲学）。
+async function triageMessage(text) {
+  const { chat } = await import('./llm.js');
+  const sys = `${USER_CONTEXT}
+把这条私信分类，只输出 JSON、不要其它文字。kind 取值：
+- "solution"：丢来一个具体工具/项目/做法，且流露想用、有启发、值得存（常带链接或名字）
+- "inspiration"：一段观点/见闻给了他产品上的启发（没有具体工具）
+- "need"：他说想做某东西/想解决某问题，在找办法
+- "note"：其它（随手记、感想、日常）——拿不准一律 note
+kind=solution 时补字段：problem（他日后会拿来搜回这张卡的一句大白话：这方案解决什么）、solution（名字）、url（消息里的链接，没有则空串）、gist（要点一句）、adapt（对他的知识工作台怎么用，一句，口气是提议）
+kind=inspiration 时补：insight（启发一句）、source（来源）、application（对他产品的应用提议一句）`;
+  const res = await chat([{ role: 'system', content: sys }, { role: 'user', content: text }], 'deepseek');
+  if (!res?.success) return { kind: 'note' };
+  try { return JSON.parse(res.content.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { return { kind: 'note' }; }
+}
+
+// 走本机 /api/notes 存卡——复用标题/关键词/向量/主题匹配整条管道，存入即可被语义检索
+async function saveCard(t, text) {
+  const isSol = t.kind === 'solution';
+  const excerpt = isSol
+    ? `【方案卡·问题】${t.problem || text.slice(0, 60)}\n【方案】${t.solution || ''}${t.url ? ` — ${t.url}` : ''}\n【要点】${t.gist || ''}\n【怎么改造进我的产品】${t.adapt || ''}`
+    : `【灵感卡·启发】${t.insight || text.slice(0, 60)}\n【来源】${t.source || '飞书私信'}\n【对我产品的应用】${t.application || ''}`;
+  const r = await fetch(`${apiBase()}/api/notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ excerpt, noteType: 'insight', sourceTitle: (isSol ? t.solution : t.source) || null, sourceUrl: t.url || null }),
+  });
+  const j = await r.json();
+  if (!j.success) throw new Error(j.error || '保存失败');
+  return isSol
+    ? `🧩 已存方案卡：「${t.problem}」\n「怎么改造」那栏是我起草的，要改直接说。`
+    : `💡 已存灵感卡：「${t.insight}」`;
 }
 
 async function handleMessage(data) {
@@ -78,14 +138,41 @@ async function handleMessage(data) {
   const asked = isQuestion(text);
 
   let reply = null;
+  let cardSaved = false;
   if (asked) {
     try {
-      reply = await generateReply(text);
+      // 试点检索半环：先查他自己的灵感库，命中就带着答（ADR-060）
+      const hits = await searchCards(text);
+      reply = await generateReply(text, hits);
+      if (hits.length) {
+        reply = `📌 你之前存过：${hits.map(cardBrief).join('；')}\n${reply}`;
+        console.log(`[feishu-bot] 灵感库捞回命中 ${hits.length} 张（问句）`);
+      }
       if (reply) await sendText(chatId, reply);
     } catch (e) {
       console.error('[feishu-bot] 回复失败（多半缺 im:message 发送权限，捕获照常）:', e.message);
     }
+  } else {
+    // 试点捕获半环：非问句先分诊——方案/启发攒卡并回执，需求查库回聊，其余照旧静默（ADR-060）
+    try {
+      const t = await triageMessage(text);
+      if (t.kind === 'solution' || t.kind === 'inspiration') {
+        reply = await saveCard(t, text);
+        cardSaved = true;
+        await sendText(chatId, reply);
+      } else if (t.kind === 'need') {
+        const hits = await searchCards(text);
+        if (hits.length) {
+          reply = `📌 灵感库里你存过：${hits.map(cardBrief).join('；')}`;
+          console.log(`[feishu-bot] 灵感库捞回命中 ${hits.length} 张（需求）`);
+          await sendText(chatId, reply);
+        }
+      }
+    } catch (e) {
+      console.error('[feishu-bot] 试点分诊失败（消息照常进待整理）:', e.message);
+    }
   }
+  if (cardSaved) return; // 卡已入素材库，不再进待整理——避免同一条消息双份
   try {
     upsertInboxItem({
       objType: 'message', feishuId: msg.message_id,
@@ -113,7 +200,7 @@ export async function startFeishuBot() {
     wsClient.start({ eventDispatcher: dispatcher });
     wsRef = wsClient;
     started = true;
-    console.log('🤖 飞书私信机器人已启动（长连接监听 im.message.receive_v1；陈述句静默记、问句才回）');
+    console.log('🤖 飞书私信机器人已启动（长连接监听 im.message.receive_v1；问句带库答、方案/启发攒卡、需求查库、其余静默记——ADR-060 试点）');
     return { ok: true };
   } catch (e) {
     console.error('[feishu-bot] 长连接启动失败:', e.message);
