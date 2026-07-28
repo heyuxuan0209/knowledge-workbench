@@ -186,7 +186,7 @@ function parse(text){
 function cardHTML(c,i,total){
   const foot=`<div class="foot">${String(i+1).padStart(2,'0')} / ${String(total).padStart(2,'0')}</div>`;
   if(c.type==='cover'){
-    return `<div class="card ${curStyle} cover"><div class="top">AI SAFETY · 2026</div>
+    return `<div class="card ${curStyle} cover"><div class="top">AI SAFETY · ${new Date().getFullYear()}</div>
       <div class="mid">
         <div class="mark"></div>
         <div class="big" contenteditable spellcheck="false">${esc(c.big)}</div>

@@ -43,7 +43,12 @@ function buildAssemblyPrompt(articleMd, themeKey) {
   const index = readVendor('references/theme-index.md');
   const lib = readVendor(`references/theme-${themeKey}.md`);
   const common = readVendor('references/common-components.md');
+  // 日期从系统注入、禁止 LLM 生成（ADR-041 同款：模型默认年份会烂，装配出过"2025"装饰字）
+  const now = new Date();
+  const todayLine = `今天日期：${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}（系统注入）。组件里任何年份/日期类装饰字段（如报头年份、进度、日期角标），一律用这个日期取值；定稿正文里没写日期的地方，禁止自行编造任何年份。`;
   return `你是公众号排版装配器。把下面「定稿 Markdown」按所选主题的组件库装配成可直接粘贴公众号的合规 HTML。HTML 一律从组件库取、不要凭记忆手写。
+
+${todayLine}
 
 ${RED_LINE}
 
