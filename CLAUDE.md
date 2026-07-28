@@ -30,6 +30,10 @@
 - **实验输出**（cluster dump 之类一次性数据）：进 `archive/experiments/`。
 - 每轮开发收尾跑 `/tidy-closeout`（残留巡检 + 留痕检查 + git 边界检查）。
 
+## 运维红线
+
+- **后端由 launchd 常驻托管**（`gui/501/com.knowledge-workbench.backend`，`node --watch` 自动热重载）：**禁止手动 `npm start` / `npm run dev`**——会和它抢 3000 端口（已实际冲突过）。另有 sync-sources / daily·weekly·monthly-report / active-query 五个定时服务同样归 launchd 管。
+
 ## 内容创作模板（ADR-026）
 
 创作层模板是「文体 × 平台形态」正交组合：`reference/prompts/creation/genres/`（6 文体）× `platform-forms/`（10 平台形态），生成 = `draft-frame + genre + platform-form`。改动守 ADR-025 三层原则、ADR-026 价值优先于爆款；每个模板必须接真实语料（`docs/teardowns/`）。
