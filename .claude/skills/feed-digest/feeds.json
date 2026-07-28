@@ -1,0 +1,109 @@
+{
+  "categories": [
+    "AI技术与资讯",
+    "播客",
+    "聚合平台",
+    "思考与写作",
+    "其他专业内容"
+  ],
+  "sources": [
+    { "id": "tldr-ai", "name": "TLDR AI", "name_zh": "TLDR AI", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://tldr.tech/api/rss/ai"], "discover": "https://tldr.tech/ai" },
+
+    { "id": "bens-bites", "name": "Ben's Bites", "name_zh": "Ben's Bites", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://bensbites.beehiiv.com/feed", "https://www.bensbites.com/feed"], "discover": "https://www.bensbites.com/archive" },
+
+    { "id": "hf-papers", "name": "Hugging Face Papers", "name_zh": "Hugging Face 热门论文", "category": "AI技术与资讯", "cadence": "daily", "type": "json-hf",
+      "url": "https://huggingface.co/api/daily_papers", "rules": { "minScore": 20, "maxNew": 30 } },
+
+    { "id": "nlp-newsletter", "name": "NLP Newsletter", "name_zh": "NLP Newsletter", "category": "AI技术与资讯", "cadence": "weekly", "type": "rss",
+      "urls": ["https://nlp.elvissaravia.com/feed"], "discover": "https://nlp.elvissaravia.com" },
+
+    { "id": "interconnects", "name": "Interconnects", "name_zh": "Interconnects", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://www.interconnects.ai/feed"], "discover": "https://www.interconnects.ai" },
+
+    { "id": "one-useful-thing", "name": "One Useful Thing", "name_zh": "One Useful Thing", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://www.oneusefulthing.org/feed"], "discover": "https://www.oneusefulthing.org" },
+
+    { "id": "why-try-ai", "name": "Why Try AI", "name_zh": "Why Try AI", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://www.whytryai.com/feed"], "discover": "https://www.whytryai.com" },
+
+    { "id": "rundown-ai", "name": "The Rundown AI", "name_zh": "The Rundown AI", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://rss.beehiiv.com/feeds/2R3C6Bt5wj.xml"] },
+
+    { "id": "neuron-daily", "name": "The Neuron Daily", "name_zh": "The Neuron 日报", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://rss.beehiiv.com/feeds/N4eCstxvgX.xml"] },
+
+    { "id": "ai-leadership-edge", "name": "AI Leadership Edge", "name_zh": "AI Leadership Edge", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://theaileadershipedge.substack.com/feed"] },
+
+    { "id": "chinai", "name": "ChinAI Newsletter", "name_zh": "ChinAI Newsletter", "category": "AI技术与资讯", "cadence": "weekly", "type": "rss",
+      "urls": ["https://chinai.substack.com/feed"] },
+
+    { "id": "memia", "name": "Memia", "name_zh": "Memia", "category": "AI技术与资讯", "cadence": "weekly", "type": "rss",
+      "urls": ["https://memia.substack.com/feed"] },
+
+    { "id": "ai2roi", "name": "AI to ROI", "name_zh": "AI to ROI", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://ai2roi.substack.com/feed"] },
+
+    { "id": "nates-newsletter", "name": "Nate's Newsletter", "name_zh": "Nate's Newsletter", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://natesnewsletter.substack.com/feed"] },
+
+    { "id": "ai-changes-everything", "name": "AI Changes Everything", "name_zh": "AI Changes Everything", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://patmcguinness.substack.com/feed"] },
+
+    { "id": "kdnuggets-ai", "name": "KDnuggets", "name_zh": "KDnuggets", "category": "AI技术与资讯", "cadence": "daily", "type": "rss",
+      "urls": ["https://www.kdnuggets.com/feed", "https://www.kdnuggets.com/tag/artificial-intelligence/feed"], "discover": "https://www.kdnuggets.com" },
+
+    { "id": "lex-fridman", "name": "Lex Fridman Podcast", "name_zh": "Lex Fridman 播客", "category": "播客", "cadence": "weekly", "type": "rss",
+      "urls": ["https://lexfridman.com/feed/podcast/"] },
+
+    { "id": "cognitive-revolution", "name": "Cognitive Revolution", "name_zh": "Cognitive Revolution", "category": "播客", "cadence": "weekly", "type": "rss",
+      "urls": ["https://feeds.megaphone.fm/RINTP3108857801"] },
+
+    { "id": "80000-hours", "name": "80,000 Hours Podcast", "name_zh": "80,000 Hours 播客", "category": "播客", "cadence": "weekly", "type": "rss",
+      "urls": ["https://feeds.transistor.fm/80000-hours-podcast"] },
+
+    { "id": "latent-space", "name": "Latent Space Podcast", "name_zh": "Latent Space 播客", "category": "播客", "cadence": "weekly", "type": "rss",
+      "urls": ["https://www.latent.space/feed"], "discover": "https://www.latent.space" },
+
+    { "id": "product-hunt", "name": "Product Hunt", "name_zh": "Product Hunt", "category": "聚合平台", "cadence": "daily", "type": "rss",
+      "urls": ["https://www.producthunt.com/feed"], "discover": "https://www.producthunt.com", "rules": { "maxNew": 10 } },
+
+    { "id": "hackernoon-self-improvement", "name": "HackerNoon · Self-Improvement", "name_zh": "HackerNoon · 自我提升", "category": "聚合平台", "cadence": "daily", "type": "rss",
+      "urls": ["https://hackernoon.com/tagged/self-improvement/feed", "https://hackernoon.com/tagged/productivity/feed"], "discover": "https://hackernoon.com/tagged/self-improvement", "rules": { "maxNew": 8 } },
+
+    { "id": "hackernoon-writing", "name": "HackerNoon · Writing", "name_zh": "HackerNoon · 写作", "category": "聚合平台", "cadence": "daily", "type": "rss",
+      "urls": ["https://hackernoon.com/tagged/writing/feed"], "discover": "https://hackernoon.com/tagged/writing", "rules": { "maxNew": 8 } },
+
+    { "id": "hackernoon-product-management", "name": "HackerNoon · Product Management", "name_zh": "HackerNoon · 产品管理", "category": "聚合平台", "cadence": "daily", "type": "rss",
+      "urls": ["https://hackernoon.com/tagged/product-management/feed"], "discover": "https://hackernoon.com/tagged/product-management", "rules": { "maxNew": 8 } },
+
+    { "id": "wait-but-why", "name": "Wait But Why", "name_zh": "Wait But Why", "category": "思考与写作", "cadence": "weekly", "type": "rss",
+      "urls": ["https://waitbutwhy.com/feed"], "discover": "https://waitbutwhy.com" },
+
+    { "id": "james-clear-321", "name": "James Clear 3-2-1", "name_zh": "James Clear 3-2-1", "category": "思考与写作", "cadence": "weekly", "type": "rss",
+      "urls": ["https://jamesclear.com/feed"], "discover": "https://jamesclear.com" },
+
+    { "id": "farnam-street", "name": "Farnam Street Brain Food", "name_zh": "Farnam Street Brain Food", "category": "思考与写作", "cadence": "weekly", "type": "rss",
+      "urls": ["https://fs.blog/feed/"], "discover": "https://fs.blog" },
+
+    { "id": "austin-kleon", "name": "Austin Kleon", "name_zh": "Austin Kleon", "category": "思考与写作", "cadence": "weekly", "type": "rss",
+      "urls": ["https://austinkleon.substack.com/feed", "https://austinkleon.com/feed"] },
+
+    { "id": "paul-graham", "name": "Paul Graham Essays", "name_zh": "Paul Graham 随笔", "category": "思考与写作", "cadence": "weekly", "type": "scrape-pg",
+      "url": "https://paulgraham.com/articles.html", "rules": { "maxNew": 10 } },
+
+    { "id": "scott-h-young", "name": "Scott H Young", "name_zh": "Scott H Young", "category": "思考与写作", "cadence": "weekly", "type": "rss",
+      "urls": ["https://www.scotthyoung.com/blog/feed/"], "discover": "https://www.scotthyoung.com/blog" },
+
+    { "id": "dan-koe", "name": "Dan Koe Letters", "name_zh": "Dan Koe Letters", "category": "思考与写作", "cadence": "weekly", "type": "rss",
+      "urls": ["https://thedankoe.com/feed/", "https://thedankoe.com/letters/feed/"], "discover": "https://thedankoe.com" },
+
+    { "id": "dc-the-median", "name": "DC The Median", "name_zh": "DC The Median", "category": "其他专业内容", "cadence": "daily", "type": "rss",
+      "urls": ["https://dcthemedian.substack.com/feed"] },
+
+    { "id": "mark-mcneilly", "name": "Mark McNeilly", "name_zh": "Mark McNeilly", "category": "其他专业内容", "cadence": "daily", "type": "rss",
+      "urls": ["https://markmcneilly.substack.com/feed"] }
+  ]
+}
