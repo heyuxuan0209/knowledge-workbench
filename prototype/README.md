@@ -18,7 +18,7 @@
 | icons-hover-mock.html | 导航图标三组选型 | 已定（随 hover 换 SVG 落地） |
 | product-ideas-mock.html | 产品灵感库闭环（V4 阶段3：方案卡/灵感卡 + 问题→方案检索） | 封存 → ADR-060（不先建 UI，转两周无界面试点，08-11 验收） |
 | bitable-single-table-mock.html / bitable-two-table-mock.html | 飞书多维表格·发布与复盘表结构选型（单表全记 vs 内容主表+发布记录，D7/D30 两档回收） | 已定 → 方案B + 机器人代填（ADR-061） |
-| x-interpret-mock-a/b/c.html | X 一键解读浏览器插件交互三方案（A 侧边面板 / B 原位展开 / C 飞书接力） | 选型中（P1，接 ADR-064——原写 063 系撞号，已改） |
+| x-interpret-mock-a/b/c.html + x-interpret-mock-index.html | X 一键解读浏览器插件交互三方案（A 侧边面板 / B 原位展开 / C 飞书接力；index 为带切换器的对比页） | 已定 → 方案A 面板+卡片风、按钮文案「解读」（ADR-065，插件落地 extension/） |
 
 均为纯静态 HTML，直接双击（file://）可看，不依赖前端服务。
 
