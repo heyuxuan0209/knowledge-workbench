@@ -46,7 +46,7 @@
 
 ## 创作产出落飞书文档（ADR-062/063，评审场搬家）
 
-起草出的**母稿不再放本地文件夹**——调 `POST /api/feishu/draft-doc {title, markdown, brief:{topic,thesis,sources,genre,platform,voice}}`，自动建飞书文档并挂进**用户个人知识库「母稿 · knowledge-workbench」节点**（权限随空间：用户是主人、机器人可编辑），把返回的 url 给用户去评审。用户在文档里评论、或在群里 @机器人改稿；定稿后再进创作台出平台内容。两条硬规矩（ADR-063）：
+起草出的**母稿不再放本地文件夹**——调 `POST /api/feishu/draft-doc {title, markdown, brief:{topic,thesis,sources,genre,platform,voice}}`，自动建飞书文档并挂进**用户个人知识库「✍️ 内容工场」节点**（用户全部内容产出物的唯一的家——工厂不拥有产品，节点名不带项目名；权限随空间：用户是主人、机器人可编辑），把返回的 url 给用户去评审。内容工场内**状态靠 bitable「发布与复盘」的状态字段，不建状态文件夹**，母稿平铺。用户在文档里评论、或在群里 @机器人改稿；定稿后再进创作台出平台内容。两条硬规矩（ADR-063）：
 
 1. **母稿一律干净 markdown**——正文+结构，禁止排版样式（公众号排版 HTML 等成品样式属于创作台产出，不是母稿；已实证用户否决）。
 2. 落点是**知识库不是云盘**（云盘仅 `destination:'drive'` 兜底）。
