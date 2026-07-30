@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案B · 原位展开 — X 一键解读</title>
+<style>
+:root{--bg:#000;--card:#16181c;--line:#2f3336;--txt:#e7e9ea;--sub:#71767b;--acc:#1d9bf0;--kw:#7c5cff}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--txt);font:15px/1.55 -apple-system,"PingFang SC",sans-serif}
+.banner{position:sticky;top:0;z-index:60;background:var(--kw);color:#fff;padding:8px 16px;font-size:13px;text-align:center}
+.feed{max-width:600px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line);min-height:100vh}
+.topbar{padding:14px 16px;font-weight:700;border-bottom:1px solid var(--line)}
+.tweet{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px}
+.avatar{width:40px;height:40px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+.name{font-weight:700}.handle{color:var(--sub);font-size:14px}
+.text{margin-top:2px;white-space:pre-wrap}
+.video{margin-top:12px;border:1px solid var(--line);border-radius:16px;aspect-ratio:16/9;background:linear-gradient(135deg,#1a2033,#0b0e14);display:flex;align-items:center;justify-content:center;position:relative}
+.play{width:58px;height:58px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff}
+.dur{position:absolute;left:12px;bottom:10px;background:rgba(0,0,0,.75);padding:2px 8px;border-radius:4px;font-size:13px}
+.actions{display:flex;gap:40px;color:var(--sub);margin-top:10px;font-size:13px;align-items:center}
+.kw-act{background:none;border:none;color:var(--kw);font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.kw-act:hover{text-decoration:underline}
+/* 原位卡片 */
+.card{margin-top:12px;border:1px solid #3a2a6a;border-radius:14px;background:#0d0f16;overflow:hidden;display:none}
+.card.show{display:block}
+.c-head{padding:8px 14px;background:#151024;color:var(--kw);font-size:13px;font-weight:600;display:flex}
+.c-head span{flex:1}
+.c-head button{background:none;border:none;color:var(--sub);cursor:pointer}
+.c-body{padding:12px 14px}
+.stage{color:var(--sub);font-size:13px;margin:3px 0}
+.stage.done{color:#3dd68c}
+.sec{margin-bottom:12px}
+.sec h4{color:var(--kw);font-size:13px;margin-bottom:5px;letter-spacing:1px}
+.sec li{margin:0 0 5px 18px}
+.quote{border-left:3px solid var(--kw);padding:5px 12px;background:#16121f;border-radius:0 8px 8px 0;font-size:14px}
+.quote .en{color:var(--sub);font-size:13px;margin-top:3px}
+details{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px}
+summary{cursor:pointer;color:var(--acc);font-size:14px}
+details p{margin-top:8px;color:#c9cdd1;font-size:14px}
+.c-foot{display:flex;gap:8px;padding:0 14px 12px}
+.c-foot button{flex:1;background:none;border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:6px;font-size:13px;cursor:pointer}
+.c-foot .primary{border-color:var(--kw);color:var(--kw)}
+.c-foot .primary.done{background:var(--kw);color:#fff}
+.ask{display:flex;gap:8px;padding:0 14px 14px}
+.ask input{flex:1;background:#16181c;border:1px solid var(--line);border-radius:999px;padding:7px 14px;color:var(--txt);font-size:13px;outline:none}
+.ask button{background:var(--acc);border:none;color:#fff;border-radius:999px;padding:0 14px;cursor:pointer}
+.answer{background:#101720;border:1px solid #1d2a3a;border-radius:10px;padding:9px 12px;font-size:13px;margin:0 14px 12px;color:#c9cdd1}
+</style></head><body>
+<div class="banner">P1 原型 · 方案 B「原位展开」— 点推文下方操作栏的「⚡解读」（两条都可点）</div>
+<div class="feed">
+  <div class="topbar">首页</div>
+
+  <div class="tweet">
+    <div class="avatar" style="background:#3b5bdb">A</div>
+    <div style="flex:1">
+      <span class="name">Anatoli Kopadze</span> <span class="handle">@AnatoliKopadze · 7月29日</span>
+      <div class="text">Anthropic engineer:
+
+"You don't need better prompts. You need graph engineering that makes agents remember everything."
+
+In 25 minutes he shows how engineers at Anthropic wire agents into a graph where each has a job, they run in parallel, verify each other, and share a memory that never resets.</div>
+      <div class="video"><div class="play">▶</div><span class="dur">25:54</span></div>
+      <div class="actions"><span>💬 214</span><span>🔁 1.2万</span><span>❤️ 3.4万</span><button class="kw-act" onclick="expand('c1','video',this)">⚡ 解读</button></div>
+      <div class="card" id="c1"></div>
+    </div>
+  </div>
+
+  <div class="tweet">
+    <div class="avatar" style="background:#8a5a2b">N</div>
+    <div style="flex:1">
+      <span class="name">AI Builder Notes</span> <span class="handle">@ai_builder_notes · 2小时</span>
+      <div class="text">Two kinds of AI products: tools you operate, and coworkers you delegate to. The difference isn't model quality — it's memory and context.</div>
+      <div class="actions"><span>💬 48</span><span>🔁 892</span><span>❤️ 5,120</span><button class="kw-act" onclick="expand('c2','text',this)">⚡ 解读</button></div>
+      <div class="card" id="c2"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const R = {
+video: {
+  stages: ['抓取推文正文（FxTwitter）','下载视频音轨（yt-dlp）','语音转写（Groq · 几十秒）','翻译与解读（DeepSeek）'],
+  html: `<div class="c-body">
+  <div class="sec"><h4>摘要</h4><p>Anthropic Claude Code 团队工程师（前 YC 创始人）的 25 分钟演讲：别再执着于优化 prompt，要做「图工程」——把多个 agent 接成一张图，各司其职、并行运行、互相校验，共享一份永不重置的记忆。</p></div>
+  <div class="sec"><h4>要点</h4><ul>
+    <li>复杂任务拆成图上的节点，每个 agent 只负责一个明确职责</li>
+    <li>agent 之间互相验证输出，错误不会沿链路放大</li>
+    <li>共享记忆层让 agent「记住一切」，跨会话不重置</li></ul></div>
+  <div class="sec"><h4>金句</h4><div class="quote">「你不需要更好的 prompt，你需要的是图工程。」<div class="en">"You don't need better prompts. You need graph engineering."</div></div></div>
+  <details><summary>展开全文中文稿（25 分钟完整转写翻译）</summary><p>我在 Claude Code 团队工作，差不多干了一年了。在此之前我是 YC 的创始人……（下略，完整稿约 6600 字）</p></details>
+  </div>
+  <div class="c-foot"><button class="primary" onclick="save(this)">☆ 存灵感库</button><button>在 KW 打开</button></div>
+  <div class="ask"><input placeholder="就这条内容追问…" onkeydown="if(event.key==='Enter')ask(this)"><button onclick="ask(this.previousElementSibling)">↑</button></div>`
+},
+text: {
+  stages: ['翻译（短内容直接全文双语）'],
+  html: `<div class="c-body">
+  <div class="sec"><h4>中文</h4><p>AI 产品分两种：你亲手操作的工具，和你委派任务的同事。两者的差别不在模型质量——在记忆和上下文。</p></div>
+  </div>
+  <div class="c-foot"><button class="primary" onclick="save(this)">☆ 存灵感库</button><button>在 KW 打开</button></div>`
+}};
+function expand(id,k,btn){
+  const c=document.getElementById(id);
+  if(c.classList.contains('show')){c.classList.remove('show');return}
+  c.classList.add('show');
+  c.innerHTML='<div class="c-head"><span>⚡ KW 即时分析</span><button onclick="this.closest(\'.card\').classList.remove(\'show\')">✕</button></div><div class="c-body" id="'+id+'-st"></div>';
+  const st=document.getElementById(id+'-st');
+  R[k].stages.forEach((s,i)=>{
+    const d=document.createElement('div'); d.className='stage'; d.textContent='○ '+s; st.appendChild(d);
+    setTimeout(()=>{d.className='stage done'; d.textContent='✓ '+s;}, 400+i*550);
+  });
+  setTimeout(()=>{c.innerHTML='<div class="c-head"><span>⚡ KW 即时分析</span><button onclick="this.closest(\'.card\').classList.remove(\'show\')">✕</button></div>'+R[k].html;}, 600+R[k].stages.length*550);
+}
+function save(b){b.classList.add('done'); b.textContent='✓ 已存（飞书表格可见）'}
+function ask(input){
+  const v=input.value.trim(); if(!v)return; input.value='';
+  const card=input.closest('.card');
+  const a=document.createElement('div'); a.className='answer'; a.textContent='你：'+v;
+  card.insertBefore(a, card.querySelector('.ask'));
+  setTimeout(()=>{const r=document.createElement('div'); r.className='answer';
+  r.textContent='（演示回答）视频里他举了内部工作流的例子：planner、coder、reviewer 三个 agent 接成图，reviewer 不通过就打回重做，记忆层记录失败原因避免重蹈覆辙。';
+  card.insertBefore(r, card.querySelector('.ask')); r.scrollIntoView({behavior:'smooth'});},800);
+}
+</script></body></html>

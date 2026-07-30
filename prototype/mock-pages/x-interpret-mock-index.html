@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>X 一键解读 · 三方案对比选型</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{background:#0a0a0a;color:#e7e9ea;font:15px/1.6 -apple-system,"PingFang SC",sans-serif;height:100vh;display:flex;flex-direction:column}
+.top{padding:14px 20px;border-bottom:1px solid #2f3336;background:#111}
+.top h1{font-size:16px;margin-bottom:8px}
+.top p{font-size:13px;color:#9aa0a6}
+.top b{color:#b9a3ff}
+.tabs{display:flex;gap:10px;margin-top:12px}
+.tab{flex:1;text-align:left;background:#16181c;border:1px solid #2f3336;border-radius:12px;padding:10px 14px;cursor:pointer;color:#e7e9ea}
+.tab small{display:block;color:#9aa0a6;font-size:12px;margin-top:2px}
+.tab.on{border-color:#7c5cff;background:#181228}
+.tab.on b{color:#b9a3ff}
+iframe{flex:1;border:none;width:100%}
+</style></head><body>
+<div class="top">
+  <h1>P1 选型 · 刷 X 时的「一键解读」交互，三个方案</h1>
+  <p>三个方案的<b>静止画面故意做成同一条 X 信息流</b>（插件注入前的页面本来就一样）——<b>差异全在点击「解读」之后</b>。切换下面的标签，然后照提示去点按钮。</p>
+  <div class="tabs">
+    <button class="tab on" onclick="go(this,'x-interpret-mock-a.html')"><b>方案 A · 侧边面板</b><small>点推文右上角紫色「析」→ 右侧滑出面板，可追问、存灵感库</small></button>
+    <button class="tab" onclick="go(this,'x-interpret-mock-b.html')"><b>方案 B · 原位展开</b><small>点操作栏「⚡解读」→ 推文下方就地展开解读卡</small></button>
+    <button class="tab" onclick="go(this,'x-interpret-mock-c.html')"><b>方案 C · 飞书接力</b><small>点「⚡解读」→ 网页只弹轻提示，稍等右下角模拟飞书消息送达</small></button>
+  </div>
+</div>
+<iframe id="fr" src="x-interpret-mock-a.html"></iframe>
+<script>
+function go(btn,src){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));btn.classList.add('on');document.getElementById('fr').src=src}
+</script></body></html>

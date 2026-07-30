@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案C · 飞书接力 — X 一键解读</title>
+<style>
+:root{--bg:#000;--card:#16181c;--line:#2f3336;--txt:#e7e9ea;--sub:#71767b;--acc:#1d9bf0;--kw:#7c5cff;--lark:#3370ff}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--txt);font:15px/1.55 -apple-system,"PingFang SC",sans-serif}
+.banner{position:sticky;top:0;z-index:60;background:var(--kw);color:#fff;padding:8px 16px;font-size:13px;text-align:center}
+.feed{max-width:600px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line);min-height:100vh}
+.topbar{padding:14px 16px;font-weight:700;border-bottom:1px solid var(--line)}
+.tweet{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px}
+.avatar{width:40px;height:40px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+.name{font-weight:700}.handle{color:var(--sub);font-size:14px}
+.text{margin-top:2px;white-space:pre-wrap}
+.video{margin-top:12px;border:1px solid var(--line);border-radius:16px;aspect-ratio:16/9;background:linear-gradient(135deg,#1a2033,#0b0e14);display:flex;align-items:center;justify-content:center;position:relative}
+.play{width:58px;height:58px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff}
+.dur{position:absolute;left:12px;bottom:10px;background:rgba(0,0,0,.75);padding:2px 8px;border-radius:4px;font-size:13px}
+.actions{display:flex;gap:40px;color:var(--sub);margin-top:10px;font-size:13px;align-items:center}
+.kw-act{background:none;border:none;color:var(--kw);font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.kw-act.sent{color:#3dd68c;cursor:default}
+/* toast */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:#1c1f26;border:1px solid var(--line);color:var(--txt);padding:10px 18px;border-radius:999px;font-size:14px;transition:transform .3s;z-index:80}
+#toast.show{transform:translateX(-50%) translateY(0)}
+/* 飞书消息卡片 mock */
+#lark{position:fixed;right:24px;bottom:24px;width:360px;background:#fff;color:#1f2329;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:90;transform:translateY(20px);opacity:0;pointer-events:none;transition:all .35s;overflow:hidden}
+#lark.show{transform:none;opacity:1;pointer-events:auto}
+.l-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f5f6f7;font-size:13px;color:#646a73}
+.l-bot{width:26px;height:26px;border-radius:8px;background:var(--lark);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+.l-body{padding:12px 14px}
+.l-title{font-weight:600;margin-bottom:6px}
+.l-meta{font-size:12px;color:#8f959e;margin-bottom:8px}
+.l-sum{font-size:13px;line-height:1.6;background:#f5f3ff;border-left:3px solid var(--kw);padding:8px 10px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.l-points{font-size:13px;color:#41464d;margin:0 0 10px 16px}
+.l-points li{margin-bottom:4px}
+.l-btns{display:flex;gap:8px}
+.l-btns button{flex:1;border:1px solid #d0d3d6;background:#fff;border-radius:8px;padding:6px;font-size:13px;cursor:pointer;color:#1f2329}
+.l-btns .p{background:var(--lark);border-color:var(--lark);color:#fff}
+.l-btns .p.done{background:#34c724;border-color:#34c724}
+.l-note{font-size:11px;color:#8f959e;text-align:center;padding:0 0 10px}
+.l-close{position:absolute;top:8px;right:10px;border:none;background:none;color:#8f959e;cursor:pointer}
+</style></head><body>
+<div class="banner">P1 原型 · 方案 C「飞书接力」— 点「⚡解读」后网页只弹轻提示，结果以飞书消息送达（右下角会模拟弹出）</div>
+<div class="feed">
+  <div class="topbar">首页</div>
+
+  <div class="tweet">
+    <div class="avatar" style="background:#3b5bdb">A</div>
+    <div style="flex:1">
+      <span class="name">Anatoli Kopadze</span> <span class="handle">@AnatoliKopadze · 7月29日</span>
+      <div class="text">Anthropic engineer:
+
+"You don't need better prompts. You need graph engineering that makes agents remember everything."
+
+In 25 minutes he shows how engineers at Anthropic wire agents into a graph where each has a job, they run in parallel, verify each other, and share a memory that never resets.</div>
+      <div class="video"><div class="play">▶</div><span class="dur">25:54</span></div>
+      <div class="actions"><span>💬 214</span><span>🔁 1.2万</span><span>❤️ 3.4万</span><button class="kw-act" id="btn1" onclick="send(this)">⚡ 解读</button></div>
+    </div>
+  </div>
+
+  <div class="tweet">
+    <div class="avatar" style="background:#8a5a2b">N</div>
+    <div style="flex:1">
+      <span class="name">AI Builder Notes</span> <span class="handle">@ai_builder_notes · 2小时</span>
+      <div class="text">Two kinds of AI products: tools you operate, and coworkers you delegate to. The difference isn't model quality — it's memory and context.</div>
+      <div class="actions"><span>💬 48</span><span>🔁 892</span><span>❤️ 5,120</span><button class="kw-act" onclick="send(this)">⚡ 解读</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast">✓ 已发送给 KW · 解读完成后飞书通知你（手机上也能收到）</div>
+
+<div id="lark">
+  <button class="l-close" onclick="document.getElementById('lark').classList.remove('show')">✕</button>
+  <div class="l-head"><div class="l-bot">KW</div>KW 笔记助手 · 刚刚</div>
+  <div class="l-body">
+    <div class="l-title">【即时分析】@AnatoliKopadze 的视频解读好了</div>
+    <div class="l-meta">X · 视频 25 分 54 秒 · Groq 转写 · 用时 1 分 12 秒</div>
+    <div class="l-sum">Anthropic Claude Code 团队工程师的演讲：别再执着于优化 prompt，要做「图工程」——把多个 agent 接成一张图，各司其职、并行运行、互相校验，共享永不重置的记忆。</div>
+    <ul class="l-points">
+      <li>复杂任务拆成图上的节点，每个 agent 一个职责</li>
+      <li>agent 互相验证输出，错误不沿链路放大</li>
+      <li>金句：「你不需要更好的 prompt，你需要图工程」</li>
+    </ul>
+    <div class="l-btns">
+      <button class="p" id="lsave" onclick="lsave()">☆ 存灵感库</button>
+      <button>查看全文</button>
+      <button>追问</button>
+    </div>
+  </div>
+  <div class="l-note">回复这条消息即可追问；带一句感想回复则连感想一起存灵感库</div>
+</div>
+
+<script>
+function send(btn){
+  if(btn.classList.contains('sent'))return;
+  btn.classList.add('sent'); btn.textContent='✓ 已发送';
+  const t=document.getElementById('toast'); t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2600);
+  if(btn.id==='btn1') setTimeout(()=>document.getElementById('lark').classList.add('show'), 3000);
+  else setTimeout(()=>document.getElementById('lark').classList.add('show'), 1500);
+}
+function lsave(){const b=document.getElementById('lsave'); b.classList.add('done'); b.textContent='✓ 已存入'}
+</script></body></html>
