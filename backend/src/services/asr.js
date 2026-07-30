@@ -8,7 +8,7 @@ import { mkdir, readdir, rm } from 'fs/promises';
 const pexec = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// ASR 管道（M5 最小版前移，ADR-015；云通道 ADR-063）：无字幕视频的"全文解读"兜底。
+// ASR 管道（M5 最小版前移，ADR-015；云通道 ADR-064）：无字幕视频的"全文解读"兜底。
 // 音频获取（免 ffmpeg：bili audio --no-split 出完整 m4a，yt-dlp bestaudio 不转码，
 // faster-whisper 内置 PyAV 直接解码）→ 转写：配了 GROQ_API_KEY 时优先 Groq 云端
 // whisper-large-v3-turbo（约 $0.02/小时音频且有免费额度，1 小时音频几十秒转完，本地
@@ -37,7 +37,7 @@ async function proxiedFetch(url, opts = {}) {
   return fetch(url, { ...opts, dispatcher: new ProxyAgent(proxyUrl) });
 }
 
-// Groq 云转写（ADR-063）：whisper-large-v3-turbo，verbose_json 拿分段。免费档单文件
+// Groq 云转写（ADR-064）：whisper-large-v3-turbo，verbose_json 拿分段。免费档单文件
 // 上限 25MB，超限直接抛错让调用方走本地（bestaudio m4a 约 1MB/分钟，25MB≈短视频/中短
 // 播客够用；超长内容本就该本地慢慢转）。
 async function transcribeViaGroq(audioFile) {
@@ -142,7 +142,7 @@ async function downloadAudio(url, workDir) {
     if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
     await execWithRetry('yt-dlp', args);
   } else if (/(^|\/\/|\.)(x|twitter)\.com\//.test(url)) {
-    // X 推文视频（ADR-063）：yt-dlp 原生支持公开推文，无需登录；X 视频多为音画合流的
+    // X 推文视频（ADR-064）：yt-dlp 原生支持公开推文，无需登录；X 视频多为音画合流的
     // mp4（无独立 bestaudio 流），故 bestaudio/best 兜底整段视频，PyAV 能直接解出音轨。
     // X 与 YouTube 同属需代理平台，复用同一代理出口。
     const args = ['-f', 'bestaudio/best', '-o', join(workDir, 'audio.%(ext)s'), '--no-playlist', url];

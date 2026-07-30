@@ -49,7 +49,7 @@ export function detectInputType(input) {
   if ((url.hostname.includes('feishu.') || url.hostname.includes('larksuite.')) &&
       /\/(docx|wiki|minutes|docs)\/[A-Za-z0-9_-]+/.test(url.pathname)) return 'feishu';
   if (url.hostname.includes('aihot.virxact.com') && /\/items\/[a-z0-9]+/i.test(url.pathname)) return 'aihot';
-  // X/推特 直链（ADR-063）：公开推文经 FxTwitter 镜像拿正文+媒体，视频走 yt-dlp 转写；
+  // X/推特 直链（ADR-064）：公开推文经 FxTwitter 镜像拿正文+媒体，视频走 yt-dlp 转写；
   // 受保护/NSFW 推文仍抓不到，降级清晰提示。
   if (/(^|\.)(x|twitter)\.com$/.test(url.hostname)) return 'x';
   // 微信公众号文章：正文**在裸 HTML 里**（#js_content，本例 2713 字），但通用 Readability 只抽到 7 字
@@ -120,7 +120,7 @@ async function proxiedFetch(url, opts = {}) {
   return fetch(url, { ...opts, dispatcher: new ProxyAgent(proxyUrl) });
 }
 
-// X/推特 直链（ADR-063，修正 ADR-014"需登录态"的假设）：公开推文不需要登录——
+// X/推特 直链（ADR-064，修正 ADR-014"需登录态"的假设）：公开推文不需要登录——
 // FxTwitter 镜像 API（免 key、纯 JSON，须带 UA 否则 401）拿正文+作者+媒体清单，
 // 带视频再走 yt-dlp 下载音轨转写（asr.js：Groq 云优先、本地 whisper 兜底）。
 // 顺序：本地库（AI HOT 已收录的秒回、零网络）→ FxTwitter+转写 → 失败降级清晰提示
