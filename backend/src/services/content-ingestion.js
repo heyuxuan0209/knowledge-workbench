@@ -49,8 +49,8 @@ export function detectInputType(input) {
   if ((url.hostname.includes('feishu.') || url.hostname.includes('larksuite.')) &&
       /\/(docx|wiki|minutes|docs)\/[A-Za-z0-9_-]+/.test(url.pathname)) return 'feishu';
   if (url.hostname.includes('aihot.virxact.com') && /\/items\/[a-z0-9]+/i.test(url.pathname)) return 'aihot';
-  // X/推特 直链：需登录态才能抓取（本产品未接入，ADR-014 后置）。识别出来 → 若库里已有(AI HOT 收录过)
-  // 直接从库解读，否则秒回清晰提示，不再白等 25s Jina。
+  // X/推特 直链（ADR-063）：公开推文经 FxTwitter 镜像拿正文+媒体，视频走 yt-dlp 转写；
+  // 受保护/NSFW 推文仍抓不到，降级清晰提示。
   if (/(^|\.)(x|twitter)\.com$/.test(url.hostname)) return 'x';
   // 微信公众号文章：正文**在裸 HTML 里**（#js_content，本例 2713 字），但通用 Readability 只抽到 7 字
   // ——它读不懂公众号的 markup。识别出来直接抽 #js_content。（区别于 ADR-007 的"关注公众号源不抓取"：
@@ -111,10 +111,23 @@ async function ingestAihot(input) {
   }
 }
 
-// X/推特 直链：先查"是不是我已经有了"（AI HOT 常已收录该推文）——命中就走本地解读（同 aihot）；
-// 没命中 → 立即给清晰提示（X 需登录抓取，粘推文文字最快），不再空等 25s。
+// Node 内置 fetch（undici）不读 HTTP_PROXY 环境变量（见文件头代理说明的同款坑），
+// 走代理必须显式注入 ProxyAgent；只影响单次请求，不污染进程。
+async function proxiedFetch(url, opts = {}) {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+  if (!proxyUrl) return fetch(url, opts);
+  const { ProxyAgent } = await import('undici');
+  return fetch(url, { ...opts, dispatcher: new ProxyAgent(proxyUrl) });
+}
+
+// X/推特 直链（ADR-063，修正 ADR-014"需登录态"的假设）：公开推文不需要登录——
+// FxTwitter 镜像 API（免 key、纯 JSON，须带 UA 否则 401）拿正文+作者+媒体清单，
+// 带视频再走 yt-dlp 下载音轨转写（asr.js：Groq 云优先、本地 whisper 兜底）。
+// 顺序：本地库（AI HOT 已收录的秒回、零网络）→ FxTwitter+转写 → 失败降级清晰提示
+// （受保护/NSFW/已删推文仍抓不到，如实说，不猜原因）。
 async function ingestX(input) {
-  const statusId = input.trim().match(/status(?:es)?\/(\d+)/)?.[1];
+  const url = input.trim();
+  const statusId = url.match(/status(?:es)?\/(\d+)/)?.[1];
   const { getContentByUrlLike } = await import('../db/contents.js');
   const c = statusId ? getContentByUrlLike(statusId) : null;
   if (c) {
@@ -126,17 +139,87 @@ async function ingestX(input) {
           title: c.zh_title || c.en_title || null, body, type: c.content_type || 'tweet', via: 'x-db',
           metadata: {
             originalTitle: c.en_title || null, author: c.source_display_name || null,
-            platform: 'X', publishedAt: (c.published_at || '').slice(0, 10) || null, sourceUrl: c.url || input.trim(),
+            platform: 'X', publishedAt: (c.published_at || '').slice(0, 10) || null, sourceUrl: c.url || url,
           },
           note: '来源是一条推文，摘要≈全文', fetchStatus: 'success', fetchError: null,
         };
       }
-    } catch { /* 落到下面的提示 */ }
+    } catch { /* 落到 FxTwitter 抓取 */ }
+  }
+
+  if (!statusId) {
+    return {
+      title: null, body: null, type: 'tweet', fetchStatus: 'failed',
+      fetchError: '这个 X 链接里没有推文 ID（个人主页/搜索页暂不支持），请粘贴具体某条推文的链接。',
+    };
+  }
+
+  let tweet;
+  try {
+    const res = await proxiedFetch(`https://api.fxtwitter.com/i/status/${statusId}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.tweet) throw new Error(data?.message || `HTTP ${res.status}`);
+    tweet = data.tweet;
+  } catch (err) {
+    return {
+      title: null, body: null, type: 'tweet', fetchStatus: 'failed',
+      fetchError: `推文抓取失败（${err.message}）。受保护/NSFW/已删除的推文抓不到；最快：直接把推文文字粘进来。`,
+    };
+  }
+
+  const parts = [tweet.text?.trim() ? `【推文正文】\n${tweet.text.trim()}` : null];
+  if (tweet.quote?.text?.trim()) {
+    const qa = tweet.quote.author;
+    parts.push(`【引用推文${qa ? ` · ${qa.name}（@${qa.screen_name}）` : ''}】\n${tweet.quote.text.trim()}`);
+  }
+
+  const photos = tweet.media?.photos || [];
+  if (photos.length) {
+    // 视觉内容 P0 不解析（后续视觉帧能力另立 ADR），但要如实声明附图存在——
+    // 别让解读层假装读过图（ADR-021 诚实降级）
+    const alts = photos.map((p, i) => p.altText?.trim() ? `图${i + 1}：${p.altText.trim()}` : null).filter(Boolean);
+    parts.push(`【推文附图 ${photos.length} 张${alts.length ? '，作者提供的图片描述如下' : '（画面内容暂不解析，解读时勿凭空推测图片信息）'}】${alts.length ? '\n' + alts.join('\n') : ''}`);
+  }
+
+  const videos = (tweet.media?.videos || []).filter(v => v.type !== 'gif'); // 动图无音轨，跳过转写
+  let note = null;
+  if (videos.length) {
+    const durationMin = videos[0].duration ? Math.round(videos[0].duration / 60) : null;
+    try {
+      const { transcribeVideo } = await import('./asr.js');
+      const asr = await transcribeVideo(url);
+      parts.push(`【视频转写${durationMin ? `（时长约 ${durationMin} 分钟）` : ''}${asr.source === 'captions' ? '（来自视频字幕）' : '（语音听写，可能存在少量误差）'}】\n${asr.text}`);
+      if (asr.truncated) note = '视频较长，已转写前 40 分钟';
+    } catch (err) {
+      parts.push(`【重要声明】这条推文带视频，但音频转写失败（${err.message}），以上仅为推文文字，不代表视频内容。解读时请明确这一局限，不要推测视频细节。`);
+      note = '视频转写失败，仅解读了推文文字';
+    }
+  }
+
+  const body = parts.filter(Boolean).join('\n\n');
+  if (!body) {
+    return {
+      title: null, body: null, type: 'tweet', fetchStatus: 'failed',
+      fetchError: '这条推文没有可解读的文字内容（纯图片/纯动图且无文字描述）。',
+    };
   }
   return {
-    title: null, body: null, type: 'tweet', fetchStatus: 'failed',
-    fetchError: 'X / 推特链接需要登录态才能抓取（本产品未接入）。最快：直接把推文文字粘进来；'
-      + '若它在你的资讯里（AI HOT 已收录），去「资讯」页找到它点「AI 精读」。',
+    title: null,
+    body,
+    type: videos.length ? 'video' : 'tweet',
+    via: 'fxtwitter',
+    metadata: {
+      originalTitle: null,
+      author: tweet.author ? `${tweet.author.name}（@${tweet.author.screen_name}）` : null,
+      platform: 'X',
+      publishedAt: tweet.created_timestamp ? new Date(tweet.created_timestamp * 1000).toISOString().slice(0, 10) : null,
+      sourceUrl: tweet.url || url,
+    },
+    note: note || (!videos.length && !photos.length ? '来源是一条推文，正文≈全文' : null),
+    fetchStatus: 'success', fetchError: null,
   };
 }
 

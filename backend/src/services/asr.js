@@ -8,10 +8,12 @@ import { mkdir, readdir, rm } from 'fs/promises';
 const pexec = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// 本地 ASR 管道（M5 最小版前移，ADR-015）：无字幕视频的"全文解读"兜底。
+// ASR 管道（M5 最小版前移，ADR-015；云通道 ADR-063）：无字幕视频的"全文解读"兜底。
 // 音频获取（免 ffmpeg：bili audio --no-split 出完整 m4a，yt-dlp bestaudio 不转码，
-// faster-whisper 内置 PyAV 直接解码）→ scripts/transcribe.py 本地转写 → 文本进
-// 现有翻译/解读管道。零 API 费、内容不出本机；首次调用会下载 whisper small 模型（~460MB）。
+// faster-whisper 内置 PyAV 直接解码）→ 转写：配了 GROQ_API_KEY 时优先 Groq 云端
+// whisper-large-v3-turbo（约 $0.02/小时音频且有免费额度，1 小时音频几十秒转完，本地
+// CPU 要 20 分钟）；无 key / 文件超限 / 调用失败自动降级 scripts/transcribe.py 本地
+// 转写（零 API 费、内容不出本机；首次调用会下载 whisper small 模型 ~460MB）。
 //
 // 成本画像（M 系芯片 CPU int8）：10 分钟音频约 1-3 分钟转写，只在首次解读时发生，
 // 结果由 content-body-resolver 缓存进 contents.zh_body，之后秒开。
@@ -25,6 +27,46 @@ export const FULL_AUDIO_SECONDS = 10800;    // 「转写全程」：3 小时（�
 const DOWNLOAD_TIMEOUT = 5 * 60000;
 const TRANSCRIBE_TIMEOUT = 15 * 60000;
 const DIARIZE_TIMEOUT = 25 * 60000; // 分离管道（whisperX+pyannote）CPU 上明显更慢
+
+// Node 内置 fetch（undici）不读 HTTP_PROXY 环境变量（content-ingestion.js 同款坑），
+// 走代理必须显式注入 ProxyAgent；只影响单次请求，不污染进程。
+async function proxiedFetch(url, opts = {}) {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+  if (!proxyUrl) return fetch(url, opts);
+  const { ProxyAgent } = await import('undici');
+  return fetch(url, { ...opts, dispatcher: new ProxyAgent(proxyUrl) });
+}
+
+// Groq 云转写（ADR-063）：whisper-large-v3-turbo，verbose_json 拿分段。免费档单文件
+// 上限 25MB，超限直接抛错让调用方走本地（bestaudio m4a 约 1MB/分钟，25MB≈短视频/中短
+// 播客够用；超长内容本就该本地慢慢转）。
+async function transcribeViaGroq(audioFile) {
+  const { readFile } = await import('fs/promises');
+  const buf = await readFile(audioFile);
+  if (buf.length > 24 * 1024 * 1024) {
+    throw new Error(`音频 ${(buf.length / 1048576).toFixed(0)}MB 超过 Groq 免费档上限（25MB）`);
+  }
+  const form = new FormData();
+  form.append('file', new Blob([buf]), audioFile.split('/').pop());
+  form.append('model', 'whisper-large-v3-turbo');
+  form.append('response_format', 'verbose_json');
+  const res = await proxiedFetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) throw new Error(`Groq ${res.status}：${(await res.text()).slice(0, 150)}`);
+  const data = await res.json();
+  if (!data.text || data.text.trim().length < 20) throw new Error('转写结果为空（可能是纯音乐/无人声内容）');
+  return {
+    text: data.text.trim(),
+    language: data.language || null,
+    duration: data.duration || null,
+    truncated: false, // Groq 整文件转写，无本地管道的 maxSeconds 截断
+    segments: (data.segments || []).map(s => ({ start: s.start, end: s.end, text: s.text })),
+  };
+}
 
 // 转写调度（M5 完整版，2026-07-16）：
 // diarize=true 且配了 HF_TOKEN → whisperX 说话人分离管道（transcribe-diarize.py），
@@ -45,12 +87,20 @@ async function runTranscriber(audioFile, { diarize = false, maxSeconds = MAX_AUD
       console.log(`[asr] 分离管道失败（${(err.stderr || err.message || '').toString().slice(0, 150)}），回落普通转写`);
     }
   }
+  // 普通转写：Groq 云优先（快、近乎免费），失败/超限/无 key → 本地 whisper 兜底，渐进增强不硬依赖
+  if (process.env.GROQ_API_KEY) {
+    try {
+      return { ...(await transcribeViaGroq(audioFile)), diarized: false, engine: 'groq' };
+    } catch (err) {
+      console.log(`[asr] Groq 云转写失败（${(err.message || '').slice(0, 150)}），降级本地 whisper`);
+    }
+  }
   const { stdout } = await pexec('python3', [
     join(__dirname, '../../scripts/transcribe.py'), audioFile, '--max-seconds', String(maxSeconds),
   ], { env: CLI_ENV, timeout, maxBuffer: 64 * 1024 * 1024 });
   const result = JSON.parse(stdout);
   if (!result.text || result.text.length < 20) throw new Error('转写结果为空（可能是纯音乐/无人声内容）');
-  return { ...result, diarized: false };
+  return { ...result, diarized: false, engine: 'local' };
 }
 
 // 本地音频文件转写（上传场景）：会议录音默认转全程（上限 60 分钟，防极端）。
@@ -61,7 +111,8 @@ export async function transcribeAudioFile(filePath, { maxSeconds = 3600, diarize
 
 async function findAudioFile(dir) {
   const files = await readdir(dir, { recursive: true });
-  const audio = files.find(f => /\.(m4a|webm|mp3|wav|opus)$/i.test(f));
+  // mp4：X 视频无独立音频流时落盘的是音画合流文件，PyAV/Groq 都能直接解出音轨
+  const audio = files.find(f => /\.(m4a|webm|mp3|wav|opus|mp4)$/i.test(f));
   return audio ? join(dir, audio) : null;
 }
 
@@ -90,8 +141,15 @@ async function downloadAudio(url, workDir) {
     const args = ['-f', 'bestaudio', '-o', join(workDir, 'audio.%(ext)s'), '--no-playlist', url];
     if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
     await execWithRetry('yt-dlp', args);
+  } else if (/(^|\/\/|\.)(x|twitter)\.com\//.test(url)) {
+    // X 推文视频（ADR-063）：yt-dlp 原生支持公开推文，无需登录；X 视频多为音画合流的
+    // mp4（无独立 bestaudio 流），故 bestaudio/best 兜底整段视频，PyAV 能直接解出音轨。
+    // X 与 YouTube 同属需代理平台，复用同一代理出口。
+    const args = ['-f', 'bestaudio/best', '-o', join(workDir, 'audio.%(ext)s'), '--no-playlist', url];
+    if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
+    await execWithRetry('yt-dlp', args);
   } else {
-    throw new Error('暂只支持 B站 / YouTube 视频的音频转写');
+    throw new Error('暂只支持 B站 / YouTube / X 视频的音频转写');
   }
 
   const audioFile = await findAudioFile(workDir);
