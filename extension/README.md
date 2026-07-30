@@ -8,7 +8,7 @@
 
 1. 地址栏打开 `chrome://extensions`
 2. 右上角打开「开发者模式」
-3. 点「加载已解压的扩展程序」，选择本目录（`knowledge-workbench/extension/`）
+3. 点左上角「加载未打包的扩展程序」（英文界面叫 Load unpacked），文件框里 ⌘⇧G 粘贴本目录路径（`knowledge-workbench/extension/`）
 4. 打开 x.com 或 youtube.com 即可看到「解读」按钮
 
 ## 依赖
