@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KW 解读",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "X / YouTube 一键解读：英文富媒体 → 中文卡片解读，可追问、存灵感库（依赖本机 knowledge-workbench 后端）",
   "content_scripts": [
     {

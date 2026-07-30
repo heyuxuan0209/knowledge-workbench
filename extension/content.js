@@ -224,6 +224,9 @@ async function streamChat(messages, cardEl) {
   return full;
 }
 
+// 存灵感库＝两边落（用户实测踩坑：只存 notes 时灵感页看不到——灵感页读 ideas 表）：
+// ① 解读材料 → notes（素材库，ADR-060 灵感卡格式）
+// ② 感想/标题 → ideas（灵感页），并把 ① 作为「料」挂上（supportingNoteIds，火候直接生效）
 async function saveNote() {
   if (!state?.data || ui.save.classList.contains('done')) return;
   const d = state.data, m = d.metadata || {};
@@ -237,7 +240,19 @@ async function saveNote() {
     });
     const res = await r.json();
     if (!res.success) throw new Error(res.error || '保存失败');
-    ui.save.classList.add('done'); ui.save.textContent = '✓ 已存入灵感库';
+
+    const title = (feel || d.zhTitle || d.title || `${m.author || '一条内容'} 的启发`).slice(0, 40);
+    const ideaBody = [feel ? `感想：${feel}` : null,
+      `来源：${[m.author, m.platform].filter(Boolean).join(' @ ')} — ${state.url}`,
+      `解读摘要：${summary.slice(0, 300)}`].filter(Boolean).join('\n');
+    const r2 = await fetch(`${KW}/api/ideas`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body: ideaBody, sourceKind: 'user', sourceRef: state.url,
+        supportingNoteIds: [res.data?.id].filter(Boolean) }),
+    });
+    const res2 = await r2.json();
+    if (!res2.success) throw new Error(res2.error || 'ideas 保存失败');
+    ui.save.classList.add('done'); ui.save.textContent = '✓ 已存（灵感页 + 素材库）';
   } catch (e) {
     ui.save.textContent = `存失败：${e.message.slice(0, 20)}`;
   }
