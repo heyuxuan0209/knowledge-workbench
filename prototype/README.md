@@ -17,6 +17,7 @@
 | inspiration-merged-mock.html / inspiration-redesign-mock.html | 灵感页改版 | 已过审 → ADR-035（随手记/卡片养大） |
 | icons-hover-mock.html | 导航图标三组选型 | 已定（随 hover 换 SVG 落地） |
 | product-ideas-mock.html | 产品灵感库闭环（V4 阶段3：方案卡/灵感卡 + 问题→方案检索） | 封存 → ADR-060（不先建 UI，转两周无界面试点，08-11 验收） |
+| bitable-single-table-mock.html / bitable-two-table-mock.html | 飞书多维表格·发布与复盘表结构选型（单表全记 vs 内容主表+发布记录，D7/D30 两档回收） | 已定 → 方案B + 机器人代填（ADR-061） |
 
 均为纯静态 HTML，直接双击（file://）可看，不依赖前端服务。
 
@@ -25,7 +26,7 @@
 | 目录 | 主题 | 状态 |
 |---|---|---|
 | feed-lifecycle-mock/ | 处理进度/今日已清 | 已否决 → ADR-045 |
-| feed-mute-archive-mock/ | 显式 mute / 归档 | 已定 → ADR-049/053（显式 mute，⚙调精选面板落地） |
+| feed-mute-archive-mock/ | 显式 mute / 归档 | 已定 → ADR-040/053（显式 mute，⚙调精选面板落地；2026-07-29 修正错引：原写 049 实为 040） |
 | feishu-rework/ | 飞书接入 | 已定 → ADR-039 |
 | flywheel-backhalf/ | 内容飞轮后半环 | 已定 → ADR-036 |
 | inspiration-layouts/ | 灵感/摄入口改版 | 已过审 → ADR-035/039 |

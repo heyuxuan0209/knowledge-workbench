@@ -60,3 +60,13 @@ export function markTriaged(id, { status, resultKind = null, resultId = null }) 
   db.close();
   return r.changes > 0;
 }
+
+// 同上，但按 feishu_id 定位——给私信机器人用：它先按 message_id 占位去重（拿不到内部 id），
+// 存卡成功后回头把占位条标 accepted，避免收件箱里和素材库出双份。
+export function markTriagedByFeishuId(feishuId, { status, resultKind = null, resultId = null }) {
+  const db = getDatabase();
+  const r = db.prepare('UPDATE feishu_inbox SET status = ?, result_kind = ?, result_id = ? WHERE feishu_id = ?')
+    .run(status, resultKind, resultId, feishuId);
+  db.close();
+  return r.changes > 0;
+}

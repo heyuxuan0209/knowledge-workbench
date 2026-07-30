@@ -1,5 +1,5 @@
 import { feishuBase } from './feishu-auth.js';
-import { upsertInboxItem } from '../db/feishu-inbox.js';
+import { upsertInboxItem, markTriagedByFeishuId } from '../db/feishu-inbox.js';
 
 // 笔记机器人独立应用（ADR-056：一个飞书应用只许一个长连接消费者）。
 // 主应用 FEISHU_APP_ID 已被 Claude 桥独占事件流，本机器人用 FEISHU_BOT_APP_ID/SECRET（.env）。
@@ -123,9 +123,11 @@ async function saveCard(t, text) {
   });
   const j = await r.json();
   if (!j.success) throw new Error(j.error || '保存失败');
-  return isSol
-    ? `🧩 已存方案卡：「${t.problem}」\n「怎么改造」那栏是我起草的，要改直接说。`
+  // 回执带上方案名/链接——用户发的是裸链接时，不带这个他认不出这卡对应哪条消息（2026-07-29 实证）
+  const receipt = isSol
+    ? `🧩 已存方案卡：「${t.problem}」→ ${t.solution || ''}${t.url ? `\n${t.url}` : ''}\n「怎么改造」那栏是我起草的，要改直接说。`
     : `💡 已存灵感卡：「${t.insight}」`;
+  return { receipt, noteId: j.data?.id || null };
 }
 
 async function handleMessage(data) {
@@ -137,13 +139,22 @@ async function handleMessage(data) {
   const chatId = msg.chat_id;
   const asked = isQuestion(text);
 
-  let reply = null;
-  let cardSaved = false;
+  // 幂等闸门（必须在任何 LLM/回复之前）：飞书对未及时确认的事件会拉长间隔重推十几个小时
+  //（2026-07-29 实证：同一条消息 09:18→21:55 五连推，每推重过一遍 DeepSeek → 存了 5 张措辞各异的变体卡）。
+  // 先按 message_id 入库占位，重推到这里直接落空；存成卡后再回头把占位条标 accepted（不出双份）。
+  const isNew = upsertInboxItem({
+    objType: 'message', feishuId: msg.message_id,
+    title: text.slice(0, 40), snippet: text, sourceName: '私信',
+    suggested: 'idea', feishuTime: msg.create_time || null,
+    extra: { chatId, asked, senderId: data?.sender?.sender_id?.open_id || null },
+  });
+  if (!isNew) { console.log('[feishu-bot] 重推事件已处理过，跳过:', msg.message_id); return; }
+
   if (asked) {
     try {
       // 试点检索半环：先查他自己的灵感库，命中就带着答（ADR-060）
       const hits = await searchCards(text);
-      reply = await generateReply(text, hits);
+      let reply = await generateReply(text, hits);
       if (hits.length) {
         reply = `📌 你之前存过：${hits.map(cardBrief).join('；')}\n${reply}`;
         console.log(`[feishu-bot] 灵感库捞回命中 ${hits.length} 张（问句）`);
@@ -157,13 +168,14 @@ async function handleMessage(data) {
     try {
       const t = await triageMessage(text);
       if (t.kind === 'solution' || t.kind === 'inspiration') {
-        reply = await saveCard(t, text);
-        cardSaved = true;
-        await sendText(chatId, reply);
+        const { receipt, noteId } = await saveCard(t, text);
+        // 卡已入素材库——占位的待整理条标记落地，收件箱不再出现这条
+        markTriagedByFeishuId(msg.message_id, { status: 'accepted', resultKind: 'note', resultId: noteId });
+        await sendText(chatId, receipt);
       } else if (t.kind === 'need') {
         const hits = await searchCards(text);
         if (hits.length) {
-          reply = `📌 灵感库里你存过：${hits.map(cardBrief).join('；')}`;
+          const reply = `📌 灵感库里你存过：${hits.map(cardBrief).join('；')}`;
           console.log(`[feishu-bot] 灵感库捞回命中 ${hits.length} 张（需求）`);
           await sendText(chatId, reply);
         }
@@ -172,15 +184,6 @@ async function handleMessage(data) {
       console.error('[feishu-bot] 试点分诊失败（消息照常进待整理）:', e.message);
     }
   }
-  if (cardSaved) return; // 卡已入素材库，不再进待整理——避免同一条消息双份
-  try {
-    upsertInboxItem({
-      objType: 'message', feishuId: msg.message_id,
-      title: text.slice(0, 40), snippet: text, sourceName: '私信',
-      suggested: 'idea', feishuTime: msg.create_time || null,
-      extra: { chatId, asked, reply, senderId: data?.sender?.sender_id?.open_id || null },
-    });
-  } catch (e) { console.error('[feishu-bot] 捕获入库失败:', e.message); }
 }
 
 // 启动长连接监听。幂等；未配置/启动失败只记日志不中断服务。
@@ -195,7 +198,10 @@ export async function startFeishuBot() {
       appSecret: botAppSecret(),
     });
     const dispatcher = new lark.EventDispatcher({}).register({
-      'im.message.receive_v1': async (d) => { await handleMessage(d); },
+      // 不 await——处理链里有 DeepSeek（动辄 10s+），await 会让 SDK 的事件确认迟到，
+      // 飞书判投递失败后拉长间隔重推十几小时（变体卡连环案的另一半根因）。
+      // 立即返回先确认，重活后台跑；失败靠幂等闸门保证重推无害。
+      'im.message.receive_v1': (d) => { handleMessage(d).catch(e => console.error('[feishu-bot] 后台处理失败:', e.message)); },
     });
     wsClient.start({ eventDispatcher: dispatcher });
     wsRef = wsClient;

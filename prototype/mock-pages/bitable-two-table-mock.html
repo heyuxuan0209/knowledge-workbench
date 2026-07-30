@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>方案B · 内容主表 + 发布记录 — 发布与复盘 bitable 选型</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f5f6f7; color: #1f2329; padding: 24px; }
+  .head { max-width: 1280px; margin: 0 auto 16px; }
+  .head h1 { font-size: 20px; margin-bottom: 6px; }
+  .head .sub { color: #646a73; font-size: 13px; line-height: 1.7; }
+  .tag { display: inline-block; background: #7f3bf5; color: #fff; border-radius: 4px; font-size: 12px; padding: 2px 8px; margin-right: 8px; vertical-align: 2px; }
+  .verdict { max-width: 1280px; margin: 0 auto 16px; display: flex; gap: 12px; }
+  .verdict .card { flex: 1; background: #fff; border-radius: 8px; padding: 12px 16px; font-size: 13px; line-height: 1.8; border: 1px solid #e5e6eb; }
+  .verdict .good { border-top: 3px solid #34c724; }
+  .verdict .bad { border-top: 3px solid #f54a45; }
+  .board { max-width: 1280px; margin: 0 auto; background: #fff; border-radius: 10px; border: 1px solid #e5e6eb; overflow: hidden; }
+  .tabs { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid #e5e6eb; }
+  .tab { padding: 8px 16px; font-size: 13.5px; cursor: pointer; border-radius: 8px 8px 0 0; color: #646a73; }
+  .tab.on { background: #f0f4ff; color: #3370ff; font-weight: 600; }
+  .pane { display: none; }
+  .pane.on { display: block; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; width: 100%; }
+  th, td { border-right: 1px solid #eef0f2; border-bottom: 1px solid #eef0f2; padding: 8px 10px; text-align: left; }
+  th { background: #fafbfc; color: #646a73; font-weight: 500; }
+  th.d7 { background: #eaf3ff; color: #245bdb; } td.d7 { background: #f5faff; }
+  th.d30 { background: #fff7e8; color: #b26a00; } td.d30 { background: #fffcf5; }
+  .pill { border-radius: 10px; padding: 1px 9px; font-size: 12px; }
+  .p-wx { background: #e8f7e9; color: #2ea043; } .p-xhs { background: #ffe9ec; color: #e0344b; }
+  .p-sp { background: #fdeef4; color: #c9438f; }
+  .topic { background: #f0f4ff; color: #3370ff; border-radius: 4px; padding: 1px 7px; font-size: 12px; }
+  .st { border-radius: 4px; padding: 1px 8px; font-size: 12px; }
+  .st-draft { background: #eceef1; color: #646a73; } .st-review { background: #fff7e8; color: #b26a00; }
+  .st-final { background: #e8f7e9; color: #2ea043; } .st-pub { background: #f0f4ff; color: #3370ff; }
+  .link { color: #3370ff; text-decoration: none; }
+  .rel { color: #7f3bf5; font-size: 12px; }
+  .rate-hi { color: #2ea043; font-weight: 600; } .rate-lo { color: #f54a45; }
+  .comment { max-width: 240px; white-space: normal; color: #646a73; font-size: 12px; line-height: 1.5; }
+  .rollup { background: #faf8ff; }
+  .rollup td { font-weight: 600; border-top: 2px solid #e0d5ff; }
+  .concl { max-width: 240px; white-space: normal; font-size: 12px; line-height: 1.5; }
+  .foot { max-width: 1280px; margin: 14px auto 0; font-size: 13px; color: #646a73; }
+  .foot a { color: #3370ff; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1><span class="tag">方案B</span>内容主表 + 发布记录 — 文章有主页,数据挂在下面</h1>
+    <div class="sub">两张关联表:「内容主表」一篇文章一行(选题、母稿飞书文档、全流程状态),「发布记录」一行 = 一篇 × 一平台(物料 + D7/D30 数据)。复盘视图按选题聚合发布记录自动算汇总。点上面的页签切换 ↓</div>
+  </div>
+
+  <div class="verdict">
+    <div class="card good"><b>✓ 优点</b><br>一篇文章有唯一主页:母稿文档链接、评审状态、各平台战绩一处看全;选题/母稿信息不重复填;天然对齐你的工作流(母稿状态:草稿→评审→定稿→已分发);以后接自动化(创作台出内容自动建发布行)结构现成。</div>
+    <div class="card bad"><b>✗ 缺点</b><br>发布时要多一步「关联到主表那篇」;两张表有一点学习成本;每月只发一两篇的话,主表显得有点空。</div>
+  </div>
+
+  <div class="board">
+    <div class="tabs">
+      <div class="tab on" onclick="sw(0)">📄 内容主表</div>
+      <div class="tab" onclick="sw(1)">🚀 发布记录</div>
+      <div class="tab" onclick="sw(2)">🎯 复盘视图(按选题聚合)</div>
+    </div>
+
+    <div class="pane on">
+      <div class="twrap"><table>
+        <tr><th>选题标签</th><th>母稿标题</th><th>母稿(飞书文档)</th><th>文体</th><th>状态</th><th>发布记录</th><th>创建</th></tr>
+        <tr><td><span class="topic">AI错误自信</span></td><td>AI 工具最大的风险不是能力不够</td><td><a class="link" href="#">📄 打开母稿</a></td><td>思辨辨析体</td><td><span class="st st-pub">已分发</span></td><td class="rel">🔗 公众号 · 小红书 (2)</td><td>07-08</td></tr>
+        <tr><td><span class="topic">收藏≠读过</span></td><td>收藏 = 稍后读 = 永远不读,直到我做了它</td><td><a class="link" href="#">📄 打开母稿</a></td><td>实践复盘体</td><td><span class="st st-pub">已分发</span></td><td class="rel">🔗 公众号 · B站 (2)</td><td>07-15</td></tr>
+        <tr><td><span class="topic">灵感库无界面</span></td><td>我把产品的 UI 砍了,先跑两周试点</td><td><a class="link" href="#">📄 打开母稿</a></td><td>实践复盘体</td><td><span class="st st-pub">已分发</span></td><td class="rel">🔗 公众号 (1)</td><td>07-24</td></tr>
+        <tr><td><span class="topic">信息流校准</span></td><td>信息流从倒垃圾场到情报台的四次校准</td><td><a class="link" href="#">📄 打开母稿</a></td><td>实践复盘体</td><td><span class="st st-review">评审中</span></td><td class="rel">—</td><td>07-27</td></tr>
+        <tr><td><span class="topic">AI帮我盯</span></td><td>单人做产品,最缺的是一双帮你盯着的眼睛</td><td><a class="link" href="#">📄 打开母稿</a></td><td>一句话提炼体</td><td><span class="st st-draft">草稿</span></td><td class="rel">—</td><td>07-28</td></tr>
+      </table></div>
+    </div>
+
+    <div class="pane">
+      <div class="twrap"><table style="min-width:1600px">
+        <tr>
+          <th>关联母稿</th><th>标题(平台化)</th><th>平台</th><th>形态</th><th>发布时间</th><th>链接</th><th>物料</th>
+          <th class="d7">D7 曝光</th><th class="d7">D7 互动率</th><th class="d7">D7 传播</th><th class="d7">D7 涨粉</th>
+          <th class="d30">D30 曝光</th><th class="d30">D30 互动率</th><th class="d30">D30 涨粉</th>
+          <th>评论摘录</th>
+        </tr>
+        <tr>
+          <td class="rel">🔗 AI错误自信</td><td>AI 工具最大的风险不是能力不够</td><td><span class="pill p-wx">公众号</span></td><td>长文</td><td>07-10</td><td><a class="link" href="#">原文</a></td><td>📎 封面.png</td>
+          <td class="d7">3,204</td><td class="d7 rate-hi">6.8%</td><td class="d7">在看41·转发87</td><td class="d7">+23</td>
+          <td class="d30">3,876</td><td class="d30">6.1%</td><td class="d30">+29</td>
+          <td class="comment">"错得太自信太准了" — 共鸣在代价故事</td>
+        </tr>
+        <tr>
+          <td class="rel">🔗 AI错误自信</td><td>被 AI 坑过一次后,我改了用法</td><td><span class="pill p-xhs">小红书</span></td><td>图文卡</td><td>07-11</td><td><a class="link" href="#">笔记</a></td><td>📎 图卡×6</td>
+          <td class="d7">1,890</td><td class="d7 rate-lo">2.1%</td><td class="d7">收藏33</td><td class="d7">+4</td>
+          <td class="d30">—</td><td class="d30">—</td><td class="d30">—</td>
+          <td class="comment">评论少;标题钩子偏弱?</td>
+        </tr>
+        <tr>
+          <td class="rel">🔗 收藏≠读过</td><td>收藏 = 稍后读 = 永远不读</td><td><span class="pill p-wx">公众号</span></td><td>长文</td><td>07-18</td><td><a class="link" href="#">原文</a></td><td>📎 封面.png</td>
+          <td class="d7">5,412</td><td class="d7 rate-hi">8.9%</td><td class="d7">在看77·转发204</td><td class="d7">+61</td>
+          <td class="d30">—</td><td class="d30">—</td><td class="d30">—</td>
+          <td class="comment">"这个转折看哭" · 大量「我也是」共鸣</td>
+        </tr>
+        <tr>
+          <td class="rel">🔗 收藏≠读过</td><td>你收藏的100篇,读过几篇?(口播)</td><td><span class="pill p-sp">B站</span></td><td>口播视频</td><td>07-19</td><td><a class="link" href="#">视频</a></td><td>📎 脚本 · 成片</td>
+          <td class="d7">—</td><td class="d7">—</td><td class="d7">—</td><td class="d7">—</td>
+          <td class="d30">—</td><td class="d30">—</td><td class="d30">—</td>
+          <td class="comment">—</td>
+        </tr>
+      </table></div>
+    </div>
+
+    <div class="pane">
+      <div class="twrap"><table>
+        <tr><th>选题标签</th><th>发布数</th><th>总曝光</th><th>平均互动率</th><th>总涨粉</th><th>共鸣信号摘要</th><th>验证结论(回流选题地图)</th></tr>
+        <tr class="rollup"><td><span class="topic">收藏≠读过</span></td><td>2</td><td>5,412+</td><td class="rate-hi">8.9%</td><td>+61</td><td class="concl">转发率历史最高;评论全是「我也是」型认同</td><td class="concl">✅ 强验证 — 「工具解决行为惯性」方向可做系列</td></tr>
+        <tr class="rollup"><td><span class="topic">AI错误自信</span></td><td>2</td><td>5,094</td><td>4.5%</td><td>+27</td><td class="concl">公众号强(6.8%),小红书弱(2.1%)——观点强但图文形态没接住</td><td class="concl">🟡 部分验证 — 选题成立,小红书需换钩子重发一次</td></tr>
+        <tr class="rollup"><td><span class="topic">灵感库无界面</span></td><td>1</td><td>—</td><td>—</td><td>—</td><td class="concl">D7 未到</td><td class="concl">⏳ 待数据</td></tr>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="foot">「复盘视图」不用手填 — bitable 的关联+汇总字段自动算,只有「验证结论」一列是你(或机器人)每月写一句 &nbsp;|&nbsp; 对比:<a href="bitable-single-table-mock.html">方案A · 单表全记</a></div>
+
+<script>
+function sw(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on', j===i));
+  document.querySelectorAll('.pane').forEach((p,j)=>p.classList.toggle('on', j===i));
+}
+</script>
+</body>
+</html>

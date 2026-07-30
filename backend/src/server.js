@@ -1161,6 +1161,21 @@ app.post('/api/feishu/inbox/:id/triage', async (req, res) => {
   }
 });
 
+// 评审场搬家 Phase 1（ADR-062）：起草产出 → 飞书文档（owner=用户，机器人可编辑）。
+// body: { title, markdown, brief?: {topic, thesis, sources, genre, platform, voice}, fileExtension? }
+// brief 提供时拼「创作简报」头（评审交接物约定）；返回 { url, token }。
+app.post('/api/feishu/draft-doc', async (req, res) => {
+  try {
+    const { title, markdown, brief, fileExtension } = req.body || {};
+    const { createDocFromMarkdown, draftBrief } = await import('./services/feishu-docs.js');
+    const body = brief ? draftBrief(brief) + (markdown || '') : markdown;
+    const result = await createDocFromMarkdown({ title, markdown: body, fileExtension: fileExtension || 'md' });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/feishu/pick', async (req, res) => {
   try {
     const { listPickable } = await import('./services/feishu-sync.js');

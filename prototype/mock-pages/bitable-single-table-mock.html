@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>方案A · 单表全记 — 发布与复盘 bitable 选型</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f5f6f7; color: #1f2329; padding: 24px; }
+  .head { max-width: 1280px; margin: 0 auto 16px; }
+  .head h1 { font-size: 20px; margin-bottom: 6px; }
+  .head .sub { color: #646a73; font-size: 13px; line-height: 1.7; }
+  .tag { display: inline-block; background: #3370ff; color: #fff; border-radius: 4px; font-size: 12px; padding: 2px 8px; margin-right: 8px; vertical-align: 2px; }
+  .verdict { max-width: 1280px; margin: 0 auto 16px; display: flex; gap: 12px; }
+  .verdict .card { flex: 1; background: #fff; border-radius: 8px; padding: 12px 16px; font-size: 13px; line-height: 1.8; border: 1px solid #e5e6eb; }
+  .verdict .good { border-top: 3px solid #34c724; }
+  .verdict .bad { border-top: 3px solid #f54a45; }
+  .verdict b { font-size: 13px; }
+  .board { max-width: 1280px; margin: 0 auto; background: #fff; border-radius: 10px; border: 1px solid #e5e6eb; overflow: hidden; }
+  .board-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #e5e6eb; font-size: 13px; }
+  .board-bar .bt { font-weight: 600; font-size: 14px; }
+  .board-bar .view { color: #3370ff; background: #f0f4ff; border-radius: 4px; padding: 2px 10px; }
+  .board-bar .view.off { color: #646a73; background: none; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 12.5px; white-space: nowrap; min-width: 1750px; }
+  th, td { border-right: 1px solid #eef0f2; border-bottom: 1px solid #eef0f2; padding: 8px 10px; text-align: left; }
+  th { background: #fafbfc; color: #646a73; font-weight: 500; position: sticky; top: 0; }
+  th.d7 { background: #eaf3ff; color: #245bdb; }
+  td.d7 { background: #f5faff; }
+  th.d30 { background: #fff7e8; color: #b26a00; }
+  td.d30 { background: #fffcf5; }
+  .pill { border-radius: 10px; padding: 1px 9px; font-size: 12px; }
+  .p-wx { background: #e8f7e9; color: #2ea043; } .p-xhs { background: #ffe9ec; color: #e0344b; }
+  .p-sp { background: #fdeef4; color: #c9438f; } .p-x { background: #eceef1; color: #333; }
+  .topic { background: #f0f4ff; color: #3370ff; border-radius: 4px; padding: 1px 7px; font-size: 12px; }
+  .rate-hi { color: #2ea043; font-weight: 600; } .rate-lo { color: #f54a45; }
+  .link { color: #3370ff; text-decoration: none; }
+  .file { color: #646a73; font-size: 12px; }
+  .comment { max-width: 260px; white-space: normal; color: #646a73; font-size: 12px; line-height: 1.5; }
+  .foot { max-width: 1280px; margin: 14px auto 0; font-size: 13px; color: #646a73; }
+  .foot a { color: #3370ff; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1><span class="tag">方案A</span>单表全记 — 一张表走天下</h1>
+    <div class="sub">一行 = 一篇内容在一个平台的一次发布。身份、物料、D7/D30 数据、复盘全在同一张表,靠「视图」切换看法(按选题分组 = 复盘视图,按日期排 = 发布日志)。</div>
+  </div>
+
+  <div class="verdict">
+    <div class="card good"><b>✓ 优点</b><br>填表零跳转:发布完一行填完,回收数据找到行填 D7/D30 即可;结构一眼看穿,没有关联字段的学习成本;量少时(每月几篇)最顺手。</div>
+    <div class="card bad"><b>✗ 缺点</b><br>同一篇文章的选题/母稿链接在每个平台行重复填;「一篇内容整体表现」要靠分组视图汇总,没有真正的文章主页;以后篇数多了,横向 20+ 列会越来越难扫。</div>
+  </div>
+
+  <div class="board">
+    <div class="board-bar">
+      <span class="bt">📊 发布与复盘</span>
+      <span class="view">全部记录</span>
+      <span class="view off">按选题分组(复盘)</span>
+      <span class="view off">待回收 D7</span>
+      <span class="view off">待回收 D30</span>
+    </div>
+    <div class="twrap">
+    <table>
+      <tr>
+        <th>选题标签</th><th>标题(平台化)</th><th>平台</th><th>形态</th><th>发布时间</th><th>链接</th><th>物料</th><th>状态</th>
+        <th class="d7">D7 曝光</th><th class="d7">D7 互动率</th><th class="d7">D7 传播</th><th class="d7">D7 涨粉</th>
+        <th class="d30">D30 曝光</th><th class="d30">D30 互动率</th><th class="d30">D30 传播</th><th class="d30">D30 涨粉</th>
+        <th>评论摘录(定性)</th>
+      </tr>
+      <tr>
+        <td><span class="topic">AI错误自信</span></td><td>AI 工具最大的风险不是能力不够</td><td><span class="pill p-wx">公众号</span></td><td>长文</td><td>07-10</td><td><a class="link" href="#">原文</a></td><td class="file">📎 封面.png</td><td>✅ 已回收完</td>
+        <td class="d7">3,204</td><td class="d7 rate-hi">6.8%</td><td class="d7">在看41 · 转发87</td><td class="d7">+23</td>
+        <td class="d30">3,876</td><td class="d30">6.1%</td><td class="d30">转发102</td><td class="d30">+29</td>
+        <td class="comment">"错得太自信这个说法太准了,我上周刚被坑" —— 共鸣点在「代价故事」</td>
+      </tr>
+      <tr>
+        <td><span class="topic">AI错误自信</span></td><td>被 AI 坑过一次后,我改了用法</td><td><span class="pill p-xhs">小红书</span></td><td>图文卡</td><td>07-11</td><td><a class="link" href="#">笔记</a></td><td class="file">📎 图卡×6</td><td>⏳ 待回收 D30</td>
+        <td class="d7">1,890</td><td class="d7 rate-lo">2.1%</td><td class="d7">收藏33</td><td class="d7">+4</td>
+        <td class="d30">—</td><td class="d30">—</td><td class="d30">—</td><td class="d30">—</td>
+        <td class="comment">评论少;标题钩子偏弱?</td>
+      </tr>
+      <tr>
+        <td><span class="topic">收藏≠读过</span></td><td>收藏 = 稍后读 = 永远不读</td><td><span class="pill p-wx">公众号</span></td><td>长文</td><td>07-18</td><td><a class="link" href="#">原文</a></td><td class="file">📎 封面.png</td><td>⏳ 待回收 D30</td>
+        <td class="d7">5,412</td><td class="d7 rate-hi">8.9%</td><td class="d7">在看77 · 转发204</td><td class="d7">+61</td>
+        <td class="d30">—</td><td class="d30">—</td><td class="d30">—</td><td class="d30">—</td>
+        <td class="comment">"直到我做了它——这个转折看哭" · 大量「我也是」型共鸣</td>
+      </tr>
+      <tr>
+        <td><span class="topic">收藏≠读过</span></td><td>你收藏的100篇文章,读过几篇?(口播)</td><td><span class="pill p-sp">B站</span></td><td>口播视频</td><td>07-19</td><td><a class="link" href="#">视频</a></td><td class="file">📎 脚本.md · 成片.mp4</td><td>🕐 待回收 D7</td>
+        <td class="d7">—</td><td class="d7">—</td><td class="d7">—</td><td class="d7">—</td>
+        <td class="d30">—</td><td class="d30">—</td><td class="d30">—</td><td class="d30">—</td>
+        <td class="comment">—</td>
+      </tr>
+      <tr>
+        <td><span class="topic">灵感库无界面</span></td><td>我把产品的 UI 砍了,先跑两周试点</td><td><span class="pill p-wx">公众号</span></td><td>长文</td><td>07-26</td><td><a class="link" href="#">原文</a></td><td class="file">📎 封面.png</td><td>🕐 待回收 D7</td>
+        <td class="d7">—</td><td class="d7">—</td><td class="d7">—</td><td class="d7">—</td>
+        <td class="d30">—</td><td class="d30">—</td><td class="d30">—</td><td class="d30">—</td>
+        <td class="comment">—</td>
+      </tr>
+    </table>
+    </div>
+  </div>
+
+  <div class="foot">🔵 蓝底 = D7 快照 · 🟡 黄底 = D30 快照(长尾平台才需要) · 「待回收」视图就是你每周五分钟要填的清单 &nbsp;|&nbsp; 对比:<a href="bitable-two-table-mock.html">方案B · 内容主表 + 发布记录</a></div>
+</body>
+</html>
