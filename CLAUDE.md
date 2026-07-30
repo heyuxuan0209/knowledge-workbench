@@ -44,9 +44,14 @@
    - 「怎么改造/应用」是判断字段：AI 只起草，须向用户明示可裁决（ADR-044）。
 2. **检索**：接到"我想做X / 怎么解决Y"类需求，**动手前先** `GET /api/notes/search-semantic?q=<问题大白话>` 查一遍；命中就明说"你之前存过：…"再干活。**真帮上忙时在 process-log 记一行 `[灵感库捞回]`**（试点就靠这个计数验收，工单见 handoff/）。
 
-## 创作产出落飞书文档（ADR-062，评审场搬家）
+## 创作产出落飞书文档（ADR-062/063，评审场搬家）
 
-起草出的**母稿不再放本地文件夹**——调 `POST /api/feishu/draft-doc {title, markdown, brief:{topic,thesis,sources,genre,platform,voice}}`，自动建飞书文档（头部创作简报、owner=用户、Claude 机器人可编辑），把返回的 url 给用户去评审。用户在文档里评论、或在群里 @机器人改稿；定稿后再进创作台出平台内容。历史补档脚本见 `backend/scripts/backfill-published-to-feishu.mjs`。
+起草出的**母稿不再放本地文件夹**——调 `POST /api/feishu/draft-doc {title, markdown, brief:{topic,thesis,sources,genre,platform,voice}}`，自动建飞书文档并挂进**用户个人知识库「母稿 · knowledge-workbench」节点**（权限随空间：用户是主人、机器人可编辑），把返回的 url 给用户去评审。用户在文档里评论、或在群里 @机器人改稿；定稿后再进创作台出平台内容。两条硬规矩（ADR-063）：
+
+1. **母稿一律干净 markdown**——正文+结构，禁止排版样式（公众号排版 HTML 等成品样式属于创作台产出，不是母稿；已实证用户否决）。
+2. 落点是**知识库不是云盘**（云盘仅 `destination:'drive'` 兜底）。
+
+历史补档脚本见 `backend/scripts/backfill-published-to-feishu.mjs`。
 
 ## 内容创作模板（ADR-026）
 

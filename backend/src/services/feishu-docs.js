@@ -7,6 +7,8 @@ import { feishuBase, feishuFetch, getTenantAccessToken } from './feishu-auth.js'
 // 用户 open_id 从 FEISHU_OWNER_OPEN_ID 读（open_id 是应用维度的，此值仅对主应用有效）。
 
 const ownerOpenId = () => process.env.FEISHU_OWNER_OPEN_ID || '';
+const wikiSpaceId = () => process.env.FEISHU_WIKI_SPACE_ID || '';
+const wikiParentNode = () => process.env.FEISHU_WIKI_PARENT_NODE || '';
 
 // 上传 markdown 字节做导入素材。parent_type 固定 ccm_import_open（导入专用挂载点）。
 async function uploadForImport(fileName, content, fileExtension) {
@@ -42,12 +44,35 @@ async function waitImport(ticket) {
   throw new Error('导入任务超时（20s）');
 }
 
+// 导入产物挪进用户知识库（应用已是知识库成员，2026-07-30 实测可建节点——个人版走「文档应用」授权即可，
+// 无需把机器人加为"协作者"）。挪进去后权限随空间走：用户是空间主人、应用可编辑，双赢且无需 owner 转移。
+async function moveIntoWiki(objToken) {
+  const d = await feishuFetch(`/open-apis/wiki/v2/spaces/${wikiSpaceId()}/nodes/move_docs_to_wiki`, {
+    method: 'POST',
+    body: { parent_wiki_token: wikiParentNode() || undefined, obj_type: 'docx', obj_token: objToken },
+  });
+  if (d?.wiki_token) return d.wiki_token;
+  // 大文档转异步任务：轮询到出 wiki_token
+  if (d?.task_id) {
+    for (let i = 0; i < 15; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      const t = await feishuFetch(`/open-apis/wiki/v2/tasks/${d.task_id}`, { query: { task_type: 'move' } });
+      const tok = t?.task?.move_result?.[0]?.node?.node_token;
+      if (tok) return tok;
+    }
+  }
+  throw new Error('move_docs_to_wiki 未返回 wiki_token');
+}
+
 // markdown（或 html）→ 飞书 docx。返回 { url, token }。
-// transferOwner=true 时把 owner 转给 FEISHU_OWNER_OPEN_ID（用户），主应用退为可编辑协作者。
-export async function createDocFromMarkdown({ title, markdown, fileExtension = 'md', transferOwner = true }) {
+// destination='wiki'（默认）：挪进用户知识库「母稿」节点下，权限随空间（用户=空间主人，应用可编辑）。
+// destination='drive'：留云空间并把 owner 转给用户（FEISHU_OWNER_OPEN_ID），主应用退为可编辑协作者。
+export async function createDocFromMarkdown({ title, markdown, fileExtension = 'md', destination = 'wiki' }) {
   if (!title?.trim() || !markdown?.trim()) throw new Error('title 和 markdown 必填');
-  // fail fast：owner 转不了就别建——建完才报错会留下一个用户看不见的应用名下孤儿文档（2026-07-30 实测）
-  if (transferOwner && !ownerOpenId()) throw new Error('缺 FEISHU_OWNER_OPEN_ID（backend/.env），无法把文档 owner 转给用户');
+  // fail fast：落点配置不全就别建——建完才报错会留下一个用户看不见的应用名下孤儿文档（2026-07-30 实测）
+  if (destination === 'wiki' && !wikiSpaceId()) throw new Error('缺 FEISHU_WIKI_SPACE_ID（backend/.env）');
+  if (destination === 'drive' && !ownerOpenId()) throw new Error('缺 FEISHU_OWNER_OPEN_ID（backend/.env），无法把文档 owner 转给用户');
+
   const fileToken = await uploadForImport(`${title}.${fileExtension}`, markdown, fileExtension);
   const task = await feishuFetch('/open-apis/drive/v1/import_tasks', {
     method: 'POST',
@@ -56,19 +81,20 @@ export async function createDocFromMarkdown({ title, markdown, fileExtension = '
       file_token: fileToken,
       type: 'docx',
       file_name: title,
-      point: { mount_type: 1, mount_key: '' }, // 挂主应用空间根目录；owner 转走后在用户「归我所有」可见
+      point: { mount_type: 1, mount_key: '' }, // 先挂应用空间，随后按 destination 挪走/转 owner
     },
   });
   const result = await waitImport(task.ticket);
 
-  if (transferOwner) {
-    if (!ownerOpenId()) throw new Error('缺 FEISHU_OWNER_OPEN_ID（backend/.env），无法把文档 owner 转给用户');
-    await feishuFetch(`/open-apis/drive/v1/permissions/${result.token}/members/transfer_owner`, {
-      method: 'POST',
-      query: { type: 'docx' },
-      body: { member_type: 'openid', member_id: ownerOpenId() },
-    });
+  if (destination === 'wiki') {
+    const wikiToken = await moveIntoWiki(result.token);
+    return { url: `https://my.feishu.cn/wiki/${wikiToken}`, token: result.token, wikiToken };
   }
+  await feishuFetch(`/open-apis/drive/v1/permissions/${result.token}/members/transfer_owner`, {
+    method: 'POST',
+    query: { type: 'docx' },
+    body: { member_type: 'openid', member_id: ownerOpenId() },
+  });
   return { url: result.url, token: result.token };
 }
 
