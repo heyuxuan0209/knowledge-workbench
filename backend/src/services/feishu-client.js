@@ -1,4 +1,4 @@
-import { feishuFetch } from './feishu-auth.js';
+import { feishuFetch, feishuBase, getTenantAccessToken } from './feishu-auth.js';
 
 // 飞书各资源的读取封装（ADR-037）。每个函数对应一条官方开放平台接口，注释标了 path，
 // 真机联通若某接口漂移，改这一行即可（sync/pick 都调这里，不散落 URL）。
@@ -68,19 +68,29 @@ export async function getMinuteInfo(minuteToken) {
 }
 
 export async function getMinuteText(minuteToken) {
-  // 文字记录接口：GET /open-apis/minutes/v1/minutes/{token}/transcript（需 minutes:minutes:readonly）
+  // 文字记录接口：GET /open-apis/minutes/v1/minutes/{token}/transcript
+  // 两个实测事实（2026-07-31，Zara 妙记精读时踩出）：
+  // ① 该接口返回的是**纯文本文件流不是 JSON**——不能走 feishuFetch（res.json() 必炸）；
+  // ② 租户 token 对用户自己的妙记报 2091005 permission deny——必须优先用户授权 token。
+  let token = null;
   try {
-    const d = await feishuFetch(`/open-apis/minutes/v1/minutes/${minuteToken}/transcript`, { preferUser: true });
-    // 不同租户返回结构略异：优先 data.transcript（纯文本）；否则拼 sentence 列表
-    if (typeof d?.transcript === 'string') return d.transcript;
-    if (Array.isArray(d?.sentences)) return d.sentences.map(s => s.content || s.text || '').join('\n');
-    return typeof d === 'string' ? d : '';
-  } catch (e) {
-    // 转写接口未开通/无权限时，退回信息里的摘要（若有），不硬失败
+    const { getUserAccessTokenIfConnected } = await import('./feishu-user-auth.js');
+    token = await getUserAccessTokenIfConnected();
+  } catch { /* 未连用户授权则退回应用令牌试一把 */ }
+  if (!token) token = await getTenantAccessToken();
+  const res = await fetch(`${feishuBase()}/open-apis/minutes/v1/minutes/${minuteToken}/transcript`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await res.text();
+  if (body.trim().startsWith('{') && body.includes('"code"')) {
+    // 返回了 JSON = 报错（权限/参数）。退回智能纪要摘要兜底，不硬失败。
     const info = await getMinuteInfo(minuteToken).catch(() => null);
     if (info?.summary) return info.summary;
-    throw e;
+    let code = '';
+    try { code = JSON.parse(body).code; } catch { /* 保留原文截断 */ }
+    throw new Error(`妙记转写获取失败(${code || body.slice(0, 60)})`);
   }
+  return body;
 }
 
 // ---------- 群聊消息 im ----------
