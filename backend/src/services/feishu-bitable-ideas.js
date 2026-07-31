@@ -85,7 +85,11 @@ function toFields(idea) {
 export async function reconcileIdeasToBitable() {
   const { listIdeas } = await import('../db/ideas.js');
   const { annotateReadiness } = await import('./idea-readiness.js');
-  const ideas = annotateReadiness(listIdeas({ includeDismissed: true, limit: 500 }));
+  // 表只进「经用户审核」的灵感（ADR-069，用户实测反馈：AI 报告反复提议的近似选题涌进表里
+  // 显得"全是重复且没审过"）：亲手记的（user/feed/feishu 来源）+ AI 提议但已采纳/已用的。
+  // 未裁决的 AI 建议留在 KW 灵感页当选题建议——那是它的本职，不是复盘表的料。
+  const ideas = annotateReadiness(listIdeas({ includeDismissed: false, limit: 500 }))
+    .filter(i => i.source_kind !== 'ai' || ['adopted', 'created'].includes(i.status));
 
   const tableId = await ensureTable();
   const records = await listAllRecords(tableId);
