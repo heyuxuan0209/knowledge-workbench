@@ -999,6 +999,10 @@ app.get('/api/ideas', async (req, res) => {
   }
 });
 
+// 灵感变动 → 触发 bitable 防抖对账（ADR-068 单向同步；失败静默，定时兜底）
+const pokeIdeasBitable = () => import('./services/feishu-bitable-ideas.js')
+  .then(m => m.scheduleIdeasBitableSync()).catch(() => {});
+
 // 手记一条灵感（随手记：备忘录/群聊/脑内瞬间想法）。source_kind 默认 user。
 // 手记（user）且没自带料时，自动补料——拿标题语义检索素材库挂上相关素材（解决"手记灵感是孤岛"）。
 app.post('/api/ideas', async (req, res) => {
@@ -1023,6 +1027,7 @@ app.post('/api/ideas', async (req, res) => {
         await autoLinkIdea(idea.id);
       } catch (e) { console.warn('[ideas] 自动补料失败（不影响保存）:', e.message); }
     }
+    pokeIdeasBitable();
     res.json({ success: true, data: getIdea(idea.id) });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -1048,6 +1053,7 @@ app.post('/api/ideas/:id/adopt-note', async (req, res) => {
     if (!noteId) return res.status(400).json({ success: false, error: 'noteId is required' });
     const { adoptRelatedNote, getIdea } = await import('./db/ideas.js');
     const done = adoptRelatedNote(req.params.id, noteId);
+    if (done) pokeIdeasBitable();
     res.json({ success: done, data: done ? getIdea(req.params.id) : null });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -1986,6 +1992,12 @@ async function catchUpSyncIfStale() {
 }
 setTimeout(catchUpSyncIfStale, 20 * 1000);
 setInterval(catchUpSyncIfStale, 3600 * 1000);
+
+// 灵感库 → bitable 对账（ADR-068 单向）：启动 45s 后跑一次 + 每 10 分钟兜底；
+// 变动路由的 pokeIdeasBitable() 是即时路径（30s 防抖），这里兜住编辑/删除/AI 生成等未挂钩的路径
+setTimeout(() => pokeIdeasBitable(), 45 * 1000);
+setInterval(() => import('./services/feishu-bitable-ideas.js')
+  .then(m => m.reconcileIdeasToBitable()).catch(() => {}), 10 * 60 * 1000);
 
 app.post('/api/sync-all', async (req, res) => {
   res.json({ success: true, data: await syncAllChannels() });
