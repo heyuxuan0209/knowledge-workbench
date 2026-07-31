@@ -53,6 +53,10 @@
 
 历史补档脚本见 `backend/scripts/backfill-published-to-feishu.mjs`。
 
+## 北极星五问（ADR-070，内容与产品的决策关卡）
+
+**每次内容发布决策、每个产品/skill 立项，先过 `reference/prompts/creation/north-star.md` 的五问**：①为筛同频人还是为数据好看 ②我是这个主张的活证据吗（转述必须注入自己的实证）③有没有"会有人不同意"的观点 ④有没有把模糊感受压成一句可转述的机制命名 ⑤人味是否人产、入口是否在用户已经在的地方。答不上→改到能答，或不做。北极星：max(同频密度)≠max(流量)；人机分界线：人做观点/品味/判断/真实性，AI 做其余。voice-profile 管"怎么说像我"，north-star 管"该不该做"——north-star 在上游。
+
 ## 内容创作模板（ADR-026）
 
 创作层模板是「文体 × 平台形态」正交组合：`reference/prompts/creation/genres/`（6 文体）× `platform-forms/`（10 平台形态），生成 = `draft-frame + genre + platform-form`。改动守 ADR-025 三层原则、ADR-026 价值优先于爆款；每个模板必须接真实语料（`docs/teardowns/`）。
