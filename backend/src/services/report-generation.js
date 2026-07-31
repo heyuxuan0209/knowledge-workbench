@@ -36,7 +36,26 @@ function gatherInputs(db) {
   return { stories, registeredContents };
 }
 
-function buildPrompt(stories, registeredContents) {
+// 复盘回流（闭环层4，2026-07-31）：拉「发布与复盘」内容主表的验证结论，注入选题建议上下文——
+// 让日报的 ideas 知道"哪些方向被市场验证过/评论区在争什么"，接续已验证方向而不是每天从零想。
+// 拉不到（飞书挂/未配）静默跳过——复盘信号是增强，不是日报的依赖。
+async function fetchVerdicts() {
+  try {
+    const { feishuFetch } = await import('./feishu-auth.js');
+    const d = await feishuFetch(
+      '/open-apis/bitable/v1/apps/QIlkbwmGma9Tb1sRyAicfZeEnjb/tables/tblna4uWPhP0qQMH/records',
+      { query: { page_size: 100 } }
+    );
+    return (d.items || [])
+      .filter(r => r.fields?.['验证结论'])
+      .map(r => `- 《${r.fields['母稿标题'] || ''}》：${String(r.fields['验证结论']).replace(/\n/g, ' ').slice(0, 180)}`);
+  } catch (e) {
+    console.warn('[daily-report] 拉复盘验证结论失败（跳过，不影响日报）:', e.message);
+    return [];
+  }
+}
+
+function buildPrompt(stories, registeredContents, verdicts = []) {
   const storyBlock = stories.map((s, i) => {
     const members = s.members.map(m =>
       `  - [${m.id}] ${(m.zh_title || m.en_title || '').slice(0, 80)}`
@@ -57,6 +76,9 @@ ${storyBlock}
 
 # 关注的信息源动态
 ${registeredBlock}
+
+# 他自己内容的复盘验证信号（来自发布数据与评论区，选题建议要接续这些，不是每天从零想）
+${verdicts.length ? verdicts.join('\n') : '（暂无）'}
 
 请输出 JSON（不要 markdown 代码块），结构如下：
 {
@@ -79,6 +101,7 @@ ${registeredBlock}
 要求：
 - focus 取最重要的 3-5 个，宁缺毋滥
 - ideas 出 2-3 个，优先选"有多源交叉验证 + 有争议点"的话题（争议是好内容的燃料）
+- 若「复盘验证信号」有内容：ideas 里至少 1 个要接续已验证方向或回应他评论区的真实争论（比如做续集/深挖同温层线索），并在 angle 里点明接的是哪条信号；但别硬凑——信号与今日热点无交集时照常出题
 - contentIds 必须来自上面方括号里的真实 id，不得编造
 - 全部用中文`;
 }
@@ -95,7 +118,8 @@ export async function generateDailyReport({ days = 7 } = {}) { // eslint-disable
     return { success: false, error: '近期没有足够内容，请先同步数据源' };
   }
 
-  const prompt = buildPrompt(stories, registeredContents);
+  const verdicts = await fetchVerdicts();
+  const prompt = buildPrompt(stories, registeredContents, verdicts);
   const result = await chat([{ role: 'user', content: prompt }]);
 
   if (!result.success) {
