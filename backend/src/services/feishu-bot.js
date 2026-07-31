@@ -33,6 +33,7 @@ async function getBotToken() {
 
 let started = false;
 let wsRef = null;
+const pendingDigest = new Map(); // chatId → { replyText, data, noteId, url, at }：链接解读的追问期上下文（10 分钟，ADR-067）
 
 function extractText(message) {
   if (!message || message.message_type !== 'text') return '';
@@ -41,16 +42,34 @@ function extractText(message) {
 // 问句：全/半角问号结尾 → 想要反馈；否则静默记
 const isQuestion = (t) => /[?？]\s*$/.test(t);
 
-// 发一条文本回私信（用本应用令牌——chat_id 是应用维度的，拿主应用令牌发不进这个会话）
-async function sendText(chatId, text) {
+// 发一条文本消息（用本应用令牌——chat_id 是应用维度的，拿主应用令牌发不进这个会话）
+async function sendMessage(receiveId, idType, text) {
   const token = await getBotToken();
-  const res = await fetch(`${feishuBase()}/open-apis/im/v1/messages?receive_id_type=chat_id`, {
+  const res = await fetch(`${feishuBase()}/open-apis/im/v1/messages?receive_id_type=${idType}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ receive_id: chatId, msg_type: 'text', content: JSON.stringify({ text }) }),
+    body: JSON.stringify({ receive_id: receiveId, msg_type: 'text', content: JSON.stringify({ text }) }),
   });
   const j = await res.json();
   if (j.code !== 0) throw new Error(`发送失败(${j.code}): ${j.msg || '未知错误'}`);
+}
+const sendText = (chatId, text) => sendMessage(chatId, 'chat_id', text);
+
+// 给用户本人发私信（插件「转发飞书」/主动推送用，ADR-067）。
+// 坑（实测 99992361 open_id cross app）：open_id 是应用维度的，主应用的 FEISHU_OWNER_OPEN_ID
+// 在本机器人应用下无效 → 改用你和机器人的 p2p chat_id：优先 .env FEISHU_BOT_OWNER_CHAT_ID，
+// 否则从收件箱历史私信自动取（你给机器人发过消息就有）。
+let ownerChatId = null;
+export async function sendToOwner(text) {
+  if (!ownerChatId) {
+    ownerChatId = process.env.FEISHU_BOT_OWNER_CHAT_ID || null;
+    if (!ownerChatId) {
+      const { latestOwnerChatId } = await import('../db/feishu-inbox.js');
+      ownerChatId = latestOwnerChatId();
+    }
+    if (!ownerChatId) throw new Error('找不到与机器人的私聊会话（先给「KW 笔记助手」发一条消息，或配 FEISHU_BOT_OWNER_CHAT_ID）');
+  }
+  return sendMessage(ownerChatId, 'chat_id', text);
 }
 
 // 用户背景 + 理解口径——决定回复答不答得对路（改这一处即可，日后可移到设置页）。
@@ -149,6 +168,55 @@ async function handleMessage(data) {
     extra: { chatId, asked, senderId: data?.sender?.sender_id?.open_id || null },
   });
   if (!isNew) { console.log('[feishu-bot] 重推事件已处理过，跳过:', msg.message_id); return; }
+
+  // ── 链接消息 → 解读链路（ADR-067）：发链接=想看懂，优先级高于问句/分诊。
+  //    摄入+中文解读+落库（素材必存，附言当感想按 ADR-066 分流立灵感），回文本卡片。
+  const url = text.match(/https?:\/\/[^\s，。」』]+/)?.[0];
+  if (url) {
+    try {
+      await sendText(chatId, '⏳ 收到，解读中…（含视频约 1-2 分钟，好了发你）');
+      const { digestUrl } = await import('./link-digest.js');
+      const dg = await digestUrl(url, text.replace(url, '').trim().slice(0, 200));
+      pendingDigest.set(chatId, { ...dg, url, at: Date.now() });
+      await sendText(chatId, dg.replyText);
+      markTriagedByFeishuId(msg.message_id, { status: 'accepted', resultKind: 'note', resultId: dg.noteId });
+    } catch (e) {
+      console.error('[feishu-bot] 链接解读失败:', e.message);
+      await sendText(chatId, `解读失败：${e.message}`).catch(() => {});
+    }
+    return;
+  }
+
+  // ── 解读追问期（上一条解读后 10 分钟内）：「全文」发全稿 / 问句带材料答 / 短句当感想立灵感
+  const pend = pendingDigest.get(chatId);
+  if (pend && Date.now() - pend.at < 10 * 60_000) {
+    try {
+      if (/^全文$/i.test(text)) {
+        const full = (pend.data.zhBody || pend.data.body || '').trim() || '（这条没有可发的全文）';
+        const CH = 3500, MAX = 4; // 飞书单条消息别太长，超 4 段引导去工作台
+        for (let i = 0; i < full.length && i < CH * MAX; i += CH) await sendText(chatId, full.slice(i, i + CH));
+        if (full.length > CH * MAX) await sendText(chatId, `（全文较长，已发前 ${CH * MAX} 字，完整稿去 KW 工作台粘链接看）`);
+        markTriagedByFeishuId(msg.message_id, { status: 'accepted', resultKind: 'note', resultId: pend.noteId });
+        return;
+      }
+      if (asked) {
+        const { askDigest } = await import('./link-digest.js');
+        const a = await askDigest(pend, text);
+        if (a) {
+          await sendText(chatId, a);
+          markTriagedByFeishuId(msg.message_id, { status: 'accepted', resultKind: 'note', resultId: pend.noteId });
+          return;
+        }
+        // 材料答不上 → 落回下面的通用问句流程
+      } else {
+        const { saveFeel } = await import('./link-digest.js');
+        await saveFeel(pend, text);
+        markTriagedByFeishuId(msg.message_id, { status: 'accepted', resultKind: 'note', resultId: pend.noteId });
+        await sendText(chatId, `💡 已立为灵感：「${text.slice(0, 40)}」（解读素材已挂料）`);
+        return;
+      }
+    } catch (e) { console.error('[feishu-bot] 解读追问期处理失败（落回常规流程）:', e.message); }
+  }
 
   if (asked) {
     try {

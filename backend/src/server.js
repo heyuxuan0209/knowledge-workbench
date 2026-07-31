@@ -176,6 +176,19 @@ app.post('/api/content/ingest', async (req, res) => {
   }
 });
 
+// 插件「转发飞书」（ADR-067）：把当前解读推给用户本人私信（手机同步可见）
+app.post('/api/feishu/push-digest', async (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (!text?.trim()) return res.status(400).json({ success: false, error: 'text is required' });
+    const { sendToOwner } = await import('./services/feishu-bot.js');
+    await sendToOwner(text.slice(0, 9000));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 上传文件即时分析（UI 改造）：音频→本地转写全程 / PDF→抽文字。异步：返回 jobId，前端轮询。
 app.post('/api/content/upload', upload.single('file'), async (req, res) => {
   try {

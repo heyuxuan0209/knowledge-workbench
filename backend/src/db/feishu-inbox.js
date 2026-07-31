@@ -29,6 +29,18 @@ function hydrate(row) {
   return row;
 }
 
+// 最近一条私信的 p2p chat_id（ADR-067 sendToOwner 用：open_id 跨应用不通用，chat_id 才是本机器人应用的稳定会话标识）
+export function latestOwnerChatId() {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT json_extract(extra, '$.chatId') AS chat_id FROM feishu_inbox
+    WHERE obj_type = 'message' AND json_extract(extra, '$.chatId') IS NOT NULL
+    ORDER BY datetime(created_at) DESC LIMIT 1
+  `).get();
+  db.close();
+  return row?.chat_id || null;
+}
+
 export function listInbox({ status = 'pending', limit = 100 } = {}) {
   const db = getDatabase();
   const rows = status

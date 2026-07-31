@@ -59,6 +59,7 @@ function ensurePanel() {
     <div class="body"></div>
     <div class="foot">
       <div class="row"><input class="feel" placeholder="一句感想（写了会立为灵感）…"><button class="btn p save">☆ 存灵感库</button></div>
+      <div class="row"><button class="btn fwd" style="flex:1">✈ 转发到飞书（手机可看）</button></div>
       <div class="row"><input class="ask" placeholder="就这条内容追问…"><button class="btn send">↑</button></div>
       <div class="hint">KW · knowledge-workbench 本机后端</div>
     </div>`;
@@ -68,10 +69,12 @@ function ensurePanel() {
     body: wrap.querySelector('.body'),
     feel: wrap.querySelector('.feel'),
     save: wrap.querySelector('.save'),
+    fwd: wrap.querySelector('.fwd'),
     ask: wrap.querySelector('.ask'),
   };
   wrap.querySelector('.close').onclick = () => wrap.classList.remove('open');
   ui.save.onclick = saveNote;
+  ui.fwd.onclick = pushToFeishu;
   wrap.querySelector('.send').onclick = sendAsk;
   ui.ask.addEventListener('keydown', e => { if (e.key === 'Enter') sendAsk(); });
   document.documentElement.appendChild(host);
@@ -259,6 +262,30 @@ async function saveNote() {
     ui.save.classList.add('done'); ui.save.textContent = '✓ 已存灵感 + 挂料';
   } catch (e) {
     ui.save.textContent = `存失败：${e.message.slice(0, 20)}`;
+  }
+}
+
+// 转发到飞书（ADR-067）：解读推给用户本人私信，手机上也能看/继续在飞书里追问
+async function pushToFeishu() {
+  if (!state?.data || state.streaming) return;
+  const d = state.data, m = d.metadata || {};
+  const interp = state.chat.find(x => x.role === 'assistant')?.content || (d.zhBody || d.body || '').slice(0, 3000);
+  const text = [`📖 ${d.zhTitle || d.title || state.url}`,
+    [m.author, m.platform].filter(Boolean).join(' · ') || null,
+    state.url, '', interp].filter(x => x !== null).join('\n');
+  const old = ui.fwd.textContent;
+  ui.fwd.textContent = '发送中…';
+  try {
+    const r = await fetch(`${KW}/api/feishu/push-digest`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const res = await r.json();
+    if (!res.success) throw new Error(res.error || '发送失败');
+    ui.fwd.textContent = '✓ 已发到你的飞书';
+  } catch (e) {
+    ui.fwd.textContent = `发送失败：${e.message.slice(0, 18)}`;
+    setTimeout(() => { ui.fwd.textContent = old; }, 2500);
   }
 }
 

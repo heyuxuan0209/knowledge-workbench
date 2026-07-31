@@ -408,6 +408,17 @@ export default function WorkbenchPage() {
     }
   }
 
+  // ---- Mac App / 快捷启动器通路（ADR-067）：?analyze=<链接> 打开即自动解读 ----
+  // X/YouTube 的原生 Mac App 里插件进不去，「KW 解读.app」拷贝链接后拉起本页并带此参数；
+  // 用完立即清参数，防刷新/收藏后重复摄入。
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get('analyze')
+    if (!target) return
+    window.history.replaceState(null, '', window.location.pathname)
+    acquire(target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ---- 触点①「从飞书选」：列可挑的飞书文档/知识库，挑中后抓正文送右栏解读（飞书=来源不是打字框）----
   const pickFeishu = async () => {
     try {
