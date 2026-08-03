@@ -1035,7 +1035,7 @@ const uniqVals = a => [...new Set(a.filter(Boolean))]
 const COVER_PRESET_OPTS = {
   name: ['AI 观察手记', 'AI 踩坑手记'],
   tag: ['深度精读', '深度复盘', '踩坑复盘', '实践复盘'],
-  author_html: ['杰西卡　<b>独立开发者</b> · AI 产品人'],
+  author_html: ['杰西卡　<b>AI 产品人</b> · 做过数百个数字化项目'],
 }
 
 // ADR-052 P1 头图面板：选系列风格 + 填期刊字段 → 生成双尺寸 PNG（消息大图 1800×766 + 方图 2000×2000）。
@@ -1135,7 +1135,7 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
             </span>
           )}
         </label>
-        <CoverField f={f} set={set} label="作者行（可用 <b>身份</b> 上色）" k="author_html" ph="杰西卡　<b>独立开发者</b> · AI 产品人"
+        <CoverField f={f} set={set} label="作者行（可用 <b>身份</b> 上色）" k="author_html" ph="杰西卡　<b>AI 产品人</b> · 做过数百个数字化项目"
           chips={uniqVals([...(prefs.options.author_html || []), ...COVER_PRESET_OPTS.author_html])} />
         <CoverField f={f} set={set} label="类型标签" k="tag" ph="深度精读"
           chips={uniqVals([...(prefs.options.tag || []), ...COVER_PRESET_OPTS.tag])} />
