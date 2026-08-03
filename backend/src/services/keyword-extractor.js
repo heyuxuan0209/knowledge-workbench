@@ -18,7 +18,7 @@ export async function extractKeywords(title, summary) {
 
   try {
     const response = await deepseekClient.chat.completions.create({
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro', // deepseek-chat 已作废（2026-07 改版）
+      model: 'deepseek-v4-flash', // 关键词提取=杂活，走便宜款（ADR-071 分级；deepseek-chat 已作废）
       messages: [
         {
           role: 'system',
