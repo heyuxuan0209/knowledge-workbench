@@ -84,10 +84,10 @@ ${text}
 译文：`;
 
   // 单次重试：翻译量大时（一次 RSS 同步几百条）偶发连接抖动，重试一次再抛
-  let result = await chat([{ role: 'user', content: prompt }], 'deepseek');
+  let result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash');
   if (!result.success) {
     await new Promise(r => setTimeout(r, 800));
-    result = await chat([{ role: 'user', content: prompt }], 'deepseek');
+    result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash');
   }
   if (!result.success) {
     throw new Error(`翻译失败: ${result.error}`);
@@ -147,7 +147,7 @@ ${fullText}
 只返回 JSON 数组，不要有任何其他文字或代码块标记：
 [{"title": "章节标题", "startTime": 0, "endTime": 120}]`;
 
-  const result = await chat([{ role: 'user', content: prompt }], 'deepseek');
+  const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash');
   if (!result.success) return [];
 
   try {

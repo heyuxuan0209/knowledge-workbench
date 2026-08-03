@@ -17,7 +17,7 @@ export async function generateNoteTitle(noteId, excerpt) {
     const result = await chat([{
       role: 'user',
       content: `给这段知识素材起一个中文标题，要求：12 字以内、说清核心内容是什么（不要"关于/浅谈"这类空词）、只输出标题本身。\n\n${excerpt.slice(0, 1500)}`,
-    }]);
+    }], 'deepseek', 'deepseek-v4-flash');
     if (!result.success) throw new Error(result.error);
     const title = result.content.trim().replace(/^["「《#\s]+|["」》\s]+$/g, '').slice(0, 24);
     if (title) setNoteTitle(noteId, title);

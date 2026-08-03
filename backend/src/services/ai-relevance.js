@@ -36,7 +36,7 @@ export async function filterRelevant(items) {
 只输出 JSON（不要代码块）：{"results": [{"i": 0, "relevant": true}, {"i": 1, "relevant": false}, ...]}
 
 ${list}`,
-  }]);
+  }], 'deepseek', 'deepseek-v4-flash');
 
   if (!result.success) {
     console.warn('⚠️ relevance filter LLM failed, keeping all:', result.error);
@@ -80,7 +80,7 @@ ${list}`;
   const map = new Map();
   // 一次重试：瞬时 API 失败/整段没解析出来，不该让整批条目静默丢摘要（漏摘要在同步侧会常驻 null）
   for (let attempt = 0; attempt < 2 && map.size === 0; attempt++) {
-    const result = await chat([{ role: 'user', content: prompt }]);
+    const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash');
     if (!result.success) continue;
     const arr = extractJson(result.content)?.summaries;
     if (!Array.isArray(arr)) continue;

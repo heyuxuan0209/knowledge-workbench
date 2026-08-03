@@ -14,6 +14,21 @@ function deepseekClient() {
   return _client;
 }
 
+// Qwen（阿里云百炼，OpenAI 兼容）——高频杂活省钱通道（2026-08-03，成本分级）。
+// 分工：相关性打分/翻译/起标题/提关键词等简单高频活走 qwen（输入¥0.2/M,便宜5倍）；
+// 写稿/报告/thread/同化等生成任务留 deepseek v4-pro（质量优先）。调用点用 chat(msgs,'qwen') 指定。
+let _qwenClient = null;
+function qwenClient() {
+  if (!_qwenClient) {
+    _qwenClient = new OpenAI({
+      apiKey: process.env.QWEN_API_KEY || '',
+      baseURL: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    });
+  }
+  return _qwenClient;
+}
+const QWEN_MODEL = process.env.QWEN_MODEL || 'qwen3.5-flash';
+
 // Deepseek 模型名（2026-07 改版：deepseek-chat 作废，官方只认 deepseek-v4-pro / deepseek-v4-flash）。
 // 默认走 v4-pro（质量优先，对齐内容北极星）；可用 DEEPSEEK_MODEL 覆盖（如批量任务省钱切 v4-flash）。
 export const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
@@ -21,12 +36,10 @@ export const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
 // Claude API 配置（备选）
 // TODO: 后续实现 Anthropic SDK
 
-// 计算成本（Deepseek 价格：¥1/M tokens）
+// 计算成本（粗估，仅用于日志）。qwen3.5-flash 约 ¥0.2/M 输入,deepseek-v4-pro 约 ¥3/M 输入。
 function calculateCost(tokens, provider = 'deepseek') {
-  if (provider === 'deepseek') {
-    return (tokens / 1_000_000) * 1.0; // ¥1/M tokens
-  }
-  // Claude 价格可以后续添加
+  if (provider === 'qwen') return (tokens / 1_000_000) * 0.5;   // qwen flash 混合估
+  if (provider === 'deepseek') return (tokens / 1_000_000) * 3.0; // v4-pro 混合估
   return 0;
 }
 
@@ -100,13 +113,17 @@ export async function* streamChat(messages, provider = 'deepseek', model = null)
 // options.temperature：报告类生成传 0——同样的输入尽量给同样的输出，
 // 否则"重新生成"每次内容都变，用户无法信任报告（2026-07-16 反馈 #1）
 export async function chat(messages, provider = 'deepseek', model = null, options = {}) {
-  if (provider === 'deepseek') {
-    const modelName = model || DEFAULT_MODEL;
+  if (provider === 'deepseek' || provider === 'qwen') {
+    const isQwen = provider === 'qwen';
+    const client = isQwen ? qwenClient() : deepseekClient();
+    const modelName = model || (isQwen ? QWEN_MODEL : DEFAULT_MODEL);
 
     try {
-      const response = await deepseekClient().chat.completions.create({
+      const response = await client.chat.completions.create({
         model: modelName,
         messages: messages,
+        // qwen3.5 默认开思考模式(慢+多花输出钱),杂活一律关掉
+        ...(isQwen ? { enable_thinking: false } : {}),
         ...(options.temperature !== undefined ? { temperature: options.temperature } : {})
       });
 
