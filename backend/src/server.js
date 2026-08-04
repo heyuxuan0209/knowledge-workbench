@@ -193,6 +193,19 @@ app.post('/api/content/ingest', async (req, res) => {
   }
 });
 
+// 回存解读缓存（ADR-076 补）：插件/前端首次流式解读完，把结果按 URL 存下，重开秒出。
+app.post('/api/content/interpretation-cache', async (req, res) => {
+  try {
+    const { url, interpretation } = req.body || {};
+    if (!url || !interpretation?.trim()) return res.status(400).json({ success: false, error: 'url 和 interpretation 必填' });
+    const { setCachedInterpretation } = await import('./db/ingest-cache.js');
+    setCachedInterpretation(url, interpretation);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 插件「转发飞书」（ADR-067）：把当前解读推给用户本人私信（手机同步可见）
 app.post('/api/feishu/push-digest', async (req, res) => {
   try {
@@ -539,7 +552,7 @@ app.get('/api/materials', async (req, res) => {
   try {
     const { getNotes } = await import('./db/notes.js');
     const rows = getNotes({ limit: 200, q: req.query.q || null });
-    res.json({ success: true, data: rows.map(n => ({ id: n.id, excerpt: (n.excerpt || '').slice(0, 90), sourceTitle: n.title || n.content_zh_title || n.source_title || '未命名素材', sourceUrl: n.source_url || n.content_url || null })) });
+    res.json({ success: true, data: rows.map(n => ({ id: n.id, excerpt: (n.excerpt || '').slice(0, 160), full: n.excerpt || '', sourceTitle: n.title || n.content_zh_title || n.source_title || '未命名素材', sourceUrl: n.source_url || n.content_url || null })) });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

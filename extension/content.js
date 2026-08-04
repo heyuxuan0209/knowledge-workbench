@@ -179,9 +179,24 @@ const INTERPRET_PROMPT = '请解读这份材料，输出三部分（用【摘要
 
 async function runInterpret() {
   state.chat = [{ role: 'user', content: INTERPRET_PROMPT }];
+  // 命中解读缓存（同链接第二次）→ 直接渲染，秒出，不再跑 DeepSeek（ADR-076 补）
+  if (state.data.cachedInterpretation) {
+    card('解读', md(state.data.cachedInterpretation) + '<p style="color:#71767b;font-size:12px;margin-top:6px">· 上次已解读，秒开</p>');
+    state.chat.push({ role: 'assistant', content: state.data.cachedInterpretation });
+    return;
+  }
   const c = card('解读', '<p style="color:#71767b">生成中…</p>');
   const text = await streamChat(state.chat, c);
-  if (text) state.chat.push({ role: 'assistant', content: text });
+  if (text) {
+    state.chat.push({ role: 'assistant', content: text });
+    // 回存解读缓存（仅链接类；粘贴文本无 url 不存）——下次重开秒出
+    if (state.url) {
+      fetch(`${KW}/api/content/interpretation-cache`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: state.url, interpretation: text }),
+      }).catch(() => {});
+    }
+  }
 }
 
 async function sendAsk() {

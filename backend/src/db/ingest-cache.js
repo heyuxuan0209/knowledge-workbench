@@ -13,10 +13,14 @@ function ensureTable(db) {
     url TEXT,                     -- 原始 URL（留痕）
     payload TEXT NOT NULL,        -- 摄入+翻译结果的 JSON（body/zhBody/zhTitle/metadata/transcript…）
     engine TEXT,                  -- 转写引擎（groq/local/captions），诊断用
+    interpretation TEXT,          -- 解读产物（摘要/要点/金句），首次生成后缓存，重开秒出（ADR-076 补）
     hits INTEGER DEFAULT 0,       -- 命中次数（看缓存值不值）
     created_at TEXT DEFAULT (datetime('now')),
     used_at TEXT DEFAULT (datetime('now'))
   )`);
+  // 已存在的旧表补列（首版没有 interpretation，这里幂等补上）
+  const cols = db.prepare('PRAGMA table_info(ingest_cache)').all().map(c => c.name);
+  if (!cols.includes('interpretation')) db.exec('ALTER TABLE ingest_cache ADD COLUMN interpretation TEXT');
   ready = true;
 }
 
@@ -52,17 +56,41 @@ export function normalizeUrlKey(raw) {
 }
 
 // 命中返回解析后的 payload（并累加 hits/used_at），未命中返回 null。
+// 若已缓存解读产物，附到 cachedInterpretation 字段——调用方据此跳过重跑 DeepSeek。
 export function getIngestCache(url) {
   const db = getDatabase();
   ensureTable(db);
   const key = normalizeUrlKey(url);
-  const row = db.prepare('SELECT payload FROM ingest_cache WHERE url_key = ?').get(key);
+  const row = db.prepare('SELECT payload, interpretation FROM ingest_cache WHERE url_key = ?').get(key);
   if (row) {
     db.prepare("UPDATE ingest_cache SET hits = hits + 1, used_at = datetime('now') WHERE url_key = ?").run(key);
   }
   db.close();
   if (!row) return null;
-  try { return JSON.parse(row.payload); } catch { return null; }
+  try {
+    const data = JSON.parse(row.payload);
+    if (row.interpretation) data.cachedInterpretation = row.interpretation;
+    return data;
+  } catch { return null; }
+}
+
+// 单独取缓存的解读（机器人链路用）。无则 null。
+export function getCachedInterpretation(url) {
+  const db = getDatabase();
+  ensureTable(db);
+  const row = db.prepare('SELECT interpretation FROM ingest_cache WHERE url_key = ?').get(normalizeUrlKey(url));
+  db.close();
+  return row?.interpretation || null;
+}
+
+// 写解读缓存（首次生成后回存）。行需已存在（ingest 总是先缓存）；不存在则静默跳过。
+export function setCachedInterpretation(url, interpretation) {
+  if (!interpretation?.trim()) return;
+  const db = getDatabase();
+  ensureTable(db);
+  db.prepare("UPDATE ingest_cache SET interpretation = ? WHERE url_key = ?")
+    .run(interpretation, normalizeUrlKey(url));
+  db.close();
 }
 
 // 写缓存（upsert）。engine 从 payload.transcriptEngine 或调用方传入，仅诊断。

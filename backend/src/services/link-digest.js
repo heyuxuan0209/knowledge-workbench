@@ -27,13 +27,19 @@ export async function digestUrl(url, feel = '') {
   const d = j.data;
   const m = d.metadata || {};
 
-  const { chat } = await import('./llm.js');
-  const material = `【标题】${d.zhTitle || d.title || '(无题)'}\n【作者/平台】${[m.author, m.platform].filter(Boolean).join(' · ') || '未知'}\n【正文】\n${(d.zhBody || d.body || '').slice(0, 12000)}`;
-  const res = await chat([
-    { role: 'system', content: '你是用户的中文内容解读助手。材料如下：\n' + material },
-    { role: 'user', content: INTERPRET_PROMPT },
-  ], 'deepseek');
-  const interp = res?.success ? (res.content || '').trim() : '（解读生成失败，可直接提问针对性追问）';
+  // 解读缓存（ADR-076 补）：同链接第二次直接复用，不再重跑 DeepSeek
+  const { getCachedInterpretation, setCachedInterpretation } = await import('../db/ingest-cache.js');
+  let interp = getCachedInterpretation(url);
+  if (!interp) {
+    const { chat } = await import('./llm.js');
+    const material = `【标题】${d.zhTitle || d.title || '(无题)'}\n【作者/平台】${[m.author, m.platform].filter(Boolean).join(' · ') || '未知'}\n【正文】\n${(d.zhBody || d.body || '').slice(0, 12000)}`;
+    const res = await chat([
+      { role: 'system', content: '你是用户的中文内容解读助手。材料如下：\n' + material },
+      { role: 'user', content: INTERPRET_PROMPT },
+    ], 'deepseek');
+    interp = res?.success ? (res.content || '').trim() : '（解读生成失败，可直接提问针对性追问）';
+    if (res?.success && interp) setCachedInterpretation(url, interp);
+  }
 
   // 素材必存；带感想 → 另立灵感 + 挂料（ADR-066 分流）
   let noteId = null, ideaOk = false;
