@@ -124,13 +124,24 @@ app.get('/api/contents/:id/interpretation', async (req, res) => {
 // 直接把摄入失败的原因透传给前端。对话（#8）是下一步，这里只负责「摄入 + 翻译」。
 app.post('/api/content/ingest', async (req, res) => {
   try {
-    const { input } = req.body;
+    const { input, refresh } = req.body;
 
     if (!input) {
       return res.status(400).json({
         success: false,
         error: 'input is required'
       });
+    }
+
+    // 转写/翻译缓存（ADR-070）：链接类输入第二次解读直接复用首次结果，不再重下、重转。
+    // 只缓存 URL（粘贴的纯文本不缓存）；refresh=true 跳过缓存并重写（内容更新/想重跑时用）。
+    const isUrl = /^https?:\/\//i.test(input.trim());
+    if (isUrl && !refresh) {
+      const { getIngestCache } = await import('./db/ingest-cache.js');
+      const cached = getIngestCache(input);
+      if (cached) {
+        return res.json({ success: true, data: { ...cached, fromCache: true } });
+      }
     }
 
     const { ingest } = await import('./services/content-ingestion.js');
@@ -164,10 +175,16 @@ app.post('/api/content/ingest', async (req, res) => {
       translation = await translateContent(ingested);
     }
 
-    res.json({
-      success: true,
-      data: { ...ingested, ...translation, truncated }
-    });
+    const data = { ...ingested, ...translation, truncated };
+
+    // 写缓存：仅 URL 类、且真花了力气（视频/音频/网页抓取）。飞书文档是你自己的、随时会改，不缓存。
+    if (isUrl && ingested.type !== 'feishu') {
+      import('./db/ingest-cache.js')
+        .then(({ setIngestCache }) => setIngestCache(input, data, ingested.transcriptEngine || null))
+        .catch(err => console.warn('[ingest-cache] 写缓存失败（不影响返回）:', err.message));
+    }
+
+    res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({
       success: false,
