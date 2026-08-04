@@ -1,4 +1,4 @@
-// KW 解读 · 内容脚本（P1，接 ADR-064；选型见 prototype/mock-pages/x-interpret-mock-*）
+// 读懂（原名 KW 解读）· 内容脚本（P1，接 ADR-064；选型见 prototype/mock-pages/x-interpret-mock-*）
 // 形态：推文/视频旁注入「解读」按钮 → 右侧滑出卡片风面板 → 摄入+翻译 → 流式解读 → 追问/存灵感库。
 // 依赖本机 KW 后端（launchd 常驻 :3000）；后端 CORS 全开，内容脚本直连即可，无需 background。
 
@@ -54,7 +54,7 @@ function ensurePanel() {
   const style = document.createElement('style'); style.textContent = CSS; root.appendChild(style);
   const wrap = document.createElement('div'); wrap.className = 'wrap'; root.appendChild(wrap);
   wrap.innerHTML = `
-    <div class="head">⚡ <b>KW 解读</b><button class="close">✕</button></div>
+    <div class="head">⚡ <b>读懂</b><button class="close">✕</button></div>
     <div class="src"></div>
     <div class="body"></div>
     <div class="foot">

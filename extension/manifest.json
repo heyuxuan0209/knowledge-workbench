@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "KW 解读",
-  "version": "0.2.0",
-  "description": "X / YouTube 一键解读：英文富媒体 → 中文卡片解读，可追问、存灵感库（依赖本机 knowledge-workbench 后端）",
+  "name": "读懂",
+  "version": "0.3.0",
+  "description": "X / YouTube 一键读懂：英文富媒体 → 中文卡片解读，可追问、存灵感库（依赖本机 knowledge-workbench 后端）",
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "action": { "default_title": "读懂", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" } },
   "content_scripts": [
     {
       "matches": ["https://x.com/*", "https://twitter.com/*", "https://www.youtube.com/*"],
