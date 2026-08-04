@@ -1,4 +1,4 @@
-// KW 解读插件冒烟测试（ADR-065 验证方式）：jsdom 模拟 x.com DOM → content.js 注入按钮
+// 读懂（原 KW 解读）插件冒烟测试（ADR-065 验证方式）：jsdom 模拟 x.com DOM → content.js 注入按钮
 // → 点击 → 真实后端全流程（摄入走本地库秒回路径 + DeepSeek 流式解读）。
 // 运行：node extension/smoke.mjs（需本机后端在跑；jsdom 复用 backend 依赖）
 import { createRequire } from 'module';
