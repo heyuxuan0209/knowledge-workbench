@@ -5,6 +5,14 @@
 
 **English** · [中文](#中文)
 
+<div align="center">
+
+<video src="https://github.com/heyuxuan0209/knowledge-workbench/releases/download/media/kw-demo.mp4" poster="https://raw.githubusercontent.com/heyuxuan0209/knowledge-workbench/main/assets/demo-poster.jpg" controls width="820"></video>
+
+<sub>▶️ 3 分钟看懂这个工作台 · A 3-min walkthrough &nbsp;|&nbsp; 播放器加载不出来就点 <a href="https://github.com/heyuxuan0209/knowledge-workbench/releases/download/media/kw-demo.mp4">这里看完整视频 / watch the full video</a></sub>
+
+</div>
+
 ## English
 
 **Saved hundreds of articles, yet when it's time to write you can't recall a single one?** And here's the thing — what's truly valuable usually isn't those bookmarks; it's **the pitfalls you hit doing the work, the judgments hashed out in meetings, the sparks that flash through your mind** — and those are the ones most easily lost.
