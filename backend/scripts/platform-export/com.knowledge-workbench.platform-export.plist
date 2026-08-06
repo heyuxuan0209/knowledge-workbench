@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 平台数据导出：每天 10:07 跑一次（避开整点，不写 0 10）。装法见同目录 README.md。
+     需登录 GUI 会话才能开有头 Chrome——LaunchAgent 天然在用户 Aqua 会话里跑，符合。 -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.knowledge-workbench.platform-export</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>scripts/platform-export/run.mjs</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/heyuxuan/Documents/项目/knowledge-workbench/backend</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>7</integer></dict>
+  <key>StandardOutPath</key><string>/Users/heyuxuan/Library/Logs/knowledge-workbench/platform-export.log</string>
+  <key>StandardErrorPath</key><string>/Users/heyuxuan/Library/Logs/knowledge-workbench/platform-export.log</string>
+</dict>
+</plist>
