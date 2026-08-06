@@ -24,7 +24,7 @@ The approach is simple: **AI eats every chore that produces no understanding** �
 
 > **What you read ＋ your own first-hand experience → collide into judgment → write it → ship it → feed the review back → understand better what to write next**
 
-> **The flywheel is closing its last half-loop**: "publish → data → review → self-evolution" has **taken its first step** — automatically pulling the performance of shipped content back for side-by-side comparison (Xiaohongshu / WeChat already working, Douyin / Video Account being connected). Only once this half-loop is done does it truly close the loop.
+> **The flywheel's first full loop is now built**: "publish → data → review → self-evolution" — automatically pulling shipped content's performance back for side-by-side comparison — now works across all four platforms (Xiaohongshu / WeChat / Douyin / Video Account). Next up is sharpening the attribution and self-evolution.
 
 ---
 
@@ -53,7 +53,7 @@ This workbench turns "two streams of first-hand material → cognition → conte
                        ↓ Fission (AI fully-automatic: long-form / thread / voiceover / image-text…)
                    Multi-platform content (widen)
                        ↓ Publish + review (data flows back automatically, side-by-side comparison)
-                   Feed back to next round (closed loop · last half-loop under construction)
+                   Feed back to next round (closed loop · first full version working)
 ```
 
 Division-of-labor principle: **AI eats every link that produces no understanding**; **"deciding what to write, the core thesis, the judgment" stays in the human's hands**.
@@ -95,14 +95,14 @@ Three steps: **pick a few pieces of material → AI drafts a deep piece → one 
 - **Multiple visual styles, swap freely** (Warm Journal / Midnight Neon / Aesop / Neo-Brutalist…): pick a "series style" and header image, layout, and voiceover are unified.
 - **Not the "obviously AI-written" cookie-cutter kind**: whether it reads like AI isn't something de-AI-ed out afterward — it's **whether real human corpus was fed in from the start** — so every template connects to a real deconstructed corpus (e.g. Douyin voiceover learns "grind on the mechanism, anti-viral," not the 3-second-hook playbook); and each passage can be clicked back to see which piece of material it cites.
 
-### 📊 Review — let what's shipped feed the next round (under construction)
-Automatically pull back the performance data of already-published content **for side-by-side comparison** (the difference of the same piece across Xiaohongshu / WeChat / Douyin / Video Account), helping me see clearly "which way of writing actually leaves readers better off," then feed it back into the next topic choice. Currently Xiaohongshu / WeChat are already working, Douyin / Video Account being connected — this is the last link in closing the flywheel.
+### 📊 Review — let what's shipped feed the next round
+Automatically pull back the performance data of already-published content **for side-by-side comparison** (the difference of the same piece across Xiaohongshu / WeChat / Douyin / Video Account), helping me see clearly "which way of writing actually leaves readers better off," then feed it back into the next topic choice. **Automatic data flow-back now works across all four platforms (Xiaohongshu / WeChat / Douyin / Video Account)** — the last link of the flywheel is closed, and its first full loop is built.
 
 ---
 
 ## 🗺 What's being built · What's next
 
-**The flywheel's last half-loop — "publish → data → review → self-evolution" — is closing**: automatic data flow-back from four platforms already published has taken its first step (Xiaohongshu / WeChat working, Douyin / Video Account being connected), and the next step is to let the system help me see clearly "which way of writing actually leaves readers better off," then feed it back into the next topic choice. Only once this half-loop is done does it truly close the loop.
+**The flywheel's first full loop — "publish → data → review → self-evolution" — is now built**: automatic data flow-back and side-by-side comparison now work across all four platforms (Xiaohongshu / WeChat / Douyin / Video Account), and the next step is to let the system help me see clearly "which way of writing actually leaves readers better off," then feed it back into the next topic choice.
 
 Want to watch it grow or talk ideas — ⭐ star and follow, or open an issue.
 
@@ -139,7 +139,7 @@ Copyright © 2026 Jessica · All rights not expressly granted are reserved.
 
 > **读到的 ＋ 自己的一手经验 → 碰撞想明白 → 写出来 → 发出去 → 复盘反哺 → 更懂下一篇写什么**
 
-> **飞轮正在合上最后半环**：「发布 → 数据 → 复盘 → 自进化」已经**迈出第一步**——把发出去的内容表现自动接回来做横向对照（小红书 / 公众号已跑通，抖音 / 视频号接入中）。做完这半环，它才算真正闭环。
+> **飞轮第一版完整闭环已建成**：「发布 → 数据 → 复盘」——把发出去的内容表现自动接回来做横向对照——**四平台（小红书 / 公众号 / 抖音 / 视频号）已全部打通**。接下来是持续打磨归因与自进化，让它更准地反哺下一次选题。
 
 ---
 
@@ -168,7 +168,7 @@ Copyright © 2026 Jessica · All rights not expressly granted are reserved.
                        ↓ 裂变（AI 全自动：长文 / thread / 口播 / 图文…）
                    多平台内容（放宽）
                        ↓ 发布 + 复盘（数据自动回流，横向对照）
-                   反哺下一次（闭环 · 最后半环在建）
+                   反哺下一次（闭环 · 第一版已打通）
 ```
 
 分工原则：**AI 吃掉一切不产生理解的环节**；**「决定写什么、核心论点、判断」留在人手上**。
@@ -210,14 +210,14 @@ Copyright © 2026 Jessica · All rights not expressly granted are reserved.
 - **多种视觉风格随便换**（暖刊 / 午夜霓虹 / Aesop / 新粗野…），选一套「系列风格」就统一了头图、排版和配音。
 - **不是"一看就是 AI 写的"套路货**：像不像 AI，不是事后去 AI 味改出来的，是**一开始有没有接真人语料**写出来的——所以每个模板都接一份真实拆解语料（比如抖音口播学"死磕机制、反爆款"，不是 3 秒钩子那套）；每段还能点回去看它引自哪条素材。
 
-### 📊 复盘 —— 让发出去的反哺下一次（在建）
-把已发内容的表现数据**自动拉回来做横向对照**（同一条内容在小红书 / 公众号 / 抖音 / 视频号的差异），帮我看清"哪种写法真的让读者更有收获"，再反哺下一次选题。目前小红书 / 公众号已跑通，抖音 / 视频号接入中——这是飞轮闭合的最后一环。
+### 📊 复盘 —— 让发出去的反哺下一次
+把已发内容的表现数据**自动拉回来做横向对照**（同一条内容在小红书 / 公众号 / 抖音 / 视频号的差异），帮我看清"哪种写法真的让读者更有收获"，再反哺下一次选题。**四平台（小红书 / 公众号 / 抖音 / 视频号）数据自动回流已全部打通**——飞轮的最后一环闭上了，第一版完整闭环就此建成。
 
 ---
 
 ## 🗺 在做什么 · 接下来
 
-**飞轮的最后半环——「发布 → 数据 → 复盘 → 自进化」——正在合上**：四平台已发数据自动回流已迈出第一步（小红书 / 公众号跑通，抖音 / 视频号接入中），下一步是让系统帮我看清「哪种写法真的让读者更有收获」，再反哺下一次选题。做完这半环，它才算真正闭环。
+**飞轮的第一版完整闭环已经建成**：四平台（小红书 / 公众号 / 抖音 / 视频号）已发数据自动回流、横向对照全部打通，「发布 → 数据 → 复盘」这最后半环闭上了。下一步是持续打磨归因——让系统更准地看清「哪种写法真的让读者更有收获」，再反哺下一次选题（自进化方向）。
 
 想看它长大、聊聊想法，欢迎 ⭐ star 关注或开 issue 交流。
 
