@@ -5,13 +5,9 @@
 
 **English** · [中文](#中文)
 
-<div align="center">
+https://github.com/user-attachments/assets/2d873ad5-4439-4a17-9f24-9112ee7d2ce0
 
-<a href="https://github.com/heyuxuan0209/knowledge-workbench/releases/download/media/kw-demo.mp4"><img src="assets/demo-poster.jpg" width="820" alt="演示视频：一个人，用 AI 做内容"></a>
-
-<sub>▶️ 点封面看 3 分钟正片《一个人，用 AI 做内容》· click the cover to watch the 3-min walkthrough</sub>
-
-</div>
+<div align="center"><sub>▶️ 3 分钟正片《一个人，用 AI 做内容》· a 3-min walkthrough of the workbench</sub></div>
 
 ## English
 
