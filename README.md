@@ -7,9 +7,9 @@
 
 <div align="center">
 
-<video src="https://github.com/heyuxuan0209/knowledge-workbench/releases/download/media/kw-demo.mp4" poster="https://raw.githubusercontent.com/heyuxuan0209/knowledge-workbench/main/assets/demo-poster.jpg" controls width="820"></video>
+<a href="https://github.com/heyuxuan0209/knowledge-workbench/releases/download/media/kw-demo.mp4"><img src="assets/demo-poster.jpg" width="820" alt="演示视频：一个人，用 AI 做内容"></a>
 
-<sub>▶️ 3 分钟看懂这个工作台 · A 3-min walkthrough &nbsp;|&nbsp; 播放器加载不出来就点 <a href="https://github.com/heyuxuan0209/knowledge-workbench/releases/download/media/kw-demo.mp4">这里看完整视频 / watch the full video</a></sub>
+<sub>▶️ 点封面看 3 分钟正片《一个人，用 AI 做内容》· click the cover to watch the 3-min walkthrough</sub>
 
 </div>
 
