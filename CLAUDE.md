@@ -31,6 +31,30 @@
 - **实验输出**（cluster dump 之类一次性数据）：进 `archive/experiments/`。
 - 每轮开发收尾跑 `/tidy-closeout`（残留巡检 + 留痕检查 + git 边界检查）。
 
+## 部署拓扑与入口（2026-08-07 起，接手必读 · ADR-074/080/081/082/083）
+
+**产品不在本机跑。** 排障前先认清代码跑在哪台机器上——报错路径出现 `/home/bot/...` 就是服务器侧问题，别在 Mac 上查环境（已误判过一轮）。
+
+- **用户入口**：桌面双击 `KW-知识工作台.command` → `http://kw-vps:3000`（Tailscale tailnet；VPS tailnet IP `100.82.29.35`）。整个 KW（Feed/素材/笔记/即时分析/创作台）都在这一个地址里。
+- **后端**：VPS `vultr-paris`（199.247.9.202，法国）systemd `kw-backend.service`，user=bot，repo `/home/bot/projects/knowledge-workbench`。**前端构建产物由它 `express.static` 托管**（`frontend/dist`，`existsSync` 守卫；回滚＝`rm -rf frontend/dist` + 重启）。
+- **备用通道**：ssh 隧道 `localhost:3000`，Mac launchd `com.knowledge-workbench.tunnel` 常驻自动重连（plist 在 `backend/scripts/`）。
+- **公网零暴露**：ufw 只放 22/443 + `3000/tcp on tailscale0`。别为了图方便去开公网端口。
+- **本机 5173 的 vite dev 仅开发用**；桌面 `KW-本地开发.command` 会自动避让并恢复常驻隧道。
+
+**部署一次改动（用户说「部署一下」时照做）**：
+```
+git push                                   # 先 fetch 查分叉！本仓多端在写，曾差点冲掉远端 7 个提交
+ssh vultr-paris 'sudo -u bot -H git -C /home/bot/projects/knowledge-workbench pull --ff-only'
+# 动了前端就必须 build，否则线上是旧包且【不会报错】：
+ssh vultr-paris 'cd /home/bot/projects/knowledge-workbench/frontend && sudo -u bot -H npm run build'
+ssh vultr-paris 'systemctl restart kw-backend'
+```
+VPS 每天 07:00 有 cron `git pull`，但**不重启、不 build**——别以为 push 完就生效了。
+
+**服务器环境变更一律固化成幂等脚本**（范例 `backend/scripts/provision-render-env.sh`：头图渲染要 playwright+Pillow+Chromium+中文字体+fontconfig 别名），只在机器上手改＝重建就丢。
+
+**用户面文档是桌面 `使用手册-Claude与VPS.md`**——改了拓扑/入口/部署方式，**必须同步更新它**，否则用户按旧手册操作会踩空。用户说"打不开"时，先让他双击 `KW-知识工作台.command` 把自检输出念给你，比盲猜快。
+
 ## 运维红线
 
 - **后端由 launchd 常驻托管**（`gui/501/com.knowledge-workbench.backend`，`node --watch` 自动热重载）：**禁止手动 `npm start` / `npm run dev`**——会和它抢 3000 端口（已实际冲突过）。另有 sync-sources / daily·weekly·monthly-report / active-query 五个定时服务同样归 launchd 管。
