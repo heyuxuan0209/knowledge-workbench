@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 创作台命脉：Mac → VPS 后端的 ssh 隧道（ADR-081）。
+     前端在本机 5173，/api 代理到 localhost:3000，而 3000 只是这条隧道的本地口——
+     隧道一断，创作台所有接口全挂，且本机已无后端兜底（ADR-074 cutover 后）。
+
+     装法：
+       cp backend/scripts/com.knowledge-workbench.tunnel.plist ~/Library/LaunchAgents/
+       pkill -f "ssh -f -N.*3000:127.0.0.1:3000"          # 先清掉手敲的那条，否则抢端口
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.knowledge-workbench.tunnel.plist
+     看状态： launchctl print gui/$(id -u)/com.knowledge-workbench.tunnel | head -20
+     看日志： tail -f ~/Library/Logs/knowledge-workbench/tunnel.log
+
+     三个关键选项，少一个就会踩坑：
+     - ServerAliveInterval/CountMax：90s 内没心跳就让 ssh 自己退出。不配的话会出现「僵尸隧道」
+       ——进程活着、3000 端口照样 LISTEN，但连接早死了，前端请求挂到超时才失败，比连不上更难查。
+     - ExitOnForwardFailure：端口占用/转发建不起来时立刻退出，交给 KeepAlive 重来，不留半残进程。
+     - 不能带 -f：-f 会让 ssh 自己 daemonize 后立即退出，launchd 会以为任务结束而反复重启。
+
+     注意：~/.ssh/config 里 vultr-paris 走 ProxyCommand（本地代理 127.0.0.1:7897）。
+     代理没起来时隧道连不上，launchd 会按 ThrottleInterval 每 30s 重试，等代理起来自动接上。 -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.knowledge-workbench.tunnel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/ssh</string>
+    <string>-N</string>
+    <string>-T</string>
+    <string>-o</string><string>ExitOnForwardFailure=yes</string>
+    <string>-o</string><string>ServerAliveInterval=30</string>
+    <string>-o</string><string>ServerAliveCountMax=3</string>
+    <string>-o</string><string>BatchMode=yes</string>
+    <string>-L</string><string>3000:127.0.0.1:3000</string>
+    <string>vultr-paris</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>/Users/heyuxuan/Library/Logs/knowledge-workbench/tunnel.log</string>
+  <key>StandardErrorPath</key><string>/Users/heyuxuan/Library/Logs/knowledge-workbench/tunnel.log</string>
+</dict>
+</plist>
