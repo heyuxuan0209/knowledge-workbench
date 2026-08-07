@@ -88,3 +88,6 @@ prototype/tutorial-viz/hyperframes-研究/
 
 # .agents 镜像里 feed-digest 的运行时状态（同 .claude 侧规则）
 .agents/skills/feed-digest/data/
+
+# 服务器端 python venv（头图 playwright + Pillow，见 ADR-080）：环境不进仓
+.venv/
