@@ -49,7 +49,7 @@ ssh vultr-paris 'sudo -u bot -H git -C /home/bot/projects/knowledge-workbench pu
 ssh vultr-paris 'cd /home/bot/projects/knowledge-workbench/frontend && sudo -u bot -H npm run build'
 ssh vultr-paris 'systemctl restart kw-backend'
 ```
-VPS 每天 07:00 有 cron `git pull`，但**不重启、不 build**——别以为 push 完就生效了。
+VPS 每天 07:00 有 root cron 跑 `backend/scripts/auto-deploy.sh`（ADR-085）：自动拉取→按改动 build/重启→三条自检→**不过就回滚上一版并飞书通知**。但**当天要生效仍需手动部署**（等到第二天太慢），且自检只发现"起不来"、发现不了"能跑但功能坏"，所以改完自己验。
 
 **服务器环境变更一律固化成幂等脚本**（范例 `backend/scripts/provision-render-env.sh`：头图渲染要 playwright+Pillow+Chromium+中文字体+fontconfig 别名），只在机器上手改＝重建就丢。
 
