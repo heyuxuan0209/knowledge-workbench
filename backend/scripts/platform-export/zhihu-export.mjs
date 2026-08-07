@@ -9,7 +9,7 @@
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { config, todayStamp } from './lib/config.mjs';
-import { openProfile, snap } from './lib/browser.mjs';
+import { openProfile, snap, detectWithReload } from './lib/browser.mjs';
 import { writeCsv } from './lib/scrape.mjs';
 
 const DATA_URL = 'https://www.zhihu.com/creator/manage/creation/all';
@@ -26,17 +26,12 @@ async function detectZhihu(page) {
   return 'unknown';
 }
 
+// 返回 'in' / 'out'（确认看到登录页）/ 'unknown'（判不准，页面没读到内容）。
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
-  let status = 'unknown';
-  const firstDeadline = Date.now() + 12_000;
-  while (Date.now() < firstDeadline) {
-    status = await detectZhihu(page);
-    if (status !== 'unknown') break;
-    await page.waitForTimeout(1000);
-  }
-  if (status === 'in') return true;
-  if (!waitForLogin) return false;
+  let status = await detectWithReload(page, detectZhihu, { url: DATA_URL });
+  if (status === 'in') return 'in';
+  if (!waitForLogin) return status;
 
   console.log('\n👉 请在弹出的 Chrome 窗口里登录知乎（扫码 / 密码 / 短信验证码都行）。');
   console.log('   登录成功后脚本会自动继续，最多等 15 分钟…\n');
@@ -46,11 +41,11 @@ async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
     status = await detectZhihu(page);
     if (status === 'in') break;
   }
-  if (status !== 'in') return false;
+  if (status !== 'in') return status;
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   await page.waitForTimeout(2000);
   console.log('[zhihu] 登录成功，开始读内容列表…');
-  return true;
+  return 'in';
 }
 
 // DOM 抽取每张内容卡 → 记录数组 + 后台标称条数。
@@ -133,11 +128,12 @@ export async function exportZhihu({ waitForLogin = false } = {}) {
   const ctx = await openProfile(config.zhihuProfile);
   const page = ctx.pages()[0] || await ctx.newPage();
   try {
-    const ok = await ensureLoggedIn(page, { waitForLogin });
-    if (!ok) {
-      await snap(page, 'zhihu-login');
-      const err = new Error('知乎创作中心需要登录');
+    const status = await ensureLoggedIn(page, { waitForLogin });
+    if (status !== 'in') {
+      await snap(page, status === 'out' ? 'zhihu-login' : 'zhihu-undetermined');
+      const err = new Error(status === 'out' ? '知乎创作中心需要登录' : '知乎创作中心登录态判不准（页面没读到内容）');
       err.loginRequired = true;
+      err.loginStatus = status;
       throw err;
     }
     const csv = await scrapeToCsv(page, stamp);

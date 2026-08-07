@@ -35,7 +35,7 @@ async function runPlatform(name, fn) {
     }
     return { name, ok: true, uploaded, note: (r.sourceFile ? '' : (name === 'mp' ? '（阅读来源报表未拿到）' : '')) };
   } catch (e) {
-    return { name, ok: false, loginRequired: !!e.loginRequired, error: e.message };
+    return { name, ok: false, loginRequired: !!e.loginRequired, loginStatus: e.loginStatus, error: e.message };
   }
 }
 
@@ -49,14 +49,18 @@ const sph = await runPlatform('sph', exportSph);
 const zhihu = await runPlatform('zhihu', exportZhihu);
 const results = [xhs, mp, dy, sph, zhihu];
 
-// 组装群通知：每个平台一行，✅ 列出实际文件名 / ❌ 列出原因（未登录 or 失败）。
+// 组装群通知：每个平台一行，✅ 列出实际文件名 / ❌ 列出原因（未登录 or 判不准 or 失败）。
 // 目的（工单）：她一眼看清哪个平台这次「没有数据」，不会把「导出失败」误读成「没流量」。
+// 「真掉线」和「判不准」必须分开说（2026-08-07 实测）：前者得掏手机扫码，后者多半只是页面没渲染出来、
+// 直接补一次就过——混成一条会让她每天白掏一次手机。
 const label = { xhs: '小红书', mp: '公众号', dy: '抖音', sph: '视频号', zhihu: '知乎' };
 const lines = [];
 for (const r of results) {
   if (r.ok) {
     const files = r.uploaded.join(' / ') || '(无文件)';
     lines.push(`✅ ${files}${r.note}`);
+  } else if (r.loginRequired && r.loginStatus === 'unknown') {
+    lines.push(`⚠️ ${label[r.name]} 登录态判不准：页面没读到内容（刷新重试过一次仍如此），未取数。多半不是真掉线，先直接补数：node run.mjs --force`);
   } else if (r.loginRequired) {
     lines.push(`❌ ${label[r.name]} 未登录，需扫码（不硬闯，扫码后补数：node run.mjs --force）`);
   } else {

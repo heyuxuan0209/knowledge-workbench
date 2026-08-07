@@ -44,6 +44,32 @@ export async function snap(page, label) {
   } catch { return null; }
 }
 
+// 轮询探测登录态，拿不到结论（unknown）时**reload 一次**再探——只一次，不循环。
+// 由来（2026-08-07 实测）：视频号那次报「未登录」，_debug 截图是一张纯白图——页面压根没渲染出来，
+// 12 秒内只拿到 unknown 就被判成未登录，其实登录态好好的。白等一次刷新能救回这种误判；
+// 但视频号有"别反复自动开"的风控红线，所以只重试一次，不做退避循环。
+// detect: (page) => 'in' | 'out' | 'unknown'；返回最终 status（'unknown' 表示判不准，不当已登录）。
+export async function detectWithReload(page, detect, { url, windowMs = 12_000, stepMs = 1000 } = {}) {
+  const probe = async () => {
+    const deadline = Date.now() + windowMs;
+    let s = 'unknown';
+    while (Date.now() < deadline) {
+      s = await detect(page);
+      if (s !== 'unknown') return s;
+      await page.waitForTimeout(stepMs);
+    }
+    return s;
+  };
+  let status = await probe();
+  if (status !== 'unknown') return status;
+  console.log('[login] 页面没读到可判断的内容，刷新一次再探（只重试这一次）…');
+  if (url) await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
+  else await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
+  status = await probe();
+  if (status === 'unknown') console.log('[login] 刷新后仍判不准——按纪律不硬闯，报「判不准」而不是「未登录」。');
+  return status;
+}
+
 // 依次尝试一组"可见文本"定位并点击，命中第一个就返回 true（选择器易漂，文本最稳）。
 // 每个候选给短超时，全部落空返回 false 让上层决定是否报错。
 export async function clickFirstByText(page, labels, { timeout = 4000 } = {}) {

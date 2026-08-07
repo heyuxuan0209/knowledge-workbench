@@ -5,7 +5,7 @@
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { config, todayStamp } from './lib/config.mjs';
-import { openProfile, downloadTo, snap, clickFirstByText } from './lib/browser.mjs';
+import { openProfile, downloadTo, snap, clickFirstByText, detectWithReload } from './lib/browser.mjs';
 
 const HOME = 'https://mp.weixin.qq.com/';
 
@@ -20,14 +20,15 @@ async function detectMp(page) {
   return 'unknown';
 }
 
-// 确保已登录。waitForLogin=true（交互式首次登录）时等用户扫码；false（自动跑）时未登录即返回 false。
-// 微信后台登录态短命，所以自动跑先检测、未登录不硬闯——交给上层发「需扫码，已暂停」。
+// 确保已登录。返回 'in' / 'out'（确认看到二维码登录页）/ 'unknown'（判不准，页面没读到内容）。
+// 微信后台登录态短命，所以自动跑先检测、未登录不硬闯——交给上层发通知；
+// 但 'out' 和 'unknown' 通知里要分开说，别把「没加载出来」也喊成「去扫码」。
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
   await page.waitForTimeout(2500);
-  let status = await detectMp(page);
-  if (status === 'in') return true;
-  if (!waitForLogin) return false;
+  let status = await detectWithReload(page, detectMp, { url: HOME, windowMs: 8_000 });
+  if (status === 'in') return 'in';
+  if (!waitForLogin) return status;
 
   // 交互式：等用户用微信扫码。扫码成功后 MP 自动跳带 token= 的首页，同页轮询即可。
   console.log('\n👉 请打开手机微信，扫描弹出的 Chrome 窗口里的二维码登录公众号后台。');
@@ -36,9 +37,9 @@ async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   while (Date.now() < deadline) {
     await page.waitForTimeout(2500);
     status = await detectMp(page);
-    if (status === 'in') { console.log('[mp] 登录成功，开始导出…'); return true; }
+    if (status === 'in') { console.log('[mp] 登录成功，开始导出…'); return 'in'; }
   }
-  return false;
+  return status; // 等超时也没登上：把最后一次探测结果如实带出去（out / unknown）
 }
 
 // 导航到 内容分析 页（数据 → 内容分析）。
@@ -56,11 +57,12 @@ export async function exportMp({ waitForLogin = false } = {}) {
   const page = ctx.pages()[0] || await ctx.newPage();
   let sourceFile = null;
   try {
-    const ok = await ensureLoggedIn(page, { waitForLogin });
-    if (!ok) {
-      await snap(page, 'mp-login');
-      const err = new Error('公众号后台需要扫码登录');
+    const status = await ensureLoggedIn(page, { waitForLogin });
+    if (status !== 'in') {
+      await snap(page, status === 'out' ? 'mp-login' : 'mp-undetermined');
+      const err = new Error(status === 'out' ? '公众号后台需要扫码登录' : '公众号后台登录态判不准（页面没读到内容）');
       err.loginRequired = true;
+      err.loginStatus = status;
       throw err;
     }
 

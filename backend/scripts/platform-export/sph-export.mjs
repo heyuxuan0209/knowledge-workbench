@@ -13,7 +13,7 @@
 import { pathToFileURL } from 'url';
 import { join } from 'path';
 import { config, todayStamp } from './lib/config.mjs';
-import { openProfile, snap } from './lib/browser.mjs';
+import { openProfile, snap, detectWithReload } from './lib/browser.mjs';
 import { writeCsv } from './lib/scrape.mjs';
 
 const DATA_URL = 'https://channels.weixin.qq.com/platform/post/list';
@@ -27,17 +27,13 @@ async function detectSph(page) {
   return 'unknown';
 }
 
+// 返回 'in'（已登录）/ 'out'（确认看到登录页）/ 'unknown'（判不准，页面没读到内容）。
+// 'out' 和 'unknown' 都不硬闯，但上层通知要分开说——扫码 vs 大概率只是没加载出来。
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
-  let status = 'unknown';
-  const firstDeadline = Date.now() + 12_000;
-  while (Date.now() < firstDeadline) {
-    status = await detectSph(page);
-    if (status !== 'unknown') break;
-    await page.waitForTimeout(1000);
-  }
-  if (status === 'in') return true;
-  if (!waitForLogin) return false;
+  let status = await detectWithReload(page, detectSph, { url: DATA_URL });
+  if (status === 'in') return 'in';
+  if (!waitForLogin) return status;
 
   console.log('\n👉 请打开手机微信，扫描弹出的 Chrome 窗口里的二维码登录视频号助手。');
   console.log('   登录成功后脚本会自动继续导出，最多等 15 分钟…\n');
@@ -47,11 +43,11 @@ async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
     status = await detectSph(page);
     if (status === 'in') break;
   }
-  if (status !== 'in') return false;
+  if (status !== 'in') return status;
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   await page.waitForTimeout(2000);
   console.log('[sph] 登录成功，开始读视频列表…');
-  return true;
+  return 'in';
 }
 
 // 视频号 CSV 列（含微信特有的「在看」；收藏视频号列表不给、留空；涨粉是账号级、逐条留空）。
@@ -118,11 +114,12 @@ export async function exportSph({ waitForLogin = false } = {}) {
   const ctx = await openProfile(config.sphProfile);
   const page = ctx.pages()[0] || await ctx.newPage();
   try {
-    const ok = await ensureLoggedIn(page, { waitForLogin });
-    if (!ok) {
-      await snap(page, 'sph-login');
-      const err = new Error('视频号助手需要扫码登录');
+    const status = await ensureLoggedIn(page, { waitForLogin });
+    if (status !== 'in') {
+      await snap(page, status === 'out' ? 'sph-login' : 'sph-undetermined');
+      const err = new Error(status === 'out' ? '视频号助手需要扫码登录' : '视频号助手登录态判不准（页面没读到内容）');
       err.loginRequired = true;
+      err.loginStatus = status;
       throw err;
     }
 

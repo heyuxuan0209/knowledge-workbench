@@ -10,7 +10,7 @@
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { config, todayStamp } from './lib/config.mjs';
-import { openProfile, snap, clickFirstByText } from './lib/browser.mjs';
+import { openProfile, snap, clickFirstByText, detectWithReload } from './lib/browser.mjs';
 import { writeCsv, STD_COLUMNS } from './lib/scrape.mjs';
 
 // 作品管理（逐条卡片列表）
@@ -27,18 +27,14 @@ async function detectDy(page) {
   return 'unknown';
 }
 
+// 返回 'in' / 'out'（确认看到登录页）/ 'unknown'（判不准，页面没读到内容）。
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
-  let status = 'unknown';
-  const firstDeadline = Date.now() + 12_000;
-  while (Date.now() < firstDeadline) {
-    status = await detectDy(page);
-    if (status !== 'unknown') break;
-    await page.waitForTimeout(1000);
-  }
   // 判不准不当已登录：宁可通知扫码，也别硬闯出一份空数据（「没数据≠没流量」的误判成本更高）。
-  if (status === 'in') return true;
-  if (!waitForLogin) return false;
+  // 但先 reload 一次再判——纯白页/没渲染完被判成未登录已实测发生过（2026-08-07 视频号）。
+  let status = await detectWithReload(page, detectDy, { url: DATA_URL });
+  if (status === 'in') return 'in';
+  if (!waitForLogin) return status;
 
   console.log('\n👉 请在弹出的 Chrome 窗口里登录抖音创作者后台（扫码或手机号+验证码）。');
   console.log('   登录成功后脚本会自动继续导出，最多等 15 分钟…\n');
@@ -48,11 +44,11 @@ async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
     status = await detectDy(page);
     if (status === 'in') break;
   }
-  if (status !== 'in') return false;
+  if (status !== 'in') return status;
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   await page.waitForTimeout(2000);
   console.log('[dy] 登录成功，开始读作品管理…');
-  return true;
+  return 'in';
 }
 
 // 已登录才有的指标标签集合（用于逐卡「标签取值」解析）；ACTIONS 是卡内动作按钮（跳过）。
@@ -108,11 +104,12 @@ export async function exportDy({ waitForLogin = false } = {}) {
   const ctx = await openProfile(config.dyProfile);
   const page = ctx.pages()[0] || await ctx.newPage();
   try {
-    const ok = await ensureLoggedIn(page, { waitForLogin });
-    if (!ok) {
-      await snap(page, 'dy-login');
-      const err = new Error('抖音创作者后台需要扫码登录');
+    const status = await ensureLoggedIn(page, { waitForLogin });
+    if (status !== 'in') {
+      await snap(page, status === 'out' ? 'dy-login' : 'dy-undetermined');
+      const err = new Error(status === 'out' ? '抖音创作者后台需要扫码登录' : '抖音创作者后台登录态判不准（页面没读到内容）');
       err.loginRequired = true;
+      err.loginStatus = status;
       throw err;
     }
 
