@@ -2471,6 +2471,28 @@ app.get('/api/stats/cost', async (req, res) => {
   }
 });
 
+// ========== 前端静态托管（ADR-082）==========
+// 迁云后前端只活在 Mac 的 Vite dev server 上，服务器 GET / 是 404——产品只有半个身子在线上，
+// 关掉本机那个终端创作台就没了。有 frontend/dist 就托管，没有则行为完全不变（本地开发照旧 5173 代理）。
+// 必须放在所有 API 路由之后：先让 /api/* 匹配到真路由，未命中的路径才回 index.html 给 SPA 兜底，
+// 否则接口的 404/错误会被 index.html 吞掉，前端拿到一坨 HTML 当 JSON 解析，报错还看不出原因。
+{
+  const { existsSync } = await import('fs');
+  const { fileURLToPath } = await import('url');
+  const DIST = fileURLToPath(new URL('../../frontend/dist', import.meta.url));
+  if (existsSync(DIST)) {
+    const express_static = express.static(DIST, { index: 'index.html', maxAge: '1h' });
+    app.use(express_static);
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path === '/health') return next();
+      res.sendFile(pathJoin(DIST, 'index.html'));
+    });
+    console.log(`🖥️  前端静态托管已启用：${DIST}`);
+  } else {
+    console.log('🖥️  未发现 frontend/dist，跳过静态托管（本地开发用 vite dev 即可）');
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 AI Insight Hub backend running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
