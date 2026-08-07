@@ -132,7 +132,9 @@ fi
 # ── 回滚 ────────────────────────────────────────────────
 log "❌ $FAILED —— 开始回滚到 $BEFORE"
 asbot "git -C '$REPO' reset --hard $BEFORE" >> "$LOG" 2>&1
-asbot "rm -rf '$REPO/frontend/dist'; [ -d '$REPO/frontend/dist.prev' ] && mv '$REPO/frontend/dist.prev' '$REPO/frontend/dist' || true"
+# ⚠️ 只有确实存在备份时才动 dist——否则"先删后恢复"在没备份的情况下会把前端整个删掉，
+# 变成回滚反而把站点搞挂（GET / 直接 404）。宁可留着新 dist，也不能删到没有。
+asbot "if [ -d '$REPO/frontend/dist.prev' ]; then rm -rf '$REPO/frontend/dist'; mv '$REPO/frontend/dist.prev' '$REPO/frontend/dist'; fi"
 systemctl restart "$SERVICE"
 if healthy; then
   log "↩️ 已回滚到上一个可用版本，服务正常"
