@@ -61,6 +61,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   // 阶段1·B：从整个素材库挑（不必先有主题），默认不选，可搜；生成只用勾中的
   const [mats, setMats] = useState([])
   const [selMat, setSelMat] = useState(new Set())
+  const [expMat, setExpMat] = useState(new Set())  // 素材台「展开全文」态（ADR-039 取料截断修复）
   const [matQ, setMatQ] = useState('')
   useEffect(() => {
     if (!v2Mode) return
@@ -502,18 +503,33 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
             )}
             <div style={{ flex: 1, minHeight: 120, maxHeight: 360, overflowY: 'auto', border: '1px solid var(--line10)', borderRadius: 6, padding: '4px 8px' }}>
               {matsShown.length === 0 && <div style={{ fontSize: 12, color: 'var(--faint)', padding: '8px 2px' }}>{mats.length ? '没有匹配的素材' : '素材库为空 / 加载中…'}</div>}
-              {matsShown.map(m => (
-                <div key={m.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '6px 0', fontSize: 12.5, borderBottom: '1px solid var(--line08)' }}>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flex: 1, minWidth: 0, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={selMat.has(m.id)} onChange={() => toggleMat(m.id)} style={{ marginTop: 3, flex: 'none' }} />
-                    <span><b style={{ color: 'var(--body)' }}>{m.sourceTitle}</b>{m.excerpt ? <span style={{ color: 'var(--faint)' }}> · {m.excerpt}</span> : null}</span>
-                  </label>
-                  {!isEmpty && (
-                    <button onClick={() => insertMat(m)} title="把这条插入正文（不重新生成）"
-                      style={{ flex: 'none', border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--accent)', borderRadius: 5, padding: '2px 7px', fontSize: 11, cursor: 'pointer' }}>插入</button>
+              {matsShown.map(m => {
+                const isExp = expMat.has(m.id)
+                const hasMore = (m.full || '').length > (m.excerpt || '').length
+                return (
+                <div key={m.id} style={{ padding: '6px 0', fontSize: 12.5, borderBottom: '1px solid var(--line08)' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                    <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={selMat.has(m.id)} onChange={() => toggleMat(m.id)} style={{ marginTop: 3, flex: 'none' }} />
+                      <span><b style={{ color: 'var(--body)' }}>{m.sourceTitle}</b>{!isExp && m.excerpt ? <span style={{ color: 'var(--faint)' }}> · {m.excerpt}{hasMore ? '…' : ''}</span> : null}</span>
+                    </label>
+                    {!isEmpty && (
+                      <button onClick={() => insertMat(m)} title="把这条插入正文（不重新生成）"
+                        style={{ flex: 'none', border: '1px solid var(--line10)', background: 'var(--surface)', color: 'var(--accent)', borderRadius: 5, padding: '2px 7px', fontSize: 11, cursor: 'pointer' }}>插入</button>
+                    )}
+                  </div>
+                  {hasMore && (
+                    <button onClick={() => setExpMat(s => { const n = new Set(s); n.has(m.id) ? n.delete(m.id) : n.add(m.id); return n })}
+                      style={{ marginLeft: 24, marginTop: 2, border: 'none', background: 'none', color: 'var(--accent)', fontSize: 11, cursor: 'pointer', padding: 0 }}>
+                      {isExp ? '收起 ▴' : '展开全文 ▾'}
+                    </button>
+                  )}
+                  {isExp && (
+                    <div style={{ marginLeft: 24, marginTop: 4, maxHeight: 220, overflowY: 'auto', fontSize: 12, lineHeight: 1.65, color: 'var(--body)', whiteSpace: 'pre-wrap', background: 'var(--surface)', border: '1px solid var(--line08)', borderRadius: 6, padding: '8px 10px' }}>{m.full}</div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
             {studio.paragraphRefs?.length > 0 && (
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line08)' }}>
