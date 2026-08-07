@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import { setGlobalDispatcher, EnvHttpProxyAgent } from 'undici';
 
@@ -2493,7 +2494,17 @@ app.get('/api/stats/cost', async (req, res) => {
   }
 }
 
+// 启动时打印当前 commit：迁云后"线上到底跑的是哪一版"是个反复要回答的问题
+// （push 了没生效、自动部署有没有回滚过），日志里有这一行就不用猜。取不到就跳过，不影响启动。
+function currentCommit() {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch { return null; }
+}
+
 app.listen(PORT, () => {
+  const sha = currentCommit();
+  if (sha) console.log(`🔖 当前版本：${sha}`);
   console.log(`🚀 AI Insight Hub backend running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`✨ v0.2.0 - Workspace Chat APIs enabled`);
