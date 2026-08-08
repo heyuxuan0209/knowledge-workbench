@@ -66,6 +66,7 @@ v2 用 `type` 决定**块的组合**：不属于该类型的块直接不渲染�
 | `chat` | 对谈 | 交换看法 | `oneliner` `narrative` `topics` `appraisal` `takeaways` `resources` `quotes` `seeds` |
 | `interview` | 用户访谈 | 问用户 | `oneliner` `narrative` `persona` `saidVsDid` `hypotheses` `appraisal` `quotes` `todos` `seeds` |
 | `myTalk` | 我的分享 | 我在台上 | `oneliner` `narrative` `outline` `feedback` `retro` `quotes` `seeds` |
+| `plan` | 计划 | 口述一个还没定死的计划 | `oneliner` `narrative` `itinerary` `booking` `tradeoffs` `budget` `pitfalls` `checklist` `quotes` `seeds` |
 
 **块按 `blocks` 数组顺序渲染**（不是按上表顺序）。建议序：`oneliner` → `narrative` → 主体 → `quotes` → `seeds`。
 
@@ -186,6 +187,41 @@ v2 用 `type` 决定**块的组合**：不属于该类型的块直接不渲染�
 ```
 `verdict`：`confirmed` ✅证实 ｜ `refuted` ❌证伪 ｜ `unclear` ❓待验证
 空数组时渲染成「本次没有可验证的假设——**下次访谈前先把假设写下来**」。
+
+### 计划专属（`plan`）
+
+**为什么单独一类**：把旅行计划硬塞进 `myTalk`，会渲染出「现场反应 —」「复盘 — — —」「没有值得直引的原话」
+——**独白没有现场反应、不需要复盘、不会引用自己**。这是「决策 · 0」那个错误的翻版。
+
+**`itinerary`** — 逐日行程 ★ **投屏模式一天一页**（7 天塞一页必然溢出；按天切也对齐读者心智）
+```jsonc
+{ "type": "itinerary", "items": [
+  { "day": "Day 2", "title": "大同 → 悬空寺 → 应县木塔", "meta": "140km · 车程 2.5h",
+    "stops": [{ "time": "08:20", "name": "悬空寺 + 恒山", "dur": "2.5h", "price": "¥15 + ¥100",
+                "note": "…", "alt": "恐高或没抢到登临票 → 山下远观即可" }],
+    "stay": "砂河镇酒店（比台怀镇便宜）", "tip": "山路弯道多，限速 60" }]}
+```
+`alt` 是**备选/兜底**，绿底渲染——计划里"下雨改去哪"这类信息以前只能塞进备注。
+
+**`booking`** — 前置预约 ★ **计划类最该被单独拎出来的一块**
+```jsonc
+{ "type": "booking", "items": [
+  { "what": "悬空寺登临票", "how": "公众号「恒山风景名胜区」", "when": "提前 7 天 · 早 7:20 放票",
+    "note": "每日仅 2470 张。没抢到只能远观", "critical": true }]}
+```
+`critical: true` 整行粉底 + 「必抢」标。页脚固定：**「这一栏没做完，后面整条行程都可能白跑。」**
+**会失败、有截止的事，不该和普通待办混在一起。**
+
+**`tradeoffs`** — 取舍 ★ **计划的核心**
+```jsonc
+{ "type": "tradeoffs", "items": [
+  { "chose": "北→南顺向环线", "gave": "按「最想去哪」自由排序",
+    "cost": "路线一旦排错就得原路折返", "why": "7 天能把四段古建全串上" }]}
+```
+空数组时渲染成「**没记下取舍——那这份计划其实还没做决定**」。
+
+**`budget`** — 预算（分项 + 合计黑底条）　**`pitfalls`** — 避坑（粉卡片）
+**`checklist`** — 要准备什么（分组勾选，收件人是自己，所以没有 owner/due）
 
 ### 我的分享专属
 

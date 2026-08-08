@@ -29,6 +29,9 @@ export const TYPES = {
   chat:      { label: '对谈',            blocks: ['oneliner', 'narrative', 'topics', 'appraisal', 'takeaways', 'resources', 'quotes', 'seeds'] },
   interview: { label: '用户访谈',        blocks: ['oneliner', 'narrative', 'persona', 'saidVsDid', 'hypotheses', 'appraisal', 'quotes', 'todos', 'seeds'] },
   myTalk:    { label: '我的分享',        blocks: ['oneliner', 'narrative', 'outline', 'feedback', 'retro', 'quotes', 'seeds'] },
+  // 口述一个还没定死的计划（旅行 / 产品排期 / 装修…）。招牌不是"讲了什么"，
+  // 是**取舍了什么 + 有什么会失败的前置**——前五类都没有这两块。
+  plan:      { label: '计划',            blocks: ['oneliner', 'narrative', 'itinerary', 'booking', 'tradeoffs', 'budget', 'pitfalls', 'checklist', 'quotes', 'seeds'] },
 };
 
 /* ── 通用零件 ─────────────────────────────────────────────────────────────── */
@@ -212,11 +215,89 @@ B.quotes = (b) => {
       : `<p class="empty mt">没有值得直引的原话</p>`}</div>`;
 };
 
+
+/* ── 计划类专属 ───────────────────────────────────────────────────────────── */
+
+/** 逐日行程 —— 投屏模式一天一页（见 paginate），流式模式顺着往下读 */
+B.itinerary = (b) => {
+  const d = b.items?.[0];
+  if (!d) return `<div class="pad-md ctr grow"><p class="empty">没有行程</p></div>`;
+  return `<div class="pad-md ctr grow">
+    <div class="dayh"><span class="dn">${esc(d.day ?? '')}</span>
+      <span class="dt">${esc(d.title ?? '')}</span>
+      ${d.meta ? `<span class="dm">${esc(d.meta)}</span>` : ''}</div>
+    <div class="stops">${(d.stops ?? []).map((x) => `<div class="stop">
+      <div class="sw"><div class="stime">${esc(x.time ?? '')}</div>
+        ${x.dur || x.price ? `<div class="smeta">${esc([x.dur, x.price].filter(Boolean).join(' · '))}</div>` : ''}</div>
+      <div class="sbody"><div class="sname">${esc(x.name)}</div>
+        ${x.note ? `<div class="snote">${esc(x.note)}</div>` : ''}
+        ${x.alt ? `<div class="salt">备选：${esc(x.alt)}</div>` : ''}</div>
+    </div>`).join('')}</div>
+    ${d.stay ? `<div class="stay"><b>住</b> ${esc(d.stay)}</div>` : ''}
+    ${d.tip ? `<div class="tip"><b>自驾</b> ${esc(d.tip)}</div>` : ''}
+  </div>`;
+};
+
+/** 前置预约 —— 会失败、有截止的事。计划类最该被单独拎出来的一块。 */
+B.booking = (b) => {
+  const items = b.items ?? [];
+  const rows = items.map((r) => `<tr class="${r.critical ? 'crit' : ''}">
+    <td data-l="要约什么"><b>${esc(r.what)}</b>${r.critical ? '<span class="must">必抢</span>' : ''}</td>
+    <td data-l="怎么约">${esc(r.how ?? '')}</td>
+    <td data-l="什么时候" class="whenc">${esc(r.when ?? '')}</td>
+    <td data-l="注意">${esc(r.note ?? '')}</td></tr>`).join('');
+  return `<div class="pad-md ctr grow">
+    ${table('', items.length, rows, '没有需要提前预约的', 4,
+      `<tr><th class="th-main">前置预约 · ${items.length}</th><th>怎么约</th><th class="whenc">什么时候</th><th>注意</th></tr>`)}
+    <div class="foot-note">这一栏没做完，后面整条行程都可能白跑。</div></div>`;
+};
+
+/** 取舍 —— 计划的核心。为了什么放弃了什么、代价是什么。 */
+B.tradeoffs = (b) => {
+  const items = b.items ?? [];
+  return `<div class="pad-md ctr grow">${label('取舍', 'zh')}
+    <div class="mt">${items.length ? items.map((t) => `<div class="svdi">
+      <div class="svdc green"><div class="svdh">选了</div><div>${esc(t.chose)}</div></div>
+      <div class="svdc pink"><div class="svdh">放弃了</div><div>${esc(t.gave)}</div></div>
+      ${t.cost || t.why ? `<div class="svdg">${t.cost ? `代价：${esc(t.cost)}` : ''}${t.cost && t.why ? '　｜　' : ''}${t.why ? `为什么值：${esc(t.why)}` : ''}</div>` : ''}
+    </div>`).join('') : `<p class="empty">没记下取舍——那这份计划其实还没做决定</p>`}</div></div>`;
+};
+
+/** 预算 */
+B.budget = (b) => {
+  const items = b.items ?? [];
+  const rows = items.map((x) => `<tr><td data-l="项目">${esc(x.name)}</td>
+    <td class="amt" data-l="金额">${esc(x.amount)}</td>
+    <td data-l="备注">${esc(x.note ?? '')}</td></tr>`).join('');
+  return `<div class="pad-md ctr grow">
+    ${table('', items.length, rows, '没算预算', 3,
+      `<tr><th class="th-main">预算${b.note ? ' · ' + esc(b.note) : ''}</th><th class="amt">金额</th><th>备注</th></tr>`)}
+    ${b.total ? `<div class="total"><span>合计</span><b>${esc(b.total)}</b></div>` : ''}</div>`;
+};
+
+B.pitfalls = (b) => `<div class="pad-md ctr grow">
+  ${label('避坑', 'zh')}<div class="mt">${cardList(b.items ?? [], { accent: 'pink' })}</div></div>`;
+
+B.checklist = (b) => {
+  const groups = b.groups ?? [];
+  return `<div class="pad-md ctr grow">${label(b.title ?? '要准备什么', 'zh')}
+    <div class="mt ckg">${groups.map((g) => `<div class="ck">
+      <div class="ckh">${esc(g.name)}</div>
+      ${(g.items ?? []).map((x) => `<div class="cki"><span class="box"></span><span>${esc(x)}</span></div>`).join('')}
+    </div>`).join('')}</div></div>`;
+};
+
 /* ── 分页（只影响投屏模式；流式模式天然不需要） ───────────────────────────── */
 function paginate(blocks) {
   const out = [];
   for (const b of blocks) {
-    if (b.type === 'decisions' || b.type === 'todos') {
+    if (b.type === 'itinerary') {
+      // 一天一页：7 天塞一页必然溢出，而按天切天然对齐读者的心智
+      (b.items ?? []).forEach((d, i) => out.push({ ...b, items: [d], _cont: i > 0 }));
+    } else if (b.type === 'booking' || b.type === 'pitfalls') {
+      chunk(b.items ?? [], CAP).forEach((items, i) =>
+        out.push({ ...b, items, _cont: i > 0, _total: b.items?.length ?? 0 }));
+    } else if (b.type === 'decisions' || b.type === 'todos') {
       const parts = chunk(b.items ?? [], CAP);
       parts.forEach((items, i) => out.push({
         ...b, items, _cont: i > 0, _offset: i * CAP,
@@ -421,6 +502,42 @@ td.pink{background:var(--pink)}td.green{background:var(--green)}
 .srcbtn{display:inline-block;margin-top:16px;font-size:14px;font-weight:800;color:var(--black);
   text-decoration:none;background:#fff;border:var(--bd);padding:8px 14px;width:fit-content}
 
+
+/* 计划类：逐日行程 */
+.dayh{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;border-bottom:var(--bd);padding-bottom:10px}
+.dn{background:var(--black);color:#fff;font-size:13px;font-weight:800;letter-spacing:.06em;padding:5px 12px}
+.dt{font-size:22px;font-weight:900}
+.dm{font-size:12px;font-weight:700;color:#666;letter-spacing:.04em}
+.stops{margin-top:12px}
+.stop{display:flex;gap:14px;padding:11px 0;border-bottom:1px solid rgba(10,10,10,.18)}
+.stop:last-child{border-bottom:0}
+.sw{flex:none;width:76px}
+.stime{font-size:14px;font-weight:900;font-variant-numeric:tabular-nums}
+.smeta{font-size:11px;font-weight:700;color:#666;margin-top:2px}
+.sname{font-size:17px;font-weight:900;line-height:1.4}
+.snote{font-size:14px;font-weight:500;line-height:1.75;margin-top:3px;color:#333}
+.salt{font-size:13px;font-weight:700;background:var(--green);padding:4px 8px;margin-top:6px;display:inline-block}
+.stay,.tip{border:var(--bd);padding:9px 13px;margin-top:10px;font-size:14px;font-weight:600}
+.stay{background:var(--pink)}.tip{background:var(--gray)}
+.stay b,.tip b{font-size:11px;letter-spacing:.06em;margin-right:8px}
+/* 前置预约 */
+tr.crit td{background:var(--pink)}
+.must{background:var(--black);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 7px;margin-left:8px}
+td.whenc,th.whenc{font-weight:800}
+/* 预算 */
+td.amt,th.amt{font-weight:900;font-variant-numeric:tabular-nums;text-align:right}
+.total{display:flex;justify-content:space-between;align-items:baseline;border:var(--bd);
+  border-top:0;background:var(--black);color:#fff;padding:12px 16px}
+.total span{font-size:11px;font-weight:800;letter-spacing:.08em}
+.total b{font-size:20px;font-weight:900}
+/* 清单 */
+.ckg{display:grid;gap:12px}
+.ck{border:var(--bd);padding:12px 14px}
+.ckh{font-size:12px;font-weight:800;letter-spacing:.06em;margin-bottom:8px}
+.cki{display:flex;gap:10px;align-items:flex-start;font-size:15px;font-weight:500;
+  line-height:1.7;margin-top:5px}
+.cki .box{flex:none;margin-top:4px}
+
 /* 原话 */
 .quote{border-left:var(--bd);padding-left:16px;margin-top:16px}
 .qt{font-size:20px;font-weight:900;line-height:1.45}
@@ -491,6 +608,14 @@ a.ts{border-bottom:2px solid var(--black)}
   .svdg{grid-column:1/-1;border-top:var(--bd)}
   .retro{grid-template-columns:repeat(3,1fr)}
   .rc+.rc{border-top:0;border-left:var(--bd)}
+  .dayh{padding-bottom:14px}.dn{font-size:15px;padding:7px 16px}.dt{font-size:32px}.dm{font-size:14px}
+  .stops{margin-top:18px}.stop{padding:14px 0;gap:22px}.sw{width:110px}
+  .stime{font-size:18px}.smeta{font-size:12px}
+  .sname{font-size:22px}.snote{font-size:var(--fs);line-height:var(--lh)}.salt{font-size:15px}
+  .stay,.tip{padding:12px 18px;font-size:16px;margin-top:14px}
+  .total{padding:14px 22px}.total b{font-size:26px}
+  .ckg{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+  .ck{padding:18px 22px}.cki{font-size:var(--fs)}
   .quote{padding-left:30px;margin-top:26px}.qt{font-size:34px}
   .narr{gap:20px}.np{padding-left:26px}.np p{font-size:var(--fs);line-height:var(--lh)}
   .nh{font-size:22px}

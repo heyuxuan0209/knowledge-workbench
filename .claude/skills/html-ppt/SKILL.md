@@ -1,6 +1,6 @@
 ---
 name: html-ppt
-description: 把一场录音/会议的结构化产出渲染成品牌 HTML 页（Raw Grid 主题，中文）。五种场次类型各有各的块：会议纪要 meeting / 分享会 talk / 对谈 chat / 用户访谈 interview / 我的分享 myTalk——分享会不该有「决策」和「待办」。同一份产物在手机上是纵向滚动分享页、在宽屏上是投屏翻页 deck。触发：入会 agent 处理完录音要「出片 / 做成 PPT / 做成分享页」，或用户说「把这场做成一页」。不用于：做对外演讲片（那 6 套是手工复制模板改字，见 prototype/html-ppt-mocks/）、做公众号排版（用 gzh-design）、做信息图（用 baoyu-infographic）。
+description: 把一场录音/会议的结构化产出渲染成品牌 HTML 页（Raw Grid 主题，中文）。六种场次类型各有各的块：会议纪要 meeting / 分享会 talk / 对谈 chat / 用户访谈 interview / 我的分享 myTalk——分享会不该有「决策」和「待办」。同一份产物在手机上是纵向滚动分享页、在宽屏上是投屏翻页 deck。触发：入会 agent 处理完录音要「出片 / 做成 PPT / 做成分享页」，或用户说「把这场做成一页」。不用于：做对外演讲片（那 6 套是手工复制模板改字，见 prototype/html-ppt-mocks/）、做公众号排版（用 gzh-design）、做信息图（用 baoyu-infographic）。
 ---
 
 # html-ppt · 场次出片
