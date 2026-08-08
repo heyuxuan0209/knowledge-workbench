@@ -1295,6 +1295,29 @@ ${items.length ? items.map((it) => `<a class="row" href="${esc(it.url)}">
   }
 });
 
+// 改某一块：先 GET 取回 session，改掉那一块，再 PUT 回来 —— **URL 不变**，
+// 已经发出去 / 收藏过的链接还是同一个。整份重出会换文件名，等于把旧链接作废。
+app.get('/api/ppt/:name/session', async (req, res) => {
+  try {
+    const { getSession } = await import('./services/ppt.js');
+    res.json({ success: true, data: await getSession(req.params.name) });
+  } catch (error) {
+    res.status(404).json({ success: false, error: '找不到该产物的源数据（可能是 30 天前的，已清理）：' + error.message });
+  }
+});
+
+app.put('/api/ppt/:name', async (req, res) => {
+  try {
+    const { rerenderSession } = await import('./services/ppt.js');
+    const session = req.body?.session || req.body;
+    if (!Array.isArray(session?.blocks) || !session.blocks.length)
+      throw new Error('session.blocks 为空，没有可渲染的内容');
+    res.json({ success: true, data: await rerenderSession(req.params.name, session) });
+  } catch (error) {
+    res.status(422).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/ppt/list', async (req, res) => {
   try {
     const { listSessions } = await import('./services/ppt.js');

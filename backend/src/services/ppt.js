@@ -33,6 +33,7 @@ async function sweep() {
       if ((await stat(p)).mtimeMs < cutoff) {
         await unlink(p);
         await unlink(p + '.meta.json').catch(() => {});
+        await unlink(p + '.session.json').catch(() => {});
       }
     }
   } catch { /* 目录不存在或权限问题都不影响出片 */ }
@@ -113,10 +114,33 @@ export async function renderSession(session) {
   const meta = session.meta ?? {};
   const name = `${stamp}-${slugify(meta.title)}.html`;
   const outPath = join(OUT_DIR, name);
-  const deckPath = join(OUT_DIR, `.${name}.json`);
+  return renderTo(session, outPath, name);
+}
 
-  await writeFile(deckPath, JSON.stringify(deck), 'utf8');
-  try {
+/**
+ * 原地重渲染：取出存着的 session、改掉某一块、用同一个文件名重出。
+ * URL 不变 —— 你已经发出去 / 收藏过的链接还是那一个。
+ */
+export async function rerenderSession(name, session) {
+  if (name.includes('/') || name.includes('\\') || name.includes('..') || !name.endsWith('.html'))
+    throw new Error('非法文件名');
+  await mkdir(OUT_DIR, { recursive: true });
+  return renderTo(session, join(OUT_DIR, name), name);
+}
+
+/** 读回某个产物的 session 源数据（要改哪一块，先取这个） */
+export async function getSession(name) {
+  if (name.includes('/') || name.includes('\\') || name.includes('..') || !name.endsWith('.html'))
+    throw new Error('非法文件名');
+  return JSON.parse(await readFile(join(OUT_DIR, name) + '.session.json', 'utf8'));
+}
+
+async function renderTo(session, outPath, name) {
+  const meta = session.meta ?? {};
+  // 源数据留在产物旁边——删了就只能整份重做，改一个块都要重来
+  const deckPath = outPath + '.session.json';
+  await writeFile(deckPath, JSON.stringify(session, null, 1), 'utf8');
+  {
     const { stderr } = await runBuild(deckPath, outPath);
     // 降级过的页要让上游知道——不是错误，但值得在群消息里提一句
     const warnings = stderr.split('\n').map(s => s.trim()).filter(s => s.startsWith('[html-ppt]'));
@@ -126,8 +150,6 @@ export async function renderSession(session) {
       duration: meta.duration ?? null, createdAt: new Date().toISOString(),
     }), 'utf8').catch(() => {});
     return { name, path: outPath, url: `/ppt/${encodeURIComponent(name)}`, warnings };
-  } finally {
-    await unlink(deckPath).catch(() => {});
   }
 }
 
