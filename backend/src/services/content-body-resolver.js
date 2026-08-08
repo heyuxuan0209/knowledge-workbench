@@ -101,7 +101,7 @@ export async function resolveContentBody(content, { full = false } = {}) {
         return {
           body: content.zh_summary || '',
           isFullText: false,
-          note: `无法获取播客音频与 shownotes（${podcastError.message}），以下基于标题与简介，请自行收听原节目核实：${content.url}`
+          note: `没拿到这期的音频和 shownotes（${podcastError.message}）。以下只是标题与简介，请点右上角「跳转原文」去听原节目。`
         };
       }
     }
@@ -149,8 +149,8 @@ export async function resolveContentBody(content, { full = false } = {}) {
           body: content.zh_summary || '',
           isFullText: false,
           note: botBlocked
-            ? `YouTube 拦截了服务器的访问（对数据中心 IP 要求登录验证），所以拿不到字幕也下不了音频。要读全文：在本机（Mac）上解读这条，或把文字稿粘进来。原视频：${content.url}`
-            : `无法获取视频字幕，音频转写也失败（${raw}），以下基于标题与简介，请自行查看原视频核实：${content.url}`
+            ? 'YouTube 拦截了服务器的访问（对数据中心 IP 要求登录验证），所以拿不到字幕也下不了音频。要读全文：在本机（Mac）上解读这条，或把文字稿粘进来；原视频点右上角「跳转原文」。'
+            : `拿不到字幕，音频转写也失败（${raw}）。以下只是标题与简介，原视频请点右上角「跳转原文」。`
         };
       }
     }
@@ -159,7 +159,7 @@ export async function resolveContentBody(content, { full = false } = {}) {
     return {
       body: content.zh_summary || '',
       isFullText: false,
-      note: '该视频暂无法获取字幕或音频，以下基于标题与简介，深入分析请查看原视频'
+      note: '这个平台的视频暂时拿不到字幕和音频。以下只是标题与简介，深入内容请点右上角「跳转原文」看原视频。'
     };
   }
 
@@ -184,7 +184,9 @@ export async function resolveContentBody(content, { full = false } = {}) {
       return {
         body: content.zh_summary || '',
         isFullText: false,
-        note: `无法获取原文（${ingested.fetchError}），以下基于平台摘要，请自行查看原文核实：${content.url}`
+        // 提示里不再贴裸 URL：UI 右上角本来就有「跳转原文 ↗」按钮，长链接不可点、还挤掉真正有用的那句话。
+        // 也不再套一层"无法获取原文（…）"——抓取层的报错已经说清了原因和该怎么办（如公众号会说"请在微信里打开"）。
+        note: `${ingested.fetchError} 以下是摘要，全文请点右上角「跳转原文」。`
       };
     }
 
@@ -201,7 +203,7 @@ export async function resolveContentBody(content, { full = false } = {}) {
     return {
       body: content.zh_summary || '',
       isFullText: false,
-      note: `无法获取原文（${error.message}），以下基于平台摘要，请自行查看原文核实：${content.url}`
+      note: `抓取原文失败（${error.message}）。以下是摘要，全文请点右上角「跳转原文」。`
     };
   }
 }
