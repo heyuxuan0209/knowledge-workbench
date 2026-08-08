@@ -2575,10 +2575,21 @@ app.get('/api/stats/cost', async (req, res) => {
   const { fileURLToPath } = await import('url');
   const DIST = fileURLToPath(new URL('../../frontend/dist', import.meta.url));
   if (existsSync(DIST)) {
-    const express_static = express.static(DIST, { index: 'index.html', maxAge: '1h' });
+    // 缓存策略要分两类，不能一刀切（初版统一 maxAge:1h 是个坑）：
+    // · assets/* 文件名带内容 hash（index-B4i7-oqO.js），内容一变文件名就变 → 可以长缓存
+    // · index.html 是**入口**，它里面写着当前该加载哪个 hash → 一旦被缓存，部署完用户
+    //   刷新还是拿到旧 html→旧 hash→旧页面，最长一小时，而且没有任何提示（又一个静默失效）
+    const express_static = express.static(DIST, {
+      index: 'index.html',
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+        else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      },
+    });
     app.use(express_static);
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api/') || req.path === '/health') return next();
+      res.setHeader('Cache-Control', 'no-cache');   // 同上：SPA 兜底也是入口，不能被缓存
       res.sendFile(pathJoin(DIST, 'index.html'));
     });
     console.log(`🖥️  前端静态托管已启用：${DIST}`);
