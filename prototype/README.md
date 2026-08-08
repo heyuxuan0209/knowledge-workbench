@@ -42,3 +42,15 @@
 | ui-revamp-shots/ | UI 改版过程截图 | 存档（无待决选型） |
 
 > 维护方式：哪轮选型结束了，就把对应行状态改成「已定 → ADR-0xx」；整个目录都定稿的可移入 `done/`（需要时再建）。
+
+## 只在本地的目录（不进公开仓，clone 下来看不到）
+
+| 目录 | 主题 | 状态 |
+|---|---|---|
+| `html-ppt-mocks/` | 场次页模板选型：18 版可点 HTML（A–R）+ `模板墙.html`（本机 34 套现成模板一屏铺开）+ `对比-F对I.html` | **已定 → ADR-086/087/088**。定稿 7 套：**H Raw Grid（唯一工程化）**／B 黑金／A 暖纸手账／I 8-Bit Orbit／O Daisy Days／Q Neo-Grid Bold／R Editorial Forest；D 内刊、E 深色蓝科技＝备用不工程化；弃用 C/F/G/K/L/M/N/P |
+
+**为什么这个目录被 .gitignore**（本仓是公开仓）：`assets/tpl/` 是从
+`zarazhangrui/beautiful-html-templates` 拷的 68 张截图（MIT，但没必要转载）、
+`assets/zpix-subset.woff2` 是 Zpix 字体子集、18 份 mock 里是作者本人分享的真实内容。
+**落地产物在 `backend/ppt/` 和 `.claude/skills/html-ppt/`，那两处是进 git 的**；
+这里只是选型现场，留本地备查。
