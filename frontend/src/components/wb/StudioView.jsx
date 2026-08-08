@@ -840,7 +840,7 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
       await sendToPublisher([{ platform, title: defaultTitle || '', content: a.body, images: a.images || [] }])
       showToast?.('已送到发布台 · 复核窗确认后会填进该平台后台，最后一下发布由你点')
     } catch (err) {
-      showToast?.(err.message === 'UNTRUSTED' ? '扩展未信任本站——请在弹窗里点「信任」后重试' : '送出失败：' + err.message)
+      showToast?.('送出失败：' + (err.message === 'UNTRUSTED' ? '扩展拒绝了本站（未信任）——重试一次，在弹窗里点「信任」' : err.message))
     }
     setPubBusy(null)
   }
@@ -1023,7 +1023,7 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName }) {
       }])
       showToast('已送到发布台 · 在弹出的复核窗确认后会填进公众号编辑器，最后由你点发布')
     } catch (err) {
-      showToast(err.message === 'UNTRUSTED' ? '扩展未信任本站——请在弹窗里点「信任」后重试' : '送出失败：' + err.message)
+      showToast('送出失败：' + (err.message === 'UNTRUSTED' ? '扩展拒绝了本站（未信任）——重试一次，在弹窗里点「信任」' : err.message))
     }
     setPubBusy(false)
   }

@@ -124,14 +124,32 @@ export async function sendToPublisher(items) {
   return { sent: items.length };
 }
 
-/** 确保通道可用：没装扩展报错，没信任就申请。UI 在发布前调一次。 */
+/**
+ * 确保通道可用。UI 在发布前调一次。
+ *
+ * 顺序不能反：**REQUEST_TRUST_DOMAIN 必须第一个调**。扩展侧只把这一个 action 列进
+ * ACTIONS_NOT_NEED_TRUST_DOMAIN，**其余全部 action 在未信任时一律返回 403**——
+ * 包括看起来人畜无害的 CHECK_SERVICE_STATUS。
+ * 第一版把 checkExtension() 放在前面，结果它自己先吃了 403 抛出去，
+ * 永远走不到申请信任那一步，用户点按钮什么都不弹，UI 还提示"请在弹窗里点信任"——
+ * 而那个弹窗从来没被触发过。死循环。
+ *
+ * 已信任时 REQUEST_TRUST_DOMAIN 直接返回 {trusted:true}，不打扰用户，所以可以每次无条件调。
+ */
 export async function ensureChannel() {
-  await checkExtension();
   try {
-    await call('MULTIPOST_EXTENSION_PLATFORMS');   // 用一个需要信任的 action 探是否已信任
+    await requestTrust();
   } catch (e) {
-    if (e.message === 'UNTRUSTED') await requestTrust();
-    else throw e;
+    // 超时＝扩展没装/没注入本站，比"没信任"更根本，得说清楚是哪一种
+    if (/没有响应/.test(e.message)) {
+      throw new Error(
+        `扩展没有响应。两种可能：① MultiPost 没装或没启用；` +
+        `② 当前地址不在扩展的 host_permissions 里——它只放行 https、localhost 和 127.0.0.1，` +
+        `所以 http://kw-vps:3000 用不了，请改用 http://localhost:3000。当前地址：${location.origin}`,
+      );
+    }
+    throw e;
   }
+  await checkExtension();
   return true;
 }
