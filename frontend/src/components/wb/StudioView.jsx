@@ -831,6 +831,10 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
   // 只映射了有对应通道的形态；douyin-koubo 是口播文字稿、没有 mp4 可传，故意不给按钮
   // （视频通道要真视频文件，KW 现在出不了成片——那是 writing 工作区手工做的）。
   const [pubBusy, setPubBusy] = useState(null)
+  // 公众号封面：MultiPost 的 article 通道有硬检查 `if (!cover) throw new Error("需要封面图片")`——
+  // 没封面点发布必失败，而它只会在页面角上闪一句含糊的「同步失败，请重试」。
+  // ④ 头图渲染器出的图正好当封面，所以把它提到 FilmPane 存着，⑤ 排版发布时取用。
+  const [coverImg, setCoverImg] = useState(null)
   const pubOne = async (k, a) => {
     const platform = FORM_TO_PLATFORM[k]
     if (!platform || !a?.body) return
@@ -968,16 +972,16 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
       </div>
 
       {/* ④ 公众号头图（ADR-052 P1 · AI 观察手记系列）：字段 → 双尺寸 PNG */}
-      <CoverPanel showToast={showToast} defaultTitle={defaultTitle} boundPreset={boundPreset} seriesName={seriesName} />
+      <CoverPanel showToast={showToast} defaultTitle={defaultTitle} boundPreset={boundPreset} seriesName={seriesName} onCover={setCoverImg} />
 
       {/* ⑤ 公众号排版（ADR-052 P2 · vendored gzh-design）：定稿 → 合规 HTML */}
-      <TypesetPanel showToast={showToast} articleMd={adapted['gzh-long']?.body || ''} boundTheme={boundTheme} seriesName={seriesName} />
+      <TypesetPanel showToast={showToast} articleMd={adapted['gzh-long']?.body || ''} boundTheme={boundTheme} seriesName={seriesName} cover={coverImg} defaultTitle={defaultTitle} />
     </>
   )
 }
 
 // ADR-052 P2 排版面板：选主题 → LLM 装配 + 校验兜底 → 合规公众号 HTML；预览 + 复制到公众号 + 下载。
-function TypesetPanel({ showToast, articleMd, boundTheme, seriesName }) {
+function TypesetPanel({ showToast, articleMd, boundTheme, seriesName, cover, defaultTitle }) {
   const [themes, setThemes] = useState([])
   const [theme, setTheme] = useState('olive-journal')
   const [busy, setBusy] = useState(false)
@@ -1012,12 +1016,17 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName }) {
   const [pubBusy, setPubBusy] = useState(false)
   const pub = async () => {
     if (!result?.html) return
+    // 挡在这里而不是让它到公众号页面上才失败——那边只闪一句含糊的「同步失败，请重试」，不说缺什么
+    if (!cover) { showToast('公众号必须有封面图——先在上面 ④「公众号头图」点生成，再回来发'); return }
+    const title = (articleMd.match(/^#\s+(.+)$/m)?.[1] || defaultTitle || '').trim().slice(0, 64)
+    if (!title) { showToast('没取到标题——母稿开头加一行「# 标题」，或在上面填标题'); return }
     setPubBusy(true)
     try {
       await ensureChannel()
       await sendToPublisher([{
         platform: 'ARTICLE_WEIXIN',
-        title: (articleMd.match(/^#\s+(.+)$/m)?.[1] || '').slice(0, 64),
+        title,
+        cover,
         htmlContent: result.html,
         content: articleMd,
       }])
@@ -1102,7 +1111,7 @@ const COVER_PRESET_OPTS = {
 
 // ADR-052 P1 头图面板：选系列风格 + 填期刊字段 → 生成双尺寸 PNG（消息大图 1800×766 + 方图 2000×2000）。
 // title_html 只让用户填「主标题 + 点睛词」，UI 自动包一个 <span class="ul">（守 ux-no-raw-numbers，用户零 HTML）。
-function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
+function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName, onCover }) {
   const [presets, setPresets] = useState([])
   const [preset, setPreset] = useState('ticket-brisk')
   const [f, setF] = useState({ name: 'AI 观察手记', issue_event: '', badge: '', kicker: '', title: defaultTitle || '', keyword: '', author_html: '', tag: '深度精读' })
@@ -1138,6 +1147,8 @@ function CoverPanel({ showToast, defaultTitle, boundPreset, seriesName }) {
     setBusy(true); showToast('正在渲染头图（双尺寸，约 3–5 秒）…')
     try {
       const j = await api('/api/studio/cover', { method: 'POST', body: { skin, content } }); setResult(j.data.shapes); showToast('头图已生成（消息大图 + 方图）')
+      // 交给 ⑤ 当公众号封面。用 wide（16:9 消息大图）——微信会自己按 16:9/1:1/3:4 裁三版
+      onCover?.(j.data.shapes?.wide?.base64 ? { name: 'cover.png', type: 'image/png', url: j.data.shapes.wide.base64 } : null)
       // 出图成功才回写常用值/期号（以用户实际填的为准——重复生成同一期不会误 +1）
       api('/api/studio/cover-used', { method: 'POST', body: { name: f.name, issue_event: f.issue_event, author_html: f.author_html, tag: f.tag } })
         .then(r => { const p = r.data || {}; setPrefs({ options: p.options || {}, last: p.last || {} }) })
