@@ -36,7 +36,7 @@ const RED_LINE = `【平台红线·硬约束】只输出从 <section> 开始的*
 - 每个正文段落主动挑 1–3 个关键短语加"正文下划线"（用所选主题在 theme-index 里的下划线 CSS）。`;
 
 // 拼装 prompt：SKILL 流程 + 主题索引 + 该主题组件库 + 通用增量库 + 定稿 → 产出 section HTML
-function buildAssemblyPrompt(articleMd, themeKey) {
+function buildAssemblyPrompt(articleMd, themeKey, author) {
   const theme = ARTICLE_THEMES.find(t => t.key === themeKey);
   if (!theme) throw new Error(`未知排版主题「${themeKey}」（可用：${ARTICLE_THEMES.map(t => t.key).join('/')}）`);
   const skill = readVendor('SKILL.md');
@@ -44,6 +44,12 @@ function buildAssemblyPrompt(articleMd, themeKey) {
   const lib = readVendor(`references/theme-${themeKey}.md`);
   const common = readVendor('references/common-components.md');
   // 日期从系统注入、禁止 LLM 生成（ADR-041 同款：模型默认年份会烂，装配出过"2025"装饰字）
+  // 署名注入（2026-08-08）：vendor SKILL.md §107 的设计是"用户给了署名就填入，没给就保留 {{作者名}} 占位
+  // **并在交付时提示用户替换**"。KW 原来两件都没做——既不传作者、也不提示，于是 {{作者名}}/{{身份}}
+  // 静默留在产出里，预览看着正常，发出去才是模板占位符。作者取头图里用过的署名（cover_prefs.last）。
+  const authorLine = author?.trim()
+    ? `作者署名：${author.trim()}。**签名区与引言卡署名一律用它**，禁止输出 {{作者名}} / {{身份}} / {{简介}} 之类占位符。`
+    : `没有提供作者署名——签名区**整段省略**，禁止输出 {{作者名}} / {{身份}} / {{简介}} 之类占位符（宁可没有署名，也不要把模板占位发出去）。`;
   const now = new Date();
   const todayLine = `今天日期：${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}（系统注入）。组件里任何年份/日期类装饰字段（如报头年份、进度、日期角标），一律用这个日期取值；定稿正文里没写日期的地方，禁止自行编造任何年份。`;
   // 头图卡标题红线：头图给"还没读正文的人"看，别塞只有读完才懂的黑话（曾把标题改成"原料采购台的四次校准"、摘要塞回作者已删的"推倒重来"）
@@ -65,6 +71,8 @@ function buildAssemblyPrompt(articleMd, themeKey) {
   return `你是公众号排版装配器。把下面「定稿 Markdown」按所选主题的组件库装配成可直接粘贴公众号的合规 HTML。HTML 一律从组件库取、不要凭记忆手写。
 
 ${todayLine}
+
+${authorLine}
 
 ${headCardRule}
 
@@ -115,9 +123,9 @@ function checkAndFix(html) {
 }
 
 // 排版主流程：装配 → fix+validate；有 ERROR/WARNING 就带着校验反馈让 LLM 修，最多重试 2 轮。
-export async function typeset(articleMd, themeKey) {
+export async function typeset(articleMd, themeKey, author = '') {
   if (!articleMd?.trim()) throw new Error('定稿为空');
-  const prompt = buildAssemblyPrompt(articleMd, themeKey);
+  const prompt = buildAssemblyPrompt(articleMd, themeKey, author);
   let totalCost = 0;
   const first = await chat([{ role: 'user', content: prompt }]);
   if (!first.success) throw new Error(`LLM 装配失败: ${first.error}`);

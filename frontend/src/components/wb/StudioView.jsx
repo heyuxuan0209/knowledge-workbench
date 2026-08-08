@@ -934,7 +934,10 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
                     )}
                     <button className="wb-btn-ghost" title="复制该适配稿（去 [素材N] 标记）" onClick={() => copyText(a.body)}>📋 复制</button>
                     <button className="wb-btn-ghost" title="导出这篇为文件（长文=.md，其余=.txt）" onClick={() => exportOne(k)}>⬇ 导出</button>
-                    {FORM_TO_PLATFORM[k] && (
+                    {k === 'gzh-long' && (
+                      <span style={{ fontSize: 11, color: 'var(--sub2)' }} title="公众号要的是排版后的 section HTML + 封面图，不能直接发母稿">公众号在下面 ⑤ 排版后发 ↓</span>
+                    )}
+                    {FORM_TO_PLATFORM[k] && k !== 'gzh-long' && (
                       <button className="wb-btn-ghost" disabled={pubBusy === k}
                         title={CARD_FORMS.has(k) ? '小红书/抖音图文必须带图——先「生成图文卡片」，否则扩展会静默跳过什么都不发' : '经 MultiPost 扩展送进该平台创作后台并填好，最后一下发布仍由你点'}
                         onClick={() => pubOne(k, a)}>{pubBusy === k ? '送出中…' : '🚀 送去发布'}</button>
@@ -1037,6 +1040,9 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName, cover, def
     setPubBusy(false)
   }
   const clean = result && result.errors.length === 0 && result.warnings.length === 0
+  // 第二道防线：后端已经在 prompt 里禁了占位符，但 LLM 不保证听话。
+  // {{作者名}} 这类漏网在预览里长得跟正文一样，一路发到公众号才被读者看见——必须挡在发布前。
+  const holes = [...new Set((result?.html || '').match(/\{\{[^{}]{1,30}\}\}/g) || [])]
   return (
     <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginTop: 11, background: 'var(--surface)' }}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>⑤ 公众号排版 <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--sub2)' }}>· 定稿 → 可粘贴公众号的合规 HTML（LLM 装配 + 校验兜底）</span></div>
@@ -1048,7 +1054,20 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName, cover, def
             style={{ border: '1px solid var(--line10)', background: theme === t.key ? 'var(--accent)' : 'var(--surface)', color: theme === t.key ? '#fff' : 'var(--body)', borderRadius: 16, padding: '5px 11px', fontSize: 12.5, cursor: 'pointer' }}>{t.name}</span>
         ))}
       </div>
-      <button className="wb-btn-primary" disabled={busy || !articleMd?.trim()} onClick={gen}>{busy ? '排版中（约 1 分钟）…' : (result ? '↻ 重新排版' : '📰 排版成公众号 HTML')}</button>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="wb-btn-primary" disabled={busy || !articleMd?.trim()} onClick={gen}>{busy ? '排版中（约 1 分钟）…' : (result ? '↻ 重新排版' : '📰 排版成公众号 HTML')}</button>
+        <button className="wb-btn-outline" disabled={pubBusy || !result?.html || !cover || holes.length > 0} onClick={pub}
+          title={!result?.html ? '先点左边排版' : holes.length ? `排版里还有没替换的模板占位符：${holes.join(' ')}` : !cover ? '还缺封面——先在上面 ④「公众号头图」点生成' : '经扩展直接在公众号建好草稿并跳到编辑页'}>
+          {pubBusy ? '送出中…' : '🚀 送到公众号'}
+        </button>
+        {!result?.html && <span style={{ fontSize: 11, color: 'var(--faint)' }}>排版完才能送</span>}
+        {result?.html && !cover && <span style={{ fontSize: 11, color: 'var(--amber)' }}>还缺封面 → 上面 ④ 生成头图</span>}
+        {holes.length > 0 && (
+          <span style={{ fontSize: 11, color: 'var(--red)' }}>
+            ⚠️ 排版里还有 {holes.length} 处模板占位没替换（{holes.join('、')}）——点「↻ 重新排版」，或用「📋 复制到公众号」后手动改
+          </span>
+        )}
+      </div>
 
       {result && (
         <div style={{ marginTop: 12 }}>
@@ -1058,7 +1077,6 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName, cover, def
             </span>
             <span style={{ fontSize: 11, color: 'var(--faint)' }}>· {result.leaf} 处 span leaf</span>
             <span style={{ marginLeft: 'auto' }} />
-            <button className="wb-btn-primary" disabled={pubBusy} title="经 MultiPost 扩展直接送进公众号编辑器（图片自动传进素材库）——最后一下发布仍由你点" onClick={pub}>{pubBusy ? '送出中…' : '🚀 送到公众号'}</button>
             <button className="wb-btn-ghost" onClick={copy}>📋 复制到公众号</button>
             <button className="wb-btn-ghost" onClick={dl}>⬇ 下载 HTML</button>
           </div>

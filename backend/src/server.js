@@ -940,11 +940,23 @@ app.get('/api/studio/article-themes', async (req, res) => {
 
 app.post('/api/studio/typeset', async (req, res) => {
   try {
-    const { article_md, theme } = req.body || {};
+    const { article_md, theme, author } = req.body || {};
     if (!article_md?.trim()) return res.status(400).json({ success: false, error: '定稿为空——先在②适配稿备好公众号长文' });
     if (!theme) return res.status(400).json({ success: false, error: '先选排版主题' });
+    // 署名没显式传就取头图里用过的那个（cover_prefs.last.author_html）——同一个人、同一处署名，
+    // 没道理让用户在两个面板各填一遍。取不到就让 typeset 走"整段省略签名"，别输出 {{作者名}} 占位。
+    let who = (author || '').trim();
+    if (!who) {
+      try {
+        const { getDatabase } = await import('./db/init.js');
+        const db = getDatabase();
+        const row = db.prepare("SELECT value FROM app_meta WHERE key='cover_prefs'").get();
+        db.close();
+        who = (JSON.parse(row?.value || '{}')?.last?.author_html || '').replace(/<[^>]+>/g, '').trim();
+      } catch { /* 取不到就空着 */ }
+    }
     const { typeset } = await import('./services/typeset.js');
-    const data = await typeset(article_md, theme);
+    const data = await typeset(article_md, theme, who);
     res.json({ success: true, data });
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
