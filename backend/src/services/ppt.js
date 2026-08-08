@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { mkdir, writeFile, readdir, stat, unlink } from 'fs/promises';
+import { mkdir, writeFile, readFile, readdir, stat, unlink } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -23,16 +23,53 @@ function slugify(s) {
     .slice(0, 40) || 'meeting';
 }
 
-/** 清掉过期产物。失败不抛——清理不该让出片失败。 */
+/** 清掉过期产物（连同旁边的 .meta.json）。失败不抛——清理不该让出片失败。 */
 async function sweep() {
   try {
     const cutoff = Date.now() - KEEP_DAYS * 864e5;
     for (const f of await readdir(OUT_DIR)) {
       if (!f.endsWith('.html')) continue;
       const p = join(OUT_DIR, f);
-      if ((await stat(p)).mtimeMs < cutoff) await unlink(p);
+      if ((await stat(p)).mtimeMs < cutoff) {
+        await unlink(p);
+        await unlink(p + '.meta.json').catch(() => {});
+      }
     }
   } catch { /* 目录不存在或权限问题都不影响出片 */ }
+}
+
+const TYPE_LABEL = { meeting: '会议纪要', talk: '分享会 · DemoDay', chat: '对谈',
+  interview: '用户访谈', myTalk: '我的分享' };
+
+/**
+ * 列出全部场次页，新的在前。
+ * 元信息走产物旁边的 .meta.json —— 不去解析 HTML：那样既慢又会在改模板时静默失配。
+ */
+export async function listSessions() {
+  const out = [];
+  let files = [];
+  try { files = await readdir(OUT_DIR); } catch { return out; }
+  for (const f of files) {
+    if (!f.endsWith('.html')) continue;
+    const p = join(OUT_DIR, f);
+    let meta = {};
+    try { meta = JSON.parse(await readFile(p + '.meta.json', 'utf8')); } catch { /* 老产物没有 meta，照样列出来 */ }
+    let st = null;
+    try { st = await stat(p); } catch { continue; }
+    out.push({
+      name: f,
+      url: `/ppt/${encodeURIComponent(f)}`,
+      title: meta.title || f.replace(/^\d{8}-\d{4}-/, '').replace(/\.html$/, '').replace(/-/g, ' '),
+      type: meta.type || null,
+      typeLabel: meta.type ? (TYPE_LABEL[meta.type] || meta.type) : '（未标注类型）',
+      date: meta.date || null,
+      duration: meta.duration || null,
+      createdAt: meta.createdAt || new Date(st.mtimeMs).toISOString(),
+      bytes: st.size,
+    });
+  }
+  out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return out;
 }
 
 function runBuild(deckPath, outPath) {
@@ -73,7 +110,8 @@ export async function renderSession(session) {
   // 用本地时间，不用 toISOString —— 后者带时区偏移，且 slice 会把数字从中间切断（曾产出 "2026-08-07234"）
   const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
-  const name = `${stamp}-${slugify(deck?.meta?.title)}.html`;
+  const meta = session.meta ?? {};
+  const name = `${stamp}-${slugify(meta.title)}.html`;
   const outPath = join(OUT_DIR, name);
   const deckPath = join(OUT_DIR, `.${name}.json`);
 
@@ -82,6 +120,11 @@ export async function renderSession(session) {
     const { stderr } = await runBuild(deckPath, outPath);
     // 降级过的页要让上游知道——不是错误，但值得在群消息里提一句
     const warnings = stderr.split('\n').map(s => s.trim()).filter(s => s.startsWith('[html-ppt]'));
+    // 旁路存元信息，供 /ppt/ 索引页列表用（别去解析 HTML：慢，且改模板时会静默失配）
+    await writeFile(outPath + '.meta.json', JSON.stringify({
+      type: session.type ?? 'meeting', title: meta.title ?? null, date: meta.date ?? null,
+      duration: meta.duration ?? null, createdAt: new Date().toISOString(),
+    }), 'utf8').catch(() => {});
     return { name, path: outPath, url: `/ppt/${encodeURIComponent(name)}`, warnings };
   } finally {
     await unlink(deckPath).catch(() => {});

@@ -1242,6 +1242,68 @@ app.post('/api/ppt/session', async (req, res) => {
   }
 });
 
+// 场次页索引 —— 产物必须有入口，否则等于没交付（"我把它放哪了？"就是这么来的）。
+// 必须注册在 /ppt/:name 之前，否则 /ppt/ 会被当成一个空文件名。
+app.get(['/ppt', '/ppt/'], async (req, res) => {
+  try {
+    const { listSessions } = await import('./services/ppt.js');
+    const items = await listSessions();
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const fmt = (iso) => { const d = new Date(iso); const p = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+    res.type('html').send(`<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>场次页 · 知识工作台</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--black:#0A0A0A;--pink:#F2D4CF;--green:#E5EDD6;--gray:#F5F5F5;--bd:3px solid var(--black)}
+body{font-family:'Segoe UI',system-ui,-apple-system,Helvetica,'Noto Sans SC',sans-serif;color:var(--black);
+  background:#fff;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:0 16px 64px}
+header{border-bottom:var(--bd);padding:26px 0 16px;margin-bottom:22px}
+.lb{background:var(--black);color:#fff;padding:5px 12px;font-size:11px;font-weight:800;
+  letter-spacing:.08em;display:inline-block}
+h1{font-size:32px;font-weight:900;margin-top:12px;line-height:1.25}
+.sub{color:#555;font-size:14px;margin-top:8px}
+.sub a{color:var(--black)}
+a.row{display:block;border:var(--bd);padding:16px 18px;margin-bottom:12px;text-decoration:none;color:inherit}
+a.row:hover{background:var(--gray)}
+.t{font-size:11px;font-weight:800;letter-spacing:.06em;background:var(--pink);padding:3px 9px;display:inline-block}
+.t.meeting{background:var(--green)}.t.interview{background:var(--pink)}
+.t.talk{background:#FDE68A}.t.chat{background:#A8D8F0}.t.myTalk{background:#D4A5E8}
+.n{font-size:19px;font-weight:900;margin-top:8px;line-height:1.4}
+.m{font-size:12px;font-weight:700;color:#666;margin-top:6px;letter-spacing:.04em}
+.empty{border:var(--bd);padding:22px 18px;color:#555}
+.empty code{background:var(--gray);padding:2px 6px;font-size:13px}
+footer{border-top:var(--bd);margin-top:22px;padding-top:14px;font-size:12px;font-weight:700;color:#666}
+</style></head><body><div class="wrap">
+<header><span class="lb">知识工作台</span><h1>场次页</h1>
+<div class="sub">录音 / 会议的结构化产出 · 手机上是滚动分享页，宽屏上是投屏 deck · 保留 30 天
+&nbsp;·&nbsp;<a href="/">← 回工作台</a></div></header>
+${items.length ? items.map((it) => `<a class="row" href="${esc(it.url)}">
+  <span class="t ${esc(it.type || '')}">${esc(it.typeLabel)}</span>
+  <div class="n">${esc(it.title)}</div>
+  <div class="m">${[it.date, it.duration].filter(Boolean).map(esc).join(' · ')}${it.date || it.duration ? ' &nbsp;|&nbsp; ' : ''}生成于 ${esc(fmt(it.createdAt))} · ${Math.round(it.bytes / 1024)}KB</div>
+</a>`).join('') : `<div class="empty">还没有场次页。<br><br>
+把一场录音的纪要丢给飞书里的机器人，说「做成分享页」；或本地跑
+<code>node backend/ppt/build.mjs &lt;session.json&gt; -o out.html</code>。</div>`}
+<footer>共 ${items.length} 场 · 杰西卡聊 AI · 内容工场</footer>
+</div></body></html>`);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+app.get('/api/ppt/list', async (req, res) => {
+  try {
+    const { listSessions } = await import('./services/ppt.js');
+    res.json({ success: true, data: await listSessions() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 产物走 tailnet 内的 URL（公网仍零端口，见 ADR-083）。只读、只认白名单文件名。
 app.get('/ppt/:name', async (req, res) => {
   try {
