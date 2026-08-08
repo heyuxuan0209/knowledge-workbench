@@ -451,16 +451,23 @@ function classifyYoutubeError(error) {
 }
 
 // Jina Reader 兜底（RESEARCH-PIPELINE-EXTENSIONS.md §二 / ADR-013）：readability 抓不到
-// （SPA/反爬/公众号单篇）时重试 r.jina.ai。只读、合规、免 key；免费档限 20 RPM，
-// 单用户产品够用。返回体是带元数据头的纯文本：
+// （SPA/反爬）时重试 r.jina.ai。返回体是带元数据头的纯文本：
 //   Title: xxx / URL Source: xxx / Markdown Content:\n<正文>
+//
+// ⚠️ 2026-08-08：原来"免 key"这条**已经失效**，而且是迁云那天（8/3）就断的、没人发现——
+// Jina 按网络信誉封禁匿名请求，VPS 所在的 Vultr 整个 AS20473 在黑名单里，所有匿名调用
+// 直接 401（AuthenticationRequiredError: bad network reputation）。实测同一批 URL：
+// 无 key 全 401，带 key 全 200 拿到正文。所以配 JINA_API_KEY 才是兜底真正可用的前提。
+// 没配也不崩，只是兜底等于没有——上层会拿到 401 并如实写进 note。
 async function fetchViaJina(url) {
+  const jinaKey = process.env.JINA_API_KEY;
   const response = await axios.get(`https://r.jina.ai/${url}`, {
     timeout: 25000, // Jina 渲染慢于直抓；上层 resolver 的 40s 超时覆盖"直抓失败+兜底"全链
     headers: {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
       // 源头剔除导航/cookie 同意组件（Cookiebot 等的整段文案会被当正文抓走）
       'X-Remove-Selector': 'header, footer, nav, aside, [id*="cookie" i], [class*="cookie" i], [id*="consent" i], [class*="consent" i]',
+      ...(jinaKey ? { Authorization: `Bearer ${jinaKey}` } : {}),
     },
   });
 
@@ -499,6 +506,17 @@ async function fetchViaJina(url) {
 export async function ingestUrl(input) {
   const url = input.trim();
   let directError; // 直抓失败原因，Jina 也失败时合并报告，不掩盖第一手信息
+
+  // 公众号必须走专用抽取：正文在 #js_content，通用 Readability 抽不出（本函数下面那套）。
+  // 2026-08-08 实测发现的真 bug：content-body-resolver 直接调 ingestUrl，**绕过了
+  // detectInputType 的路由**，于是公众号一直走通用路径，用户看到的报错是"可能是动态渲染
+  // 页面 + Jina Reader 401"——两个原因都指错了方向（真因是微信对非微信环境的访问验证）。
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('mp.weixin.qq.com') && u.pathname.startsWith('/s')) {
+      return await ingestWechat(url);
+    }
+  } catch { /* URL 非法：交给下面的通用流程去报错，别在这吞掉 */ }
 
   try {
     const response = await axios.get(url, {

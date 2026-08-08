@@ -76,8 +76,17 @@ export async function resolveContentBody(content, { full = false } = {}) {
         const raw = ingested.body.length > 20000 ? ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）' : ingested.body;
         const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw);
         persistZhBody(content.id, ingested.body, zhBody);
-        // 转写标注/「仅 shownotes」声明已由 ingestXiaoyuzhou 内嵌在正文里，此处不再重复
-        return { body: zhBody, isFullText: true, note: null };
+        // 声明已由 ingestXiaoyuzhou 内嵌在正文里，但**不能因此就说这是全文**：
+        // 2026-08-08 实测，只拿到 shownotes 时这里仍返回 isFullText:true，前端的降级警告条
+        // 就不显示，声明只剩正文里一行小字、容易被划过去。只有真拿到转写才算全文。
+        const onlyShownotes = /未能获取音频转写|仅为节目 shownotes/.test(ingested.body);
+        return {
+          body: zhBody,
+          isFullText: !onlyShownotes,
+          note: onlyShownotes
+            ? '这期没拿到音频转写，下面只是节目 shownotes（大纲/简介），不代表节目完整内容——结论请以原节目为准'
+            : null,
+        };
       } catch (podcastError) {
         return {
           body: content.zh_summary || '',
@@ -120,10 +129,18 @@ export async function resolveContentBody(content, { full = false } = {}) {
             : '正文由音频本地转写（ASR）生成，可能有少量听写误差';
         return { body: zhBody, isFullText: true, note, truncated };
       } catch (asrError) {
+        // 报错要指对方向：直接把 yt-dlp 的原始 warning 贴给用户，会把人引到错误的因上。
+        // 2026-08-08 实测，VPS 上取 YouTube 100% 撞 "Sign in to confirm you're not a bot"
+        // （数据中心 IP 被风控，与 JS runtime 那条 warning 无关，换 node 引擎也没用），
+        // 而同一个视频在本机住宅 IP 上完全正常——所以这里要说清"哪台机器不行、你能怎么办"。
+        const raw = String(asrError.message || '');
+        const botBlocked = /not a bot|Sign in to confirm|cookies/i.test(raw);
         return {
           body: content.zh_summary || '',
           isFullText: false,
-          note: `无法获取视频字幕，音频转写也失败（${asrError.message}），以下基于标题与简介，请自行查看原视频核实：${content.url}`
+          note: botBlocked
+            ? `YouTube 拦截了服务器的访问（对数据中心 IP 要求登录验证），所以拿不到字幕也下不了音频。要读全文：在本机（Mac）上解读这条，或把文字稿粘进来。原视频：${content.url}`
+            : `无法获取视频字幕，音频转写也失败（${raw}），以下基于标题与简介，请自行查看原视频核实：${content.url}`
         };
       }
     }
