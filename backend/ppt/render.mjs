@@ -24,15 +24,21 @@ const chunk = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o.
 
 /* ── 场次类型 → 允许的块。不在表里的块会被丢弃并 warn ─────────────────────── */
 export const TYPES = {
-  meeting:   { label: '会议纪要',        blocks: ['oneliner', 'decisions', 'todos', 'topics', 'quotes'] },
-  talk:      { label: '分享会 / DemoDay', blocks: ['oneliner', 'outline', 'resources', 'takeaways', 'quotes', 'seeds'] },
-  chat:      { label: '对谈',            blocks: ['oneliner', 'topics', 'takeaways', 'resources', 'quotes', 'seeds'] },
-  interview: { label: '用户访谈',        blocks: ['oneliner', 'persona', 'saidVsDid', 'hypotheses', 'quotes', 'todos', 'seeds'] },
-  myTalk:    { label: '我的分享',        blocks: ['oneliner', 'outline', 'feedback', 'retro', 'quotes', 'seeds'] },
+  meeting:   { label: '会议纪要',        blocks: ['oneliner', 'narrative', 'decisions', 'todos', 'topics', 'quotes'] },
+  talk:      { label: '分享会 / DemoDay', blocks: ['oneliner', 'narrative', 'outline', 'appraisal', 'resources', 'takeaways', 'quotes', 'seeds'] },
+  chat:      { label: '对谈',            blocks: ['oneliner', 'narrative', 'topics', 'appraisal', 'takeaways', 'resources', 'quotes', 'seeds'] },
+  interview: { label: '用户访谈',        blocks: ['oneliner', 'narrative', 'persona', 'saidVsDid', 'hypotheses', 'appraisal', 'quotes', 'todos', 'seeds'] },
+  myTalk:    { label: '我的分享',        blocks: ['oneliner', 'narrative', 'outline', 'feedback', 'retro', 'quotes', 'seeds'] },
 };
 
 /* ── 通用零件 ─────────────────────────────────────────────────────────────── */
 const label = (t, cls = '') => `<span class="label ${cls}">${esc(t)}</span>`;
+/** 时间码。有原始材料链接就挂上去（飞书妙记不保证支持秒级深链，所以只跳到材料本身，
+    时间码当文字锚点用——不伪造一个可能跳不准的 URL）。 */
+let SRC = null;
+const ts = (t) => !t ? '' :
+  (SRC?.url ? `<a class="ts" href="${esc(SRC.url)}" target="_blank" rel="noopener" title="回原始材料的 ${esc(t)}">${esc(t)}</a>`
+            : `<span class="ts">${esc(t)}</span>`);
 function table(title, count, rows, empty, cols = 2, head = '') {
   return `<table>
     ${head || `<tr><th class="th-main" colspan="${cols}">${esc(title)} · ${count}</th></tr>`}
@@ -118,6 +124,38 @@ B.takeaways = (b) => `<div class="pad-md ctr grow">
 B.seeds = (b) => `<div class="pad-md ctr grow">
   ${label('可沉淀选题', 'zh')}<div class="mt">${cardList(b.items ?? [], { accent: 'pink' })}</div></div>`;
 
+/** 过程叙述 —— 「太干」的解药：现场是怎么一步步展开的，不是 bullet 是段落。
+    每段可带 ts，指回原始材料。 */
+B.narrative = (b) => {
+  const items = b.items ?? [];
+  return `<div class="pad-md ctr grow">${label(b.title ?? '现场是怎么展开的', 'zh')}
+    <div class="mt narr">${items.length ? items.map((n) => `<div class="np">
+      ${n.ts ? `<div class="nts">${ts(n.ts)}</div>` : ''}
+      ${n.heading ? `<div class="nh">${esc(n.heading)}</div>` : ''}
+      <p>${esc(n.text)}</p></div>`).join('')
+      : `<p class="empty">没有过程叙述——只有结论的纪要没法反刍</p>`}</div></div>`;
+};
+
+/** 观点体检 —— 对方的观点站不站得住脚。
+    AI 只填能从材料里抽出来的（依据/链条/假设/边界/反方），
+    「我接不接受」是判断，留给人（ADR-044）：空着就渲染成「待你裁决」，不替他写。 */
+B.appraisal = (b) => {
+  const items = b.items ?? [];
+  const row = (k, v, cls = '') => v ? `<div class="ap ${cls}"><div class="apk">${esc(k)}</div><div class="apv">${esc(v)}</div></div>` : '';
+  return `<div class="pad-md ctr grow">${label('观点体检 · ' + items.length, 'zh')}
+    <div class="mt">${items.length ? items.map((a) => `<div class="apc">
+      <div class="apt">${esc(a.claim)}${a.who ? `<span class="apw">— ${esc(a.who)}</span>` : ''}${a.ts ? ts(a.ts) : ''}</div>
+      ${row('事实依据', a.evidence)}
+      ${row('推理链条', a.reasoning)}
+      ${row('隐含假设', a.assumption, 'warn')}
+      ${row('适用边界', a.boundary)}
+      ${row('最强反方', a.counter, 'warn')}
+      <div class="ap verdict"><div class="apk">我接不接受</div><div class="apv">${
+        a.myVerdict ? esc(a.myVerdict) : '<span class="pend">待你裁决 —— 这一栏 AI 不替你填</span>'}</div></div>
+    </div>`).join('') : `<p class="empty">没有值得体检的观点</p>`}</div>
+    <div class="foot-note">观点可以从感觉开始，但不能停留在感觉。经不起追问的结论，别往自己的产品里搬。</div></div>`;
+};
+
 /* ── 用户访谈专属 ─────────────────────────────────────────────────────────── */
 B.persona = (b) => {
   const f = [['是谁', b.who], ['什么场景', b.context], ['现在怎么解决', b.current], ['为什么找到我', b.trigger]]
@@ -170,7 +208,7 @@ B.quotes = (b) => {
   const items = b.items ?? [];
   return `<div class="pad ctr grow">${label('值得记住的原话', 'zh')}
     ${items.length ? items.map((q) => `<div class="quote"><div class="qt">${esc(q.text)}</div>
-      <div class="qb">— ${esc(q.who ?? '未标注')}${q.ts ? ` <span class="ts">${esc(q.ts)}</span>` : ''}</div></div>`).join('')
+      <div class="qb">— ${esc(q.who ?? '未标注')}${q.ts ? ' ' + ts(q.ts) : ''}</div></div>`).join('')
       : `<p class="empty mt">没有值得直引的原话</p>`}</div>`;
 };
 
@@ -196,6 +234,7 @@ function paginate(blocks) {
 
 /* ── 主入口 ───────────────────────────────────────────────────────────────── */
 export function render(session, { density = {} } = {}) {
+  SRC = session.meta?.source ?? null;   // 原始妙记 / 录屏，供时间码挂链
   const type = session.type ?? 'meeting';
   const spec = TYPES[type];
   if (!spec) throw new Error(`[html-ppt] 未知场次类型：${type}（可用：${Object.keys(TYPES).join(' / ')}）`);
@@ -222,7 +261,9 @@ export function render(session, { density = {} } = {}) {
     <div class="cl">${label(spec.label, 'zh')}
       <h1 class="mt">${esc(meta.title ?? '未命名场次')}</h1>
       <div class="rule"></div>
-      ${meta.subtitle ? `<p class="sub">${esc(meta.subtitle)}</p>` : ''}</div>
+      ${meta.subtitle ? `<p class="sub">${esc(meta.subtitle)}</p>` : ''}
+      ${SRC?.url ? `<a class="srcbtn" href="${esc(SRC.url)}" target="_blank" rel="noopener">
+        ↗ ${esc(SRC.label || '原始妙记 / 逐字稿')}</a>` : ''}</div>
     <div class="cr">${metaRows.length
       ? metaRows.map(([k, v]) => `<div class="ci2"><div class="cap">${esc(k)}</div><div class="cv">${esc(v)}</div></div>`).join('')
       : `<div class="ci2"><p class="empty">材料未提供元信息</p></div>`}</div></div></section>`;
@@ -348,11 +389,45 @@ td.pink{background:var(--pink)}td.green{background:var(--green)}
 .rh{font-size:12px;font-weight:800;letter-spacing:.06em;margin-bottom:6px}
 .ri{font-size:15px;font-weight:600;margin-top:4px}
 
+/* 过程叙述 */
+.narr{display:grid;gap:14px}
+.np{border-left:var(--bd);padding-left:16px}
+.nts{margin-bottom:4px}
+.nh{font-size:17px;font-weight:900;margin-bottom:4px}
+.np p{font-size:16px;font-weight:500;line-height:1.85}
+
+/* 观点体检 */
+.apc{border:var(--bd);margin-bottom:14px}
+.apt{background:var(--black);color:#fff;padding:12px 16px;font-size:17px;font-weight:900;
+  line-height:1.45;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.apw{font-size:12px;font-weight:700;opacity:.7}
+.ap{display:grid;grid-template-columns:88px 1fr;border-top:var(--bd)}
+.ap:first-of-type{border-top:0}
+.apk{font-size:11px;font-weight:800;letter-spacing:.06em;color:#666;padding:10px 12px;
+  border-right:1px solid rgba(10,10,10,.18);background:var(--gray)}
+.apv{padding:10px 14px;font-size:15px;font-weight:600;line-height:1.75}
+.ap.warn .apk{background:var(--pink);color:var(--black)}
+.ap.verdict .apk{background:var(--green)}
+.pend{color:#777;font-weight:500;font-style:normal}
+
+/* 追问条 */
+.ask{border:var(--bd);background:var(--gray);margin-top:22px;padding:16px 18px}
+.askh{font-size:12px;font-weight:800;letter-spacing:.06em}
+.askb{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.askl{font-size:15px;font-weight:800;color:var(--black);text-decoration:none;
+  border-bottom:var(--bd);width:fit-content;padding-bottom:2px}
+.askl.off{border-bottom:0;color:#777;font-weight:600}
+.askt{font-size:14px;font-weight:500;line-height:1.75;color:#333}
+.srcbtn{display:inline-block;margin-top:16px;font-size:14px;font-weight:800;color:var(--black);
+  text-decoration:none;background:#fff;border:var(--bd);padding:8px 14px;width:fit-content}
+
 /* 原话 */
 .quote{border-left:var(--bd);padding-left:16px;margin-top:16px}
 .qt{font-size:20px;font-weight:900;line-height:1.45}
 .qb{font-size:12px;font-weight:800;letter-spacing:.06em;margin-top:8px}
-.ts{font-variant-numeric:tabular-nums;background:var(--gray);padding:2px 6px}
+.ts{font-variant-numeric:tabular-nums;background:var(--gray);padding:2px 6px;font-size:11px;
+  font-weight:800;letter-spacing:.04em;color:var(--black);text-decoration:none;display:inline-block}
+a.ts{border-bottom:2px solid var(--black)}
 
 .bot{border-top:var(--bd);margin-top:20px;padding:12px 0;font-size:11px;font-weight:800;
   letter-spacing:.06em;color:#555;display:flex;gap:14px;flex-wrap:wrap}
@@ -417,6 +492,16 @@ td.pink{background:var(--pink)}td.green{background:var(--green)}
   .retro{grid-template-columns:repeat(3,1fr)}
   .rc+.rc{border-top:0;border-left:var(--bd)}
   .quote{padding-left:30px;margin-top:26px}.qt{font-size:34px}
+  .narr{gap:20px}.np{padding-left:26px}.np p{font-size:var(--fs);line-height:var(--lh)}
+  .nh{font-size:22px}
+  .apc{margin-bottom:18px}.apt{font-size:22px;padding:14px 20px}
+  .ap{grid-template-columns:110px 1fr}.apk{padding:12px 14px;font-size:12px}
+  .apv{padding:12px 18px;font-size:var(--fs);line-height:var(--lh)}
+  /* 投屏时不显示「去问机器人」——那是读的人的动作，不是讲的人的。原始材料链接收进页脚。 */
+  .ask{display:none}
+  .srcbtn{margin-top:24px;font-size:16px;padding:10px 18px}
+  .bot .src{margin-left:0}
+  .bot .src a{color:var(--black);text-decoration:none;border-bottom:2px solid var(--black)}
   .bot{position:absolute;left:0;right:0;bottom:0;height:58px;margin:0;padding:0;gap:0;
     border-top:var(--bd);background:var(--white);align-items:stretch}
   .bot .c{padding:0 28px;display:flex;align-items:center}
@@ -432,9 +517,17 @@ td.pink{background:var(--pink)}td.green{background:var(--green)}
 <div id="stage">
 ${cover}
 ${body}
+<div class="ask">
+  <div class="askh">这页是提炼，不是全部</div>
+  <div class="askb">
+    ${SRC?.url ? `<a class="askl" href="${esc(SRC.url)}" target="_blank" rel="noopener">↗ 看原始${esc(SRC.label || '妙记 / 逐字稿')}</a>` : `<span class="askl off">（这场没挂原始材料链接）</span>`}
+    <span class="askt">想深入问：<b>回飞书私聊问机器人</b>，它手里有这场的逐字稿和上下文，能顺着往下挖。这页是死的，它是活的。</span>
+  </div>
+</div>
 <div class="bot">
   <div class="c">${esc(meta.brand ?? '')}</div>
   <div class="c" id="sec"></div>
+  ${SRC?.url ? `<div class="c src"><a href="${esc(SRC.url)}" target="_blank" rel="noopener">↗ 原始${esc(SRC.label || '妙记')}</a></div>` : ''}
   ${inferred ? `<div class="c">说话人归属由内容推断，可能有误差</div>` : ''}
   <div class="dots" id="dots"></div>
 </div>

@@ -43,7 +43,11 @@ v2 用 `type` 决定**块的组合**：不属于该类型的块直接不渲染�
     "duration": "52 min",           // 可空
     "participants": ["K 老师"],      // 可空
     "myRole": "访谈者",              // 可空 —— 我在场干嘛，决定这份记录的视角
-    "brand": "杰西卡聊 AI"
+    "brand": "杰西卡聊 AI",
+    "source": {                     // 强烈建议给：原始妙记 / 录屏
+      "label": "妙记逐字稿",
+      "url": "https://my.feishu.cn/minutes/obcnxxxx"
+    }
   },
   "blocks": [ /* 见 §三 */ ]
 }
@@ -57,11 +61,13 @@ v2 用 `type` 决定**块的组合**：不属于该类型的块直接不渲染�
 
 | type | 中文 | 我在场干嘛 | 块 |
 |---|---|---|---|
-| `meeting` | 会议纪要 | 参与决策 | `oneliner` `decisions` `todos` `topics` `quotes` |
-| `talk` | 分享会 / DemoDay | 听别人讲 | `oneliner` `outline` `resources` `takeaways` `quotes` `seeds` |
-| `chat` | 对谈 | 交换看法 | `oneliner` `topics` `takeaways` `resources` `quotes` `seeds` |
-| `interview` | 用户访谈 | 问用户 | `oneliner` `persona` `saidVsDid` `hypotheses` `quotes` `todos` `seeds` |
-| `myTalk` | 我的分享 | 我在台上 | `oneliner` `outline` `feedback` `retro` `quotes` `seeds` |
+| `meeting` | 会议纪要 | 参与决策 | `oneliner` `narrative` `decisions` `todos` `topics` `quotes` |
+| `talk` | 分享会 / DemoDay | 听别人讲 | `oneliner` `narrative` `outline` `appraisal` `resources` `takeaways` `quotes` `seeds` |
+| `chat` | 对谈 | 交换看法 | `oneliner` `narrative` `topics` `appraisal` `takeaways` `resources` `quotes` `seeds` |
+| `interview` | 用户访谈 | 问用户 | `oneliner` `narrative` `persona` `saidVsDid` `hypotheses` `appraisal` `quotes` `todos` `seeds` |
+| `myTalk` | 我的分享 | 我在台上 | `oneliner` `narrative` `outline` `feedback` `retro` `quotes` `seeds` |
+
+**块按 `blocks` 数组顺序渲染**（不是按上表顺序）。建议序：`oneliner` → `narrative` → 主体 → `quotes` → `seeds`。
 
 **类型由 agent 判，但必须在产出里明说**（"我把它当成分享会处理了"），判错一句话就能改。
 传了不属于该类型的块 → **丢弃 + warn**，不报错（宁可少一块，不要出现「决策 · 0」）。
@@ -82,6 +88,32 @@ v2 用 `type` 决定**块的组合**：不属于该类型的块直接不渲染�
 { "type": "quotes", "items": [{ "text": "…", "who": "K 老师", "ts": "00:18:20" }] }
 ```
 `ts` 是妙记时间码，当**文字锚点**用——会议纪要里不放视频位（ADR-086 收口）。
+
+**`narrative`** — 过程叙述 ★ **「太干」的解药**
+```jsonc
+{ "type": "narrative", "title": "现场是怎么展开的", "items": [
+  { "ts": "01:12:40", "heading": "「赋能所有行业」那一刻场子凉了",
+    "text": "第 5 位讲通用 RAG，被主持人问「你自己平时用它检索什么」，他答不上来…" }]}
+```
+**不是 bullet，是段落。** 纪要只留结论就没法反刍——过程里的转折、谁被问住了、气氛什么时候变的，
+这些才是后来能长出观点的东西。`ts` 是时间码，有 `meta.source.url` 时会挂成回原始材料的链接。
+
+**`appraisal`** — 观点体检 ★ **别全盘接收**
+```jsonc
+{ "type": "appraisal", "items": [
+  { "claim": "AI 产品应该先做通用能力，行业场景后面自然会来",
+    "who": "第 5 位分享者", "ts": "01:12:40",
+    "evidence":   "没有给出案例或数据，只举了「大模型能力在涨」这一个趋势",
+    "reasoning":  "能力涨 → 通用产品有价值 → 所以先做通用。第二跳没有中间论据",
+    "assumption": "默认「通用能力」和「用户愿意付钱」是同一件事",
+    "boundary":   "在基础设施层可能成立；在应用层，用户买的是场景不是能力",
+    "counter":    "同场第 3、第 7 位都是极窄场景起步，现场反证就在隔壁",
+    "myVerdict":  null }]}
+```
+六栏对应「观点易得，真相难寻」那套追问：**事实依据 / 推理链条 / 隐含假设 / 适用边界 / 最强反方**。
+
+> **`myVerdict` 是判断，AI 不许替他填**（ADR-044：产品只标准化"重复不判断"的事）。
+> 留空时渲染成「**待你裁决 —— 这一栏 AI 不替你填**」。AI 只填能从材料里抽出来的五栏。
 
 **`seeds`** — 可沉淀选题（这是内容流水线的燃料，不是会议要素）
 ```jsonc
@@ -202,6 +234,10 @@ GET  /ppt/:name                      →  产物（保留 30 天）
 命令行：`node backend/ppt/build.mjs <session.json> -o <out.html>`
 
 失败 **422** + 具体哪页超多少像素，**不返回半成品**。
+
+**追问出口**：手机流式模式底部固定一条「这页是提炼，不是全部」——挂原始材料链接，
+并写明**想深入问就回飞书私聊问机器人**（它有逐字稿和上下文，HTML 是死的）。
+投屏模式隐藏这条（讲的人不需要），原始材料链接收进页脚。
 
 **受众边界**：产物走 tailnet，只有本人能开——**这是刻意的**（ADR-087）。
 给没参会的人看的那份是**飞书文档**（可搜索、可评论、能 @人），走 `POST /api/feishu/draft-doc`。
