@@ -39,8 +39,10 @@ async function sweep() {
   } catch { /* 目录不存在或权限问题都不影响出片 */ }
 }
 
+// ⚠️ 加场次类型时这里也要加，否则索引页显示原始 type（曾漏过 plan，列表里出现「[plan]」）。
+// 真相源是 backend/ppt/render.mjs 的 TYPES —— 这里只是给索引页用的中文名。
 const TYPE_LABEL = { meeting: '会议纪要', talk: '分享会 · DemoDay', chat: '对谈',
-  interview: '用户访谈', myTalk: '我的分享' };
+  interview: '用户访谈', myTalk: '我的分享', plan: '计划' };
 
 /**
  * 列出全部场次页，新的在前。
