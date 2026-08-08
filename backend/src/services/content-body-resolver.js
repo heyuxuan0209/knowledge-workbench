@@ -58,7 +58,17 @@ export async function resolveContentBody(content, { full = false } = {}) {
   // ③ ASR 也失败 → 诚实降级为标题+简介
   if (content.content_type === 'video') {
     if (content.zh_body && !full) {
-      return { body: content.zh_body, isFullText: true, note: null };
+      // 缓存命中也要如实标记：早先缓存下来的播客可能只是 shownotes（当时没转写成功），
+      // 这里若无脑 isFullText:true，下面新加的"只有 shownotes"判断就永远够不着——
+      // 2026-08-08 实测就是这么漏的：改完代码，已缓存的那期照旧显示成全文。
+      const onlyShownotes = /未能获取音频转写|仅为节目 shownotes/.test(content.zh_body);
+      return {
+        body: content.zh_body,
+        isFullText: !onlyShownotes,
+        note: onlyShownotes
+          ? '这期没拿到音频转写，下面只是节目 shownotes（大纲/简介），不代表节目完整内容——结论请以原节目为准'
+          : null,
+      };
     }
 
     const isYoutube = content.url && /youtube\.com|youtu\.be/.test(content.url);

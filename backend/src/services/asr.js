@@ -124,7 +124,15 @@ async function execWithRetry(cmd, args) {
       return await pexec(cmd, args, { env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 4 * 1024 * 1024 });
     } catch (err) {
       if (attempt >= 1) {
-        const reason = err.killed ? '下载超时（可能被平台临时限速，稍后再试）' : (err.stderr || err.message || '').toString().trim().slice(0, 120);
+        // 截取要挑对行：yt-dlp 的 stderr 常常先吐几行 WARNING（如"No supported JavaScript
+        // runtime"），真正的 ERROR 在后面。直接 slice(0,120) 会把警告当成失败原因报给用户，
+        // 上层再据此判断/展示就全歪了（2026-08-08 实测：真因是 IP 被风控，用户看到的却是
+        // JS runtime 警告）。所以优先取 ERROR 行，没有才退回原样截断。
+        const rawErr = (err.stderr || err.message || '').toString().trim();
+        const errLine = rawErr.split('\n').find(l => /^\s*ERROR[: ]/i.test(l));
+        const reason = err.killed
+          ? '下载超时（可能被平台临时限速，稍后再试）'
+          : (errLine || rawErr).trim().slice(0, 200);
         throw new Error(`音频下载失败：${reason}`);
       }
       await new Promise(r => setTimeout(r, 5000));
