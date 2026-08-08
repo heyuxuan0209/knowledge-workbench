@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { IconWarn, IconBolt } from './Icons'
 import { api } from './util'
 import FeishuPicker from './FeishuPicker'
+import { ensureChannel, sendToPublisher, FORM_TO_PLATFORM } from '../../lib/multipost'
 
 // 创作台（视觉对齐原型 06-studio）：平台模板分段 + 衬线草稿区 + 溯源警示 + 复制/导出。
 // 平台列表动态化（P1）：来自 /api/studio/platforms（reference/prompts/creation/platforms/
@@ -826,6 +827,24 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
   const toggleEdit = k => { setAdapted(a => ({ ...a, [k]: { ...a[k], editing: !a[k].editing, open: true } })); focusAssist(k) }
   const selected = [...filmForms]
 
+  // 一键发布（ADR-094）：把这篇适配稿送进 MultiPost 的发布台。
+  // 只映射了有对应通道的形态；douyin-koubo 是口播文字稿、没有 mp4 可传，故意不给按钮
+  // （视频通道要真视频文件，KW 现在出不了成片——那是 writing 工作区手工做的）。
+  const [pubBusy, setPubBusy] = useState(null)
+  const pubOne = async (k, a) => {
+    const platform = FORM_TO_PLATFORM[k]
+    if (!platform || !a?.body) return
+    setPubBusy(k)
+    try {
+      await ensureChannel()
+      await sendToPublisher([{ platform, title: defaultTitle || '', content: a.body, images: a.images || [] }])
+      showToast?.('已送到发布台 · 复核窗确认后会填进该平台后台，最后一下发布由你点')
+    } catch (err) {
+      showToast?.(err.message === 'UNTRUSTED' ? '扩展未信任本站——请在弹窗里点「信任」后重试' : '送出失败：' + err.message)
+    }
+    setPubBusy(null)
+  }
+
   if (draftEmpty) {
     return (
       <div className="wb-card" style={{ padding: '18px 20px', textAlign: 'center', color: 'var(--sub)' }}>
@@ -911,6 +930,11 @@ function FilmPane({ draftEmpty, pforms, filmForms, toggleFilmForm, adapted, setA
                     )}
                     <button className="wb-btn-ghost" title="复制该适配稿（去 [素材N] 标记）" onClick={() => copyText(a.body)}>📋 复制</button>
                     <button className="wb-btn-ghost" title="导出这篇为文件（长文=.md，其余=.txt）" onClick={() => exportOne(k)}>⬇ 导出</button>
+                    {FORM_TO_PLATFORM[k] && (
+                      <button className="wb-btn-ghost" disabled={pubBusy === k}
+                        title={CARD_FORMS.has(k) ? '小红书/抖音图文必须带图——先「生成图文卡片」，否则扩展会静默跳过什么都不发' : '经 MultiPost 扩展送进该平台创作后台并填好，最后一下发布仍由你点'}
+                        onClick={() => pubOne(k, a)}>{pubBusy === k ? '送出中…' : '🚀 送去发布'}</button>
+                    )}
                     {!a.passthrough && (
                       <button className="wb-btn-ghost" disabled={a.reBusy} title="丢弃这篇、按母稿重新适配一版（改坏了想回滚用）" onClick={() => readaptOne(k)}>{a.reBusy ? '重出中…' : '↻ 重出'}</button>
                     )}
@@ -982,6 +1006,27 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName }) {
     } catch { showToast('浏览器限制复制——用「下载 HTML」，浏览器打开后全选复制兜底') }
   }
   const dl = () => { const blob = new Blob([result.html], { type: 'text/html;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '公众号排版.html'; a.click(); URL.revokeObjectURL(a.href) }
+  // 送进公众号编辑器（ADR-094）。排版产出的 section HTML 正是 MultiPost 的 article 通道吃的格式，
+  // 而且它会把正文里的 <img> 逐张传进微信素材库再换 src——外链图会被草稿接口直接过滤，这一步省不掉。
+  // 措辞刻意是「送到」不是「已发布」：扩展只保证内容注入，发布那一下在公众号编辑器里由用户点。
+  const [pubBusy, setPubBusy] = useState(false)
+  const pub = async () => {
+    if (!result?.html) return
+    setPubBusy(true)
+    try {
+      await ensureChannel()
+      await sendToPublisher([{
+        platform: 'ARTICLE_WEIXIN',
+        title: (articleMd.match(/^#\s+(.+)$/m)?.[1] || '').slice(0, 64),
+        htmlContent: result.html,
+        content: articleMd,
+      }])
+      showToast('已送到发布台 · 在弹出的复核窗确认后会填进公众号编辑器，最后由你点发布')
+    } catch (err) {
+      showToast(err.message === 'UNTRUSTED' ? '扩展未信任本站——请在弹窗里点「信任」后重试' : '送出失败：' + err.message)
+    }
+    setPubBusy(false)
+  }
   const clean = result && result.errors.length === 0 && result.warnings.length === 0
   return (
     <div style={{ border: '1px solid var(--line10)', borderRadius: 11, padding: '13px 14px', marginTop: 11, background: 'var(--surface)' }}>
@@ -1004,7 +1049,8 @@ function TypesetPanel({ showToast, articleMd, boundTheme, seriesName }) {
             </span>
             <span style={{ fontSize: 11, color: 'var(--faint)' }}>· {result.leaf} 处 span leaf</span>
             <span style={{ marginLeft: 'auto' }} />
-            <button className="wb-btn-primary" onClick={copy}>📋 复制到公众号</button>
+            <button className="wb-btn-primary" disabled={pubBusy} title="经 MultiPost 扩展直接送进公众号编辑器（图片自动传进素材库）——最后一下发布仍由你点" onClick={pub}>{pubBusy ? '送出中…' : '🚀 送到公众号'}</button>
+            <button className="wb-btn-ghost" onClick={copy}>📋 复制到公众号</button>
             <button className="wb-btn-ghost" onClick={dl}>⬇ 下载 HTML</button>
           </div>
           {!clean && (
