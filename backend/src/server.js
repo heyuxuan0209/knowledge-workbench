@@ -1212,15 +1212,49 @@ app.post('/api/feishu/inbox/:id/triage', async (req, res) => {
 });
 
 // 评审场搬家 Phase 1（ADR-062）：起草产出 → 飞书文档（owner=用户，机器人可编辑）。
-// body: { title, markdown, brief?: {topic, thesis, sources, genre, platform, voice}, fileExtension? }
-// brief 提供时拼「创作简报」头（评审交接物约定）；返回 { url, token }。
+// body: { title, markdown, brief?: {topic, thesis, sources, genre, platform, voice}, fileExtension?, draftId? }
+// brief 提供时拼「创作简报」头（评审交接物约定）。
+//
+// 带 draftId 时是**幂等**的（M27）：同一篇稿改多少版，飞书那边始终只有一篇、URL 不变。
+//   hash 没变 → 原样返回旧链接（手滑重复点不会造重复文档）
+//   hash 变了 → 原地重写正文
+//   文档被手动删了 → 静默降级为新建（否则用户删完就再也发不出去了）
+// 不带 draftId 保持老行为（每次新建），向后兼容既有调用方。
 app.post('/api/feishu/draft-doc', async (req, res) => {
   try {
-    const { title, markdown, brief, fileExtension } = req.body || {};
-    const { createDocFromMarkdown, draftBrief } = await import('./services/feishu-docs.js');
+    const { title, markdown, brief, fileExtension, draftId } = req.body || {};
+    const { createDocFromMarkdown, updateDocFromMarkdown, draftBrief } = await import('./services/feishu-docs.js');
     const body = brief ? draftBrief(brief) + (markdown || '') : markdown;
+
+    if (!draftId) {
+      const result = await createDocFromMarkdown({ title, markdown: body, fileExtension: fileExtension || 'md' });
+      return res.json({ success: true, data: { ...result, action: 'created' } });
+    }
+
+    const { getDraft, setDraftFeishuLink } = await import('./db/drafts.js');
+    const { createHash } = await import('crypto');
+    const draft = getDraft(draftId);
+    if (!draft) return res.status(404).json({ success: false, error: `找不到草稿 ${draftId}` });
+
+    const hash = createHash('sha256').update(`${title || ''}\n${body || ''}`).digest('hex');
+    if (draft.feishu_doc_token && draft.feishu_hash === hash) {
+      return res.json({ success: true, data: { url: draft.feishu_url, token: draft.feishu_doc_token, action: 'unchanged' } });
+    }
+
+    if (draft.feishu_doc_token) {
+      try {
+        await updateDocFromMarkdown({ documentId: draft.feishu_doc_token, markdown: body });
+        setDraftFeishuLink(draftId, { docToken: draft.feishu_doc_token, url: draft.feishu_url, hash });
+        return res.json({ success: true, data: { url: draft.feishu_url, token: draft.feishu_doc_token, action: 'updated' } });
+      } catch (e) {
+        // 文档被用户在飞书里删了/移走了——重建一篇，别让稿子从此发不出去
+        console.warn(`[draft-doc] 原地重写失败，降级新建：${e.message}`);
+      }
+    }
+
     const result = await createDocFromMarkdown({ title, markdown: body, fileExtension: fileExtension || 'md' });
-    res.json({ success: true, data: result });
+    setDraftFeishuLink(draftId, { docToken: result.token, url: result.url, hash });
+    res.json({ success: true, data: { ...result, action: 'created' } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

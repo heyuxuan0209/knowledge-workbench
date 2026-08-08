@@ -55,6 +55,16 @@ export function getDraft(id) {
   return row;
 }
 
+// 飞书母稿落点（M27）。稿子和它在飞书那边的文档一一对应，重发时据此判断是新建还是原地重写。
+export function setDraftFeishuLink(id, { docToken, url, hash }) {
+  const db = getDatabase();
+  db.prepare(`
+    UPDATE drafts SET feishu_doc_token = ?, feishu_url = ?, feishu_hash = ?, updated_at = datetime('now')
+    WHERE id = ?
+  `).run(docToken ?? null, url ?? null, hash ?? null, id);
+  db.close();
+}
+
 export function deleteDraft(id) {
   const db = getDatabase();
   const r = db.prepare('DELETE FROM drafts WHERE id = ?').run(id);

@@ -98,6 +98,109 @@ export async function createDocFromMarkdown({ title, markdown, fileExtension = '
   return { url: result.url, token: result.token };
 }
 
+// ── 母稿原地重写（幂等，ADR-09x）────────────────────────────────────────────
+// 背景：import_tasks 只能新建，改一版就在内容工场多一篇同名文档，认不出哪篇是最新。
+// 关键前提是飞书自带 markdown→blocks 的官方转换器（blocks/convert），所以不必自己拼块——
+// 社区反复踩的"手拼 block 导致文档内容错乱、前后关系不对"这条坑绕过去了。
+// 流程：convert → 清空根块下所有子块 → descendant 整棵树写回。文档 token / URL / 知识库节点全程不变。
+//
+// 两个实测出来的坑（别照文档想当然）：
+//  ① convert 返回的 blocks 顺序是乱的，不是文档顺序——必须按 first_level_block_ids 重排，否则段落全串。
+//  ② 删块会让挂在块上的飞书评论一起失效。当前工作流是"和 Claude 聊着改稿"、不在文档里评论，
+//     所以可接受；哪天改成在文档里评论，这里要先把评论捞出来再重写。
+
+const DESCENDANT_BATCH = 50;   // 飞书单次写入块数上限
+
+// 根块（block_id === document_id）下的直接子块，翻页取全。
+async function listRootChildren(documentId) {
+  const ids = [];
+  let pageToken = null;
+  do {
+    const d = await feishuFetch(
+      `/open-apis/docx/v1/documents/${documentId}/blocks/${documentId}/children`,
+      { query: { page_size: 500, page_token: pageToken, document_revision_id: -1 } },
+    );
+    for (const b of d?.items || []) ids.push(b.block_id);
+    pageToken = d?.has_more ? d.page_token : null;
+  } while (pageToken);
+  return ids;
+}
+
+// 按 first_level_block_ids 顺序，把每个一级块连同其子孙收成一组（保序）。
+function collectSubtrees(order, blocks) {
+  const byId = new Map(blocks.map(b => [b.block_id, b]));
+  return order.map((id) => {
+    const group = [];
+    const walk = (bid) => {
+      const b = byId.get(bid);
+      if (!b) return;
+      group.push(b);
+      for (const child of b.children || []) walk(child);
+    };
+    walk(id);
+    return { rootId: id, nodes: group };
+  });
+}
+
+/** 把已有 docx 的正文整体换成新 markdown。URL / token / 知识库节点不变。返回 { documentId, blocks }。 */
+export async function updateDocFromMarkdown({ documentId, markdown }) {
+  if (!documentId) throw new Error('documentId 必填');
+  if (!markdown?.trim()) throw new Error('markdown 不能为空');
+
+  const conv = await feishuFetch('/open-apis/docx/v1/documents/blocks/convert', {
+    method: 'POST',
+    body: { content_type: 'markdown', content: markdown },
+  });
+  const order = conv?.first_level_block_ids || [];
+  const blocks = conv?.blocks || [];
+  if (!order.length) throw new Error('markdown 转换后没有内容块');
+
+  // 先清空再写入。顺序不能反——先写会和旧内容叠在一起。
+  const existing = await listRootChildren(documentId);
+  if (existing.length) {
+    await feishuFetch(
+      `/open-apis/docx/v1/documents/${documentId}/blocks/${documentId}/children/batch_delete`,
+      {
+        method: 'DELETE',
+        query: { document_revision_id: -1 },
+        body: { start_index: 0, end_index: existing.length },
+      },
+    );
+  }
+
+  // 按一级块分批（保证一棵子树不被切断），累计到 50 块就发一批。
+  const groups = collectSubtrees(order, blocks);
+  let index = 0;
+  let written = 0;
+  let batch = [];
+  const flush = async () => {
+    if (!batch.length) return;
+    await feishuFetch(
+      `/open-apis/docx/v1/documents/${documentId}/blocks/${documentId}/descendant`,
+      {
+        method: 'POST',
+        query: { document_revision_id: -1 },
+        body: {
+          index,
+          children_id: batch.map(g => g.rootId),
+          descendants: batch.flatMap(g => g.nodes),
+        },
+      },
+    );
+    index += batch.length;
+    written += batch.reduce((n, g) => n + g.nodes.length, 0);
+    batch = [];
+  };
+  for (const g of groups) {
+    const pending = batch.reduce((n, x) => n + x.nodes.length, 0);
+    if (batch.length && pending + g.nodes.length > DESCENDANT_BATCH) await flush();
+    batch.push(g);
+  }
+  await flush();
+
+  return { documentId, blocks: written };
+}
+
 // 创作简报头——起草落飞书时拼在正文前，评审者（人/机器人）先读简报再读稿（ADR-062 交接物约定）。
 export function draftBrief({ topic = '', thesis = '', sources = '', genre = '', platform = '', voice = '' } = {}) {
   const lines = [
