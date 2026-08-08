@@ -1226,6 +1226,37 @@ app.post('/api/feishu/draft-doc', async (req, res) => {
   }
 });
 
+// ── 场次出片（ADR-086 起，ADR-088 改为按场次类型分块）───────────────────────
+// 上游是录音/妙记的结构化产出。五种场次类型（meeting/talk/chat/interview/myTalk）
+// 各有各的块组合——分享会不该有「决策 · 0」。结构见 .claude/skills/html-ppt/SCHEMA.md。
+// 一份产物同时是手机滚动分享页和投屏翻页 deck，靠 CSS 两套布局，不做缩放。
+app.post('/api/ppt/session', async (req, res) => {
+  try {
+    const { renderSession } = await import('./services/ppt.js');
+    const result = await renderSession(req.body?.session || req.body?.deck || req.body);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    // 溢出到降级底仍放不下时，build 会拒绝出片并说明哪页超多少像素——原样透出，
+    // 上游据此缩短条目或拆页重试，而不是拿到一份被切掉一半的纪要（ADR-086 三个静默失败之一）
+    res.status(422).json({ success: false, error: error.message });
+  }
+});
+
+// 产物走 tailnet 内的 URL（公网仍零端口，见 ADR-083）。只读、只认白名单文件名。
+app.get('/ppt/:name', async (req, res) => {
+  try {
+    const { OUT_DIR } = await import('./services/ppt.js');
+    const name = req.params.name;
+    // 不能用 /^[\w.-]+$/ —— 会议标题是中文，\w 匹配不到，合法产物会被自己拦成 400。
+    // 只挡穿越和非 html。
+    if (name.includes('/') || name.includes('\\') || name.includes('..') || !name.endsWith('.html'))
+      return res.status(400).send('非法文件名');
+    res.sendFile(pathJoin(OUT_DIR, name), (err) => { if (err && !res.headersSent) res.status(404).send('产物不存在或已过期（保留 30 天）'); });
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
 app.get('/api/feishu/pick', async (req, res) => {
   try {
     const { listPickable } = await import('./services/feishu-sync.js');

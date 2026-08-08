@@ -1,0 +1,134 @@
+{
+ "type": "meeting",
+ "lang": "zh",
+ "speakerInferred": true,
+ "meta": {
+  "title": "HTML PPT 模板体系对齐",
+  "date": "2026-08-07",
+  "duration": "42 min",
+  "participants": [
+   "雨轩",
+   "Claude"
+  ],
+  "brand": "杰西卡聊 AI",
+  "myRole": "主持"
+ },
+ "blocks": [
+  {
+   "type": "oneliner",
+   "text": "模板不定，入会 agent 的自动出片就接不上"
+  },
+  {
+   "type": "decisions",
+   "items": [
+    {
+     "text": "本窗口是 auto-HTML-PPT 的前置阻塞项",
+     "by": "雨轩"
+    },
+    {
+     "text": "先出 mock 给作者挑，再工程化"
+    },
+    {
+     "text": "模板定稿 7 套，但只有 H Raw Grid 需要工程化",
+     "by": "雨轩"
+    },
+    {
+     "text": "「要不要工程化」由「谁在批量产出」决定，不由「是不是模板」决定"
+    },
+    {
+     "text": "模板选型一律从 bold-template-pack 现成的 34 套里挑，不再手搓"
+    },
+    {
+     "text": "中文适配照各套 design.md 的 CJK 节执行，不自己发挥"
+    }
+   ],
+   "unresolved": [
+    {
+     "text": "会议纪要里到底要不要视频位——倾向不要，改成跳转妙记时间码的文字锚点"
+    }
+   ]
+  },
+  {
+   "type": "todos",
+   "items": [
+    {
+     "text": "出可点 HTML mock",
+     "owner": "雨轩",
+     "due": "08.07",
+     "done": true
+    },
+    {
+     "text": "定 slide 类型枚举 + 数据 schema",
+     "owner": "本窗口",
+     "due": "08.08",
+     "done": true
+    },
+    {
+     "text": "写渲染器：H 参数化 + 分页 + playwright 复测",
+     "owner": "本窗口",
+     "due": "08.08"
+    },
+    {
+     "text": "补 topics 页的容量实测",
+     "owner": "本窗口"
+    },
+    {
+     "text": "与入会 agent 对接口，跑通端到端"
+    },
+    {
+     "text": "把被否决的 8 套模板在 prototype/README 标记状态",
+     "owner": "雨轩",
+     "due": "08.08"
+    }
+   ],
+   "open": [
+    {
+     "text": "视频用 <video> 还是平台 iframe，未定"
+    }
+   ]
+  },
+  {
+   "type": "topics",
+   "items": [
+    {
+     "title": "18 套模板要不要全部参数化",
+     "views": [
+      {
+       "who": "Claude",
+       "text": "维护成本随模板数线性增长，而 7 套里 6 套一年用不了几次"
+      },
+      {
+       "who": "雨轩",
+       "text": "同意，只工程化会议纪要那一套"
+      }
+     ],
+     "resolved": true
+    },
+    {
+     "title": "溢出该怎么兜底",
+     "views": [
+      {
+       "who": "Claude",
+       "text": "条数预算只是廉价预筛，文本换行就翻倍，必须渲染后量一次"
+      }
+     ],
+     "conflict": "是否值得为此引入 playwright —— 查证后发现 VPS 已装，争议消失",
+     "resolved": true
+    }
+   ]
+  },
+  {
+   "type": "quotes",
+   "items": [
+    {
+     "text": "感觉 I 和 F 有点像，但是 F 又像 A。",
+     "who": "雨轩"
+    },
+    {
+     "text": "再选十套模板，那三个 bug 一个都不会消失。",
+     "who": "Claude"
+    }
+   ]
+  }
+ ]
+}

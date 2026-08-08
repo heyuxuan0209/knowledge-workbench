@@ -91,3 +91,8 @@ prototype/tutorial-viz/hyperframes-研究/
 
 # 服务器端 python venv（头图 playwright + Pillow，见 ADR-080）：环境不进仓
 .venv/
+
+# html-ppt 选型 mock：本地留着挑，不进公开仓
+# —— assets/tpl 是从 zarazhangrui/beautiful-html-templates 拷的 68 张截图（MIT，但没必要转载）
+#    assets/*.woff2 是 Zpix 字体子集；HTML 里带我自己分享的真实内容
+prototype/html-ppt-mocks/
