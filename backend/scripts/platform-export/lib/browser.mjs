@@ -49,7 +49,7 @@ export async function snap(page, label) {
 // 12 秒内只拿到 unknown 就被判成未登录，其实登录态好好的。白等一次刷新能救回这种误判；
 // 但视频号有"别反复自动开"的风控红线，所以只重试一次，不做退避循环。
 // detect: (page) => 'in' | 'out' | 'unknown'；返回最终 status（'unknown' 表示判不准，不当已登录）。
-export async function detectWithReload(page, detect, { url, windowMs = 12_000, stepMs = 1000 } = {}) {
+export async function detectWithReload(page, detect, { url, windowMs = 12_000, stepMs = 1000, label } = {}) {
   const probe = async () => {
     const deadline = Date.now() + windowMs;
     let s = 'unknown';
@@ -66,7 +66,20 @@ export async function detectWithReload(page, detect, { url, windowMs = 12_000, s
   if (url) await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
   else await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
   status = await probe();
-  if (status === 'unknown') console.log('[login] 刷新后仍判不准——按纪律不硬闯，报「判不准」而不是「未登录」。');
+  if (status === 'unknown') {
+    console.log('[login] 刷新后仍判不准——按纪律不硬闯，报「判不准」而不是「未登录」。');
+    // 把当时的页面文字也存下来。「判不准」十有八九是**登录页文案改了/本地化了、探测正则没命中**
+    // （公众号和 X 在 2026-08-11 同一天各栽了一次），而查这个只看截图得靠人眼抄文案，
+    // 有原文就能直接往正则里补。文本很小，只在判不准时存，不会堆垃圾。
+    if (label) {
+      try {
+        const { dumpRaw } = await import('./scrape.mjs');
+        const txt = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
+        const p = dumpRaw(`${label}-undetermined`, String(Date.now()), txt);
+        if (p) console.log(`[login] 当时的页面原文已存 → ${p}`);
+      } catch { /* 存不下来不影响主流程 */ }
+    }
+  }
   return status;
 }
 

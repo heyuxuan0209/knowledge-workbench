@@ -33,7 +33,7 @@ async function detectMp(page) {
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
   await page.waitForTimeout(2500);
-  let status = await detectWithReload(page, detectMp, { url: HOME, windowMs: 8_000 });
+  let status = await detectWithReload(page, detectMp, { url: HOME, windowMs: 8_000, label: 'mp' });
   if (status === 'in') return 'in';
   if (!waitForLogin) return status;
 

@@ -32,7 +32,7 @@ async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
   // 判不准不当已登录：宁可通知扫码，也别硬闯出一份空数据（「没数据≠没流量」的误判成本更高）。
   // 但先 reload 一次再判——纯白页/没渲染完被判成未登录已实测发生过（2026-08-07 视频号）。
-  let status = await detectWithReload(page, detectDy, { url: DATA_URL });
+  let status = await detectWithReload(page, detectDy, { url: DATA_URL, label: 'dy' });
   if (status === 'in') return 'in';
   if (!waitForLogin) return status;
 

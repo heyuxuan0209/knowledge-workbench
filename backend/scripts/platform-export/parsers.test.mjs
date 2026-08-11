@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseDouyinWorks, declaredCount } from './dy-export.mjs';
 import { parseChannelsVideos } from './sph-export.mjs';
+import { classifyX } from './x-export.mjs';
 
 // —— 抖音：2026-08-11 的新版式（导航栏 + 「作品 (2)」+ 三个新指标）——
 const DY_NEW = `作品发布
@@ -223,4 +224,47 @@ test('视频号：「已声明原创」不再吞掉指标、也不再串进下�
 
   // 视频号列表不给收藏，该列一律留空（别写 0，会被复盘当成"没人收藏"）
   assert.ok(recs.every((r) => r.收藏 === ''));
+});
+
+// —— X 登录态识别 ——
+// 下面这段是 2026-08-11 真机截图上的文字（中文站未登录落地页，_debug/x-undetermined-*.png）。
+// 第一版探测正则按英文站写，这页**一个锚都没命中** → 报「判不准」。
+// 「判不准」在群通知里的含义是"多半没掉线，直接 --force 补一次"，于是会一遍遍白补，
+// 而真正该做的是去登录。所以这条必须判成 'out'，不能是 'unknown'。
+const X_LOGIN_ZH = `正发生.
+使用手机继续
+使用 Google 继续
+使用 Apple 继续
+或
+电子邮箱或用户名
+继续
+继续即表示你同意我们的 服务条款、隐私政策 和 Cookie 使用政策。
+有人说...Cookie 吗?
+X 以及 X 整合的第三方使用 Cookie 为你提供更好、更安全、更快捷的服务，并为我们的业务提供支持。
+接受所有 Cookie
+拒绝非必要的 Cookie`;
+
+test('X：中文站未登录落地页要判成 out（不是 unknown）', () => {
+  // 注意 URL 还停在 /home，**没有跳 login**——所以不能只靠 URL 判
+  assert.equal(classifyX('https://x.com/home', X_LOGIN_ZH), 'out');
+});
+
+test('X：英文站未登录页同样判成 out', () => {
+  const en = `What's happening\nPhone, email, or username\nSign in to X\nCreate account`;
+  assert.equal(classifyX('https://x.com/', en), 'out');
+});
+
+test('X：URL 已经跳到登录流程时直接 out', () => {
+  assert.equal(classifyX('https://x.com/i/flow/login', ''), 'out');
+});
+
+test('X：页面一个字都没读到才算 unknown（判不准≠未登录）', () => {
+  assert.equal(classifyX('https://x.com/home', ''), 'unknown');
+  assert.equal(classifyX('https://x.com/home', '   \n  '), 'unknown');
+});
+
+test('X：已登录页判成 in', () => {
+  const inTxt = `有什么新鲜事？\n为你推荐\n正在关注\n私信\n书签\n个人资料`;
+  assert.equal(classifyX('https://x.com/home', inTxt), 'in');
+  assert.equal(classifyX('https://x.com/i/account_analytics', '账号分析\n曝光\n互动'), 'in');
 });

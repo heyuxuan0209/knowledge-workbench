@@ -29,7 +29,7 @@ async function detectZhihu(page) {
 // 返回 'in' / 'out'（确认看到登录页）/ 'unknown'（判不准，页面没读到内容）。
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
-  let status = await detectWithReload(page, detectZhihu, { url: DATA_URL });
+  let status = await detectWithReload(page, detectZhihu, { url: DATA_URL, label: 'zhihu' });
   if (status === 'in') return 'in';
   if (!waitForLogin) return status;
 

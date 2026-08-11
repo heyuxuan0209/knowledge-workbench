@@ -31,7 +31,7 @@ async function detectSph(page) {
 // 'out' 和 'unknown' 都不硬闯，但上层通知要分开说——扫码 vs 大概率只是没加载出来。
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(DATA_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
-  let status = await detectWithReload(page, detectSph, { url: DATA_URL });
+  let status = await detectWithReload(page, detectSph, { url: DATA_URL, label: 'sph' });
   if (status === 'in') return 'in';
   if (!waitForLogin) return status;
 

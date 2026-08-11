@@ -19,22 +19,35 @@ import { writeCsv, STD_COLUMNS, dumpRaw, extractTable, rowsToObjects } from './l
 const HOME = 'https://x.com/home';
 const DATA_URL = 'https://x.com/i/account_analytics';
 
-// 单次判断登录态。返回 'in' | 'out' | 'unknown'。
-// 未登录时 x.com 会跳 /i/flow/login 或 /login，页面上有「登录 / Sign in / 注册」这几个锚。
-// 已登录后无论哪个页面，左侧导航恒有「主页/Home」「个人资料/Profile」这类入口。
-async function detectX(page) {
-  if (/\/i\/flow\/login|\/login|\/i\/flow\/signup/i.test(page.url())) return 'out';
-  const txt = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
-  if (!txt.trim()) return 'unknown';
-  if (/登录 X|Sign in to X|立即注册|Create account|忘记密码了|Forgot password/i.test(txt)) return 'out';
-  if (/账号分析|Account analytics|为你推荐|正在关注|Following|探索|Explore|消息|Messages/i.test(txt)) return 'in';
+// 判断登录态的**纯函数**（拿 url + 页面文字，不碰浏览器，好写单测）。返回 'in' | 'out' | 'unknown'。
+//
+// 锚点全部照 2026-08-11 真机截图来，别凭印象写（这条已经栽过两次）：
+// 第一版按英文站写的「Sign in to X / Create account / Forgot password」，结果中文站的落地页
+// 一个都不命中——明明是登录页却报「判不准」。而「判不准」在通知里的意思是"多半没掉线，直接补一次数"，
+// 于是她会一遍遍补数、每次都白补，真正该做的是去登录。公众号 2026-08-11 刚踩过同一个坑
+// （见 mp-export.mjs 的注释），X 又踩一遍——**登录页文案是本地化的，必须按真机文案写。**
+//
+// 中文站未登录落地页长这样：标题「正发生.」+ 三个按钮「使用手机继续 / 使用 Google 继续 / 使用 Apple 继续」
+// + 输入框占位符「电子邮箱或用户名」+「继续」+ 底部 Cookie 横幅。注意 URL 可能还停在 x.com/home，**不跳 login**。
+export function classifyX(url, txt) {
+  if (/\/i\/flow\/login|\/login|\/i\/flow\/signup/i.test(url || '')) return 'out';
+  const t = String(txt || '');
+  if (!t.trim()) return 'unknown';
+  if (/正发生|What'?s happening|使用手机继续|使用 ?Google ?继续|Continue with Google|使用 ?Apple ?继续|电子邮箱或用户名|Phone, email, or username|立即注册|Create account|Sign in to X|忘记密码|Forgot password/i.test(t)) return 'out';
+  // 已登录才有的：左侧导航（私信/书签/个人资料）、发帖框、时间线分栏、分析页标题
+  if (/账号分析|Account analytics|有什么新鲜事|私信|书签|个人资料|Bookmarks|Direct Messages|为你推荐|正在关注|Following/i.test(t)) return 'in';
   return 'unknown';
+}
+
+async function detectX(page) {
+  const txt = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
+  return classifyX(page.url(), txt);
 }
 
 async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
   await page.goto(HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => {});
   await page.waitForTimeout(3000);
-  let status = await detectWithReload(page, detectX, { url: HOME });
+  let status = await detectWithReload(page, detectX, { url: HOME, label: 'x' });
   if (status === 'in') return 'in';
   if (!waitForLogin) return status;
 
