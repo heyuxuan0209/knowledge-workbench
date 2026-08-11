@@ -23,6 +23,7 @@ export const config = {
   dyProfile: expand(process.env.PLATFORM_EXPORT_DY_PROFILE) || join(home, '.playwright-profiles/dy'),
   sphProfile: expand(process.env.PLATFORM_EXPORT_SPH_PROFILE) || join(home, '.playwright-profiles/sph'),
   zhihuProfile: expand(process.env.PLATFORM_EXPORT_ZHIHU_PROFILE) || join(home, '.playwright-profiles/zhihu'),
+  xProfile: expand(process.env.PLATFORM_EXPORT_X_PROFILE) || join(home, '.playwright-profiles/x'),
   // 飞书云盘交接文件夹 token（云端 Claude 从这里取文件入表）——**必填**，在 backend/.env 设；
   // 不内置默认值：这是个人飞书文件夹 ID，不硬编码进公开仓。
   folderToken: process.env.PLATFORM_EXPORT_FOLDER_TOKEN || '',

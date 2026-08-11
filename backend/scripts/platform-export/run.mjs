@@ -1,5 +1,5 @@
 // 平台数据导出总入口（launchd 每天 10:07 调这个；手动补数：node run.mjs --force）。
-// 流程：小红书 + 公众号 + 抖音 + 视频号 + 知乎各导一次 → 成功的传飞书云盘 → 发一条群通知（云端 Claude 据此入表）。
+// 流程：小红书 + 公众号 + 抖音 + 视频号 + 知乎 + X 各导一次 → 成功的传飞书云盘 → 发一条群通知（云端 Claude 据此入表）。
 // 硬约束（工单）：每天最多一次、失败不自动重试、未登录不硬闯。任何结果都发通知说清在哪一步——
 // 尤其把「哪个平台这次没数据」列清楚，好让她一眼分辨「没数据≠没流量」，不误判。
 import fs from 'fs';
@@ -11,6 +11,7 @@ import { exportMp } from './mp-export.mjs';
 import { exportDy } from './dy-export.mjs';
 import { exportSph } from './sph-export.mjs';
 import { exportZhihu } from './zhihu-export.mjs';
+import { exportX } from './x-export.mjs';
 
 const force = process.argv.includes('--force');
 const stamp = todayStamp();
@@ -75,19 +76,20 @@ async function runPlatform(name, fn) {
 
 console.log(`[${new Date().toISOString()}] platform-export 开始（${stamp}${force ? ' · force' : ''}）`);
 
-// 五个平台独立跑：一个挂了不拖另一个（登录态/风控互不相干）。
+// 六个平台独立跑：一个挂了不拖另一个（登录态/风控互不相干）。
 const xhs = await runPlatform('xhs', exportXhs);
 const mp = await runPlatform('mp', exportMp);
 const dy = await runPlatform('dy', exportDy);
 const sph = await runPlatform('sph', exportSph);
 const zhihu = await runPlatform('zhihu', exportZhihu);
-const results = [xhs, mp, dy, sph, zhihu];
+const x = await runPlatform('x', exportX);
+const results = [xhs, mp, dy, sph, zhihu, x];
 
 // 组装群通知：每个平台一行，✅ 列出实际文件名 / ❌ 列出原因（未登录 or 判不准 or 失败）。
 // 目的（工单）：她一眼看清哪个平台这次「没有数据」，不会把「导出失败」误读成「没流量」。
 // 「真掉线」和「判不准」必须分开说（2026-08-07 实测）：前者得掏手机扫码，后者多半只是页面没渲染出来、
 // 直接补一次就过——混成一条会让她每天白掏一次手机。
-const label = { xhs: '小红书', mp: '公众号', dy: '抖音', sph: '视频号', zhihu: '知乎' };
+const label = { xhs: '小红书', mp: '公众号', dy: '抖音', sph: '视频号', zhihu: '知乎', x: 'X' };
 const lines = [];
 for (const r of results) {
   if (r.ok) {
@@ -114,7 +116,7 @@ const anyOk = results.some((r) => r.ok);
 if (anyOk || notified) {
   try { fs.writeFileSync(marker, new Date().toISOString()); } catch { /* 标记写不了不影响主流程 */ }
 } else {
-  console.log('[run] 五个平台全败 + 飞书通知也没送达（多半是网络/环境整体有问题）——不写当日标记，留待重试。');
+  console.log('[run] 所有平台全败 + 飞书通知也没送达（多半是网络/环境整体有问题）——不写当日标记，留待重试。');
 }
 
 console.log(`[${new Date().toISOString()}] platform-export 完成`);

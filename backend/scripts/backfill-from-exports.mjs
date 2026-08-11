@@ -27,7 +27,8 @@ const CACHE = process.env.KW_EXPORT_CACHE || path.join(os.homedir(), '.cache/kw-
 // mp-detail-*.xls / mp-detail-nonotice-*.xls（逐篇明细）和 mp-engage-*.csv（逐篇互动）。
 // 旧正则只认 `<平台>-<日期>.(xlsx|csv)`，这三份新文件**一份都不会被下载**，
 // 于是逐篇数据传到了云盘却永远进不了表——跟"数据在云盘躺 8 天"是同一类失败。
-const SNAP_PATTERN = /^(xhs|mp|zhihu|dy|sph)(?:-[a-z]+)*-(\d{8})\.(xlsx|xls|csv)$/;
+// 注意 xhs 必须排在 x 前面：正则的 | 是有序的，`x` 先命中会把 `xhs-…` 卡死在下一段上。
+const SNAP_PATTERN = /^(xhs|mp|zhihu|dy|sph|x)(?:-[a-z]+)*-(\d{8})\.(xlsx|xls|csv)$/;
 const TOLERANCE_DAYS = 1.5;   // 快照实际天数与目标档位的最大偏差
 const SNAP_HOUR_CST = 10;     // Mac launchd 10:07 取数，按当天 10:00 北京时间折算
 const NEXT_STAGE = { 3: '待回收D7', 7: '待回收D30', 30: '已回收完' };

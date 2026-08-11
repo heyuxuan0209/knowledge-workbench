@@ -177,7 +177,9 @@ PARSERS = [('xhs', 'xhs-*.xlsx', parse_xhs),
            ('公众号', 'mp-engage-*.csv', parse_mp_engage),
            ('公众号', 'mp-detail*.xls', parse_mp_detail),
            ('知乎', 'zhihu-*.csv', parse_csv), ('抖音', 'dy-*.csv', parse_csv),
-           ('视频号', 'sph-*.csv', parse_csv)]
+           ('视频号', 'sph-*.csv', parse_csv),
+           # 'x-*.csv' 不会误吃 xhs-*.csv（glob 要求字面量 "x-"），平台名要和多维表格「平台」列的取值一致
+           ('X', 'x-*.csv', parse_csv)]
 PLATFORM = {'xhs': '小红书'}
 
 

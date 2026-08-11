@@ -14,7 +14,8 @@
     "export:mp": "node scripts/platform-export/mp-export.mjs",
     "export:dy": "node scripts/platform-export/dy-export.mjs",
     "export:sph": "node scripts/platform-export/sph-export.mjs",
-    "export:zhihu": "node scripts/platform-export/zhihu-export.mjs"
+    "export:zhihu": "node scripts/platform-export/zhihu-export.mjs",
+    "export:x": "node scripts/platform-export/x-export.mjs"
   },
   "keywords": [
     "ai",
