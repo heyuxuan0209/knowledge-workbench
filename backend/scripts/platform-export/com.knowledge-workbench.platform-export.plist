@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- 平台数据导出：每天 10:07 跑一次（避开整点，不写 0 10），14:07 再补一次。装法见同目录 README.md。
+<!-- 平台数据导出。装法见同目录 README.md。
      需登录 GUI 会话才能开有头 Chrome——LaunchAgent 天然在用户 Aqua 会话里跑，符合。
+     （锁屏不影响：8/7–8/9 就是凌晨锁屏状态下跑成功的。真正跑不了的是「睡着」和「没网」。）
 
-     为什么有第二个时间点（2026-08-11 加，有实证）：launchd 的定时点若撞上 Mac 在睡觉，
-     它会在唤醒那一瞬间补跑——那会儿 Wi-Fi 往往还没连上，五个平台全开成恐龙页、连报错通知都发不出去，
-     于是静默断更（8/10、8/11 连着两天）。run.mjs 现在遇到「全败且通知也没送达」不写当日标记，
-     14:07 这个补跑就能真的救回来；当天已经成功过则读到标记秒退，不会重复导出。
+     ▍不是「10:07 定点跑一次」，是「当天没成功就一直找机会补」（2026-08-11 改，ADR-097）
+     原来只有一个定点，撞上 Mac 那会儿在睡觉/关着，这天就废了——8/10、8/11 连着两天就这么没的。
+     现在是：登录时跑一次（RunAtLoad）+ 白天每 2 小时一个机会点。配合 run.mjs 的当日 marker，
+     **当天已经成功过的话，后面每次都是读一下文件就退（约 0.3 秒），不会重复导出、不碰平台**；
+     只有当天还没成的日子才真跑。等于「你今天什么时候开机都行」，不必卡在 10:07 开着。
+
+     为什么覆盖到 20:07 就停：再往后跑完也来不及看，且深夜跑更容易撞上睡眠。
 
      ⚠️ 改完时间必须 bootout + bootstrap 重新加载：launchd 把定时点按**加载那一刻的时区**算死，
      光改文件不重载不生效。这台机器从 +8 挪到 Europe/Paris 后没重载，10:07 一直按北京时间在
@@ -22,10 +26,16 @@
   <key>WorkingDirectory</key><string>/Users/heyuxuan/Documents/项目/knowledge-workbench/backend</string>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
+  <!-- 开机/登录就先试一次：她今天几点开机都能把当天的补上，不必卡在某个钟点开着机。 -->
+  <key>RunAtLoad</key><true/>
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>7</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>7</integer></dict>
     <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>7</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>7</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>7</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>7</integer></dict>
   </array>
   <key>StandardOutPath</key><string>/Users/heyuxuan/Library/Logs/knowledge-workbench/platform-export.log</string>
   <key>StandardErrorPath</key><string>/Users/heyuxuan/Library/Logs/knowledge-workbench/platform-export.log</string>
