@@ -11,7 +11,7 @@ import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { config, todayStamp } from './lib/config.mjs';
 import { openProfile, snap, clickFirstByText, detectWithReload } from './lib/browser.mjs';
-import { writeCsv, STD_COLUMNS } from './lib/scrape.mjs';
+import { writeCsv, STD_COLUMNS, dumpRaw } from './lib/scrape.mjs';
 
 // 作品管理（逐条卡片列表）
 const DATA_URL = 'https://creator.douyin.com/creator-micro/content/manage';
@@ -52,16 +52,42 @@ async function ensureLoggedIn(page, { waitForLogin = false } = {}) {
 }
 
 // 已登录才有的指标标签集合（用于逐卡「标签取值」解析）；ACTIONS 是卡内动作按钮（跳过）。
-const METRIC_LABELS = ['播放', '点赞', '评论', '分享', '收藏', '弹幕', '平均播放时长', '封面点击率', '文案展开率', '平均浏览图片', '主页访问'];
+// 2026-08-11 补：抖音给视频卡加了 完播率/2秒跳出率/吸粉量，给图文卡加了 划走率/平均浏览图片数、
+// 又把「平均浏览图片」改成了「平均浏览图片数」——旧集合一个都不认，于是这些「标签+值」全被当成
+// **下一条的标题**塞进 CSV（实测 dy-20260811.csv 里三条标题以「完播率 - 2秒跳出率 - 吸粉量 -」开头，
+// 归一化后跟表里的标题对不上、回填直接匹配失败）。
+const METRIC_LABELS = [
+  '播放', '点赞', '评论', '分享', '收藏', '弹幕',
+  '平均播放时长', '封面点击率', '文案展开率', '平均浏览图片', '平均浏览图片数', '主页访问',
+  '完播率', '2秒跳出率', '吸粉量', '平均播放占比', '划走率',
+];
+// 指标值长这样：纯数字 / 带千分位 / 百分比 / 万千 / 时长 / 没数据的「-」
+const VALUE_RE = /^(-|--|[\d,]+(\.\d+)?[%万千]?|\d{1,2}:\d{2})$/;
+// 兜底：抖音后台迟早还会加新指标。凡是「短、以 率/量/数/比/长 结尾、且下一行长得像个值」的，
+// 一律当成没见过的指标**吃掉两行**——宁可丢一个没见过的指标，也别让它污染标题（标题是入表主键）。
+function isMetricLabel(line, next) {
+  if (METRIC_LABELS.includes(line)) return true;
+  return line.length <= 10 && /[率量数比长]$/.test(line) && next != null && VALUE_RE.test(next);
+}
 const ACTIONS = new Set(['编辑作品', '设置权限', '作品置顶', '删除作品', '取消置顶', '恢复作品', '申请复审']);
 const dtRe = /^\d{4}年\d{2}月\d{2}日\s+\d{1,2}:\d{2}$/; // 发布时间（精确到分，入表匹配主键）
 const durRe = /^(\d{1,2}:\d{2}|\d+张)$/;                 // 卡片开头的时长 / 图文张数
+// 列表正文开始前的最后一行导航文字。抖音把「共 N 个作品」改成了「作品 (N)」，旧锚点一失效，
+// 整条左侧导航 + 筛选栏（内容管理/作品合集/审核中/体裁/所有时间/导出数据…）全被当成第一条的标题。
+// 所以锚点给一组候选、取**最后一个**命中的位置，新旧版式都能兜住。
+const ANCHORS = [/^共\s*\d+\s*个作品$/, /^作品\s*[（(]\d+[）)]$/, /^所有时间$/, /^导出数据$/];
+// 后台标称的作品数（用于「标称 N 条却解析出 0 条」的改版告警）。
+export function declaredCount(text) {
+  const m = text.match(/共\s*(\d+)\s*个作品/) || text.match(/作品\s*[（(](\d+)[）)]/);
+  return m ? Number(m[1]) : null;
+}
 
 // 把作品管理页的 innerText 解析成逐条记录。策略：发布时间行作锚，其前是标题块（去掉时长/张数/动作按钮），
 // 其后按「指标标签 → 下一行值」成对取值，遇到不认识的标签且指标已开始＝下一张卡开始。
 export function parseDouyinWorks(text) {
   let lines = text.split('\n').map((s) => s.trim()).filter(Boolean);
-  const anchor = lines.findIndex((l) => /^共\s*\d+\s*个作品$/.test(l));
+  let anchor = -1;
+  lines.forEach((l, idx) => { if (ANCHORS.some((re) => re.test(l))) anchor = idx; });
   if (anchor >= 0) lines = lines.slice(anchor + 1);
   const recs = [];
   let i = 0;
@@ -78,7 +104,7 @@ export function parseDouyinWorks(text) {
     while (i < lines.length) {
       const l = lines[i];
       if (dtRe.test(l)) break;
-      if (METRIC_LABELS.includes(l)) { m[l] = lines[i + 1] ?? ''; i += 2; continue; }
+      if (isMetricLabel(l, lines[i + 1])) { m[l] = lines[i + 1] ?? ''; i += 2; continue; }
       if (Object.keys(m).length === 0) { i++; continue; } // 状态/活动前缀
       break; // 指标已开始又遇非指标 → 下一张卡
     }
@@ -91,7 +117,8 @@ export function parseDouyinWorks(text) {
         评论: m['评论'] || '',
         收藏: m['收藏'] || '',
         '分享/转发': m['分享'] || '',
-        涨粉: '', // 抖音逐条不给涨粉（账号级指标），留空
+        // 抖音现在逐条给「吸粉量」了（2026-08-11 实测），拿它当涨粉；老版式没有就留空。
+        涨粉: m['吸粉量'] === '-' ? '' : (m['吸粉量'] || ''),
       });
     }
   }
@@ -120,8 +147,8 @@ export async function exportDy({ waitForLogin = false } = {}) {
     await page.waitForTimeout(2000);
 
     const txt = await page.evaluate(() => document.body?.innerText || '');
-    const countMatch = txt.match(/共\s*(\d+)\s*个作品/);
-    const declared = countMatch ? Number(countMatch[1]) : null;
+    dumpRaw('dy', stamp, txt);
+    const declared = declaredCount(txt);
     const recs = parseDouyinWorks(txt);
 
     // 后台说有 N 条却解析到 0 → 大概率改版/没加载，报错让人看截图（别静默出空文件被当"没流量"）。

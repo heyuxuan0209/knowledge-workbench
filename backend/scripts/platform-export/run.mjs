@@ -58,14 +58,16 @@ if (!(await waitOnline())) {
 async function runPlatform(name, fn) {
   try {
     const r = await fn();
-    const files = [r.file, r.sourceFile].filter(Boolean);
+    const files = [r.file, r.sourceFile, ...(r.extraFiles || [])].filter(Boolean);
     const uploaded = [];
     for (const f of files) {
       if (!fs.existsSync(f)) { console.warn(`[run] ${name} 导出声称成功但文件不存在：${f}`); continue; }
       await uploadFile(f);
       uploaded.push(basename(f));
     }
-    return { name, ok: true, uploaded, note: (r.sourceFile ? '' : (name === 'mp' ? '（阅读来源报表未拿到）' : '')) };
+    // 「主表成了但某块附加数据没拿到」要在通知里点名——她据此判断这次的数能不能拿来复盘。
+    const gaps = [...(r.missing || []), ...(!r.sourceFile && name === 'mp' ? ['阅读来源报表'] : [])];
+    return { name, ok: true, uploaded, note: gaps.length ? `（未拿到：${gaps.join('、')}）` : '' };
   } catch (e) {
     return { name, ok: false, loginRequired: !!e.loginRequired, loginStatus: e.loginStatus, error: e.message };
   }

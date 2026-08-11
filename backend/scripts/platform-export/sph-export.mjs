@@ -14,7 +14,7 @@ import { pathToFileURL } from 'url';
 import { join } from 'path';
 import { config, todayStamp } from './lib/config.mjs';
 import { openProfile, snap, detectWithReload } from './lib/browser.mjs';
-import { writeCsv } from './lib/scrape.mjs';
+import { writeCsv, dumpRaw } from './lib/scrape.mjs';
 
 const DATA_URL = 'https://channels.weixin.qq.com/platform/post/list';
 
@@ -58,6 +58,12 @@ const dtRe = /^\d{4}年\d{2}月\d{2}日\s+\d{1,2}:\d{2}$/; // 发布时间（精
 const NUM = /^[\d,]+(\.\d+)?万?$/;
 const ACTIONS = new Set(['置顶', '取消置顶', '分享', '弹幕管理', '评论管理', '修改描述和封面', '可见权限', '删除', '数据', '编辑', '推广']);
 const HEADER = new Set(['视频管理', '特效创作工具', '发表视频', '「秒剪」自动字幕，免费不限次数']);
+// 卡片上的状态徽章，夹在**发布时间和 5 个数字之间**。
+// 由来（2026-08-11 实测）：声明了原创的视频多出一行「已声明原创」，卡在时间和数字中间，
+// 于是「时间后紧跟最多 5 个数字」这条一读到它就停手 → 那条的指标全空，而它和后面 5 个数字
+// 一起被当成**下一条的标题**（sph-20260811.csv 里两条标题以「已声明原创 598 3 1 6 10」开头）。
+// 结果是双杀：这条没数据、下一条标题对不上表、回填两条都填不进去。
+const BADGES = new Set(['已声明原创', '声明原创', '原创', '已参与', '广告', '合集']);
 const stopLine = (l) => /腾讯微信视频号运营规范|Tencent Inc|^©/.test(l);
 
 // 解析视频号 iframe 的 innerText → { declared, recs }。
@@ -77,16 +83,18 @@ export function parseChannelsVideos(text) {
     while (i < lines.length && !dtRe.test(lines[i])) {
       const l = lines[i];
       if (stopLine(l)) { i = lines.length; break; }
-      if (!ACTIONS.has(l) && !HEADER.has(l) && !/^(合集|视频)\s*\(\d+\)/.test(l)) titleParts.push(l);
+      if (!ACTIONS.has(l) && !HEADER.has(l) && !BADGES.has(l) && !/^(合集|视频)\s*\(\d+\)/.test(l)) titleParts.push(l);
       i++;
     }
     if (i >= lines.length) break;
     const datetime = lines[i]; i++;
+    // 发布时间和数字之间可能夹着状态徽章（已声明原创…），先跳过它们再收数字
+    while (i < lines.length && BADGES.has(lines[i])) i++;
     // 发布时间后紧跟最多 5 个数字
     const nums = [];
     while (i < lines.length && nums.length < 5 && NUM.test(lines[i])) { nums.push(lines[i]); i++; }
-    // 跳过该卡的操作按钮
-    while (i < lines.length && ACTIONS.has(lines[i])) i++;
+    // 跳过该卡的操作按钮和残留徽章
+    while (i < lines.length && (ACTIONS.has(lines[i]) || BADGES.has(lines[i]))) i++;
     const rec = { 标题: titleParts.join(' ').trim(), 发布时间: datetime, '曝光/播放量': '', 点赞: '', 评论: '', '分享/转发': '', 在看: '', 收藏: '', 涨粉: '' };
     METRIC_KEYS.forEach((k, idx) => { if (nums[idx] != null) rec[k] = nums[idx]; });
     if (rec.标题 || nums.length) recs.push(rec);
@@ -131,6 +139,7 @@ export async function exportSph({ waitForLogin = false } = {}) {
       await snap(page, 'sph-noframe');
       throw new Error('视频号视频列表 iframe 没读到内容（后台可能改版或未加载）');
     }
+    dumpRaw('sph', stamp, txt);
     const { declared, recs } = parseChannelsVideos(txt);
     if (declared && declared > 0 && recs.length === 0) {
       await snap(page, 'sph-parse0');

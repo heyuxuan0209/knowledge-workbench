@@ -4,6 +4,22 @@
 // 为什么走 DOM 文本而不是抓 XHR：与 xhs/mp 一致的哲学——最稳的是「人眼在页面上看到的那份数据」，
 // 后台改版接口漂了但只要页面还渲染成表，文本抓取就还在。抓不到就 snap+抛「卡在哪一步」，不硬猜。
 import fs from 'fs';
+import { join } from 'path';
+import { debugDir } from './config.mjs';
+
+// 把这次读到的页面原文存一份到 _debug/。
+// 由来（2026-08-11）：抖音把「共 N 个作品」改成「作品 (N)」、又加了三个新指标标签，解析器把
+// 整条导航栏和指标都塞进了标题；查这种 bug 只有截图完全不够——得要**当时那份 innerText**，
+// 否则每调一次解析器就要重新登一次平台（视频号还有"别反复自动开"的风控红线）。
+// 文本很小（几 KB），每次都存，出问题时能离线复现。
+export function dumpRaw(platform, stamp, text) {
+  try {
+    fs.mkdirSync(debugDir, { recursive: true });
+    const p = join(debugDir, `${platform}-raw-${stamp}.txt`);
+    fs.writeFileSync(p, text ?? '', 'utf8');
+    return p;
+  } catch { return null; }
+}
 
 // 在浏览器里把「像表格的结构」读成 { headers, rows }。
 // 兼容三种：语义 <table>、ARIA role="table"/"grid"、以及常见 div 表格（抖音/视频号多是 React/Vue 自绘）。

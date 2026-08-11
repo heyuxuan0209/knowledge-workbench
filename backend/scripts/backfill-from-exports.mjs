@@ -22,7 +22,12 @@ const TABLE = 'tblL11CZzfQSxIy9';
 const REVIEW_CHAT = process.env.KW_REVIEW_CHAT_ID || 'oc_1cce937115d3a6771d9dd3d497e0be3b';
 const PYTHON = process.env.KW_PYTHON || '/home/bot/.venv-kw/bin/python3';
 const CACHE = process.env.KW_EXPORT_CACHE || path.join(os.homedir(), '.cache/kw-exports');
-const SNAP_PATTERN = /^(xhs|mp|zhihu|dy|sph)-(\d{8})\.(xlsx|csv)$/;
+// 平台前缀 + 可选的种类后缀 + 日期 + 扩展名。
+// 种类后缀是 2026-08-11 加的：公众号除了 mp-<日期>.xlsx（全号汇总）还多了
+// mp-detail-*.xls / mp-detail-nonotice-*.xls（逐篇明细）和 mp-engage-*.csv（逐篇互动）。
+// 旧正则只认 `<平台>-<日期>.(xlsx|csv)`，这三份新文件**一份都不会被下载**，
+// 于是逐篇数据传到了云盘却永远进不了表——跟"数据在云盘躺 8 天"是同一类失败。
+const SNAP_PATTERN = /^(xhs|mp|zhihu|dy|sph)(?:-[a-z]+)*-(\d{8})\.(xlsx|xls|csv)$/;
 const TOLERANCE_DAYS = 1.5;   // 快照实际天数与目标档位的最大偏差
 const SNAP_HOUR_CST = 10;     // Mac launchd 10:07 取数，按当天 10:00 北京时间折算
 const NEXT_STAGE = { 3: '待回收D7', 7: '待回收D30', 30: '已回收完' };
@@ -31,7 +36,26 @@ const dry = process.argv.includes('--dry');
 const notify = process.argv.includes('--notify');
 const force = process.argv.includes('--force');   // 覆盖已填过的档位（默认不覆盖手填值）
 const log = (...a) => console.log(...a);
-const normTitle = (s) => String(s ?? '').replace(/[\s,，。？?！!、：:；;「」【】""''·~—\-()（）]/g, '').toLowerCase();
+// 弯引号也要去：表里手打的是「可能“说清楚”只对了一半」，公众号后台存的是直引号，
+// 只去直引号这两个串就永远对不上（2026-08-11 实测，一篇公众号文章因此回填不进去）。
+const normTitle = (s) => String(s ?? '').replace(/[\s,，。？?！!、：:；;「」【】《》〈〉""''“”‘’·~～—\-()（）]/g, '').toLowerCase();
+
+/** 各平台导出里的发布时间写法不统一，统一折算成毫秒（一律按北京时间解读） */
+function pubToMs(pub) {
+  const s = String(pub ?? '').trim();
+  const p2 = (x) => String(x).padStart(2, '0');
+  let m = s.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2})/);
+  if (m) return Date.parse(`${m[1]}-${p2(m[2])}-${p2(m[3])}T${p2(m[4])}:${m[5]}:00+08:00`);
+  m = s.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (m) return Date.parse(`${m[1]}-${p2(m[2])}-${p2(m[3])}T00:00:00+08:00`);
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m) return Date.parse(`${m[1]}-${m[2]}-${m[3]}T00:00:00+08:00`);
+  m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m) return Date.parse(`${m[1]}-${p2(m[2])}-${p2(m[3])}T${p2(m[4] ?? 0)}:${m[5] ?? '00'}:00+08:00`);
+  return NaN;
+}
+/** 北京时间的「哪一天」 */
+const dayOf = (ms) => (Number.isFinite(ms) ? new Date(ms + 8 * 3600e3).toISOString().slice(0, 10) : null);
 const flat = (v) => (Array.isArray(v) ? v.map((x) => x?.text ?? x).join('') : (v?.text ?? v));
 
 /** 快照日期(YYYYMMDD) → 取数时刻的毫秒时间戳 */
@@ -114,15 +138,38 @@ async function fetchFieldNames() {
   return new Set(r.items.map((f) => f.field_name));
 }
 
-/** 在一张快照里找这条内容：先精确匹配归一化标题，再退回前缀匹配。
- *  知乎「想法」、抖音等没有独立标题，导出里塞的是正文截断，跟表里记的长度对不上。 */
-function lookup(byTitle, key) {
+/** 在一张快照里找这条内容：精确标题 → 前缀 → **按发布日兜底**。
+ *
+ *  为什么要有第三级（2026-08-11 实测）：视频号后台**根本不给标题**，列表里那一行是视频正文；
+ *  知乎「想法」同理。而表里记的「平台化标题」是她自己起的短标题——
+ *  「把 X 上的英文长视频，4 分钟读完」对上「经常刷到30分钟以上的英文长视频，现场读起来头疼…」，
+ *  靠任何字符串相似度都不可能匹配上，视频号 3 条因此一条都填不进去。
+ *  但**发布时间是准的**（导出器一直按"发布时间是入表匹配主键"抓到分），所以按发布日兜底：
+ *  只有当天该平台**恰好只有一条**时才敢认——多条就宁可报"匹配不上"让人看一眼，不瞎猜。
+ *
+ *  前缀阈值 12 → 8：「你相信AI能一键出片吗」归一化才 10 个字，卡在 12 上直接被判死。
+ *  放宽的代价是系列稿（…启动1/…启动2）可能撞前缀，所以前缀候选**多于一条时先用发布日消歧**。 */
+const PREFIX_MIN = 8;
+function lookup(byTitle, key, pubMs) {
   if (byTitle[key]) return byTitle[key];
-  if (key.length < 12) return null;
-  for (const [k, v] of Object.entries(byTitle)) {
-    if (k.length >= 12 && (k.startsWith(key.slice(0, 12)) || key.startsWith(k.slice(0, 12)))) return v;
+  const entries = Object.entries(byTitle);
+  const day = dayOf(pubMs);
+  const sameDay = (v) => day != null && v?.pub && dayOf(pubToMs(v.pub)) === day;
+
+  if (key.length >= PREFIX_MIN) {
+    const head = key.slice(0, PREFIX_MIN);
+    const cands = entries
+      .filter(([k]) => k.length >= PREFIX_MIN && (k.startsWith(head) || key.startsWith(k.slice(0, PREFIX_MIN))))
+      .map(([, v]) => v);
+    if (cands.length === 1) return cands[0];
+    if (cands.length > 1) {
+      const narrowed = cands.filter(sameDay);
+      if (narrowed.length === 1) return narrowed[0];
+    }
   }
-  return null;
+
+  const byDay = entries.map(([, v]) => v).filter(sameDay);
+  return byDay.length === 1 ? byDay[0] : null;
 }
 
 /** 在该平台的所有快照里，挑第一张「到了第 stage 天之后」且离档位最近的。
@@ -131,7 +178,7 @@ function pickSnapshot(snapsOfPlatform, key, pubMs, stage) {
   let best = null;
   let nearest = null;   // 不满足"已过档位"时用来解释还差多少
   for (const [date, byTitle] of Object.entries(snapsOfPlatform || {})) {
-    const hit = lookup(byTitle, key);
+    const hit = lookup(byTitle, key, pubMs);
     if (!hit) continue;
     const age = (snapshotTime(date) - pubMs) / 864e5;
     const cand = { date, age, gap: Math.abs(age - stage), data: hit };
@@ -188,7 +235,10 @@ const main = async () => {
 
     const d = best.data;
     const interactions = d.like + d.comment + d.fav + d.share;
-    const hasInteraction = interactions > 0 || d.like || d.comment || d.fav || d.share;
+    // d.engaged = 这份快照里**确实读到了逐篇互动数**（公众号 mp-engage 才有这个标记）。
+    // 原来的规则是「只在真拿到互动数时才写」，而公众号那时根本拿不到，只能一直留空；
+    // 现在拿到了，就算真的是 0 赞 0 评也该如实写 0——那是"没人互动"，不是"没数据"。
+    const hasInteraction = d.engaged === true || interactions > 0;
     const fields = {};
     const put = (name, value) => { if (fieldNames.has(name)) fields[name] = value; };
     put(`D${stage}曝光`, d.exposure);
@@ -196,9 +246,13 @@ const main = async () => {
     if (d.ctr) put(`D${stage}点击率`, d.ctr);
     // 只有真拿到互动数才写互动率——公众号导出目前没有逐篇互动，写 0 会污染复盘
     if (hasInteraction && d.exposure > 0) put(`D${stage}互动率`, Number((interactions / d.exposure).toFixed(4)));
-    const spread = hasInteraction
-      ? `赞${d.like} 评${d.comment} 藏${d.fav} 分享${d.share}`
-      : (d.extra || '');
+    // 互动数和分发口径要**一起**写进「传播」：原来是二选一，一旦有互动数就把 extra 丢掉，
+    // 而公众号最该被看见的恰恰在 extra 里——「送达64 消息内打开11 分享带来85 完读率50.6%」。
+    // 只看「阅读101」会把一篇好文判成扑街，看到送达才知道是盘子小、不是内容差。
+    const spread = [
+      hasInteraction ? `赞${d.like} 评${d.comment} 藏${d.fav} 分享${d.share}` : '',
+      d.extra || '',
+    ].filter(Boolean).join(' ');
     if (spread) put(`D${stage}传播`, `${spread}｜快照${best.date}(第${best.age.toFixed(1)}天)`);
     put('回收状态', NEXT_STAGE[stage] ?? '已回收完');
 
