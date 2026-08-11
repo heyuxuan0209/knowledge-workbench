@@ -14,7 +14,11 @@ const HOME = 'https://mp.weixin.qq.com/';
 async function detectMp(page) {
   const url = page.url();
   if (/token=/.test(url) && !/bizlogin|loginpage/i.test(url)) return 'in';
-  const loginHint = await page.getByText(/扫码登录|使用微信.*扫描|请使用微信/).first()
+  // 登录页文案会改（2026-08-11 实测：现在写的是「微信扫一扫，选择公众平台账号登录」，
+  // 老正则一个都没命中 → 明明是二维码登录页却报「判不准」，通知里让她"直接补数"，
+  // 补几次都白补，真正该做的是掏手机扫码）。所以多留几个锚：扫码提示 + 只在登出态出现的
+  // 「使用账号登录 / 立即注册」入口，任一命中就算确凿的 out。
+  const loginHint = await page.getByText(/扫码登录|扫一扫|使用微信.*扫描|请使用微信|使用账号登录|立即注册/).first()
     .isVisible({ timeout: 600 }).catch(() => false);
   if (loginHint) return 'out';
   return 'unknown';

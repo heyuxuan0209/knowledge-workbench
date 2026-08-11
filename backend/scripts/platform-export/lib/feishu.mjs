@@ -82,7 +82,9 @@ export async function notify(text, chatId = config.chatId) {
 }
 
 // 通知封装：即便发送本身失败，也不要再抛（避免"报错的报错"淹没真正的失败原因），只打日志。
+// 返回 true = 确实送达。调用方要据此判断「这次结果她到底知不知道」——
+// 通知没送达时静默吞掉，就等于导出坏了也没人知道（2026-08-10/11 断更两天就是这么发生的）。
 export async function notifySafe(text, chatId) {
-  try { await notify(text, chatId); }
-  catch (e) { console.error(`[notify] 发送失败，通知内容未送达：${e.message}\n原文：${text}`); }
+  try { await notify(text, chatId); return true; }
+  catch (e) { console.error(`[notify] 发送失败，通知内容未送达：${e.message}\n原文：${text}`); return false; }
 }

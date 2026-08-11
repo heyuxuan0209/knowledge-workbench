@@ -22,6 +22,38 @@ if (!force && fs.existsSync(marker)) {
   process.exit(0);
 }
 
+// 开跑前先确认这台机器真的联网（2026-08-10/11 实测踩坑）：
+// launchd 的定时点撞上 Mac 在睡觉时，会在「唤醒的那一瞬间」补跑——此时 Wi-Fi 还没重连上，
+// 于是五个平台全部打开成 Chrome 恐龙页（ERR_INTERNET_DISCONNECTED），被判成「登录态判不准」，
+// 连报错的飞书通知都发不出去（fetch failed）。结果：数据没更新、人也不知道，静默断更两天。
+// 所以：探网 → 没网就等一会儿再探（唤醒后几十秒内一般就好），始终没网就**什么都不做直接退**，
+// 且**不写当日标记**——这样下一次唤醒/下一个定时点还会再试，断网不该吃掉当天的名额。
+const NET_PROBES = ['https://creator.xiaohongshu.com/', 'https://open.feishu.cn/'];
+async function online() {
+  for (const url of NET_PROBES) {
+    try {
+      await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
+      return true; // 能拿到任何 HTTP 响应就算通（404/403 也说明网是通的）
+    } catch { /* 换下一个探针 */ }
+  }
+  return false;
+}
+async function waitOnline({ tries = 10, gapMs = 60_000 } = {}) {
+  for (let i = 1; i <= tries; i++) {
+    if (await online()) return true;
+    if (i < tries) {
+      console.log(`[net] 第 ${i}/${tries} 次探测：没网（多半是刚从睡眠唤醒，Wi-Fi 还没连上），${gapMs / 1000}s 后再探…`);
+      await new Promise((r) => setTimeout(r, gapMs));
+    }
+  }
+  return false;
+}
+
+if (!(await waitOnline())) {
+  console.log(`[net] 等了 10 分钟仍然没网，本次不导出、也不写当日标记——下次唤醒/明天定时还会再试。`);
+  process.exit(75); // EX_TEMPFAIL：临时性失败，区别于「跑了但平台失败」的 1
+}
+
 // 跑一个平台：导出 → 逐个上传。返回结构化结果（不抛，把成败收进对象）。
 async function runPlatform(name, fn) {
   try {
@@ -70,10 +102,18 @@ for (const r of results) {
 
 const allOk = results.every((r) => r.ok);
 const head = '数据导出已更新：';
-await notifySafe([head, ...lines].join('\n'));
+const notified = await notifySafe([head, ...lines].join('\n'));
 
-// 写当日标记（无论成败都写——失败按工单不自动重试，需人工 --force 补数）
-try { fs.writeFileSync(marker, new Date().toISOString()); } catch { /* 标记写不了不影响主流程 */ }
+// 写当日标记（跑过了就不重复跑——失败按工单不自动重试，需人工 --force 补数）。
+// 唯一的例外：**一个平台都没成、通知也没发出去**——这种「全军覆没且她还不知道」的局面
+// 基本只有网络/环境整体出问题才会出现，把标记写下去等于把当天彻底锁死在静默失败上。
+// 这种情况下不写标记，留给下一次唤醒/下一个定时点再试一遍。
+const anyOk = results.some((r) => r.ok);
+if (anyOk || notified) {
+  try { fs.writeFileSync(marker, new Date().toISOString()); } catch { /* 标记写不了不影响主流程 */ }
+} else {
+  console.log('[run] 五个平台全败 + 飞书通知也没送达（多半是网络/环境整体有问题）——不写当日标记，留待重试。');
+}
 
 console.log(`[${new Date().toISOString()}] platform-export 完成`);
 console.log(lines.join('\n'));
