@@ -49,12 +49,22 @@ npm run export:zhihu # 打开知乎创作中心，扫码/密码登录，登录�
 
 ## 日常（自动）
 
-launchd 每天 **10:07** 跑一次 `run.mjs`（两个平台都导 → 上传 → 发群通知）。装/查/卸：
+launchd **登录时跑一次 + 白天 10/12/14/16/18/20 点 07 分各一次**（五个平台都导 → 上传 → 发群通知）。
+不是"定点跑一次"而是"当天没成就一直找机会补"——当天成过的日子后面每次读一下 marker 就退（约 0.3 秒，
+不开浏览器、不碰平台）。理由见 ADR-097：定点等于把成败押在"那一分钟她电脑什么状态"上。
 
 ```bash
 # 安装（一次性）
 cp backend/scripts/platform-export/com.knowledge-workbench.platform-export.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.knowledge-workbench.platform-export.plist
+
+# 让 Mac 每天 9:55 自己醒（否则合盖睡着时 launchd 会"唤醒即补跑"，那会儿 Wi-Fi 还没连上）
+sudo pmset repeat wakeorpoweron MTWRFSU 09:55:00
+# 已登记为 `wakepoweron at 9:55AM every day`（2026-08-11 装）。注意：Apple Silicon 只有
+# 「从睡眠唤醒」确定生效，「从完全关机开机」历来不支持，别指望关机后还能跑。查：pmset -g sched
+#
+# ⚠️ 没有 TTY 的场景（agent 会话里 sudo 读不到密码）走 GUI 授权弹窗，密码不经过任何日志：
+# osascript -e 'do shell script "/usr/bin/pmset repeat wakeorpoweron MTWRFSU 09:55:00" with administrator privileges'
 
 # 立刻手动触发一次（验证/补数，绕过当日 marker）
 launchctl kickstart -k gui/$(id -u)/com.knowledge-workbench.platform-export
