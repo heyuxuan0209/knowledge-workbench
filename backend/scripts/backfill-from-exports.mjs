@@ -208,6 +208,12 @@ const main = async () => {
   const noMatch = [];
   const alreadyFilled = [];
   const notYetDue = [];
+  // 「这个平台压根没有导出数据」和「有数据但这条对不上」是两回事，必须分开。
+  // 由来（2026-08-12 首次线上干跑）：X 的导出器默认没启用，于是表里 9 行 X **每天**都会出现在
+  // 「❓匹配不上」里——一个天天亮的红灯会把真红灯一起淹掉，而真红灯（某条标题改过了、
+  // 某个平台改版了）恰恰是这份通知唯一的价值。所以没数据的平台按平台**折成一行**，
+  // 不逐行刷屏；「匹配不上」那一栏只留真正需要人看一眼的。
+  const noSnapshotByPlatform = new Map();
 
   for (const rec of pending) {
     const f = rec.fields;
@@ -221,6 +227,12 @@ const main = async () => {
     // 已经有人（多半是他自己或我手动）填过这一档就别碰——自动覆盖手填值是不可接受的
     if (!force && f[`D${stage}曝光`] != null && f[`D${stage}曝光`] !== '') {
       alreadyFilled.push(`${label} D${stage} — 已有值 ${flat(f[`D${stage}曝光`])}，跳过（--force 可覆盖）`);
+      continue;
+    }
+
+    // 该平台一张快照都没有＝没有导出器/没启用，不是这一条的问题，别混进「匹配不上」
+    if (!snapshots[platform] || !Object.keys(snapshots[platform]).length) {
+      noSnapshotByPlatform.set(platform, (noSnapshotByPlatform.get(platform) || 0) + 1);
       continue;
     }
 
@@ -271,12 +283,19 @@ const main = async () => {
   }
 
   const section = (t, arr) => (arr.length ? `\n${t}（${arr.length}）：\n` + arr.map((x) => `  · ${x}`).join('\n') : '');
+  // 没有导出数据的平台：一个平台一行，不逐行刷屏
+  const noSnapLines = [...noSnapshotByPlatform.entries()]
+    .map(([p, n]) => `${p} ${n} 行 — 该平台没有导出数据（没有导出器或未启用），非本条的问题`);
   log(section('已有值·跳过', alreadyFilled));
   log(section('未到取数窗口', notYetDue));
+  log(section('ℹ️ 该平台无导出数据', noSnapLines));
   log(section('⚠️ 已错过取数窗口（那几天没有快照）', missedWindow));
   log(section('❓ 快照里匹配不上（标题改过？）', noMatch));
-  log(`\n合计：回填 ${filled.length} 行，未到期 ${notYetDue.length}，错过窗口 ${missedWindow.length}，匹配不上 ${noMatch.length}`);
+  log(`\n合计：回填 ${filled.length} 行，未到期 ${notYetDue.length}，错过窗口 ${missedWindow.length}，`
+    + `匹配不上 ${noMatch.length}，无导出数据 ${[...noSnapshotByPlatform.values()].reduce((a, b) => a + b, 0)}`);
 
+  // 通知只在**有人需要做点什么**时才发：回填了（好消息）、错过窗口、或匹配不上（要人看一眼）。
+  // 「该平台没有导出数据」不进这个条件——那是个已知的常态，天天推一遍只会让人不再看这条通知。
   if (notify && !dry && (filled.length || missedWindow.length || noMatch.length)) {
     const text = `📊 发布记录自动回填（${new Date().toISOString().slice(0, 10)}）\n\n`
       + (filled.length ? `已回填 ${filled.length} 行：\n${filled.map((x) => `• ${x}`).join('\n')}\n` : '本轮无新数据到期。\n')
