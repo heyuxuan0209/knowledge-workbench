@@ -225,8 +225,12 @@ app.post('/api/content/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: '没收到文件' });
     const { startUploadJob } = await import('./services/upload-ingest.js');
-    const { id, kind } = startUploadJob({ path: req.file.path, originalname: req.file.originalname, mimetype: req.file.mimetype });
-    res.json({ success: true, data: { jobId: id, kind, filename: req.file.originalname } });
+    // busboy 按 latin1 解 multipart 的 filename，中文名到这里是双重编码。
+    // 在入口处回正一次——再往后它就成了 source_title，会被拼进 embedding，坏了就搜不回来。
+    const { decodeUploadFilename } = await import('./util/decode-filename.js');
+    const originalname = decodeUploadFilename(req.file.originalname);
+    const { id, kind } = startUploadJob({ path: req.file.path, originalname, mimetype: req.file.mimetype });
+    res.json({ success: true, data: { jobId: id, kind, filename: originalname } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
