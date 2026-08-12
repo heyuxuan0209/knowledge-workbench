@@ -76,14 +76,16 @@ async function runPlatform(name, fn) {
 
 console.log(`[${new Date().toISOString()}] platform-export 开始（${stamp}${force ? ' · force' : ''}）`);
 
-// 六个平台独立跑：一个挂了不拖另一个（登录态/风控互不相干）。
+// 各平台独立跑：一个挂了不拖另一个（登录态/风控互不相干）。
 const xhs = await runPlatform('xhs', exportXhs);
 const mp = await runPlatform('mp', exportMp);
 const dy = await runPlatform('dy', exportDy);
 const sph = await runPlatform('sph', exportSph);
 const zhihu = await runPlatform('zhihu', exportZhihu);
-const x = await runPlatform('x', exportX);
-const results = [xhs, mp, dy, sph, zhihu, x];
+const results = [xhs, mp, dy, sph, zhihu];
+// X 默认不跑（config.enableX，见那里的注释）：登录态没种上，天天报「未登录」只是噪音。
+// 登过一次后在 .env 设 PLATFORM_EXPORT_ENABLE_X=true 就会加进来。
+if (config.enableX) results.push(await runPlatform('x', exportX));
 
 // 组装群通知：每个平台一行，✅ 列出实际文件名 / ❌ 列出原因（未登录 or 判不准 or 失败）。
 // 目的（工单）：她一眼看清哪个平台这次「没有数据」，不会把「导出失败」误读成「没流量」。

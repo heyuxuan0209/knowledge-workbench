@@ -29,6 +29,11 @@ export const config = {
   folderToken: process.env.PLATFORM_EXPORT_FOLDER_TOKEN || '',
   // 通知群 chat_id（云端 Claude 看到消息就自动入表回填）——**必填**，在 backend/.env 设。
   chatId: process.env.PLATFORM_EXPORT_CHAT_ID || '',
+  // X 默认**不进每天的自动跑**（2026-08-11 用户叫停）。导出器写好了，但 profile 里没有登录态，
+  // 而 X 的登录要走邮箱→密码→验证这一串、她试了两次没走完。放着不管的话，每天的飞书通知里
+  // 会固定多一行「❌ X 未登录」——天天噪音，还让「今天全绿」这个信号永远出不来。
+  // 想启用：先 `npm run export:x` 登一次，再在 .env 里设 PLATFORM_EXPORT_ENABLE_X=true。
+  enableX: /^(1|true|yes|on)$/i.test(process.env.PLATFORM_EXPORT_ENABLE_X || ''),
   // 降级开关：true = 脚本只开到导出页，最后一下由真人点（所有平台操作真人触发）
   manualClick: /^(1|true|yes|on)$/i.test(process.env.PLATFORM_EXPORT_MANUAL_CLICK || ''),
   // 用哪个机器人身份发通知：note = FEISHU_BOT_APP（默认，主应用桥接才收得到事件转给云端 Claude）
