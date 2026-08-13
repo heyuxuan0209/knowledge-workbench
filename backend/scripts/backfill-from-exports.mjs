@@ -257,20 +257,30 @@ const main = async () => {
     put(`D${stage}曝光`, d.exposure);
     put(`D${stage}涨粉`, d.fans);
     if (d.ctr) put(`D${stage}点击率`, d.ctr);
+    // 互动率的分母＝「真实消费量」，不是曝光（2026-08-13 她拍板统一口径）。
+    // 小红书的「曝光」是封面从信息流划过的次数，那一段已经有「封面点击率」在管；
+    // 拿它当互动率分母，会把小红书系统性压低一个数量级，且与抖音/视频号的「播放量」
+    // 根本不是一回事，横向比出来的高低是假的。实测同一条 8/5 内容：
+    // D3(分母=观看119)15.13% vs D7(分母=曝光899)2.22%，看着像暴跌 85%，其实只是换了分母。
+    // 判据用 ctr 而非平台名：有封面点击率 ⇒ 该平台的 exposure 是展示量，此时改用 view。
+    const engageBase = (d.ctr && d.view > 0) ? d.view : d.exposure;
     // 只有真拿到互动数才写互动率——公众号导出目前没有逐篇互动，写 0 会污染复盘
-    if (hasInteraction && d.exposure > 0) put(`D${stage}互动率`, Number((interactions / d.exposure).toFixed(4)));
+    if (hasInteraction && engageBase > 0) put(`D${stage}互动率`, Number((interactions / engageBase).toFixed(4)));
     // 互动数和分发口径要**一起**写进「传播」：原来是二选一，一旦有互动数就把 extra 丢掉，
     // 而公众号最该被看见的恰恰在 extra 里——「送达64 消息内打开11 分享带来85 完读率50.6%」。
     // 只看「阅读101」会把一篇好文判成扑街，看到送达才知道是盘子小、不是内容差。
     const spread = [
       hasInteraction ? `赞${d.like} 评${d.comment} 藏${d.fav} 分享${d.share}` : '',
+      // 分母是什么必须写进去。否则半年后没人知道这个百分比是按曝光还是按观看算的，
+      // 复盘时只能靠猜——这正是这次要修的那个坑。
+      hasInteraction && engageBase > 0 ? `互动率分母=${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}` : '',
       d.extra || '',
     ].filter(Boolean).join(' ');
     if (spread) put(`D${stage}传播`, `${spread}｜快照${best.date}(第${best.age.toFixed(1)}天)`);
     put('回收状态', NEXT_STAGE[stage] ?? '已回收完');
 
     const desc = `${label} D${stage} → 曝光${d.exposure}`
-      + (hasInteraction ? ` 互动率${(interactions / (d.exposure || 1) * 100).toFixed(2)}%` : ' (无互动数据)')
+      + (hasInteraction ? ` 互动率${(interactions / (engageBase || 1) * 100).toFixed(2)}%（分母${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}）` : ' (无互动数据)')
       + ` [快照${best.date}·第${best.age.toFixed(1)}天]`;
     if (dry) { log(`  [dry] ${desc}`); }
     else {
