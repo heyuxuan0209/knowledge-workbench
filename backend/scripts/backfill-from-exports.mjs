@@ -207,6 +207,7 @@ const main = async () => {
   const missedWindow = [];
   const noMatch = [];
   const alreadyFilled = [];
+  let skippedX = 0;
   const notYetDue = [];
   // 「这个平台压根没有导出数据」和「有数据但这条对不上」是两回事，必须分开。
   // 由来（2026-08-12 首次线上干跑）：X 的导出器默认没启用，于是表里 9 行 X **每天**都会出现在
@@ -223,6 +224,8 @@ const main = async () => {
     const stage = Number((flat(f['回收状态']) || '').match(/D(\d+)/)?.[1]);
     const label = `[${platform}] ${title}`;
     if (!pubMs || !stage) { noMatch.push(`${label} — 缺发布时间或回收档位`); continue; }
+    // X 不做导出器、也不回收数据（2026-08-13 何雨轩定）——静默跳过，别每天刷「匹配不上」
+    if (platform === 'X') { skippedX += 1; continue; }
 
     // 已经有人（多半是他自己或我手动）填过这一档就别碰——自动覆盖手填值是不可接受的
     if (!force && f[`D${stage}曝光`] != null && f[`D${stage}曝光`] !== '') {
@@ -301,6 +304,7 @@ const main = async () => {
   log(section('ℹ️ 该平台无导出数据', noSnapLines));
   log(section('⚠️ 已错过取数窗口（那几天没有快照）', missedWindow));
   log(section('❓ 快照里匹配不上（标题改过？）', noMatch));
+  if (skippedX) log(`\nX 平台 ${skippedX} 行已跳过（不做导出器、不回收）`);
   log(`\n合计：回填 ${filled.length} 行，未到期 ${notYetDue.length}，错过窗口 ${missedWindow.length}，`
     + `匹配不上 ${noMatch.length}，无导出数据 ${[...noSnapshotByPlatform.values()].reduce((a, b) => a + b, 0)}`);
 
