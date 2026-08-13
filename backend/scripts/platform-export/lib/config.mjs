@@ -2,6 +2,7 @@
 // 所有可调项都从 backend/.env 读，代码里不硬编造 token/chat_id/路径。
 // 这些脚本由 launchd 独立进程调起（不经 server.js），所以自己显式加载 .env。
 import dotenv from 'dotenv';
+import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -9,7 +10,23 @@ import { dirname, join } from 'path';
 const here = dirname(fileURLToPath(import.meta.url));
 // lib -> platform-export -> scripts -> backend
 export const backendDir = join(here, '../../..');
-dotenv.config({ path: join(backendDir, '.env') });
+const envPath = join(backendDir, '.env');
+
+// ⚠️ 凭证认项目、不认全局环境变量（2026-08-13 实测踩到，排查花了半小时）
+// dotenv **默认不覆盖已存在的 process.env**。而 ~/.zshrc 里 export 了一个同名的
+// FEISHU_APP_ID/SECRET（属于「视频解读」机器人，另一个项目的），于是：
+//   - launchd 跑 → plist 只设 PATH，环境干净 → 读到 .env 里的正确 app → 每天正常 ✅
+//   - 人在终端手动跑 → zshrc 的变量赢 → 用错 app → 上传报 `1061004 forbidden` ❌
+// 最坑的是报错长得像「飞书文件夹权限被改了」，会一路查到云盘协作者上去（我就查错了方向），
+// 而群通知里教人补数的那句正是 `node run.mjs --force`——照着敲就会踩，且五个平台一起挂。
+// 所以：凭证类 key 由项目 .env 说了算，谁也别想从外面盖掉。
+const parsed = dotenv.parse(fs.readFileSync(envPath));
+for (const k of ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_BOT_APP_ID', 'FEISHU_BOT_APP_SECRET']) {
+  if (parsed[k]) process.env[k] = parsed[k];
+}
+// 其余 key 保持 dotenv 默认语义：外部环境变量仍可临时覆盖，
+// 这样 `PLATFORM_EXPORT_MANUAL_CLICK=1 npm run export:xhs` 这类命令行调试照旧能用。
+dotenv.config({ path: envPath });
 
 const home = os.homedir();
 const expand = (p) => (p && p.startsWith('~') ? join(home, p.slice(1)) : p);
