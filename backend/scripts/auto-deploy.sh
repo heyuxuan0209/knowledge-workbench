@@ -39,6 +39,9 @@ asbot() { sudo -u "$SVC_USER" -H bash -lc "$1"; }
 notify() {
   local text="$1" env_file="$REPO/backend/.env"
   local id secret chat
+  # 演练标记：做验收时消息和真告警长得一模一样，已经真的骗到人一次（2026-08-13）。
+  [ "${KW_DEPLOY_DRILL:-}" = "1" ] && text="【演练 · 不是真事，不用管】
+$text"
   id=$(grep -m1 '^FEISHU_BOT_APP_ID=' "$env_file" 2>/dev/null | cut -d= -f2- | tr -d '"'"'"'')
   secret=$(grep -m1 '^FEISHU_BOT_APP_SECRET=' "$env_file" 2>/dev/null | cut -d= -f2- | tr -d '"'"'"'')
   chat=$(grep -m1 '^DEPLOY_NOTIFY_CHAT_ID=' "$env_file" 2>/dev/null | cut -d= -f2- | tr -d '"'"'"'')
@@ -146,12 +149,38 @@ if [ -z "$FAILED" ] && echo "$CHANGED" | grep -q '^backend/'; then
   if [ -z "$FAILED" ]; then
     log "重启 $SERVICE…"
     systemctl restart "$SERVICE" || FAILED="重启失败"
+    RESTARTED=1
   fi
 fi
 
 # 自检
 if [ -z "$FAILED" ]; then
   if healthy; then
+    # 「重启了」≠「新代码在跑」（ADR-101）：08-12 那个孤儿进程霸着 3000，systemctl restart
+    # 每次都"成功"、健康检查每次都 200，而端口上跑的是 22 小时前的代码。所以重启过就必须
+    # 问一句：现在应答的这个进程，装的是哪个 commit？
+    if [ "${RESTARTED:-}" = "1" ]; then
+      SERVING=$(curl -sf -m 8 "$BASE_URL/health" 2>/dev/null \
+        | python3 -c 'import sys,json;print(json.load(sys.stdin).get("commit") or "")' 2>/dev/null)
+      if [ -n "$SERVING" ] && [ "$SERVING" != "$AFTER" ]; then
+        # 不走回滚：代码本身没问题，问题是它压根没被加载。回滚只会让人以为是新代码的锅。
+        log "❌ 重启没生效：3000 上跑的是 $SERVING，应该是 $AFTER"
+        notify "⚠️ KW 部署了新代码，但**重启没生效**——3000 端口上跑的还是旧进程。
+
+应该跑：${AFTER:0:7}
+实际跑：${SERVING:0:7}
+
+最常见的原因：有人手动 \`node src/server.js\` 起过一个进程霸着 3000（禁止这么干），
+systemd 那个一直 EADDRINUSE 崩溃重启，而网站看着是好的。
+
+修法（VPS 上跑）：
+ss -tlnp | grep :3000        # 找出霸端口的 pid
+kill <pid>                   # systemd 会在 5 秒内接管
+或者跟 Claude 说一句「KW 又是孤儿进程霸端口，清一下」。"
+        exit 1
+      fi
+      [ -z "$SERVING" ] && log "（/health 没返回 commit 字段，跳过重启生效性校验——旧版本后端？）"
+    fi
     log "✅ 自检通过，部署完成（$AFTER）"
     notify "✅ KW 已自动部署 $N 个提交
 $SUBJECTS

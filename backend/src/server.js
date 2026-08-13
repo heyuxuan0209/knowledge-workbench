@@ -27,8 +27,26 @@ app.use(cors());
 // 5mb：adHoc 对话材料含长视频译文（默认 100kb 会对长内容直接 PayloadTooLarge）
 app.use(express.json({ limit: '5mb' }));
 
+// 进程身份（2026-08-13，ADR-101）：只问「3000 通不通」答不了「**谁**在应答、跑的是哪个 commit」。
+// 08-12 有个手动起的孤儿进程霸了端口 22 小时，systemd 的 kw-backend 一直 EADDRINUSE 崩溃重启
+// （counter 15468），而健康检查全绿、自动部署照报「✅ 部署完成」——三个提交静默没生效。
+// commit 取的是**进程启动那一刻**的 HEAD：它和仓库当前 HEAD 不一致，就等于「重启没生效」。
+const PROC_STARTED_AT = new Date().toISOString();
+const PROC_COMMIT = (() => {
+  try {
+    return execSync('git rev-parse HEAD', { cwd: process.cwd(), encoding: 'utf8', timeout: 3000 }).trim();
+  } catch { return null; }
+})();
+
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    pid: process.pid,
+    startedAt: PROC_STARTED_AT,
+    uptimeSec: Math.round(process.uptime()),
+    commit: PROC_COMMIT,
+  });
 });
 
 // ========== v3 Contents API（新架构，Feed 主页读取的是这里，不是下面的旧 /api/items） ==========
