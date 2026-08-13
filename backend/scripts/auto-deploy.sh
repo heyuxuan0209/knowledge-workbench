@@ -75,7 +75,41 @@ log "=== 自动部署开始 ==="
 BEFORE=$(asbot "git -C '$REPO' rev-parse HEAD" 2>/dev/null)
 [ -z "$BEFORE" ] && { log "拿不到当前 commit，放弃"; exit 1; }
 
-PULL_OUT=$(asbot "git -C '$REPO' pull --ff-only 2>&1")
+# ⚠️ 这里必须先看 pull 的退出码，不能只比对 HEAD 变没变：
+# 拉取失败时 HEAD 同样不变，会被"无新代码"那条分支吃掉，日志写一句风平浪静的
+# 「无新代码，什么都不做」然后 exit 0 —— 失败和空跑长得一模一样，翻日志也看不出来。
+# 决策 C（2026-08-13）：不给 VPS 推送凭据，那"没驮成"这件事就必须有人被告知。
+PULL_OUT=$(asbot "git -C '$REPO' pull --ff-only 2>&1"); PULL_RC=$?
+if [ "$PULL_RC" -ne 0 ]; then
+  # 分叉还是网络？两者的处理方式完全不同，消息里必须能一眼分开。
+  asbot "git -C '$REPO' fetch origin" >> "$LOG" 2>&1
+  COUNTS=$(asbot "git -C '$REPO' rev-list --left-right --count HEAD...origin/main" 2>/dev/null)
+  AHEAD=$(echo "$COUNTS" | awk '{print $1}'); BEHIND=$(echo "$COUNTS" | awk '{print $2}')
+  log "❌ git pull --ff-only 失败（rc=$PULL_RC，本地领先 ${AHEAD:-?} / 落后 ${BEHIND:-?}）：$PULL_OUT"
+  if [ -n "${AHEAD:-}" ] && [ "${AHEAD:-0}" -gt 0 ] && [ "${BEHIND:-0}" -gt 0 ]; then
+    notify "⚠️ KW 自动部署没跑成：VPS 和 GitHub 分叉了（不是网络问题）。
+
+VPS 上有 $AHEAD 个提交没推出去，GitHub 上有 $BEHIND 个提交没拉进来。
+今天的自动部署跳过了，线上还是旧版本。
+
+修法（在 Mac 上跑，保住 VPS 提交的原 SHA）：
+git fetch ssh://vultr-paris/home/bot/projects/knowledge-workbench main
+git rebase FETCH_HEAD
+git push
+
+或者直接跟 Claude 说一句「VPS 又分叉了，驮一趟」。"
+  else
+    notify "⚠️ KW 自动部署没跑成：拉取失败，但**不是分叉**（本地领先 ${AHEAD:-?} / 落后 ${BEHIND:-?}），
+大概率是网络或 GitHub 那头的问题。今天的自动部署跳过了，线上还是旧版本。
+
+git 原话：
+$PULL_OUT
+
+明早会自动再试一次。连着两天收到这条，跟 Claude 说「看下 /home/bot/kw-deploy.log」。"
+  fi
+  exit 1
+fi
+
 AFTER=$(asbot "git -C '$REPO' rev-parse HEAD" 2>/dev/null)
 if [ "$BEFORE" = "$AFTER" ]; then
   log "无新代码，什么都不做。"; exit 0
