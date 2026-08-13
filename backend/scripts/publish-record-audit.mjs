@@ -116,7 +116,9 @@ function auditRecord(rec, now) {
 const asJson = process.argv.includes('--json');
 // --notify：只在发现「数据不自洽」时推「KW · 数据复盘」群。到期未回收由 loop-data-recall.sh 负责，这里不重复推。
 const notify = process.argv.includes('--notify');
-const REVIEW_CHAT = process.env.KW_REVIEW_CHAT_ID || 'oc_1cce937115d3a6771d9dd3d497e0be3b';
+// chat_id 不进公开仓（repo 是 PUBLIC）——必填、无内置默认，缺了直接炸而不是发错群。
+const REVIEW_CHAT = process.env.KW_REVIEW_CHAT_ID;
+if (!REVIEW_CHAT) throw new Error('缺 KW_REVIEW_CHAT_ID（backend/.env）——「KW · 数据复盘」群 chat_id，无内置默认');
 const now = Date.now();
 const records = await fetchAll();
 const issues = records.flatMap((r) => auditRecord(r, now));

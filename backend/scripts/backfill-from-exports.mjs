@@ -19,7 +19,9 @@ import { feishuFetch } from '../src/services/feishu-auth.js';
 
 const APP = 'QIlkbwmGma9Tb1sRyAicfZeEnjb';
 const TABLE = 'tblL11CZzfQSxIy9';
-const REVIEW_CHAT = process.env.KW_REVIEW_CHAT_ID || 'oc_1cce937115d3a6771d9dd3d497e0be3b';
+// chat_id 不进公开仓（repo 是 PUBLIC）——必填、无内置默认，缺了直接炸而不是发错群。
+const REVIEW_CHAT = process.env.KW_REVIEW_CHAT_ID;
+if (!REVIEW_CHAT) throw new Error('缺 KW_REVIEW_CHAT_ID（backend/.env）——「KW · 数据复盘」群 chat_id，无内置默认');
 const PYTHON = process.env.KW_PYTHON || '/home/bot/.venv-kw/bin/python3';
 const CACHE = process.env.KW_EXPORT_CACHE || path.join(os.homedir(), '.cache/kw-exports');
 // 平台前缀 + 可选的种类后缀 + 日期 + 扩展名。

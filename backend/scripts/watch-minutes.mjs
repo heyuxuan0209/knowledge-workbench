@@ -26,6 +26,11 @@ const notify = process.argv.includes('--notify');
 
 // 飞书默认名 / 明写测试的
 const TEST_PAT = /^新录音(\s*\d+)?(\s|$)|测试|自测|彩排|试录|demo\s*test/i;
+// 只巡检最近这些天录的场次（2026-08-13 他定：「太早的没有用」）。
+// 用**妙记自己的 start_time**判，不用标题里的日期——标题里那个可能是播客期号
+// （「养虾夜话：03-17｜30只AI龙虾…」的 03-17 是节目期号，不是他录音的日子）。
+const MAX_AGE_DAYS = Number(process.argv.find((a) => a.startsWith('--max-age='))?.slice(10) || 60);
+
 // 面试求职类：本地一份都不留（他 2026-08-12 定）
 const INTERVIEW_PAT = /一面|二面|三面|交叉面|面试|mock|求职课|职业规划|leader沟通/i;
 
@@ -54,6 +59,13 @@ for (const d of docs) {
   if (!token) continue;                       // 不是妙记生成的文档
   if (knownWatch.has(token) || knownSessions.has(token)) continue;   // 见过了
   const info = await getMinuteInfo(token).catch(() => null);
+  const startedAt = Number(info?.start_time) || null;
+  const ageDays = startedAt ? (Date.now() - startedAt) / 864e5 : null;
+  if (ageDays != null && ageDays > MAX_AGE_DAYS) {
+    console.log(`  ⏳ ${title} — 录于 ${Math.round(ageDays)} 天前，超过 ${MAX_AGE_DAYS} 天不再巡检`);
+    if (!dry) record({ token, title, url: `https://my.feishu.cn/minutes/${token}` }, 'skipped', `太早（${Math.round(ageDays)} 天前）`);
+    continue;
+  }
   fresh.push({
     token, title, summaryDoc: d.feishuId,
     url: `https://my.feishu.cn/minutes/${token}`,
@@ -145,19 +157,26 @@ if (skipped.length) {
   if (skipped.length > 5) lines.push(`· …另有 ${skipped.length - 5} 场同理（面试/测试）`);
 }
 if (dups.length) lines.push(`\n跳过重复 ${dups.length} 场（同一录音已从别的入口进过库）`);
-if (failed.length) {
-  lines.push(`\n抓失败 ${failed.length} 场：`);
-  failed.forEach((f) => lines.push(`· ${f.title} — ${f.failed}`));
-}
+// 抓失败的只落日志和 watchlist，**不进通知**——他 2026-08-13 定：「这只抓失败就算了」。
+// 失败多半是妙记本身没转写成功，催他也没用；要查就看 watch-minutes.log。
+if (failed.length) console.log(`（抓失败 ${failed.length} 场，已记进清单不通知：${failed.map((f) => f.title).join('、')}）`);
 lines.push('\n判错了跟我说一句就改（哪场该收、哪场是测试）。');
 const text = lines.join('\n');
 
 console.log(`\n${'─'.repeat(50)}\n${text}`);
 
-if (notify && !dry && (kept.length || skipped.length || failed.length)) {
+if (notify && !dry && (kept.length || skipped.length)) {
+  // 归口「KW · 知识检索」群，不发私聊——2026-08-13 何雨轩定：定时提醒按职能进群，
+  // 私聊只留人对话。妙记入库属于知识检索，不是数据复盘。
+  // chat_id 不进公开仓（repo 是 PUBLIC）——必填、无内置默认，缺了直接炸而不是发错群。
+  const SEARCH_CHAT = process.env.KW_SEARCH_CHAT_ID;
+  if (!SEARCH_CHAT) throw new Error('缺 KW_SEARCH_CHAT_ID（backend/.env）——「KW · 知识检索」群 chat_id，无内置默认');
   try {
-    const { sendToOwner } = await import('../src/services/feishu-bot.js');
-    await sendToOwner(text);
-    console.log('\n已发到飞书。');
+    const { feishuFetch } = await import('../src/services/feishu-auth.js');
+    await feishuFetch('/open-apis/im/v1/messages', {
+      method: 'POST', query: { receive_id_type: 'chat_id' },
+      body: { receive_id: SEARCH_CHAT, msg_type: 'text', content: JSON.stringify({ text }) },
+    });
+    console.log('\n已发到「KW · 知识检索」群。');
   } catch (e) { console.log(`\n⚠️ 飞书没发出去：${e.message}`); }
 }
