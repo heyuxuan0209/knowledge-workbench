@@ -56,11 +56,18 @@ curl -X POST http://kw-vps:3000/api/ppt/session \
 
 失败返回 **422** + 具体原因（如「第 8 页超出 359px」），**不返回半成品**。
 
-**命令行（本地调试）**：
+⚠️ **Mac 上打 `kw-vps:3000` 必须绕开机场代理**，否则返 502（不是 422，别误判成参数错）。
+`~/.zshrc` 的 `no_proxy` 已加 `kw-vps,100.82.29.35,.ts.net,100.64.0.0/10`（2026-08-13）；
+在别的环境里跑先确认这条，或直接 `curl --noproxy '*'`。
+
+**命令行（本地调试，仅限 cwd = knowledge-workbench 仓库根）**：
 
 ```bash
 node backend/ppt/build.mjs <session.json> -o <out.html>
 ```
+
+本 skill 已软链到 `~/.claude/skills/html-ppt`（任何目录可见），但**引擎在 KW 仓库里**——
+在别的项目目录用时，走上面的 HTTP 那条路，别用这条相对路径。
 
 `session.json` 的结构见 SCHEMA.md §一/§三。`examples/` 下五种类型各有一份可直接跑的样例。
 
