@@ -46,10 +46,10 @@ async function waitImport(ticket) {
 
 // 导入产物挪进用户知识库（应用已是知识库成员，2026-07-30 实测可建节点——个人版走「文档应用」授权即可，
 // 无需把机器人加为"协作者"）。挪进去后权限随空间走：用户是空间主人、应用可编辑，双赢且无需 owner 转移。
-async function moveIntoWiki(objToken) {
+async function moveIntoWiki(objToken, parentWikiToken = wikiParentNode()) {
   const d = await feishuFetch(`/open-apis/wiki/v2/spaces/${wikiSpaceId()}/nodes/move_docs_to_wiki`, {
     method: 'POST',
-    body: { parent_wiki_token: wikiParentNode() || undefined, obj_type: 'docx', obj_token: objToken },
+    body: { parent_wiki_token: parentWikiToken || undefined, obj_type: 'docx', obj_token: objToken },
   });
   if (d?.wiki_token) return d.wiki_token;
   // 大文档转异步任务：轮询到出 wiki_token
@@ -67,7 +67,9 @@ async function moveIntoWiki(objToken) {
 // markdown（或 html）→ 飞书 docx。返回 { url, token }。
 // destination='wiki'（默认）：挪进用户知识库「母稿」节点下，权限随空间（用户=空间主人，应用可编辑）。
 // destination='drive'：留云空间并把 owner 转给用户（FEISHU_OWNER_OPEN_ID），主应用退为可编辑协作者。
-export async function createDocFromMarkdown({ title, markdown, fileExtension = 'md', destination = 'wiki' }) {
+export async function createDocFromMarkdown({
+  title, markdown, fileExtension = 'md', destination = 'wiki', wikiParentToken,
+}) {
   if (!title?.trim() || !markdown?.trim()) throw new Error('title 和 markdown 必填');
   // fail fast：落点配置不全就别建——建完才报错会留下一个用户看不见的应用名下孤儿文档（2026-07-30 实测）
   if (destination === 'wiki' && !wikiSpaceId()) throw new Error('缺 FEISHU_WIKI_SPACE_ID（backend/.env）');
@@ -87,7 +89,7 @@ export async function createDocFromMarkdown({ title, markdown, fileExtension = '
   const result = await waitImport(task.ticket);
 
   if (destination === 'wiki') {
-    const wikiToken = await moveIntoWiki(result.token);
+    const wikiToken = await moveIntoWiki(result.token, wikiParentToken);
     return { url: `https://my.feishu.cn/wiki/${wikiToken}`, token: result.token, wikiToken };
   }
   await feishuFetch(`/open-apis/drive/v1/permissions/${result.token}/members/transfer_owner`, {
