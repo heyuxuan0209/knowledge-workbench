@@ -118,7 +118,26 @@ function automationEvents(files, date) {
   }).slice(-160);
 }
 
-export function buildDiaryPackage({ date, rollout, commits = [], events = [], generatedAt = new Date() }) {
+function continuityContext(project, priorDiary) {
+  const handoffDir = path.join(project, 'handoff');
+  const activeHandoffs = fs.existsSync(handoffDir)
+    ? fs.readdirSync(handoffDir).filter((name) => name !== 'README.md' && name.endsWith('.md')).sort().map((name) => {
+      const text = fs.readFileSync(path.join(handoffDir, name), 'utf8');
+      return { file: `handoff/${name}`, excerpt: text.slice(0, 8000) };
+    }) : [];
+  const decisionsFile = path.join(project, 'docs/DECISIONS.md');
+  const recentDecisions = fs.existsSync(decisionsFile)
+    ? [...fs.readFileSync(decisionsFile, 'utf8').matchAll(/^## (ADR-\d+[^\n]*)/gm)].map((match) => match[1]).slice(-8)
+    : [];
+  return {
+    activeHandoffs,
+    recentDecisions,
+    priorDiary: priorDiary && fs.existsSync(priorDiary)
+      ? fs.readFileSync(priorDiary, 'utf8').slice(0, 16000) : '',
+  };
+}
+
+export function buildDiaryPackage({ date, rollout, commits = [], events = [], continuity = {}, generatedAt = new Date() }) {
   return {
     schemaVersion: 1, date, generatedAt: generatedAt.toISOString(),
     rules: {
@@ -127,7 +146,7 @@ export function buildDiaryPackage({ date, rollout, commits = [], events = [], ge
       retention: '普通 Bug、权限位、路径和部署细节不进入长期记忆；只有重大决策或可复用经验才列为候选，且本任务不自动写入',
     },
     counts: { conversations: rollout.conversations.length, commits: commits.length, automationEvents: events.length, ignoredMessages: rollout.ignored },
-    conversations: rollout.conversations, commits, automationEvents: events,
+    conversations: rollout.conversations, commits, automationEvents: events, continuity,
   };
 }
 
@@ -136,10 +155,17 @@ async function main() {
   const date = arg('date') || localDate();
   const sessionsRoot = arg('sessions-root') || path.join(process.env.HOME || '/home/bot', '.codex/sessions');
   const output = arg('output');
+  const project = arg('project') || '/home/bot/projects/knowledge-workbench';
+  const priorDiary = arg('prior-diary');
   const rollout = readRollouts(sessionsRoot, date);
   const repos = (arg('repos') || DEFAULT_REPOS.join(',')).split(',').filter(Boolean);
   const logs = (arg('logs') || DEFAULT_LOGS.join(',')).split(',').filter(Boolean);
-  const data = buildDiaryPackage({ date, rollout, commits: repos.flatMap((repo) => gitCommits(repo, date)), events: automationEvents(logs, date) });
+  const data = buildDiaryPackage({
+    date, rollout,
+    commits: repos.flatMap((repo) => gitCommits(repo, date)),
+    events: automationEvents(logs, date),
+    continuity: continuityContext(project, priorDiary),
+  });
   const text = `${JSON.stringify(data, null, 2)}\n`;
   if (output) fs.writeFileSync(output, text, { mode: 0o600 }); else process.stdout.write(text);
   console.error(`日记数据包：${rollout.files.length} 个会话文件，${data.counts.conversations} 个有效回合 → ${output || 'stdout'}`);

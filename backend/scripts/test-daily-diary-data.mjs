@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { buildDiaryPackage, parseRolloutLines, stripBridgeContext } from './daily-diary-data.mjs';
+import { splitOutput } from './split-daily-diary-output.mjs';
 
 assert.equal(stripBridgeContext('<recommended_plugins>secret</recommended_plugins>真正问题'), '真正问题');
 const date = '2026-08-16';
@@ -17,4 +18,9 @@ assert.deepEqual(parsed.conversations, [{ turnId: 'a', timestamp: '2026-08-16T10
 const data = buildDiaryPackage({ date, rollout: parsed, commits: [{ subject: 'fix: 修复' }], events: [] });
 assert.equal(data.counts.conversations, 1);
 assert.match(data.rules.retention, /普通 Bug/);
+assert.deepEqual(data.continuity, {});
+assert.deepEqual(splitOutput('<!-- WORK_DIARY -->\n# 工作日记 · 2026-08-16\n正文\n<!-- HANDOFF_DELTA -->\n# Agent 接手增量 · 2026-08-16\n增量'), {
+  diary: '# 工作日记 · 2026-08-16\n正文',
+  handoff: '# Agent 接手增量 · 2026-08-16\n增量',
+});
 console.log('daily-diary-data tests passed');

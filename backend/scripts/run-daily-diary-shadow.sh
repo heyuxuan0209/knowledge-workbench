@@ -13,15 +13,23 @@ chmod 700 "$OUT_DIR"
 
 DATA="$OUT_DIR/work-diary-$DAY.data.json"
 REPORT="$OUT_DIR/work-diary-$DAY.shadow.md"
+RAW="$OUT_DIR/work-diary-$DAY.raw.md"
+HANDOFF="$OUT_DIR/handoff-delta-$DAY.shadow.md"
 LOG="$OUT_DIR/work-diary-$DAY.codex.log"
 PROMPT="$PROJECT/backend/scripts/daily-diary-prompt.md"
 
 cd "$PROJECT/backend"
-"$NODE_BIN" scripts/daily-diary-data.mjs --date="$DAY" --output="$DATA"
+PRIOR_DAY="$(TZ=Europe/Paris date -d "$DAY -1 day" +%F)"
+PRIOR="$OUT_DIR/work-diary-$PRIOR_DAY.shadow.md"
+"$NODE_BIN" scripts/daily-diary-data.mjs --date="$DAY" --project="$PROJECT" \
+  --prior-diary="$PRIOR" --output="$DATA"
 
 cd "$PROJECT"
 "$CODEX_BIN" exec --ephemeral --sandbox read-only --model gpt-5.6-sol \
-  --output-last-message "$REPORT" "$(cat "$PROMPT")" < "$DATA" > "$LOG" 2>&1
+  --output-last-message "$RAW" "$(cat "$PROMPT")" < "$DATA" > "$LOG" 2>&1
 
-chmod 600 "$DATA" "$REPORT" "$LOG"
+"$NODE_BIN" "$PROJECT/backend/scripts/split-daily-diary-output.mjs" "$RAW" "$REPORT" "$HANDOFF"
+
+chmod 600 "$DATA" "$RAW" "$REPORT" "$HANDOFF" "$LOG"
 echo "Codex 日记影子产物：$REPORT"
+echo "Agent 接手增量影子产物：$HANDOFF"
