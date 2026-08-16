@@ -27,7 +27,7 @@ PRIOR="$OUT_DIR/work-diary-$PRIOR_DAY.shadow.md"
   --memory-roots="/home/bot/.claude/projects,/home/bot/.claude/memory" --output="$DATA"
 
 cd "$PROJECT"
-"$CODEX_BIN" exec --ephemeral --sandbox read-only --model gpt-5.6-sol \
+timeout 240 "$CODEX_BIN" exec --ephemeral --sandbox read-only --model gpt-5.6-sol \
   --output-last-message "$RAW" "$(cat "$PROMPT")" < "$DATA" > "$LOG" 2>&1
 
 "$NODE_BIN" "$PROJECT/backend/scripts/split-daily-diary-output.mjs" "$RAW" "$REPORT" "$HANDOFF" "$MEMORY"

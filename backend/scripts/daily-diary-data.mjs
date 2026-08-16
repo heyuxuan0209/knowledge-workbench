@@ -65,9 +65,11 @@ export function parseRolloutLines(lines, date) {
     const turnId = event.payload.internal_chat_message_metadata_passthrough?.turn_id
       || `${event.timestamp}-${turns.size}`;
     const turn = turns.get(turnId) || { turnId, timestamp: event.timestamp, user: '', assistant: '', assistantContext: [] };
-    if (role === 'user') turn.user = text.slice(0, 6000);
-    else if (event.payload.phase === 'final_answer') turn.assistant = text.slice(0, 8000);
-    else if (event.payload.phase === 'commentary') turn.assistantContext.push(text.slice(0, 3000));
+    if (role === 'user') turn.user = text.slice(0, 3500);
+    else if (event.payload.phase === 'final_answer') turn.assistant = text.slice(0, 4500);
+    else if (event.payload.phase === 'commentary' && turn.assistantContext.length < 2) {
+      turn.assistantContext.push(text.slice(0, 1200));
+    }
     turns.set(turnId, turn);
   }
   return {
@@ -143,13 +145,13 @@ function continuityContext(project, priorDiary, diaryDir, memoryRoots = []) {
   const memoryFiles = memoryRoots.flatMap((root) => markdownFiles(root)).sort((left, right) => {
     const leftIndex = path.basename(left) === 'MEMORY.md' ? 0 : 1;
     const rightIndex = path.basename(right) === 'MEMORY.md' ? 0 : 1;
-    return leftIndex - rightIndex || left.localeCompare(right);
-  }).slice(0, 30);
-  let memoryBudget = 60000;
+    return leftIndex - rightIndex || fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs;
+  }).slice(0, 8);
+  let memoryBudget = 36000;
   const longTermMemory = [];
   for (const file of memoryFiles) {
     if (memoryBudget <= 0) break;
-    const excerpt = readExcerpt(file, Math.min(12000, memoryBudget));
+    const excerpt = readExcerpt(file, Math.min(6000, memoryBudget));
     memoryBudget -= excerpt.length;
     if (excerpt) longTermMemory.push({ file, excerpt });
   }
@@ -160,10 +162,10 @@ function continuityContext(project, priorDiary, diaryDir, memoryRoots = []) {
   return {
     activeHandoffs,
     projectTruth: {
-      readme: readExcerpt(path.join(project, 'README.md'), 12000),
-      instructions: readExcerpt(path.join(project, 'CLAUDE.md'), 16000),
-      recentDecisions: readExcerpt(path.join(project, 'docs/DECISIONS.md'), 50000, true),
-      recentProcess: readExcerpt(path.join(project, 'docs/process-log.md'), 24000),
+      readme: readExcerpt(path.join(project, 'README.md'), 5000),
+      instructions: readExcerpt(path.join(project, 'CLAUDE.md'), 7000),
+      recentDecisions: readExcerpt(path.join(project, 'docs/DECISIONS.md'), 20000, true),
+      recentProcess: readExcerpt(path.join(project, 'docs/process-log.md'), 12000),
     },
     longTermMemory,
     recentDiaries,
