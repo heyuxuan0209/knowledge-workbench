@@ -13,6 +13,7 @@ chmod 700 "$OUT_DIR"
 
 DATA="$OUT_DIR/content-briefing-$MONTH.data.json"
 REPORT="$OUT_DIR/content-briefing-$MONTH.shadow.md"
+LOG="$OUT_DIR/content-briefing-$MONTH.codex.log"
 PROMPT="$PROJECT/backend/scripts/monthly-briefing-prompt.md"
 
 cd "$PROJECT/backend"
@@ -24,7 +25,7 @@ cd "$PROJECT"
   --sandbox read-only \
   --model gpt-5.6-sol \
   --output-last-message "$REPORT" \
-  "$(cat "$PROMPT")" < "$DATA"
+  "$(cat "$PROMPT")" < "$DATA" > "$LOG" 2>&1
 
-chmod 600 "$DATA" "$REPORT"
+chmod 600 "$DATA" "$REPORT" "$LOG"
 echo "Codex 月报影子产物：$REPORT"

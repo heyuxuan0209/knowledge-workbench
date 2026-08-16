@@ -15,7 +15,7 @@ const pkg = buildBriefingPackage({
       record_id: 'pub-1',
       fields: {
         平台化标题: '文章 A', 平台: '小红书', 发布时间: Date.parse('2026-08-03T10:00:00+08:00'),
-        关联母稿: [{ record_id: 'content-1' }], D3曝光: '100', D3互动率: 0.1,
+        关联母稿: [{ record_ids: ['content-1'], text: '母稿' }], D3曝光: '100', D3互动率: 0.1,
       },
     },
     { record_id: 'old', fields: { 平台化标题: '旧文', 平台: '小红书', 发布时间: Date.parse('2026-07-01T10:00:00+08:00') } },

@@ -60,9 +60,11 @@ async function fetchAll(table) {
 
 function linkedIds(value) {
   if (!Array.isArray(value)) return [];
-  return value.map((item) => typeof item === 'string'
-    ? item
-    : (item?.record_id || item?.recordId || item?.id)).filter(Boolean);
+  return value.flatMap((item) => {
+    if (typeof item === 'string') return [item];
+    if (Array.isArray(item?.record_ids)) return item.record_ids;
+    return [item?.record_id || item?.recordId || item?.id].filter(Boolean);
+  });
 }
 
 function normalizePublish(record) {
