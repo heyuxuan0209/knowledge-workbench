@@ -7,7 +7,7 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/zsh</string>
-    <string>/Users/heyuxuan/Documents/项目/knowledge-workbench/backend/scripts/sync-codex-diary-context.sh</string>
+    <string>/Users/heyuxuan/.local/bin/kw-codex-diary-sync</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>StartInterval</key><integer>900</integer>
