@@ -195,9 +195,9 @@ function continuityContext(project, priorDiary, diaryDir, memoryRoots = [], curr
 }
 
 export function buildDiaryPackage({ date, rollout, commits = [], events = [], continuity = {}, generatedAt = new Date() }) {
-  const conversations = rollout.conversations.map((turn) => ({
+  const conversations = rollout.conversations.map((turn, index) => ({
     ...turn,
-    evidenceRef: `turn:${turn.source || 'unknown'}:${turn.turnId}`,
+    evidenceRef: `turn:${String(index + 1).padStart(4, '0')}`,
   }));
   const referencedCommits = commits.map((commit) => ({ ...commit, evidenceRef: `commit:${commit.hash}` }));
   const referencedEvents = events.map((event, index) => ({ ...event, evidenceRef: `log:${event.log}:${index + 1}` }));
