@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 export function splitOutput(text) {
   const diaryMarker = '<!-- WORK_DIARY -->';
   const handoffMarker = '<!-- HANDOFF_DELTA -->';
-  const memoryMarker = '<!-- MEMORY_EVOLUTION -->';
+  const memoryMarker = '<!-- MEMORY_INSTRUCTIONS -->';
   const diaryStart = text.indexOf(diaryMarker);
   const handoffStart = text.indexOf(handoffMarker);
   const memoryStart = text.indexOf(memoryMarker);
@@ -13,7 +13,7 @@ export function splitOutput(text) {
   const diary = text.slice(diaryStart + diaryMarker.length, handoffStart).trim();
   const handoff = text.slice(handoffStart + handoffMarker.length, memoryStart).trim();
   const memory = text.slice(memoryStart + memoryMarker.length).trim();
-  if (!diary.startsWith('# 外脑手记') || !handoff.startsWith('# Agent 接手增量') || !memory.startsWith('# 长期记忆演化提案')) {
+  if (!diary.startsWith('# 外脑手记') || !handoff.startsWith('# Agent 接手增量') || !memory.startsWith('# 明确记忆指令')) {
     throw new Error('Codex 输出文档标题不符合约定');
   }
   return { diary, handoff, memory };
