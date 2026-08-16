@@ -135,7 +135,7 @@ function markdownFiles(root, depth = 3, current = 0) {
   });
 }
 
-function continuityContext(project, priorDiary, diaryDir, memoryRoots = []) {
+function continuityContext(project, priorDiary, diaryDir, memoryRoots = [], currentDate = '') {
   const handoffDir = path.join(project, 'handoff');
   const activeHandoffs = fs.existsSync(handoffDir)
     ? fs.readdirSync(handoffDir).filter((name) => name !== 'README.md' && name.endsWith('.md')).sort().map((name) => {
@@ -156,7 +156,8 @@ function continuityContext(project, priorDiary, diaryDir, memoryRoots = []) {
     if (excerpt) longTermMemory.push({ file, excerpt });
   }
   const recentDiaries = diaryDir && fs.existsSync(diaryDir)
-    ? fs.readdirSync(diaryDir).filter((name) => /^work-diary-\d{4}-\d{2}-\d{2}\.shadow\.md$/.test(name))
+    ? fs.readdirSync(diaryDir).filter((name) => /^work-diary-\d{4}-\d{2}-\d{2}\.shadow\.md$/.test(name)
+      && !name.includes(currentDate))
       .sort().slice(-7).map((name) => ({ file: name, excerpt: readExcerpt(path.join(diaryDir, name), 12000) }))
     : [];
   return {
@@ -202,7 +203,7 @@ async function main() {
     date, rollout,
     commits: repos.flatMap((repo) => gitCommits(repo, date)),
     events: automationEvents(logs, date),
-    continuity: continuityContext(project, priorDiary, diaryDir, memoryRoots),
+    continuity: continuityContext(project, priorDiary, diaryDir, memoryRoots, date),
   });
   const text = `${JSON.stringify(data, null, 2)}\n`;
   if (output) fs.writeFileSync(output, text, { mode: 0o600 }); else process.stdout.write(text);
