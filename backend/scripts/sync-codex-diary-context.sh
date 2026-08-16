@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mac 在线时，将今天和昨天的已清洗 Codex 对话增量同步到 VPS 私有目录。
+# Mac 每天 06:00（及登录补偿）将今天和昨天的已清洗 Codex 对话同步到 VPS 私有目录。
 set -euo pipefail
 
 USER_HOME="${HOME:?}"
