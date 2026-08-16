@@ -11,6 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 // lib -> platform-export -> scripts -> backend
 export const backendDir = join(here, '../../..');
 const envPath = join(backendDir, '.env');
+const home = os.homedir();
 
 // ⚠️ 凭证认项目、不认全局环境变量（2026-08-13 实测踩到，排查花了半小时）
 // dotenv **默认不覆盖已存在的 process.env**。而 ~/.zshrc 里 export 了一个同名的
@@ -28,8 +29,13 @@ for (const k of ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_BOT_APP_ID', 'FEI
 // 这样 `PLATFORM_EXPORT_MANUAL_CLICK=1 npm run export:xhs` 这类命令行调试照旧能用。
 dotenv.config({ path: envPath });
 
-const home = os.homedir();
 const expand = (p) => (p && p.startsWith('~') ? join(home, p.slice(1)) : p);
+const codexEnvPath = expand(process.env.KW_CODEX_BRIDGE_ENV) || join(home, '.codex-im/.env');
+if (fs.existsSync(codexEnvPath)) {
+  const codexEnv = dotenv.parse(fs.readFileSync(codexEnvPath));
+  process.env.KW_NOTIFY_FEISHU_APP_ID = codexEnv.FEISHU_APP_ID || '';
+  process.env.KW_NOTIFY_FEISHU_APP_SECRET = codexEnv.FEISHU_APP_SECRET || '';
+}
 
 export const config = {
   // 落盘目录：两个平台的 xlsx 都放这里
@@ -41,10 +47,10 @@ export const config = {
   sphProfile: expand(process.env.PLATFORM_EXPORT_SPH_PROFILE) || join(home, '.playwright-profiles/sph'),
   zhihuProfile: expand(process.env.PLATFORM_EXPORT_ZHIHU_PROFILE) || join(home, '.playwright-profiles/zhihu'),
   xProfile: expand(process.env.PLATFORM_EXPORT_X_PROFILE) || join(home, '.playwright-profiles/x'),
-  // 飞书云盘交接文件夹 token（云端 Claude 从这里取文件入表）——**必填**，在 backend/.env 设；
+  // 飞书云盘交接文件夹 token（VPS 自动回填从这里取文件）——**必填**，在 backend/.env 设；
   // 不内置默认值：这是个人飞书文件夹 ID，不硬编码进公开仓。
   folderToken: process.env.PLATFORM_EXPORT_FOLDER_TOKEN || '',
-  // 通知群 chat_id（云端 Claude 看到消息就自动入表回填）——**必填**，在 backend/.env 设。
+  // 通知群 chat_id——**必填**，在 backend/.env 设。
   chatId: process.env.PLATFORM_EXPORT_CHAT_ID || '',
   // X 默认**不进每天的自动跑**（2026-08-11 用户叫停）。导出器写好了，但 profile 里没有登录态，
   // 而 X 的登录要走邮箱→密码→验证这一串、她试了两次没走完。放着不管的话，每天的飞书通知里
@@ -53,8 +59,8 @@ export const config = {
   enableX: /^(1|true|yes|on)$/i.test(process.env.PLATFORM_EXPORT_ENABLE_X || ''),
   // 降级开关：true = 脚本只开到导出页，最后一下由真人点（所有平台操作真人触发）
   manualClick: /^(1|true|yes|on)$/i.test(process.env.PLATFORM_EXPORT_MANUAL_CLICK || ''),
-  // 用哪个机器人身份发通知：note = FEISHU_BOT_APP（默认，主应用桥接才收得到事件转给云端 Claude）
-  notifyBot: (process.env.PLATFORM_EXPORT_NOTIFY_BOT || 'note').toLowerCase(),
+  // 面向用户的通知默认统一由 Codex App 发送；上传权限仍使用项目主 App。
+  notifyBot: (process.env.PLATFORM_EXPORT_NOTIFY_BOT || 'codex').toLowerCase(),
   // 真人手动点击（MANUAL_CLICK 下载）时最多等多久（毫秒）
   manualTimeoutMs: Number(process.env.PLATFORM_EXPORT_MANUAL_TIMEOUT_MS) || 5 * 60_000,
   // 交互式首次登录时最多等多久——给足从容登录/扫码的时间（登录一被检测到就立刻继续，等久无害）

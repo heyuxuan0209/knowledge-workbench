@@ -13,6 +13,7 @@
  */
 import 'dotenv/config';
 import { feishuFetch } from '../src/services/feishu-auth.js';
+import { sendFeishuText } from './lib/feishu-notify.mjs';
 
 const APP = process.env.KW_BITABLE_APP || 'QIlkbwmGma9Tb1sRyAicfZeEnjb';
 const TABLE = process.env.KW_PUBLISH_TABLE || 'tblL11CZzfQSxIy9';
@@ -131,11 +132,7 @@ if (notify) {
   }
   const lines = errs.map((i) => `• ${i.tag}\n  ${i.type}：${i.msg}`).join('\n\n');
   const text = `发布记录巡检发现 ${errs.length} 处数据不自洽（共 ${records.length} 条）：\n\n${lines}\n\n改完可以跑一次 node backend/scripts/publish-record-audit.mjs 复核。`;
-  await feishuFetch('/open-apis/im/v1/messages', {
-    method: 'POST',
-    query: { receive_id_type: 'chat_id' },
-    body: { receive_id: REVIEW_CHAT, msg_type: 'text', content: JSON.stringify({ text }) },
-  });
+  await sendFeishuText(REVIEW_CHAT, text, { requireCodex: true });
   console.log(`[${new Date().toISOString()}] 已推送 ${errs.length} 处不自洽`);
   process.exit(1);
 }

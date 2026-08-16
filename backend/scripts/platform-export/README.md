@@ -1,6 +1,6 @@
 # 平台数据导出（小红书 + 公众号 + 抖音 + 视频号 + 知乎 → 飞书）
 
-内容发布数据进飞书多维表格「发布与复盘」做 D3/D7/D30 复盘。**Mac 本机取数**（登录态和家庭 IP 只能在本机），导出文件传飞书云盘交接文件夹，**云端 Claude** 据群通知自动入表。
+内容发布数据进飞书多维表格「发布与复盘」做 D3/D7/D30 复盘。**Mac 本机取数**（登录态和家庭 IP 只能在本机），导出文件传飞书云盘交接文件夹，VPS 确定性脚本自动入表。
 
 工单原文见对话记录；踩坑见 `docs/process-log.md` 的 `[平台导出]` 条目，决策见 `docs/DECISIONS.md`。
 
@@ -131,7 +131,7 @@ launchctl bootstrap gui/$(id -u) 相反：launchctl bootout gui/$(id -u)/com.kno
 
 - 文件：`~/Documents/platform-exports/` 下 `xhs-YYYYMMDD.xlsx`、`mp-YYYYMMDD.xlsx`、`mp-source-YYYYMMDD.png`（阅读来源）、`dy-YYYYMMDD.csv`、`sph-YYYYMMDD.csv`、`zhihu-YYYYMMDD.csv`。
 - 上传：飞书云盘交接文件夹（token 由 `backend/.env` 的 `PLATFORM_EXPORT_FOLDER_TOKEN` 指定；用主应用 `FEISHU_APP_ID/SECRET`，`drive/v1/files/upload_all`）。
-- 通知群：由 `backend/.env` 的 `PLATFORM_EXPORT_CHAT_ID` 指定。**用笔记机器人身份发**（`PLATFORM_EXPORT_NOTIFY_BOT=note`）——主应用是云端 Claude 的事件流身份，飞书不把它自己发的消息回推给它，得用另一个身份发进群，主应用桥接才收得到 → 转云端 Claude 入表。
+- 通知群：由 `backend/.env` 的 `PLATFORM_EXPORT_CHAT_ID` 指定。面向用户的消息默认用 **Codex App** 发（凭据从 `~/.codex-im/.env` 读取）；上传云盘仍使用项目主 App，避免为了统一头像而更换数据权限。
 
 ## 配置（backend/.env）
 
@@ -141,7 +141,8 @@ launchctl bootstrap gui/$(id -u) 相反：launchctl bootout gui/$(id -u)/com.kno
 | `PLATFORM_EXPORT_FOLDER_TOKEN` | （必填，无默认） | 飞书云盘交接文件夹 token |
 | `PLATFORM_EXPORT_CHAT_ID` | （必填，无默认） | 通知群 chat_id |
 | `PLATFORM_EXPORT_MANUAL_CLICK` | `false` | true=最后一下真人点 |
-| `PLATFORM_EXPORT_NOTIFY_BOT` | `note` | note=笔记机器人 / main=主应用 |
+| `PLATFORM_EXPORT_NOTIFY_BOT` | `codex` | codex=Codex（生产默认）/ note=笔记机器人 / main=主应用 |
+| `KW_CODEX_BRIDGE_ENV` | `~/.codex-im/.env` | Codex 飞书桥凭据文件；只用于群通知身份 |
 | `PLATFORM_EXPORT_XHS_PROFILE` | `~/.playwright-profiles/xhs` | 小红书登录态 |
 | `PLATFORM_EXPORT_MP_PROFILE` | `~/.playwright-profiles/mp` | 公众号登录态 |
 | `PLATFORM_EXPORT_DY_PROFILE` | `~/.playwright-profiles/dy` | 抖音登录态 |

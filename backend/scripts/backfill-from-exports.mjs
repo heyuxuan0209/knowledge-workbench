@@ -16,6 +16,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { feishuFetch } from '../src/services/feishu-auth.js';
+import { sendFeishuText } from './lib/feishu-notify.mjs';
 
 const APP = 'QIlkbwmGma9Tb1sRyAicfZeEnjb';
 const TABLE = 'tblL11CZzfQSxIy9';
@@ -320,10 +321,7 @@ const main = async () => {
       + (filled.length ? `已回填 ${filled.length} 行：\n${filled.map((x) => `• ${x}`).join('\n')}\n` : '本轮无新数据到期。\n')
       + section('⚠️ 已错过取数窗口', missedWindow)
       + section('❓ 匹配不上', noMatch);
-    await feishuFetch('/open-apis/im/v1/messages', {
-      method: 'POST', query: { receive_id_type: 'chat_id' },
-      body: { receive_id: REVIEW_CHAT, msg_type: 'text', content: JSON.stringify({ text }) },
-    });
+    await sendFeishuText(REVIEW_CHAT, text, { requireCodex: true });
     log('已推送到「KW · 数据复盘」群');
   }
 };

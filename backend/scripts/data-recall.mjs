@@ -11,12 +11,11 @@
 import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { feishuFetch } from '../src/services/feishu-auth.js';
+import { sendFeishuText } from './lib/feishu-notify.mjs';
 
 const APP = process.env.KW_BITABLE_APP || 'QIlkbwmGma9Tb1sRyAicfZeEnjb';
 const TABLE = process.env.KW_PUBLISH_TABLE || 'tblL11CZzfQSxIy9';
 const REVIEW_CHAT = process.env.KW_REVIEW_CHAT_ID;
-const NOTIFY_APP_ID = process.env.KW_NOTIFY_FEISHU_APP_ID;
-const NOTIFY_APP_SECRET = process.env.KW_NOTIFY_FEISHU_APP_SECRET;
 const DAY = 86_400_000;
 const STAGES = new Map([
   ['待回收D7', { label: 'D7', days: 7 }],
@@ -72,46 +71,7 @@ export function buildReminderText(due) {
 }
 
 async function sendReminder(text) {
-  if (!NOTIFY_APP_ID || !NOTIFY_APP_SECRET) {
-    return feishuFetch('/open-apis/im/v1/messages', {
-      method: 'POST',
-      query: { receive_id_type: 'chat_id' },
-      body: {
-        receive_id: REVIEW_CHAT,
-        msg_type: 'text',
-        content: JSON.stringify({ text }),
-      },
-    });
-  }
-
-  const base = (process.env.FEISHU_BASE || 'https://open.feishu.cn').replace(/\/$/, '');
-  const authResponse = await fetch(`${base}/open-apis/auth/v3/tenant_access_token/internal`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ app_id: NOTIFY_APP_ID, app_secret: NOTIFY_APP_SECRET }),
-  });
-  const auth = await authResponse.json();
-  if (auth.code !== 0 || !auth.tenant_access_token) {
-    throw new Error(`Codex 飞书身份鉴权失败(${auth.code}): ${auth.msg || '未知错误'}`);
-  }
-
-  const response = await fetch(`${base}/open-apis/im/v1/messages?receive_id_type=chat_id`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${auth.tenant_access_token}`,
-      'Content-Type': 'application/json; charset=utf-8',
-    },
-    body: JSON.stringify({
-      receive_id: REVIEW_CHAT,
-      msg_type: 'text',
-      content: JSON.stringify({ text }),
-    }),
-  });
-  const result = await response.json();
-  if (result.code !== 0) {
-    throw new Error(`Codex 飞书身份发消息失败(${result.code}): ${result.msg || '未知错误'}`);
-  }
-  return result.data;
+  return sendFeishuText(REVIEW_CHAT, text, { requireCodex: true });
 }
 
 async function main() {

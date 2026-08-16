@@ -1,10 +1,7 @@
 // 飞书交接：把导出文件传进云盘文件夹 + 往群里发通知。独立于 server.js 运行（launchd 直调）。
 // 凭证从 backend/.env 读：
 //   上传 = 主应用 FEISHU_APP_ID / FEISHU_APP_SECRET（工单指定，drive/v1/files/upload_all）
-//   通知 = 默认笔记机器人 FEISHU_BOT_APP_ID / FEISHU_BOT_SECRET——为什么不用主应用发：
-//          主应用是 codex-feishu-bridge（云端 Claude 的事件流）的身份，飞书不会把机器人
-//          自己发的消息作为 receive 事件回推给它，云端 Claude 就"看不见"这条通知。用另一个
-//          身份（笔记机器人）发进群，主应用桥接才收得到事件 → 转给云端 Claude 入表。
+//   通知 = 默认 Codex App（~/.codex-im/.env）；数据权限与用户可见身份严格分离。
 import fs from 'fs';
 import { basename } from 'path';
 import { config } from './config.mjs';
@@ -37,8 +34,13 @@ function mainAppToken() {
 }
 
 function notifyToken() {
-  // 默认笔记机器人；配 PLATFORM_EXPORT_NOTIFY_BOT=main 则用主应用发（一般不用）
+  if (config.notifyBot === 'codex') {
+    const id = process.env.KW_NOTIFY_FEISHU_APP_ID, secret = process.env.KW_NOTIFY_FEISHU_APP_SECRET;
+    if (!id || !secret) throw new Error('缺 Codex 飞书桥凭据（~/.codex-im/.env），拒绝用旧机器人身份发通知');
+    return tenantToken(id, secret, 'codex');
+  }
   if (config.notifyBot === 'main') return mainAppToken();
+  if (config.notifyBot !== 'note') throw new Error(`未知 PLATFORM_EXPORT_NOTIFY_BOT：${config.notifyBot}`);
   const id = process.env.FEISHU_BOT_APP_ID, secret = process.env.FEISHU_BOT_APP_SECRET;
   if (!id || !secret) throw new Error('缺 FEISHU_BOT_APP_ID / FEISHU_BOT_APP_SECRET（backend/.env）');
   return tenantToken(id, secret, 'note');
