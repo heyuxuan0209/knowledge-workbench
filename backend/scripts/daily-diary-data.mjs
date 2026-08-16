@@ -92,17 +92,24 @@ export function readRollouts(root, date) {
   return { files, ...parseRolloutLines(lines, date) };
 }
 
-function importedConversations(root, date) {
-  if (!root || !fs.existsSync(root)) return [];
-  return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+function importedConversationData(root, date) {
+  if (!root || !fs.existsSync(root)) return { conversations: [], coverage: [] };
+  const results = fs.readdirSync(root, { withFileTypes: true }).map((entry) => {
     const target = path.join(root, entry.name);
-    if (entry.isDirectory()) return importedConversations(target, date);
-    if (!entry.isFile() || entry.name !== `${date}.json`) return [];
+    if (entry.isDirectory()) return importedConversationData(target, date);
+    if (!entry.isFile() || entry.name !== `${date}.json`) return { conversations: [], coverage: [] };
     try {
       const data = JSON.parse(fs.readFileSync(target, 'utf8'));
-      return Array.isArray(data.conversations) ? data.conversations : [];
-    } catch { return []; }
+      return {
+        conversations: Array.isArray(data.conversations) ? data.conversations : [],
+        coverage: [{ source: data.source || entry.name, generatedAt: data.generatedAt || null, sourceFiles: data.sourceFiles ?? null }],
+      };
+    } catch { return { conversations: [], coverage: [] }; }
   });
+  return {
+    conversations: results.flatMap((result) => result.conversations),
+    coverage: results.flatMap((result) => result.coverage),
+  };
 }
 
 function gitCommits(repo, date) {
@@ -196,6 +203,7 @@ export function buildDiaryPackage({ date, rollout, commits = [], events = [], co
       retention: '普通 Bug、权限位、路径和部署细节不进入长期记忆；只有重大决策或可复用经验才列为候选，且本任务不自动写入',
     },
     counts: { conversations: rollout.conversations.length, commits: commits.length, automationEvents: events.length, ignoredMessages: rollout.ignored },
+    conversationCoverage: rollout.coverage || [],
     conversations: rollout.conversations, commits, automationEvents: events, continuity,
   };
 }
@@ -211,10 +219,15 @@ async function main() {
   const memoryRoots = (arg('memory-roots') || '').split(',').filter(Boolean);
   const conversationImports = arg('conversation-imports');
   const rollout = readRollouts(sessionsRoot, date);
+  const imported = importedConversationData(conversationImports, date);
   rollout.conversations = [
     ...rollout.conversations.map((turn) => ({ ...turn, source: turn.source || 'vps-codex' })),
-    ...importedConversations(conversationImports, date),
+    ...imported.conversations,
   ].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
+  rollout.coverage = [
+    { source: 'vps-codex', generatedAt: new Date().toISOString(), sourceFiles: rollout.files.length },
+    ...imported.coverage,
+  ];
   const repos = (arg('repos') || DEFAULT_REPOS.join(',')).split(',').filter(Boolean);
   const logs = (arg('logs') || DEFAULT_LOGS.join(',')).split(',').filter(Boolean);
   const data = buildDiaryPackage({

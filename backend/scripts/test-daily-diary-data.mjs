@@ -18,6 +18,7 @@ const parsed = parseRolloutLines([
 assert.deepEqual(parsed.conversations, [{ turnId: 'a', timestamp: '2026-08-16T10:00:00+02:00', user: '修复采集', assistant: '已经修好', assistantContext: ['过程'] }]);
 const data = buildDiaryPackage({ date, rollout: parsed, commits: [{ subject: 'fix: 修复' }], events: [] });
 assert.equal(data.counts.conversations, 1);
+assert.deepEqual(data.conversationCoverage, []);
 assert.match(data.rules.retention, /普通 Bug/);
 assert.deepEqual(data.continuity, {});
 assert.equal(redactSensitive('OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz'), 'OPENAI_API_KEY=[REDACTED]');

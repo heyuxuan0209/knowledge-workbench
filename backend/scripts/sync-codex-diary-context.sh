@@ -19,4 +19,6 @@ for DAY in "$(TZ=Europe/Paris date +%F)" "$(TZ=Europe/Paris date -v-1d +%F)"; do
   /usr/bin/ssh "$SSH_TARGET" "install -d -o bot -g bot -m 700 /home/bot/.codex-import/mac && install -o bot -g bot -m 600 '$REMOTE_TMP' '/home/bot/.codex-import/mac/$DAY.json' && rm '$REMOTE_TMP'"
 done
 
+/usr/bin/ssh "$SSH_TARGET" "find /home/bot/.codex-import/mac -type f -name '*.json' -mtime +30 -delete"
+
 echo "[$(date -Iseconds)] Mac Codex 对话上下文同步完成"
