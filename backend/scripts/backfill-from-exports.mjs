@@ -38,6 +38,7 @@ const NEXT_STAGE = { 3: '待回收D7', 7: '待回收D30', 30: '已回收完' };
 const dry = process.argv.includes('--dry');
 const notify = process.argv.includes('--notify');
 const force = process.argv.includes('--force');   // 覆盖已填过的档位（默认不覆盖手填值）
+const allowLate = process.argv.includes('--allow-late'); // 仅人工批准后使用；提前快照仍禁止
 const log = (...a) => console.log(...a);
 // 弯引号也要去：表里手打的是「可能“说清楚”只对了一半」，公众号后台存的是直引号，
 // 只去直引号这两个串就永远对不上（2026-08-11 实测，一篇公众号文章因此回填不进去）。
@@ -245,13 +246,14 @@ const main = async () => {
     if (!best) { noMatch.push(`${label} — 该平台快照里找不到同名条目`); continue; }
 
     const ageNow = (Date.now() - pubMs) / 864e5;
-    if (best.early || best.gap > TOLERANCE_DAYS) {
+    if (best.early || (best.gap > TOLERANCE_DAYS && !allowLate)) {
       const line = `${label} D${stage} — 现龄 ${ageNow.toFixed(1)} 天，最近快照 ${best.date} 是第 ${best.age.toFixed(1)} 天`;
       (best.early ? notYetDue : missedWindow).push(line);
       continue;
     }
 
     const d = best.data;
+    const late = best.gap > TOLERANCE_DAYS;
     const interactions = d.like + d.comment + d.fav + d.share;
     // d.engaged = 这份快照里**确实读到了逐篇互动数**（公众号 mp-engage 才有这个标记）。
     // 原来的规则是「只在真拿到互动数时才写」，而公众号那时根本拿不到，只能一直留空；
@@ -281,12 +283,13 @@ const main = async () => {
       hasInteraction && engageBase > 0 ? `互动率分母=${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}` : '',
       d.extra || '',
     ].filter(Boolean).join(' ');
-    if (spread) put(`D${stage}传播`, `${spread}｜快照${best.date}(第${best.age.toFixed(1)}天)`);
+    const provenance = `${late ? '延迟回收｜' : ''}快照${best.date}(第${best.age.toFixed(1)}天)`;
+    put(`D${stage}传播`, [spread, provenance].filter(Boolean).join('｜'));
     put('回收状态', NEXT_STAGE[stage] ?? '已回收完');
 
     const desc = `${label} D${stage} → 曝光${d.exposure}`
       + (hasInteraction ? ` 互动率${(interactions / (engageBase || 1) * 100).toFixed(2)}%（分母${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}）` : ' (无互动数据)')
-      + ` [快照${best.date}·第${best.age.toFixed(1)}天]`;
+      + ` [${late ? '延迟回收·' : ''}快照${best.date}·第${best.age.toFixed(1)}天]`;
     if (dry) { log(`  [dry] ${desc}`); }
     else {
       await feishuFetch(`/open-apis/bitable/v1/apps/${APP}/tables/${TABLE}/records/${rec.record_id}`, {
