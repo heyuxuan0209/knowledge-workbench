@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { buildDiaryPackage, parseRolloutLines, stripBridgeContext } from './daily-diary-data.mjs';
 import { splitOutput } from './split-daily-diary-output.mjs';
+import { redactSensitive } from './export-codex-conversations.mjs';
 
 assert.equal(stripBridgeContext('<recommended_plugins>secret</recommended_plugins>真正问题'), '真正问题');
 const date = '2026-08-16';
@@ -19,6 +20,8 @@ const data = buildDiaryPackage({ date, rollout: parsed, commits: [{ subject: 'fi
 assert.equal(data.counts.conversations, 1);
 assert.match(data.rules.retention, /普通 Bug/);
 assert.deepEqual(data.continuity, {});
+assert.equal(redactSensitive('OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz'), 'OPENAI_API_KEY=[REDACTED]');
+assert.equal(redactSensitive('Authorization: Bearer abcdefghijklmnopqrstuvwxyz'), 'Authorization: Bearer [REDACTED]');
 assert.deepEqual(splitOutput('<!-- WORK_DIARY -->\n# 外脑手记 · 2026-08-16\n正文\n<!-- HANDOFF_DELTA -->\n# Agent 接手增量 · 2026-08-16\n增量\n<!-- MEMORY_INSTRUCTIONS -->\n# 明确记忆指令 · 2026-08-16\n记忆'), {
   diary: '# 外脑手记 · 2026-08-16\n正文',
   handoff: '# Agent 接手增量 · 2026-08-16\n增量',

@@ -26,7 +26,8 @@ PRIOR="$OUT_DIR/work-diary-$PRIOR_DAY.md"
 cd "$PROJECT/backend"
 "$NODE_BIN" scripts/daily-diary-data.mjs --date="$DAY" --project="$PROJECT" \
   --prior-diary="$PRIOR" --diary-dir="$OUT_DIR" \
-  --memory-roots="/home/bot/.claude/projects,/home/bot/.claude/memory" --output="$DATA"
+  --memory-roots="/home/bot/.claude/projects,/home/bot/.claude/memory" \
+  --conversation-imports="/home/bot/.codex-import" --output="$DATA"
 
 cd "$PROJECT"
 timeout 240 "$CODEX_BIN" exec --ephemeral --sandbox read-only --model gpt-5.6-sol \

@@ -86,10 +86,23 @@ function rolloutFiles(root, date) {
     .map((name) => path.join(dateDir, name));
 }
 
-function readRollouts(root, date) {
+export function readRollouts(root, date) {
   const files = rolloutFiles(root, date);
   const lines = files.flatMap((file) => fs.readFileSync(file, 'utf8').split('\n').filter(Boolean));
   return { files, ...parseRolloutLines(lines, date) };
+}
+
+function importedConversations(root, date) {
+  if (!root || !fs.existsSync(root)) return [];
+  return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(root, entry.name);
+    if (entry.isDirectory()) return importedConversations(target, date);
+    if (!entry.isFile() || entry.name !== `${date}.json`) return [];
+    try {
+      const data = JSON.parse(fs.readFileSync(target, 'utf8'));
+      return Array.isArray(data.conversations) ? data.conversations : [];
+    } catch { return []; }
+  });
 }
 
 function gitCommits(repo, date) {
@@ -196,7 +209,12 @@ async function main() {
   const priorDiary = arg('prior-diary');
   const diaryDir = arg('diary-dir');
   const memoryRoots = (arg('memory-roots') || '').split(',').filter(Boolean);
+  const conversationImports = arg('conversation-imports');
   const rollout = readRollouts(sessionsRoot, date);
+  rollout.conversations = [
+    ...rollout.conversations.map((turn) => ({ ...turn, source: turn.source || 'vps-codex' })),
+    ...importedConversations(conversationImports, date),
+  ].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
   const repos = (arg('repos') || DEFAULT_REPOS.join(',')).split(',').filter(Boolean);
   const logs = (arg('logs') || DEFAULT_LOGS.join(',')).split(',').filter(Boolean);
   const data = buildDiaryPackage({
