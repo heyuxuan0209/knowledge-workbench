@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["date", "coverage", "coreInsight", "decisions", "explicitMemoryInstructions", "corrections", "openThreads", "dailyHypotheses", "unknownUnknowns", "evidenceIndex", "omittedNoise"],
+  "properties": {
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "coverage": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/coverage" } },
+    "coreInsight": { "type": "string", "maxLength": 1200 },
+    "decisions": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/decision" } },
+    "explicitMemoryInstructions": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/memory" } },
+    "corrections": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/correction" } },
+    "openThreads": { "type": "array", "maxItems": 15, "items": { "$ref": "#/$defs/thread" } },
+    "dailyHypotheses": { "type": "array", "maxItems": 6, "items": { "$ref": "#/$defs/hypothesis" } },
+    "unknownUnknowns": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/unknown" } },
+    "evidenceIndex": { "type": "array", "maxItems": 40, "items": { "$ref": "#/$defs/evidence" } },
+    "omittedNoise": { "type": "array", "maxItems": 10, "items": { "type": "string", "maxLength": 300 } }
+  },
+  "$defs": {
+    "refs": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "string", "maxLength": 240 } },
+    "coverage": { "type": "object", "additionalProperties": false, "required": ["source", "generatedAt", "sourceFiles"], "properties": { "source": { "type": "string" }, "generatedAt": { "type": ["string", "null"] }, "sourceFiles": { "type": ["integer", "null"] } } },
+    "decision": { "type": "object", "additionalProperties": false, "required": ["statement", "status", "scope", "evidenceRefs"], "properties": { "statement": { "type": "string", "maxLength": 600 }, "status": { "enum": ["explicit", "implemented", "provisional", "reversed"] }, "scope": { "type": "string", "maxLength": 300 }, "evidenceRefs": { "$ref": "#/$defs/refs" } } },
+    "memory": { "type": "object", "additionalProperties": false, "required": ["quote", "scope", "evidenceRefs"], "properties": { "quote": { "type": "string", "maxLength": 800 }, "scope": { "type": "string", "maxLength": 300 }, "evidenceRefs": { "$ref": "#/$defs/refs" } } },
+    "correction": { "type": "object", "additionalProperties": false, "required": ["before", "after", "reason", "evidenceRefs"], "properties": { "before": { "type": "string", "maxLength": 500 }, "after": { "type": "string", "maxLength": 500 }, "reason": { "type": "string", "maxLength": 500 }, "evidenceRefs": { "$ref": "#/$defs/refs" } } },
+    "thread": { "type": "object", "additionalProperties": false, "required": ["topic", "state", "nextDecision", "blocker", "evidenceRefs"], "properties": { "topic": { "type": "string", "maxLength": 400 }, "state": { "enum": ["open", "waiting-user", "waiting-system", "discussing", "shadow-validation"] }, "nextDecision": { "type": "string", "maxLength": 500 }, "blocker": { "type": "string", "maxLength": 500 }, "evidenceRefs": { "$ref": "#/$defs/refs" } } },
+    "hypothesis": { "type": "object", "additionalProperties": false, "required": ["observation", "hypothesis", "counterEvidence", "confidence", "cheapestTest", "evidenceRefs"], "properties": { "observation": { "type": "string", "maxLength": 500 }, "hypothesis": { "type": "string", "maxLength": 500 }, "counterEvidence": { "type": "string", "maxLength": 500 }, "confidence": { "enum": ["low", "medium"] }, "cheapestTest": { "type": "string", "maxLength": 500 }, "evidenceRefs": { "$ref": "#/$defs/refs" } } },
+    "unknown": { "type": "object", "additionalProperties": false, "required": ["observation", "hiddenAssumption", "impact", "cheapestTest", "evidenceRefs"], "properties": { "observation": { "type": "string", "maxLength": 500 }, "hiddenAssumption": { "type": "string", "maxLength": 500 }, "impact": { "type": "string", "maxLength": 500 }, "cheapestTest": { "type": "string", "maxLength": 500 }, "evidenceRefs": { "$ref": "#/$defs/refs" } } },
+    "evidence": { "type": "object", "additionalProperties": false, "required": ["ref", "type", "summary"], "properties": { "ref": { "type": "string", "maxLength": 240 }, "type": { "enum": ["user", "assistant", "commit", "log", "handoff", "memory"] }, "summary": { "type": "string", "maxLength": 500 } } }
+  }
+}

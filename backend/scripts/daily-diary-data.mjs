@@ -195,6 +195,12 @@ function continuityContext(project, priorDiary, diaryDir, memoryRoots = [], curr
 }
 
 export function buildDiaryPackage({ date, rollout, commits = [], events = [], continuity = {}, generatedAt = new Date() }) {
+  const conversations = rollout.conversations.map((turn) => ({
+    ...turn,
+    evidenceRef: `turn:${turn.source || 'unknown'}:${turn.turnId}`,
+  }));
+  const referencedCommits = commits.map((commit) => ({ ...commit, evidenceRef: `commit:${commit.hash}` }));
+  const referencedEvents = events.map((event, index) => ({ ...event, evidenceRef: `log:${event.log}:${index + 1}` }));
   return {
     schemaVersion: 1, date, generatedAt: generatedAt.toISOString(),
     rules: {
@@ -204,7 +210,7 @@ export function buildDiaryPackage({ date, rollout, commits = [], events = [], co
     },
     counts: { conversations: rollout.conversations.length, commits: commits.length, automationEvents: events.length, ignoredMessages: rollout.ignored },
     conversationCoverage: rollout.coverage || [],
-    conversations: rollout.conversations, commits, automationEvents: events, continuity,
+    conversations, commits: referencedCommits, automationEvents: referencedEvents, continuity,
   };
 }
 
@@ -230,11 +236,12 @@ async function main() {
   ];
   const repos = (arg('repos') || DEFAULT_REPOS.join(',')).split(',').filter(Boolean);
   const logs = (arg('logs') || DEFAULT_LOGS.join(',')).split(',').filter(Boolean);
+  const minimalContext = process.argv.includes('--minimal-context');
   const data = buildDiaryPackage({
     date, rollout,
     commits: repos.flatMap((repo) => gitCommits(repo, date)),
     events: automationEvents(logs, date),
-    continuity: continuityContext(project, priorDiary, diaryDir, memoryRoots, date),
+    continuity: minimalContext ? {} : continuityContext(project, priorDiary, diaryDir, memoryRoots, date),
   });
   const text = `${JSON.stringify(data, null, 2)}\n`;
   if (output) fs.writeFileSync(output, text, { mode: 0o600 }); else process.stdout.write(text);
