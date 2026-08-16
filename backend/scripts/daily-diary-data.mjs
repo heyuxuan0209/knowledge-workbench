@@ -60,14 +60,14 @@ export function parseRolloutLines(lines, date) {
     if (!inTargetDate(event.timestamp, date)) continue;
     const role = event.payload.role;
     if (role !== 'user' && role !== 'assistant') continue;
-    if (role === 'assistant' && event.payload.phase !== 'final_answer') continue;
     const text = stripBridgeContext(messageText(event.payload));
     if (isTestMessage(text)) { ignored += 1; continue; }
     const turnId = event.payload.internal_chat_message_metadata_passthrough?.turn_id
       || `${event.timestamp}-${turns.size}`;
-    const turn = turns.get(turnId) || { turnId, timestamp: event.timestamp, user: '', assistant: '' };
+    const turn = turns.get(turnId) || { turnId, timestamp: event.timestamp, user: '', assistant: '', assistantContext: [] };
     if (role === 'user') turn.user = text.slice(0, 6000);
-    else turn.assistant = text.slice(0, 8000);
+    else if (event.payload.phase === 'final_answer') turn.assistant = text.slice(0, 8000);
+    else if (event.payload.phase === 'commentary') turn.assistantContext.push(text.slice(0, 3000));
     turns.set(turnId, turn);
   }
   return {
@@ -118,22 +118,56 @@ function automationEvents(files, date) {
   }).slice(-160);
 }
 
-function continuityContext(project, priorDiary) {
+function readExcerpt(file, limit, fromEnd = false) {
+  if (!file || !fs.existsSync(file)) return '';
+  const text = fs.readFileSync(file, 'utf8');
+  return fromEnd ? text.slice(-limit) : text.slice(0, limit);
+}
+
+function markdownFiles(root, depth = 3, current = 0) {
+  if (!root || !fs.existsSync(root) || current > depth) return [];
+  return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(root, entry.name);
+    if (entry.isDirectory()) return markdownFiles(target, depth, current + 1);
+    return entry.isFile() && entry.name.endsWith('.md') ? [target] : [];
+  });
+}
+
+function continuityContext(project, priorDiary, diaryDir, memoryRoots = []) {
   const handoffDir = path.join(project, 'handoff');
   const activeHandoffs = fs.existsSync(handoffDir)
     ? fs.readdirSync(handoffDir).filter((name) => name !== 'README.md' && name.endsWith('.md')).sort().map((name) => {
       const text = fs.readFileSync(path.join(handoffDir, name), 'utf8');
       return { file: `handoff/${name}`, excerpt: text.slice(0, 8000) };
     }) : [];
-  const decisionsFile = path.join(project, 'docs/DECISIONS.md');
-  const recentDecisions = fs.existsSync(decisionsFile)
-    ? [...fs.readFileSync(decisionsFile, 'utf8').matchAll(/^## (ADR-\d+[^\n]*)/gm)].map((match) => match[1]).slice(-8)
+  const memoryFiles = memoryRoots.flatMap((root) => markdownFiles(root)).sort((left, right) => {
+    const leftIndex = path.basename(left) === 'MEMORY.md' ? 0 : 1;
+    const rightIndex = path.basename(right) === 'MEMORY.md' ? 0 : 1;
+    return leftIndex - rightIndex || left.localeCompare(right);
+  }).slice(0, 30);
+  let memoryBudget = 60000;
+  const longTermMemory = [];
+  for (const file of memoryFiles) {
+    if (memoryBudget <= 0) break;
+    const excerpt = readExcerpt(file, Math.min(12000, memoryBudget));
+    memoryBudget -= excerpt.length;
+    if (excerpt) longTermMemory.push({ file, excerpt });
+  }
+  const recentDiaries = diaryDir && fs.existsSync(diaryDir)
+    ? fs.readdirSync(diaryDir).filter((name) => /^work-diary-\d{4}-\d{2}-\d{2}\.shadow\.md$/.test(name))
+      .sort().slice(-7).map((name) => ({ file: name, excerpt: readExcerpt(path.join(diaryDir, name), 12000) }))
     : [];
   return {
     activeHandoffs,
-    recentDecisions,
-    priorDiary: priorDiary && fs.existsSync(priorDiary)
-      ? fs.readFileSync(priorDiary, 'utf8').slice(0, 16000) : '',
+    projectTruth: {
+      readme: readExcerpt(path.join(project, 'README.md'), 12000),
+      instructions: readExcerpt(path.join(project, 'CLAUDE.md'), 16000),
+      recentDecisions: readExcerpt(path.join(project, 'docs/DECISIONS.md'), 50000, true),
+      recentProcess: readExcerpt(path.join(project, 'docs/process-log.md'), 24000),
+    },
+    longTermMemory,
+    recentDiaries,
+    priorDiary: readExcerpt(priorDiary, 16000),
   };
 }
 
@@ -157,6 +191,8 @@ async function main() {
   const output = arg('output');
   const project = arg('project') || '/home/bot/projects/knowledge-workbench';
   const priorDiary = arg('prior-diary');
+  const diaryDir = arg('diary-dir');
+  const memoryRoots = (arg('memory-roots') || '').split(',').filter(Boolean);
   const rollout = readRollouts(sessionsRoot, date);
   const repos = (arg('repos') || DEFAULT_REPOS.join(',')).split(',').filter(Boolean);
   const logs = (arg('logs') || DEFAULT_LOGS.join(',')).split(',').filter(Boolean);
@@ -164,7 +200,7 @@ async function main() {
     date, rollout,
     commits: repos.flatMap((repo) => gitCommits(repo, date)),
     events: automationEvents(logs, date),
-    continuity: continuityContext(project, priorDiary),
+    continuity: continuityContext(project, priorDiary, diaryDir, memoryRoots),
   });
   const text = `${JSON.stringify(data, null, 2)}\n`;
   if (output) fs.writeFileSync(output, text, { mode: 0o600 }); else process.stdout.write(text);
