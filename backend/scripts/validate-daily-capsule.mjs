@@ -7,6 +7,10 @@ const allRefs = (capsule) => [
   ...capsule.openThreads, ...capsule.dailyHypotheses, ...capsule.unknownUnknowns,
 ].flatMap((item) => item.evidenceRefs || []);
 
+const normalizeQuoteLayout = (text) => text
+  .replace(/(?:^|\n)\s*[-*]\s+/g, '')
+  .replace(/\s+/g, '');
+
 export function validateCapsule(ledger, capsule) {
   const errors = [];
   if (capsule.date !== ledger.date) errors.push(`日期不一致：${capsule.date} != ${ledger.date}`);
@@ -16,9 +20,13 @@ export function validateCapsule(ledger, capsule) {
     ...ledger.automationEvents.map((item) => item.evidenceRef),
   ]);
   for (const ref of allRefs(capsule)) if (!validRefs.has(ref)) errors.push(`未知证据引用：${ref}`);
-  const userTexts = ledger.conversations.map((item) => item.user || '');
+  const conversationsByRef = new Map(ledger.conversations.map((item) => [item.evidenceRef, item]));
   for (const instruction of capsule.explicitMemoryInstructions) {
-    if (!userTexts.some((text) => text.includes(instruction.quote))) {
+    const normalizedQuote = normalizeQuoteLayout(instruction.quote);
+    const linkedUserTexts = instruction.evidenceRefs
+      .map((ref) => conversationsByRef.get(ref)?.user || '')
+      .filter(Boolean);
+    if (!linkedUserTexts.some((text) => normalizeQuoteLayout(text).includes(normalizedQuote))) {
       errors.push(`明确记忆指令不是用户原文：${instruction.quote.slice(0, 80)}`);
     }
   }
