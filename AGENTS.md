@@ -1,6 +1,6 @@
 # knowledge-workbench — 工作纪律（每个对话窗口都适用）
 
-> **规则真身在 `CLAUDE.md`，先完整读它**（含多会话并发安全红线、「文件放哪」边界）。本文件只保底核心纪律，两处不一致时以 CLAUDE.md 为准。
+> **本文件是 Codex / 通用 Agent 的加载入口，完整规则的唯一真相源在 `CLAUDE.md`，必须继续完整读它**（含真实部署拓扑、多会话并发红线、文件边界和开发/部署流程）。本文件只保底核心纪律，不复制整份规则，避免两份真相分叉。
 > **新接手的 agent**：按 `handoff/README.md` 的接手协议走（五步只读活文件，不信任何"项目现状"快照）。
 
 ## 决策与踩坑必须留痕
@@ -20,5 +20,3 @@
 ## 内容创作模板（ADR-026）
 
 创作层模板是「文体 × 平台形态」正交组合：`reference/prompts/creation/genres/`（6 文体）× `platform-forms/`（10 平台形态），生成 = `draft-frame + genre + platform-form`。改动守 ADR-025 三层原则、ADR-026 价值优先于爆款；每个模板必须接真实语料（`docs/teardowns/`）。
-
-## Imported Claude Cowork project instructions
