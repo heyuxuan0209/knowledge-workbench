@@ -33,6 +33,7 @@
 | feed-mute-archive-mock/ | 显式 mute / 归档 | 已定 → ADR-040/053（显式 mute，⚙调精选面板落地；2026-07-29 修正错引：原写 049 实为 040） |
 | feishu-rework/ | 飞书接入 | 已定 → ADR-039 |
 | flywheel-backhalf/ | 内容飞轮后半环 | 已定 → ADR-036 |
+| content-review-dashboard/ | 内容实验驾驶舱：流量/同频双目标、D7 触发、行动建议 + 自由探索（真实数据交互原型） | **探索中·待用户点选**（2026-08-25） |
 | inspiration-layouts/ | 灵感/摄入口改版 | 已过审 → ADR-035/039 |
 | reader-descent-mock/ | 精读器分析层（A–E/Z 多版） | 探索中·未产品化 |
 | season-skins/ | 心情皮肤 | 已定 → ADR-037 |

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>内容实验驾驶舱 · 交互原型</title>
+  <style>
+    :root{
+      --bg:#eae7df;--paper:#fbfaf6;--paper2:#f4f2eb;--ink:#211f1a;--body:#39352e;
+      --sub:#746e63;--faint:#aaa295;--line:#d8d3c9;--line2:#e7e3da;
+      --blue:#355f86;--blue2:#e8eff5;--green:#3f7350;--green2:#eaf2eb;
+      --amber:#a87822;--amber2:#f7efd8;--red:#a24b3f;--red2:#f7e9e6;--purple:#765b8e;
+      --shadow:0 10px 30px rgba(42,36,27,.06);
+    }
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.55}
+    button,select{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:206px 1fr}.sidebar{position:sticky;top:0;height:100vh;background:#e2dfd6;border-right:1px solid rgba(33,31,26,.08);padding:20px 14px;display:flex;flex-direction:column}
+    .brand{display:flex;align-items:center;gap:10px;font:700 16px Georgia,serif;padding:2px 8px 22px}.brand i{width:12px;height:12px;border-radius:3px;background:var(--blue);box-shadow:10px 0 0 rgba(53,95,134,.25)}
+    .navlab{font-size:10px;color:var(--faint);letter-spacing:.13em;padding:12px 11px 6px}.nav{display:flex;align-items:center;gap:10px;border-radius:8px;padding:9px 11px;color:var(--sub);margin:1px 0}.nav b{width:18px;text-align:center;font-size:13px}.nav.on{background:var(--paper);color:var(--blue);font-weight:700;box-shadow:0 1px 4px rgba(33,31,26,.06)}
+    .sidefoot{margin-top:auto;border-top:1px solid rgba(33,31,26,.08);padding:14px 9px 0;color:var(--sub);font-size:11px}.sidefoot strong{display:block;color:var(--ink);font-size:12px;margin-bottom:3px}.main{min-width:0;padding:24px 30px 80px}.max{max-width:1260px;margin:0 auto}
+    .top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:17px}.eyebrow{color:var(--blue);font-size:11px;font-weight:800;letter-spacing:.12em}.title{font:600 29px/1.2 Georgia,"Songti SC",serif;margin:4px 0}.subtitle{color:var(--sub);font-size:12.5px}.health{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 13px;box-shadow:var(--shadow);min-width:225px}.health .hrow{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--sub)}.health strong{color:var(--green)}.healthbar{height:5px;background:#e7e3d9;border-radius:8px;margin:8px 0 5px;overflow:hidden}.healthbar i{display:block;width:88%;height:100%;background:var(--green);border-radius:8px}
+    .controlbar{position:sticky;top:8px;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;background:rgba(251,250,246,.94);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:12px;padding:9px 10px 9px 13px;box-shadow:var(--shadow);margin-bottom:18px}.objective{display:flex;align-items:center;gap:10px}.objective>span{font-size:11px;color:var(--sub);font-weight:700}.switch{display:flex;background:var(--paper2);padding:3px;border-radius:9px}.switch button,.tabs button{border:0;background:transparent;color:var(--sub);cursor:pointer;border-radius:7px;padding:7px 15px;font-weight:700;font-size:12px}.switch button.on{background:var(--ink);color:#fff;box-shadow:0 2px 8px rgba(33,31,26,.16)}.switch button.on.same{background:var(--green)}.tabs{display:flex;gap:2px}.tabs button.on{background:var(--blue2);color:var(--blue)}
+    .view{display:none}.view.on{display:block}.maturity{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}.mcard{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:13px 15px;min-height:76px}.mcard:first-child{background:var(--ink);color:#fff}.mcard .n{font:700 24px Georgia,serif}.mcard .l{font-size:11px;color:var(--sub);margin-top:2px}.mcard:first-child .l{color:rgba(255,255,255,.67)}.mcard .tag{font-size:9px;font-weight:800;color:var(--blue);background:var(--blue2);padding:2px 6px;border-radius:10px;float:right;margin-top:3px}
+    .sectionhead{display:flex;justify-content:space-between;align-items:end;margin:24px 0 11px}.sectionhead h2{font:600 19px Georgia,"Songti SC",serif;margin:0}.sectionhead p{color:var(--sub);font-size:11px;margin:2px 0 0}.sectionhead .stamp{font-size:10px;color:var(--faint)}
+    .actionlayout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(290px,.7fr);gap:14px;align-items:start}.insights{display:grid;gap:10px;align-content:start}.insight{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:15px 16px;cursor:pointer;transition:.15s;position:relative}.insight:hover,.insight.sel{border-color:var(--blue);transform:translateY(-1px);box-shadow:var(--shadow)}.insight.sel:before{content:"";position:absolute;left:-1px;top:12px;bottom:12px;width:4px;background:var(--blue);border-radius:0 4px 4px 0}.insight .ih{display:flex;gap:10px;align-items:flex-start}.rank{width:24px;height:24px;border-radius:7px;background:var(--blue2);color:var(--blue);font-weight:800;font-size:11px;display:grid;place-items:center;flex:0 0 auto}.insight h3{font-size:14px;margin:0 0 3px}.insight p{font-size:11.5px;color:var(--sub);margin:0}.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}.chip{font-size:10px;padding:3px 7px;border-radius:12px;background:var(--paper2);color:var(--sub);border:1px solid var(--line2)}.chip.good{background:var(--green2);color:var(--green)}.chip.warn{background:var(--amber2);color:var(--amber)}
+    .evidence{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px;min-height:340px;position:sticky;top:68px}.evidence .kind{display:inline-flex;align-items:center;gap:5px;color:var(--blue);background:var(--blue2);padding:3px 8px;border-radius:12px;font-size:10px;font-weight:800}.evidence h3{font:600 17px/1.35 Georgia,"Songti SC",serif;margin:12px 0 6px}.confidence{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--sub);margin-bottom:13px}.confbar{width:72px;height:5px;background:var(--line2);border-radius:8px;overflow:hidden}.confbar i{display:block;height:100%;background:var(--amber);width:62%}.evsec{border-top:1px solid var(--line2);padding-top:10px;margin-top:10px}.evsec b{font-size:10px;letter-spacing:.08em;color:var(--faint)}.evsec p,.evsec ul{font-size:11.5px;color:var(--body);margin:5px 0 0}.evsec ul{padding-left:18px}.experimentbtn{width:100%;border:0;background:var(--blue);color:#fff;border-radius:8px;padding:9px;margin-top:13px;font-weight:750;cursor:pointer}.experimentbtn.added{background:var(--green)}
+    .platforms{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.pcard{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:12px}.pcard .ph{display:flex;justify-content:space-between;font-size:11px;font-weight:800}.pcard .role{font-size:10px;color:var(--sub);margin:3px 0 10px}.metric{display:flex;justify-content:space-between;border-top:1px solid var(--line2);padding:6px 0;font-size:10.5px;color:var(--sub)}.metric strong{color:var(--ink)}.metric .tiny{color:var(--faint);font-weight:500}.pcard.dim{opacity:.55}
+    .experiments{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.xcard{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px}.xcard .xh{display:flex;justify-content:space-between;align-items:center}.xcard .status{font-size:9px;background:var(--amber2);color:var(--amber);border-radius:10px;padding:2px 7px;font-weight:800}.xcard h4{margin:9px 0 5px;font-size:13px}.xcard p{margin:0;color:var(--sub);font-size:11px}.steps{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}.step{background:var(--paper2);border-radius:7px;padding:7px;font-size:9.5px;color:var(--sub)}.step b{display:block;color:var(--ink);font-size:10px}.xcard button{margin-top:10px;border:1px solid var(--line);background:transparent;border-radius:7px;color:var(--blue);font-size:10px;padding:5px 8px;cursor:pointer}
+    .explorebar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:11px}.filters{display:flex;gap:5px;flex-wrap:wrap}.fbtn{border:1px solid var(--line);background:var(--paper);color:var(--sub);padding:5px 9px;border-radius:7px;cursor:pointer;font-size:10.5px}.fbtn.on{background:var(--ink);color:#fff}.explorebar select{border:1px solid var(--line);background:var(--paper);border-radius:7px;padding:5px 9px;color:var(--sub);font-size:10.5px}
+    .exploregrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr);gap:13px}.plotcard,.rankcard,.matrixcard{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:15px}.plothead{display:flex;justify-content:space-between}.plothead h3,.rankcard h3,.matrixcard h3{font:600 15px Georgia,serif;margin:0}.plothead span{font-size:10px;color:var(--sub)}.plot{height:390px;margin-top:12px;background:linear-gradient(180deg,#f7f7f2,#f1efe8);border:1px solid var(--line2);border-radius:9px;position:relative;overflow:hidden}.axisv{position:absolute;left:50%;top:7%;bottom:10%;border-left:1px dashed #bbb4a8}.axish{position:absolute;top:50%;left:8%;right:5%;border-top:1px dashed #bbb4a8}.qlab{position:absolute;font-size:10px;font-weight:800;line-height:1.35}.qlab small{font-weight:500;color:var(--sub)}.dot{position:absolute;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #fff;box-shadow:0 2px 6px rgba(33,31,26,.22);cursor:pointer;transition:.15s}.dot:hover,.dot.sel{transform:translate(-50%,-50%) scale(1.25);z-index:5;outline:3px solid rgba(53,95,134,.18)}.dot.low{border-style:dashed;opacity:.62}.axislabel{position:absolute;font-size:9px;color:var(--faint)}.axislabel.x{bottom:3px;left:50%;transform:translateX(-50%)}.axislabel.y{left:1px;top:50%;writing-mode:vertical-rl;transform:translateY(-50%) rotate(180deg)}
+    .rankcard{padding-bottom:8px}.ranksub{font-size:10px;color:var(--sub);margin:3px 0 9px}.row{display:grid;grid-template-columns:21px 1fr auto;gap:7px;padding:8px 0;border-top:1px solid var(--line2);cursor:pointer;align-items:center}.row:hover{background:var(--paper2)}.row .rn{font:700 13px Georgia,serif;color:var(--faint);text-align:center}.row .rt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px}.row .rp{font-size:9px;color:var(--sub)}.row .rv{text-align:right;font-size:10px;font-weight:800;color:var(--blue)}
+    .detailpane{margin-top:10px;border-top:1px solid var(--line2);padding-top:10px;min-height:105px}.detailpane h4{margin:0 0 3px;font-size:12px}.detailpane p{margin:0;font-size:10.5px;color:var(--sub)}.dmetrics{display:flex;gap:6px;margin-top:8px}.dm{flex:1;background:var(--paper2);border-radius:7px;padding:6px;text-align:center}.dm b{display:block;font-size:12px}.dm span{font-size:8.5px;color:var(--faint)}
+    .matrixcard{margin-top:13px}.matrix{width:100%;border-collapse:collapse;margin-top:10px;font-size:10.5px}.matrix th{text-align:left;color:var(--faint);font-weight:650;border-bottom:1px solid var(--line);padding:7px}.matrix td{padding:8px 7px;border-bottom:1px solid var(--line2)}.matrix .heat{display:inline-block;min-width:52px;text-align:center;border-radius:5px;padding:3px 5px;background:var(--blue2);color:var(--blue);font-weight:800}.matrix .heat.hot{background:#d9e9dc;color:var(--green)}.matrix .heat.cold{background:var(--paper2);color:var(--faint)}
+    .tip{position:fixed;display:none;pointer-events:none;background:rgba(25,23,19,.94);color:#fff;padding:7px 9px;border-radius:7px;font-size:10px;max-width:250px;z-index:99;box-shadow:0 7px 22px rgba(0,0,0,.25)}.tip b{display:block;margin-bottom:2px}
+    @media(max-width:980px){.app{grid-template-columns:1fr}.sidebar{display:none}.main{padding:18px}.actionlayout,.exploregrid{grid-template-columns:1fr}.evidence{position:static}.platforms{grid-template-columns:repeat(2,1fr)}.experiments{grid-template-columns:1fr}.maturity{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><i></i>知识工作台</div>
+    <div class="navlab">WORKBENCH</div>
+    <div class="nav"><b>◫</b>资讯</div><div class="nav"><b>▤</b>素材</div><div class="nav"><b>◇</b>主题</div><div class="nav"><b>✦</b>灵感</div><div class="nav"><b>✎</b>创作</div>
+    <div class="navlab">FEEDBACK LOOP</div>
+    <div class="nav on"><b>↻</b>复盘</div>
+    <div class="sidefoot"><strong>原型 · 真实数据样板</strong>不改正式产品。用来拍板内容复盘应该长什么样。</div>
+  </aside>
+  <main class="main"><div class="max">
+    <header class="top">
+      <div><div class="eyebrow">CONTENT EXPERIMENT COCKPIT</div><h1 class="title">内容实验驾驶舱</h1><div class="subtitle">看见变化 → 核对证据 → 决定下一次验证。AI 提假设，人做判断。</div></div>
+      <div class="health"><div class="hrow"><span>数据健康度</span><strong>可复盘</strong></div><div class="healthbar"><i></i></div><div class="hrow"><span>107 条发布 · 94 条有数据</span><span>更新 08-25</span></div></div>
+    </header>
+    <div class="controlbar">
+      <div class="objective"><span>这次我想看</span><div class="switch"><button class="on" data-goal="traffic">流量</button><button data-goal="same">同频</button></div></div>
+      <div class="tabs"><button class="on" data-view="action">行动建议</button><button data-view="explore">自由探索</button></div>
+    </div>
+
+    <section class="view on" id="actionView">
+      <div class="maturity">
+        <div class="mcard"><span class="tag" style="color:#fff;background:rgba(255,255,255,.13)">当前目标</span><div class="n" id="goalName">扩大有效分发</div><div class="l" id="goalDesc">先看谁拿到触达，再检查有没有空流量</div></div>
+        <div class="mcard"><span class="tag">主判断点</span><div class="n">D7</div><div class="l">成熟后才进入行动建议</div></div>
+        <div class="mcard"><div class="n">10</div><div class="l">近期内容仍在 D3 观察</div></div>
+        <div class="mcard"><div class="n">13</div><div class="l">X 暂无数据，不参与结论</div></div>
+      </div>
+
+      <div class="sectionhead"><div><h2>本次最值得关注</h2><p>按目标排序，只给 3 条；点开看证据、反例和下一步。</p></div><span class="stamp">基于 08-25 快照 · 方向性结论</span></div>
+      <div class="actionlayout">
+        <div class="insights" id="insightList"></div>
+        <aside class="evidence" id="evidence"></aside>
+      </div>
+
+      <div class="sectionhead"><div><h2>平台现在各自负责什么</h2><p>不跨平台比绝对曝光，只和各自历史基线比较。</p></div></div>
+      <div class="platforms">
+        <div class="pcard"><div class="ph"><span>小红书</span><span>62 篇</span></div><div class="role">放大器 · 选题测试场</div><div class="metric"><span>D7 中位曝光</span><strong>1,195</strong></div><div class="metric"><span>优先看</span><strong class="tiny">点击 · 涨粉/千次</strong></div></div>
+        <div class="pcard"><div class="ph"><span>公众号</span><span>13 篇</span></div><div class="role">深读与关系验证</div><div class="metric"><span>D7 中位阅读</span><strong>53</strong></div><div class="metric"><span>优先看</span><strong class="tiny">完读 · 分享贡献</strong></div></div>
+        <div class="pcard"><div class="ph"><span>视频号</span><span>5 篇</span></div><div class="role">稳定基本盘</div><div class="metric"><span>D7 中位播放</span><strong>659</strong></div><div class="metric"><span>优先看</span><strong class="tiny">分享 · 在看</strong></div></div>
+        <div class="pcard"><div class="ph"><span>知乎</span><span>10 篇</span></div><div class="role">强观点高波动场</div><div class="metric"><span>D7 中位阅读</span><strong>8</strong></div><div class="metric"><span>特殊峰值</span><strong>5,327</strong></div></div>
+        <div class="pcard dim"><div class="ph"><span>抖音</span><span>4 篇</span></div><div class="role">样本不足，暂不定性</div><div class="metric"><span>D7 中位播放</span><strong>334</strong></div><div class="metric"><span>优先补</span><strong class="tiny">完播 · 2 秒跳出</strong></div></div>
+      </div>
+
+      <div class="sectionhead"><div><h2>下一轮实验</h2><p>不是 AI 自动改稿，而是把一个判断变成可证伪的小实验。</p></div></div>
+      <div class="experiments">
+        <div class="xcard"><div class="xh"><span class="status">建议验证</span><span style="font-size:10px;color:var(--faint)">小红书 · 连续 3 篇</span></div><h4>具体人物＋反差现场，是否提升分发？</h4><p>把“AI 落地难”写成一个企业现场，保持图文形态与发布时间段接近。</p><div class="steps"><div class="step"><b>D3 早期信号</b>曝光、点击率</div><div class="step"><b>D7 判断</b>是否持续高于中位</div></div><button onclick="toggleTest(this)">＋ 加入实验</button></div>
+        <div class="xcard"><div class="xh"><span class="status">建议验证</span><span style="font-size:10px;color:var(--faint)">公众号 · 2 篇</span></div><h4>“我的真实改造过程”是否提高同频转化？</h4><p>对照泛方法稿，重点看完读、分享贡献与每百阅读涨粉。</p><div class="steps"><div class="step"><b>控制</b>篇幅、推送时段</div><div class="step"><b>D7 判断</b>深度行为是否复现</div></div><button onclick="toggleTest(this)">＋ 加入实验</button></div>
+        <div class="xcard"><div class="xh"><span class="status">候选续集</span><span style="font-size:10px;color:var(--faint)">评论证据</span></div><h4>爆款 demo 离真正落地还有多远？</h4><p>来自 16.8 万曝光内容的最高频争论；不是追热点，是接住已有问题。</p><div class="steps"><div class="step"><b>验证</b>深评质量</div><div class="step"><b>护栏</b>不牺牲真实判断</div></div><button onclick="toggleTest(this)">＋ 加入实验</button></div>
+      </div>
+    </section>
+
+    <section class="view" id="exploreView">
+      <div class="explorebar"><div class="filters" id="filters"><button class="fbtn on" data-p="全部">全部</button><button class="fbtn" data-p="小红书">小红书</button><button class="fbtn" data-p="公众号">公众号</button><button class="fbtn" data-p="视频号">视频号</button><button class="fbtn" data-p="抖音">抖音</button><button class="fbtn" data-p="知乎">知乎</button></div><select id="stageSelect"><option value="all">最新成熟档位</option><option value="7">只看 D7</option><option value="3">只看 D3</option></select></div>
+      <div class="exploregrid">
+        <div class="plotcard"><div class="plothead"><div><h3>流量 × 同频四象限</h3><span>横轴按平台内历史基线归一；纵轴先用每千触达涨粉做代理</span></div><span>虚线圈＝低样本</span></div><div class="plot" id="plot"><div class="axisv"></div><div class="axish"></div><div class="qlab" style="right:4%;top:4%;color:var(--green)">高流量 · 高同频<br><small>旗舰内容</small></div><div class="qlab" style="left:9%;top:4%;color:var(--blue)">低流量 · 高同频<br><small>小而珍贵</small></div><div class="qlab" style="right:4%;bottom:11%;color:var(--amber);text-align:right">高流量 · 低同频<br><small>分发命中</small></div><div class="qlab" style="left:9%;bottom:11%;color:var(--red)">双低<br><small>换题或重做</small></div><div class="axislabel x">相对本平台的流量表现 →</div><div class="axislabel y">每千触达涨粉 →</div></div></div>
+        <div class="rankcard"><h3 id="rankTitle">流量优先排序</h3><div class="ranksub">点内容可在左图定位，并查看原始分母。</div><div id="rankList"></div><div class="detailpane" id="detailPane"><h4>点一条内容查看</h4><p>不只显示百分比，也保留原始人数与数据阶段。</p></div></div>
+      </div>
+      <div class="matrixcard"><h3>同一母稿，跨平台发生了什么</h3><div style="font-size:10px;color:var(--sub);margin-top:3px">这不是因果证明，但能快速看出“同一内容不能平移”。</div><table class="matrix"><thead><tr><th>母稿 / 主题</th><th>小红书</th><th>公众号</th><th>视频号</th><th>抖音</th><th>知乎</th><th>当前判断</th></tr></thead><tbody>
+        <tr><td>她开会没带 PPT，只带了一个 agent</td><td><span class="heat hot">168,074</span></td><td><span class="heat">158</span></td><td>—</td><td>—</td><td>—</td><td>小红书分发命中；公众号需看完读</td></tr>
+        <tr><td>一个人做内容，我把杂活全喂给 AI 了</td><td><span class="heat">899</span></td><td>—</td><td><span class="heat">590</span></td><td><span class="heat">494</span></td><td><span class="heat cold">8</span></td><td>视频平台稳定；知乎需重写观点</td></tr>
+        <tr><td>别再信「AI 一键出片」了</td><td><span class="heat">436</span></td><td><span class="heat cold">33</span></td><td><span class="heat">739</span></td><td><span class="heat">173</span></td><td><span class="heat cold">17</span></td><td>视频号更适配这个命题</td></tr>
+        <tr><td>10 倍的个体，1.2 倍的组织</td><td><span class="heat">476</span></td><td><span class="heat">101</span></td><td>—</td><td>—</td><td><span class="heat cold">2</span></td><td>公众号量小但深读、分享、涨粉强</td></tr>
+      </tbody></table></div>
+    </section>
+  </div></main>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const COLORS={"小红书":"#c25548","公众号":"#3f7350","视频号":"#4d7d91","抖音":"#282722","知乎":"#3d65a1"};
+const ITEMS=[
+ {p:"小红书",t:"她开会没带 PPT，只带了一个 agent",reach:168074,fans:144,stage:7,base:100,growth:1.12,form:"图文卡",note:"赞1118 · 藏1306 · 评72；高流量，涨粉效率0.86/千次"},
+ {p:"小红书",t:"飞书 AI 绝活大会上，他戴着安全帽上台",reach:5630,fans:7,stage:7,base:82,growth:1.18,form:"图文卡",note:"评论出现真实厂二代 FDE，专业人群被触达"},
+ {p:"小红书",t:"如果 Palantir 出生在国内，它活不过第一年",reach:4429,fans:2,stage:7,base:76,growth:2.37,form:"图文卡",note:"D3 1871 → D7 4429，出现二次分发"},
+ {p:"小红书",t:"一个人做内容，我把杂活全喂给 AI 了",reach:899,fans:8,stage:7,base:47,growth:1.18,form:"口播视频",note:"涨粉8，8.90/千次；小流量高同频"},
+ {p:"小红书",t:"他们差点吵起来：要不要让 agent 说话",reach:1503,fans:0,stage:7,base:58,growth:1.11,form:"图文卡",note:"互动强，但当前没有涨粉"},
+ {p:"小红书",t:"收藏 = 稍后读 = 永远不读，直到我做了它",reach:680,fans:4,stage:7,base:42,growth:1.08,form:"图文卡",note:"涨粉4，5.88/千次；机制型亲历内容"},
+ {p:"小红书",t:"一人公司能做好 FDE 吗？",reach:1125,fans:0,stage:3,base:53,growth:1,form:"图文卡",note:"D3 延迟快照；仍应观察，不下结论"},
+ {p:"公众号",t:"会说话的 agent，多半不干活",reach:5272,fans:2,stage:7,base:100,growth:1.02,form:"长文",note:"外部涌入明显，但完读率仅3.1%"},
+ {p:"公众号",t:"你效率提升 10 倍，你们公司为什么没有？",reach:101,fans:2,stage:7,base:59,growth:1.03,form:"长文",note:"完读52.5%；7人分享带来78阅读；19.8/千次涨粉"},
+ {p:"公众号",t:"4次推倒重来，我把信息流从1459条砍到了12条",reach:53,fans:2,stage:7,base:50,growth:1.13,form:"长文",note:"完读40%；分享带来36阅读；低样本高密度"},
+ {p:"公众号",t:"一人公司路线之争",reach:58,fans:0,stage:7,base:52,growth:1.02,form:"长文",note:"分享10；完读32.7%；有讨论但未涨粉"},
+ {p:"公众号",t:"她开会没带 PPT，只带了一个 agent",reach:158,fans:0,stage:7,base:67,growth:1.05,form:"长文",note:"同母稿在小红书16.8万；平台分发差异巨大"},
+ {p:"视频号",t:"别再信「AI 一键出片」了",reach:739,fans:0,stage:7,base:62,growth:1.05,form:"口播视频",note:"当前视频号样本中的最高播放"},
+ {p:"视频号",t:"如何更好地与 AI 协作，并不是靠嘴把需求讲清楚",reach:694,fans:0,stage:7,base:58,growth:1.07,form:"口播视频",note:"稳定基本盘，但缺完播与涨粉归因"},
+ {p:"视频号",t:"把 X 上的英文长视频，4 分钟读完",reach:624,fans:0,stage:7,base:54,growth:1.04,form:"口播视频",note:"播放稳定；需补完播和关注转化"},
+ {p:"视频号",t:"一个人做内容，我把杂活全喂给 AI 了",reach:590,fans:0,stage:7,base:51,growth:1.13,form:"口播视频",note:"与抖音接近，知乎仅8"},
+ {p:"抖音",t:"一个人做内容，我把杂活全喂给 AI 了",reach:494,fans:0,stage:7,base:58,growth:1.01,form:"口播视频",note:"样本不足；当前缺完播与2秒跳出"},
+ {p:"抖音",t:"你相信 AI 能一键出片吗",reach:173,fans:0,stage:7,base:45,growth:1.02,form:"口播视频",note:"同主题视频号739；值得查开头与平台包装"},
+ {p:"知乎",t:"如果 Palantir 来中国，他活不过第一年",reach:5327,fans:0,stage:7,base:100,growth:1.40,form:"想法",note:"知乎唯一明显破圈；强观点而非教程"},
+ {p:"知乎",t:"会说话的 agent，多半不干活",reach:35,fans:0,stage:7,base:54,growth:1,form:"文章",note:"同内容公众号5272；直接平移没有获得分发"},
+ {p:"知乎",t:"把长视频变成中文卡片",reach:34,fans:0,stage:3,base:53,growth:1,form:"视频",note:"人工按同日唯一项匹配；低样本"}
+];
+const INSIGHTS={
+ traffic:[
+  {title:"具体人物＋反差现场，是目前最强的分发入口",brief:"两篇现场叙事显著高于小红书 D7 中位，但样本仍少，应该验证而不是奉为公式。",chips:["16.8万峰值","小红书","中等可信"],hyp:"具体人物、可视场景和反差动作，可能降低理解门槛并提高首轮分发。",evidence:["“她开会没带 PPT”D7 168,074，涨粉144","“安全帽上台”D7 5,630，涨粉7","小红书 D7 中位约1,195"],counter:"“我参加了飞书大会，见到 Zara”也有现场感，但只有3,205；人物场景不是充分条件。",next:"连续做3篇真实现场叙事，主要看D3点击/曝光，护栏看涨粉/千次。",conf:68},
+  {title:"强观点可能带来 D3 之后的二次分发",brief:"Palantir 选题从 D3 1,871 增至 D7 4,429，是近期少见的持续增长。",chips:["D3→D7 +137%","反事实命题","待复现"],hyp:"反事实、会有人不同意的命题，可能让内容在评论与转发中继续获得分发。",evidence:["小红书 D3 1,871 → D7 4,429","知乎同主题 D7 5,327，远高于知乎中位8"],counter:"目前几乎只有一个强样本，可能同时受到题材知名度影响。",next:"用另一个熟悉领域做同结构强观点，不复刻 Palantir 名词，验证结构而非热点。",conf:57},
+  {title:"视频号已有稳定基本盘，但还没有真正的突破样本",brief:"4条 D7 集中在590–739，稳定性比抖音好；目前缺完播数据，不能判断内容承接。",chips:["中位659","低波动","缺完播"],hyp:"现有口播结构适配视频号的基本分发，但开头/完播尚未被优化。",evidence:["AI一键出片739","AI协作694","英文长视频624","AI杂活590"],counter:"只有4条D7样本，稳定也可能只是平台给固定冷启动流量。",next:"下一轮只改前5秒开头，补采完播/停留后再判断是否值得加量。",conf:46}
+ ],
+ same:[
+  {title:"亲身工作流，比大流量内容更容易把读者变成粉丝",brief:"“AI杂活”曝光不到900，却带来8个粉丝，单位触达涨粉约为16.8万爆款的10倍。",chips:["8.90粉/千次","亲历机制","高同频"],hyp:"展示自己真实做法、取舍和机制，比观察别人更能筛到认同你工作方式的人。",evidence:["AI杂活：899曝光 / 涨粉8 = 8.90/千次","开会没PPT：168,074曝光 / 涨粉144 = 0.86/千次","收藏稍后读：680曝光 / 涨粉4 = 5.88/千次"],counter:"粉丝总量仍小，单篇多1–2个关注就会显著改变比率。",next:"继续做3篇“我如何改造真实工作”的内容；只有复现后才升级为规律。",conf:72},
+  {title:"公众号的小样本深读，比阅读量更能说明内容命中",brief:"两篇百次以内阅读的文章，完读、分享贡献和涨粉明显；不能因为阅读少就判失败。",chips:["完读40–52%","分享贡献","低样本"],hyp:"真实复盘和组织机制类内容，在公众号更容易形成深读与主动分享。",evidence:["10倍个体：101阅读，完读52.5%，7人分享带来78阅读，涨粉2","1459→12：53阅读，完读40%，分享带来36阅读，涨粉2"],counter:"样本小且可能由熟人圈层驱动；必须显示原始人数，不能只看百分比。",next:"再发2篇同类真实复盘，控制篇幅与推送时段，验证深读和涨粉能否复现。",conf:64},
+  {title:"5,272 阅读不等于高质量：一次典型的流量与同频分叉",brief:"“会说话的 agent”获得大量外部阅读，但完读仅3.1%，涨粉2；标题或渠道命中，正文承接弱。",chips:["阅读5,272","完读3.1%","承接预警"],hyp:"外部流量期待与正文提供的价值不一致，导致高阅读、低完读和低转化。",evidence:["送达仅57，但单日外部涌入5,227","完读率3.1%，停留38秒","涨粉2，约0.38/千次"],counter:"外部流量来源人群可能天然更泛，不一定全是正文问题。",next:"保留标题命题，重做首屏承诺和文章结构；以完读与分享贡献为主指标。",conf:76}
+ ]
+};
+let goal="traffic",view="action",platform="全部",selectedItem=null;
+const fmt=n=>n>=10000?(n/10000).toFixed(n>=100000?1:2)+"万":n.toLocaleString("zh-CN");
+function renderInsights(){const list=document.getElementById("insightList");list.innerHTML=INSIGHTS[goal].map((x,i)=>`<article class="insight ${i===0?'sel':''}" data-i="${i}"><div class="ih"><div class="rank">0${i+1}</div><div><h3>${x.title}</h3><p>${x.brief}</p><div class="chips">${x.chips.map((c,j)=>`<span class="chip ${j===0?'good':j===2?'warn':''}">${c}</span>`).join('')}</div></div></div></article>`).join('');list.querySelectorAll('.insight').forEach(el=>el.onclick=()=>{list.querySelectorAll('.insight').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');showEvidence(+el.dataset.i)});showEvidence(0)}
+function showEvidence(i){const x=INSIGHTS[goal][i],e=document.getElementById('evidence');e.innerHTML=`<span class="kind">◇ AI 假设 · 待你裁决</span><h3>${x.title}</h3><div class="confidence"><span>可信度 ${x.conf}%</span><div class="confbar"><i style="width:${x.conf}%"></i></div><span>样本与对照共同决定</span></div><div class="evsec"><b>当前假设</b><p>${x.hyp}</p></div><div class="evsec"><b>证据</b><ul>${x.evidence.map(a=>`<li>${a}</li>`).join('')}</ul></div><div class="evsec"><b>不能排除</b><p>${x.counter}</p></div><div class="evsec"><b>下一次怎么验证</b><p>${x.next}</p></div><button class="experimentbtn" onclick="toggleExperiment(this)">采纳为下一轮实验</button>`}
+function setGoal(g){goal=g;document.querySelectorAll('.switch button').forEach(b=>b.classList.toggle('on',b.dataset.goal===g));document.querySelector('.switch button[data-goal="same"]').classList.toggle('same',g==='same');document.getElementById('goalName').textContent=g==='traffic'?'扩大有效分发':'筛到更多同频的人';document.getElementById('goalDesc').textContent=g==='traffic'?'先看谁拿到触达，再检查有没有空流量':'先看涨粉与深度行为，再检查样本是否可信';renderInsights();renderExplore()}
+function toggleExperiment(btn){btn.classList.toggle('added');btn.textContent=btn.classList.contains('added')?'✓ 已加入实验队列':'采纳为下一轮实验'}function toggleTest(btn){btn.textContent=btn.textContent.includes('已加入')?'＋ 加入实验':'✓ 已加入';btn.style.color=btn.textContent.includes('✓')?'var(--green)':'var(--blue)'}
+document.querySelectorAll('.switch button').forEach(b=>b.onclick=()=>setGoal(b.dataset.goal));document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{view=b.dataset.view;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));document.getElementById(view==='action'?'actionView':'exploreView').classList.add('on');if(view==='explore')renderExplore()});
+document.querySelectorAll('.fbtn').forEach(b=>b.onclick=()=>{platform=b.dataset.p;document.querySelectorAll('.fbtn').forEach(x=>x.classList.toggle('on',x===b));renderExplore()});document.getElementById('stageSelect').onchange=renderExplore;
+function filtered(){const st=document.getElementById('stageSelect').value;return ITEMS.filter(x=>(platform==='全部'||x.p===platform)&&(st==='all'||String(x.stage)===st))}
+function renderExplore(){const data=filtered(),plot=document.getElementById('plot');plot.querySelectorAll('.dot').forEach(x=>x.remove());const maxFan=Math.max(1,...data.map(x=>x.fans/x.reach*1000));data.forEach((x,i)=>{const d=document.createElement('div'),same=x.fans/x.reach*1000;d.className='dot '+(x.reach<100?'low':'');d.style.background=COLORS[x.p];d.style.width=d.style.height=(10+Math.min(18,Math.sqrt(x.reach)/18))+'px';d.style.left=(8+Math.max(3,Math.min(89,x.base))*.87)+'%';d.style.top=(90-Math.min(80,(same/maxFan)*76))+'%';d.dataset.title=x.t;d.onclick=()=>selectItem(x,d);d.onmousemove=ev=>showTip(ev,x);d.onmouseleave=hideTip;plot.appendChild(d)});let sorted=[...data].sort(goal==='traffic'?(a,b)=>b.base-a.base:(a,b)=>(b.fans/b.reach)-(a.fans/a.reach));document.getElementById('rankTitle').textContent=goal==='traffic'?'流量优先排序':'同频优先排序';document.getElementById('rankList').innerHTML=sorted.slice(0,9).map((x,i)=>`<div class="row" data-title="${x.t.replaceAll('"','&quot;')}"><div class="rn">${i+1}</div><div><div class="rt">${x.t}</div><div class="rp">${x.p} · D${x.stage} · ${x.form}</div></div><div class="rv">${goal==='traffic'?fmt(x.reach):(x.fans/x.reach*1000).toFixed(2)+'粉/千次'}</div></div>`).join('');document.querySelectorAll('.row[data-title]').forEach(r=>r.onclick=()=>{const x=data.find(v=>v.t===r.dataset.title);if(x)selectItem(x,[...plot.querySelectorAll('.dot')].find(d=>d.dataset.title===x.t))});if(!selectedItem||!data.includes(selectedItem))showDetail(sorted[0])}
+function selectItem(x,d){document.querySelectorAll('.dot.sel').forEach(n=>n.classList.remove('sel'));if(d)d.classList.add('sel');selectedItem=x;showDetail(x)}function showDetail(x){if(!x)return;const rate=x.fans/x.reach*1000;document.getElementById('detailPane').innerHTML=`<h4>${x.t}</h4><p>${x.note}</p><div class="dmetrics"><div class="dm"><b>${fmt(x.reach)}</b><span>${x.p==='公众号'?'阅读':'曝光/播放'}</span></div><div class="dm"><b>${rate.toFixed(2)}</b><span>涨粉/千次</span></div><div class="dm"><b>${x.growth.toFixed(2)}×</b><span>D3→D7</span></div></div>`}
+function showTip(ev,x){const t=document.getElementById('tip');t.style.display='block';t.style.left=ev.clientX+12+'px';t.style.top=ev.clientY+12+'px';t.innerHTML=`<b>${x.t}</b>${x.p} · ${fmt(x.reach)} · 涨粉${x.fans} · D${x.stage}`}function hideTip(){document.getElementById('tip').style.display='none'}
+renderInsights();renderExplore();
+</script>
+</body>
+</html>
