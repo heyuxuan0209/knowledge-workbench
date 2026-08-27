@@ -161,8 +161,17 @@ def parse_csv(path):
         title = (r.get('标题') or '').strip()
         if not title:
             continue
+        extra_parts = []
+        content_type = (r.get('类型') or '').strip()
+        if content_type:
+            extra_parts.append(content_type)
+        # 视频号特有的「在看」没有独立的 D3/D7/D30 字段，但不能在通用 CSV
+        # 解析时静默丢掉；保留到「传播」备注中，和公众号逐篇互动的口径一致。
+        zaikan = num(r.get('在看'))
+        if zaikan:
+            extra_parts.append(f'在看{int(zaikan)}')
         rec = dict(title=title, pub=(r.get('发布时间') or '').strip(),
-                   view=0.0, ctr=0.0, extra=(r.get('类型') or '').strip())
+                   view=0.0, ctr=0.0, extra=' '.join(extra_parts))
         for key, names in CSV_MAP.items():
             rec[key] = next((num(r[n]) for n in names if r.get(n) not in (None, '')), 0.0)
         out[norm_title(title)] = rec
