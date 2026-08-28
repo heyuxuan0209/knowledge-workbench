@@ -17,6 +17,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { feishuFetch } from '../src/services/feishu-auth.js';
 import { sendFeishuText } from './lib/feishu-notify.mjs';
+import { safeInteractionRate } from './lib/metrics.mjs';
 
 const APP = 'QIlkbwmGma9Tb1sRyAicfZeEnjb';
 const TABLE = 'tblL11CZzfQSxIy9';
@@ -211,6 +212,7 @@ const main = async () => {
   const missedWindow = [];
   const noMatch = [];
   const alreadyFilled = [];
+  const invalidInteractionRates = [];
   let skippedX = 0;
   const notYetDue = [];
   // 「这个平台压根没有导出数据」和「有数据但这条对不上」是两回事，必须分开。
@@ -272,8 +274,12 @@ const main = async () => {
     // D3(分母=观看119)15.13% vs D7(分母=曝光899)2.22%，看着像暴跌 85%，其实只是换了分母。
     // 判据用 ctr 而非平台名：有封面点击率 ⇒ 该平台的 exposure 是展示量，此时改用 view。
     const engageBase = (d.ctr && d.view > 0) ? d.view : d.exposure;
+    const interactionRate = hasInteraction ? safeInteractionRate(interactions, engageBase) : null;
     // 只有真拿到互动数才写互动率——公众号导出目前没有逐篇互动，写 0 会污染复盘
-    if (hasInteraction && engageBase > 0) put(`D${stage}互动率`, Number((interactions / engageBase).toFixed(4)));
+    if (interactionRate != null) put(`D${stage}互动率`, interactionRate);
+    if (hasInteraction && engageBase > 0 && interactionRate == null) {
+      invalidInteractionRates.push(`${label} D${stage} — 互动${interactions} > 分母${engageBase}，口径不可比，互动率留空`);
+    }
     // 互动数和分发口径要**一起**写进「传播」：原来是二选一，一旦有互动数就把 extra 丢掉，
     // 而公众号最该被看见的恰恰在 extra 里——「送达64 消息内打开11 分享带来85 完读率50.6%」。
     // 只看「阅读101」会把一篇好文判成扑街，看到送达才知道是盘子小、不是内容差。
@@ -281,7 +287,8 @@ const main = async () => {
       hasInteraction ? `赞${d.like} 评${d.comment} 藏${d.fav} 分享${d.share}` : '',
       // 分母是什么必须写进去。否则半年后没人知道这个百分比是按曝光还是按观看算的，
       // 复盘时只能靠猜——这正是这次要修的那个坑。
-      hasInteraction && engageBase > 0 ? `互动率分母=${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}` : '',
+      interactionRate != null ? `互动率分母=${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}` : '',
+      hasInteraction && engageBase > 0 && interactionRate == null ? `互动率未写(互动${interactions}>分母${engageBase}，口径不可比)` : '',
       d.extra || '',
     ].filter(Boolean).join(' ');
     const provenance = `${late ? '延迟回收｜' : ''}快照${best.date}(第${best.age.toFixed(1)}天)`;
@@ -289,7 +296,9 @@ const main = async () => {
     put('回收状态', NEXT_STAGE[stage] ?? '已回收完');
 
     const desc = `${label} D${stage} → 曝光${d.exposure}`
-      + (hasInteraction ? ` 互动率${(interactions / (engageBase || 1) * 100).toFixed(2)}%（分母${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}）` : ' (无互动数据)')
+      + (interactionRate != null
+        ? ` 互动率${(interactionRate * 100).toFixed(2)}%（分母${d.ctr && d.view > 0 ? `观看${d.view}` : `曝光${d.exposure}`}）`
+        : hasInteraction ? ` 互动率未写（互动${interactions}>分母${engageBase}，口径不可比）` : ' (无互动数据)')
       + ` [${late ? '延迟回收·' : ''}快照${best.date}·第${best.age.toFixed(1)}天]`;
     if (dry) { log(`  [dry] ${desc}`); }
     else {
@@ -308,6 +317,7 @@ const main = async () => {
   log(section('已有值·跳过', alreadyFilled));
   log(section('未到取数窗口', notYetDue));
   log(section('ℹ️ 该平台无导出数据', noSnapLines));
+  log(section('⚠️ 互动率口径不可比·已留空', invalidInteractionRates));
   log(section('⚠️ 已错过取数窗口（那几天没有快照）', missedWindow));
   log(section('❓ 快照里匹配不上（标题改过？）', noMatch));
   if (skippedX) log(`\nX 平台 ${skippedX} 行已跳过（不做导出器、不回收）`);
@@ -316,10 +326,11 @@ const main = async () => {
 
   // 通知只在**有人需要做点什么**时才发：回填了（好消息）、错过窗口、或匹配不上（要人看一眼）。
   // 「该平台没有导出数据」不进这个条件——那是个已知的常态，天天推一遍只会让人不再看这条通知。
-  if (notify && !dry && (filled.length || missedWindow.length || noMatch.length)) {
+  if (notify && !dry && (filled.length || missedWindow.length || noMatch.length || invalidInteractionRates.length)) {
     const text = `📊 发布记录自动回填（${new Date().toISOString().slice(0, 10)}）\n\n`
       + (filled.length ? `已回填 ${filled.length} 行：\n${filled.map((x) => `• ${x}`).join('\n')}\n` : '本轮无新数据到期。\n')
       + section('⚠️ 已错过取数窗口', missedWindow)
+      + section('⚠️ 互动率口径不可比·已留空', invalidInteractionRates)
       + section('❓ 匹配不上', noMatch);
     await sendFeishuText(REVIEW_CHAT, text, { requireCodex: true });
     log('已推送到「KW · 数据复盘」群');
