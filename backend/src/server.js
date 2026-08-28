@@ -31,6 +31,12 @@ const upload = multer({ dest: pathJoin(tmpdir(), 'kw-uploads'), limits: { fileSi
 
 app.use(securityHeaders);
 app.use(cors(createCorsOptions()));
+app.use((err, _req, res, next) => {
+  if (err?.message === 'Origin not allowed') {
+    return res.status(403).json({ status: 'error', error: 'Origin not allowed' });
+  }
+  return next(err);
+});
 app.get('/health/live', (_req, res) => res.json({ status: 'ok' }));
 app.use(createAccessProtection());
 // 5mb：adHoc 对话材料含长视频译文（默认 100kb 会对长内容直接 PayloadTooLarge）
