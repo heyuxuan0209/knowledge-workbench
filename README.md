@@ -3,7 +3,9 @@
 > 一个人做内容、为自己边做边搭的工作台，在这里公开记录它长大的过程。**欢迎 ⭐ star 关注、来交流想法。**
 > Reads what you read + your own hard-won experience → collide into judgment → write it → ship it → learn from the results.
 
-> 当前状态：产品主流程已可用，正在完成飞书 AI 黑客松的首次正式公网部署。现有功能与比赛期间更新见 [CHANGELOG](./CHANGELOG.md)。
+> 当前状态：产品主流程已可用，并已完成飞书 AI 黑客松期间的首次 HTTPS 公网部署。现有功能与比赛期间更新见 [CHANGELOG](./CHANGELOG.md)。
+
+**在线体验（建议使用 PC 端 Chrome）**：https://kw-vps.tailbf85a8.ts.net
 
 ## 一条完整内容流程
 
@@ -18,7 +20,7 @@
 - **适配与发布**：将同一核心判断重组为公众号、小红书、抖音等平台的原生形态，最后发布由人确认。
 - **数据复盘**：自动回收已发布内容的表现，横向对比后反馈下一次选题。
 
-新手导航候选方案见 [`prototype/mock-pages/content-flow-overview.html`](./prototype/mock-pages/content-flow-overview.html)。
+产品内已提供“流程总览”新手导航；早期 HTML Mock 保留在 [`prototype/mock-pages/content-flow-overview.html`](./prototype/mock-pages/content-flow-overview.html)。
 
 ## 使用方式
 
@@ -132,12 +134,11 @@ Want to watch it grow or talk ideas — ⭐ star and follow, or open an issue.
 
 ---
 
-## 📄 About this repo · Usage & Rights
+## 📄 About this repo
 
 This is my **personal work and a product-in-progress · build in public** — going public to document an attempt to turn "two streams of first-hand material (what you read + what you've accumulated) → cognition → content" into a flywheel, for viewing, learning, exchange, and inspiration, and also as part of my portfolio. It's not finished yet.
 
 - ✅ **Welcome**: reading, learning, ⭐ Star, opening Issues to exchange; quoting and discussing **provided you cite the source and link back to this repo / my homepage**.
-- 🚫 **Not yet licensed**: without written permission, please do not use for commercial purposes, redistribute, or develop derivative products based on this project's source code.
 - 🙏 If it inspired you, **cite the source and @ me** (WeChat / Xiaohongshu "杰西卡聊AI") — that's the best support.
 
 Copyright © 2026 Jessica · All rights not expressly granted are reserved.
@@ -247,12 +248,11 @@ Copyright © 2026 Jessica · All rights not expressly granted are reserved.
 
 ---
 
-## 📄 关于这个仓库 · 使用声明
+## 📄 关于这个仓库
 
 这是我的**个人作品与在建产品 · build in public**——公开是为了记录一个把「两股一手料（读到的 + 自己攒的）→ 认知 → 内容」做成飞轮的尝试，供查看、学习、交流与获得启发，也是我作品集的一部分。它还没做完。
 
 - ✅ **欢迎**：阅读、学习、⭐ Star、开 Issue 交流；在**注明出处并链接回本仓 / 我的主页**的前提下引用与讨论。
-- 🚫 **暂不授权**：未经书面许可，请勿用于商业用途、二次分发，或基于本项目源码开发衍生产品。
 - 🙏 如果它启发了你，**注明出处并 @ 我**（公众号 / 小红书「杰西卡聊AI」）就是最好的支持。
 
 版权所有 © 2026 杰西卡 · 保留未明确授予的一切权利（All rights reserved）。

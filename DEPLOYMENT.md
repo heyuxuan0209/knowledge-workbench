@@ -1,30 +1,42 @@
 # 生产部署
 
-## 推荐拓扑
+## 当前线上拓扑（2026-08-28）
 
 ```text
-浏览器 → HTTPS 域名 → Cloudflare Tunnel → 127.0.0.1:3000
-                                               └→ Express + frontend/dist + SQLite
+公网浏览器
+  → HTTPS · Tailscale Funnel（kw-vps.tailbf85a8.ts.net）
+  → Nginx Basic Auth（127.0.0.1:3443）
+  → Express + frontend/dist（127.0.0.1:3000）
+  → SQLite（VPS 唯一真相源）
+
+tailnet 内部调用 / SSH 隧道
+  → 受防火墙限制的 3000 端口
+  → 同一 Express 服务
 ```
 
-不直接开放 3000，不迁移 SQLite，不占用当前 SSH 使用的 443。Tailscale/SSH 隧道保留为运维退路。
+公网不直接开放 3000，也不迁移 SQLite。公网 HTTPS 由 Tailscale Funnel 提供，VPS 自身的 443 仍供 SSH 使用；两者不争抢监听端口。Nginx 只监听本机 3443，公网认证不会打断飞书机器人和会议流程对内部 3000 的调用。
 
 ## 生产配置
 
-复制 `backend/.env.example` 中需要的键到 `backend/.env`，真实密钥不进 Git。公网上线至少配置：
+复制 `backend/.env.example` 中需要的键到 `backend/.env`，真实密钥不进 Git。当前拓扑的应用层配置为：
 
 ```dotenv
 NODE_ENV=production
-HOST=127.0.0.1
+HOST=0.0.0.0
 PORT=3000
-ACCESS_PROTECTION_ENABLED=true
-ACCESS_USERNAME=judge
-ACCESS_PASSWORD=<密码管理器生成的长随机密码>
-ALLOWED_ORIGINS=https://<正式域名>
+ACCESS_PROTECTION_ENABLED=false
+ALLOWED_ORIGINS=https://kw-vps.tailbf85a8.ts.net,http://localhost:3000,http://127.0.0.1:3000,http://kw-vps:3000
 DB_PATH=./data/app.db
 ```
 
-如需保留 Tailscale 直连 3000，`HOST` 可保持 `0.0.0.0`，但 UFW 必须继续限定为 `tailscale0`；公网绝不允许 3000。
+`ACCESS_PROTECTION_ENABLED=false` 是有意设计：公网认证由 Nginx 完成，避免破坏内部自动化。Nginx 的口令文件为 `/etc/nginx/kw.htpasswd`，权限必须保持 `root:www-data 0640`。`HOST=0.0.0.0` 用于保留 Tailscale 直连，但 UFW 必须继续把 3000 限定在 `tailscale0`，公网绝不允许直连。
+
+Funnel 配置：
+
+```bash
+tailscale funnel --bg http://127.0.0.1:3443
+tailscale funnel status
+```
 
 ## 上线前硬检查
 
@@ -32,7 +44,7 @@ DB_PATH=./data/app.db
 2. 对运行中 SQLite 执行一致性备份，备份后跑 `PRAGMA integrity_check`。
 3. `npm run test:security` 与 `npm run test:export-parsers` 通过。
 4. `frontend/npm run build` 通过。
-5. 访问口令可用，未登录时除 `/health/live` 外均返回 401。
+5. Nginx 访问口令可用，公网未登录访问均返回 401；内部 `/health/live` 返回最小存活信息。
 6. 从国内和国外网络分别验证首页、登录和关键流程。
 
 ## 构建与重启
@@ -47,7 +59,8 @@ sudo systemctl restart kw-backend
 
 ```bash
 curl http://127.0.0.1:3000/health/live
-curl -u "$ACCESS_USERNAME:$ACCESS_PASSWORD" http://127.0.0.1:3000/health
+curl http://127.0.0.1:3000/health
+curl -u "<网关用户>:<网关密码>" http://127.0.0.1:3443/health
 git rev-parse HEAD
 ```
 
@@ -67,10 +80,11 @@ git rev-parse HEAD
 - 代码：回到上一个已验证 commit，重建前端后重启 systemd。
 - 前端：保留上一份 `frontend/dist` 产物。
 - 数据：只在确认数据已损坏时恢复备份；恢复前先保留当前库，不直接覆盖。
-- 公网入口：可先停 Cloudflare Tunnel，不影响 SSH/Tailscale 运维通道。
+- 公网入口：`tailscale funnel --https=443 off`，不影响 SSH 和 tailnet 内部运维通道。
 
 ## 当前已知运行风险
 
 - LLM 供应商余额不足时，进程仍会存活，但翻译/分类会降级。
 - SQLite 是 VPS 上的唯一真相源；Mac 本地库只是旧快照。
 - 一键发布依赖浏览器扩展和 localhost/HTTPS 上下文，最后发布按钮始终由人点击。
+- Tailscale Funnel 目前属于 beta，受其非固定带宽限制约束；长期正式运营可再迁移到自有域名入口。
