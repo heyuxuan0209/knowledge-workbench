@@ -21,6 +21,9 @@ export const IconFeishu = ({ size = 16 }) => (
 export const IconFeed = () => (
   <S><circle cx="4" cy="12" r="1" /><path d="M4 8.5a3.5 3.5 0 0 1 3.5 3.5" /><path d="M4 5a7 7 0 0 1 7 7" /></S>
 )
+export const IconMap = () => (
+  <S><path d="M2.5 3.5 6 2l4 1.5L13.5 2v10.5L10 14l-4-1.5L2.5 14z" /><path d="M6 2v10.5M10 3.5V14" /></S>
+)
 export const IconNotes = () => (
   <S><path d="M4 2.5h8v11l-4-3-4 3z" /></S>
 )

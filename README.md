@@ -3,6 +3,30 @@
 > 一个人做内容、为自己边做边搭的工作台，在这里公开记录它长大的过程。**欢迎 ⭐ star 关注、来交流想法。**
 > Reads what you read + your own hard-won experience → collide into judgment → write it → ship it → learn from the results.
 
+> 当前状态：产品主流程已可用，正在完成飞书 AI 黑客松的首次正式公网部署。现有功能与比赛期间更新见 [CHANGELOG](./CHANGELOG.md)。
+
+## 一条完整内容流程
+
+```text
+发现信息 → 解读与筛选 → 沉淀素材 → 形成主题与判断
+         → 创作母稿 → 多平台适配与发布 → 数据回流与复盘
+```
+
+- **发现与解读**：从稳定信源里筛出少量必读，读懂网页、文档、视频和播客。
+- **素材与主题**：把外部信息和自己的坑、经验、判断放在一起，长成持续更新的主题综述。
+- **母稿创作**：用真实素材起稿，保留溯源，在飞书里评审定稿。
+- **适配与发布**：将同一核心判断重组为公众号、小红书、抖音等平台的原生形态，最后发布由人确认。
+- **数据复盘**：自动回收已发布内容的表现，横向对比后反馈下一次选题。
+
+新手导航候选方案见 [`prototype/mock-pages/content-flow-overview.html`](./prototype/mock-pages/content-flow-overview.html)。
+
+## 使用方式
+
+- **日常使用**：运行桌面 `KW-知识工作台.command`，优先走 `localhost:3000` SSH 隧道，失败时退回 Tailscale。
+- **前端开发**：`cd frontend && npm install && npm run dev`，打开 `http://localhost:5173`。
+- **后端开发**：参考 `backend/.env.example` 配置后，`cd backend && npm install && npm run dev`。Mac 本地 SQLite 是旧快照，不在 Mac 跑真实 ingest。
+- **生产部署**：见 [DEPLOYMENT.md](./DEPLOYMENT.md)，包含访问保护、健康检查、SQLite 备份、验收和回滚。
+
 **English** · [中文](#中文)
 
 https://github.com/user-attachments/assets/2d873ad5-4439-4a17-9f24-9112ee7d2ce0

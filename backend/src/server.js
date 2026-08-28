@@ -3,6 +3,7 @@ import cors from 'cors';
 import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import { setGlobalDispatcher, EnvHttpProxyAgent } from 'undici';
+import { createAccessProtection, createCorsOptions, securityHeaders } from './middleware/production-security.js';
 
 dotenv.config();
 
@@ -16,6 +17,11 @@ if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+// 不改变既有 Tailscale 退路；正式公网切换时在 .env 显式收紧为 127.0.0.1。
+const HOST = process.env.HOST || '0.0.0.0';
+
+// Cloudflare Tunnel / reverse proxy only: trust the local proxy, never arbitrary forwarded headers.
+app.set('trust proxy', 'loopback');
 
 // 文件上传（即时分析支持音频/PDF，UI 改造）：存临时目录，处理完由 upload-ingest 删除。上限 300MB（会议音频）
 import multer from 'multer';
@@ -23,7 +29,10 @@ import { tmpdir } from 'os';
 import { join as pathJoin } from 'path';
 const upload = multer({ dest: pathJoin(tmpdir(), 'kw-uploads'), limits: { fileSize: 300 * 1024 * 1024 } });
 
-app.use(cors());
+app.use(securityHeaders);
+app.use(cors(createCorsOptions()));
+app.get('/health/live', (_req, res) => res.json({ status: 'ok' }));
+app.use(createAccessProtection());
 // 5mb：adHoc 对话材料含长视频译文（默认 100kb 会对长内容直接 PayloadTooLarge）
 app.use(express.json({ limit: '5mb' }));
 
@@ -2697,10 +2706,10 @@ function currentCommit() {
   } catch { return null; }
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   const sha = currentCommit();
   if (sha) console.log(`🔖 当前版本：${sha}`);
-  console.log(`🚀 AI Insight Hub backend running on http://localhost:${PORT}`);
+  console.log(`🚀 AI Insight Hub backend running on http://${HOST}:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`✨ v0.2.0 - Workspace Chat APIs enabled`);
 

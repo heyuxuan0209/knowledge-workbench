@@ -184,6 +184,27 @@ input, textarea { font-family: inherit; }
 }
 .wb-empty { margin-top: 32px; text-align: center; color: var(--faint); font-size: 12.5px; line-height: 1.8; }
 
+/* ===== 内容流程总览：只用全站 token/按钮/卡片，不引入独立视觉系统 ===== */
+.wb-overview { max-width: 1240px; margin: 0 auto; padding-top: 10px; }
+.wb-overview-kicker { color: var(--accent); font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; margin-bottom: 8px; }
+.wb-overview-rule { display: inline-flex; gap: 7px; margin-top: 14px; padding: 7px 11px; border: 1px solid var(--line10); border-radius: 999px; background: var(--surface); color: var(--sub); font-size: 11.5px; }
+.wb-overview-rule b { color: var(--accent); }.wb-overview-rule span { color: var(--faint); }
+.wb-overview-flow { display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 8px; margin-top: 24px; }
+.wb-overview-step { position: relative; min-height: 148px; padding: 14px 13px; border: 1px solid var(--line10); border-radius: 11px; background: var(--surface); text-align: left; color: var(--text); transition: .16s; }
+.wb-overview-step:hover { border-color: rgba(61,90,128,.35); transform: translateY(-2px); }
+.wb-overview-step.active { border-color: var(--accent); background: rgba(61,90,128,.06); box-shadow: 0 8px 22px rgba(33,31,26,.08); }
+.wb-overview-num { display: block; color: var(--amber); font-family: var(--mono); font-size: 10.5px; margin-bottom: 17px; }
+.wb-overview-step b { display: block; font-size: 13px; line-height: 1.35; }
+.wb-overview-step > span:not(.wb-overview-num) { display: block; margin-top: 7px; color: var(--sub2); font-size: 10.5px; line-height: 1.45; }
+.wb-overview-step em { position: absolute; left: 13px; bottom: 11px; color: var(--accent); font-size: 10px; font-style: normal; font-weight: 600; }
+.wb-overview-detail { display: grid; grid-template-columns: 1fr 230px; gap: 30px; margin-top: 16px; padding: 22px 24px; }
+.wb-overview-detail h2 { margin-top: 7px; font-family: var(--serif); font-size: 21px; }.wb-overview-detail p { margin-top: 7px; color: var(--sub); font-size: 13px; line-height: 1.65; }
+.wb-overview-jobs { display: grid; gap: 7px; margin-top: 15px; color: var(--body2); font-size: 12.5px; }.wb-overview-jobs div::before { content: '•'; color: var(--green); margin-right: 9px; }
+.wb-overview-enter { padding-left: 24px; border-left: 1px solid var(--line10); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
+.wb-overview-enter span { color: var(--sub2); font-size: 11px; }.wb-overview-enter strong { margin: 5px 0 20px; font-size: 15px; }
+@media (max-width: 1120px) { .wb-overview-flow { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 760px) { .wb-overview-flow { display: flex; overflow-x: auto; padding-bottom: 8px; }.wb-overview-step { min-width: 150px; }.wb-overview-detail { grid-template-columns: 1fr; }.wb-overview-enter { padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--line10); } }
+
 /* ===== Feed ===== */
 .wb-acquire {
   display: flex; gap: 10px; align-items: center;

@@ -22,6 +22,11 @@ SVC_USER="${KW_USER:-bot}"
 SERVICE="${KW_SERVICE:-kw-backend}"
 LOG="${KW_DEPLOY_LOG:-/home/bot/kw-deploy.log}"
 BASE_URL="http://127.0.0.1:3000"
+ENV_FILE="$REPO/backend/.env"
+ACCESS_USERNAME=$(grep -m1 '^ACCESS_USERNAME=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"'"'"'')
+ACCESS_PASSWORD=$(grep -m1 '^ACCESS_PASSWORD=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"'"'"'')
+CURL_AUTH=()
+[ -n "$ACCESS_USERNAME" ] && [ -n "$ACCESS_PASSWORD" ] && CURL_AUTH=(-u "$ACCESS_USERNAME:$ACCESS_PASSWORD")
 
 # 自我复制再执行：本脚本自己会被它执行的 git pull 改写，而 bash 是**边读边执行**的，
 # 文件中途变了会跳到错误的字节位置。所以先拷到 /tmp 跑副本。（真踩过这类坑的经典处）
@@ -63,9 +68,10 @@ $text"
 healthy() {
   local i
   for i in $(seq 1 12); do
-    if curl -sf -m 8 -o /dev/null "$BASE_URL/health" \
-       && curl -sf -m 8 -o /dev/null "$BASE_URL/" \
-       && curl -sf -m 15 -o /dev/null "$BASE_URL/api/studio/series-presets"; then
+    if curl -sf -m 8 -o /dev/null "$BASE_URL/health/live" \
+       && curl -sf -m 8 -o /dev/null "${CURL_AUTH[@]}" "$BASE_URL/health" \
+       && curl -sf -m 8 -o /dev/null "${CURL_AUTH[@]}" "$BASE_URL/" \
+       && curl -sf -m 15 -o /dev/null "${CURL_AUTH[@]}" "$BASE_URL/api/studio/series-presets"; then
       return 0
     fi
     sleep 3
@@ -77,6 +83,12 @@ log "=== 自动部署开始 ==="
 
 BEFORE=$(asbot "git -C '$REPO' rev-parse HEAD" 2>/dev/null)
 [ -z "$BEFORE" ] && { log "拿不到当前 commit，放弃"; exit 1; }
+
+# 不管本次有没有 schema 变更，部署前都先做 SQLite 一致性快照。
+# VACUUM INTO 读取运行中数据库的一致视图，不停服、不直接 cp 正在写的 db。
+log "备份生产 SQLite…"
+asbot "cd '$REPO/backend' && KW_BACKUP_DIR=/home/bot/backups/knowledge-workbench node scripts/backup-db.mjs" >> "$LOG" 2>&1 \
+  || { log "❌ SQLite 备份或完整性校验失败，部署中止"; notify "⚠️ KW 自动部署已中止：生产 SQLite 备份或完整性校验失败。\n\n线上仍运行旧版，没有执行 git pull 或重启。"; exit 1; }
 
 # ⚠️ 这里必须先看 pull 的退出码，不能只比对 HEAD 变没变：
 # 拉取失败时 HEAD 同样不变，会被"无新代码"那条分支吃掉，日志写一句风平浪静的
@@ -160,7 +172,7 @@ if [ -z "$FAILED" ]; then
     # 每次都"成功"、健康检查每次都 200，而端口上跑的是 22 小时前的代码。所以重启过就必须
     # 问一句：现在应答的这个进程，装的是哪个 commit？
     if [ "${RESTARTED:-}" = "1" ]; then
-      SERVING=$(curl -sf -m 8 "$BASE_URL/health" 2>/dev/null \
+      SERVING=$(curl -sf -m 8 "${CURL_AUTH[@]}" "$BASE_URL/health" 2>/dev/null \
         | python3 -c 'import sys,json;print(json.load(sys.stdin).get("commit") or "")' 2>/dev/null)
       if [ -n "$SERVING" ] && [ "$SERVING" != "$AFTER" ]; then
         # 不走回滚：代码本身没问题，问题是它压根没被加载。回滚只会让人以为是新代码的锅。

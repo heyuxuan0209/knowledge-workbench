@@ -8,6 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "init-db": "node src/db/init.js",
+    "test:security": "node --test src/middleware/production-security.test.js",
+    "backup:db": "node scripts/backup-db.mjs",
     "test:export-parsers": "node --test scripts/platform-export/parsers.test.mjs",
     "export:platforms": "node scripts/platform-export/run.mjs --force",
     "export:xhs": "node scripts/platform-export/xhs-export.mjs",

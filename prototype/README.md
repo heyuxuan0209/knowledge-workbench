@@ -6,6 +6,7 @@
 
 | 文件 | 主题 | 状态 |
 |---|---|---|
+| content-flow-overview.html | 七步内容流程总览：新手教程式导航，每步连回现有页面 | **已定 → ADR-108**：只做认知地图，不做管线运行中心；正式页面复用 KW 现有视觉 token |
 | x-video-cards-mock.html | X 英文视频 demo 的**标题卡 / 录屏画框 / 加速角标**配色选型，6 版（黑金·8-Bit Orbit·Raw Grid 深色变体·Neo-Grid Bold·Editorial Forest·现状对照），配色取自 `html-ppt-mocks/` 定稿模板 | **已定 → ADR-092**：选 B 黑金；渲染器 `cards_gold.py` 在 `~/Documents/项目/writing/published/2026-08-10-一键读取X上英文视频/` |
 | x-video-endcard-mock.html | X demo 片尾**第 7 张卡**：开源地址（watch-anything）+ 关注我（小红书/公众号/视频号/抖音二维码 + X @xuan70557），3 版布局 | **已定 → ADR-092**：完整版用 A（五宫格）／60 秒主推用 C（只留 GitHub + 公众号码）；二维码统一裁成纯码方图 |
 | x-video-vcover-mock.html | X demo 的**竖版封面**（视频号/抖音/小红书）3 版：A 大字压图 / B 上下对比 / C 一句话冲击。1080×1920，带 3:4 安全区与平台 UI 遮挡标尺（`#clean` 看净版） | **已定 → A 大字压图**（文案不提 X，只说「刷到的英文长视频」）；成品在创作工作区 `封面-竖版-1080x1920.png` / `封面-3比4-1080x1440.png` |

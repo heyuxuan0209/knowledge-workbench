@@ -4,7 +4,7 @@ import '../styles/tracking.css'
 import '../styles/feed-groups.css'
 import { api, streamEphemeralChat, sourceCapability } from '../components/wb/util'
 import {
-  IconFeed, IconNotes, IconTopics, IconStudio, IconSources, IconSettings,
+  IconFeed, IconNotes, IconTopics, IconStudio, IconSources, IconSettings, IconMap,
   IconChevronLeft, IconBulb,
 } from '../components/wb/Icons'
 import FeedView from '../components/wb/FeedView'
@@ -17,6 +17,7 @@ import StudioView from '../components/wb/StudioView'
 import ReportsView from '../components/wb/ReportsView'
 import SettingsView from '../components/wb/SettingsView'
 import RightPanel from '../components/wb/RightPanel'
+import OverviewView from '../components/wb/OverviewView'
 import { IdeaModal, PoolModal, ImportModal } from '../components/wb/Modals'
 
 // 知识工作台主壳（视觉规格：prototype/design_handoff_knowledge_workbench）。
@@ -25,6 +26,7 @@ import { IdeaModal, PoolModal, ImportModal } from '../components/wb/Modals'
 // 心智动线：看→存料(素材)→沉淀(主题)→要写什么(灵感)→写(创作)。
 
 const NAV_TOP = [
+  { key: 'overview', label: '流程总览', Icon: IconMap },
   { key: 'feed', label: '资讯', Icon: IconFeed },
   { key: 'notes', label: '素材', Icon: IconNotes },
   { key: 'topics', label: '主题', Icon: IconTopics },
@@ -37,7 +39,7 @@ const NAV_BOTTOM = [
 ]
 
 export default function WorkbenchPage() {
-  const [page, setPage] = useState('feed')
+  const [page, setPage] = useState(() => localStorage.getItem('wb-overview-seen') ? 'feed' : 'overview')
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [toast, setToast] = useState('')
@@ -233,6 +235,22 @@ export default function WorkbenchPage() {
   }
 
   useEffect(() => { loadContents(); loadBrief(); loadNotes(); loadSources(); loadTopics(); loadIdeas(); loadDrafts(); loadPlatforms() }, [loadContents, loadBrief, loadNotes, loadSources, loadTopics, loadIdeas, loadDrafts, loadPlatforms])
+
+  // 长期打开的工作台不应要求用户每天手动刷新浏览器。
+  // 这里只重读已入库数据，不触发昂贵的全量信源同步：
+  // · 回到标签页时刷一次；· 停留期间每 5 分钟刷一次。
+  useEffect(() => {
+    const refreshVisibleData = () => {
+      if (document.visibilityState !== 'visible') return
+      loadContents(); loadBrief(); loadNotes(); loadTopics(); loadIdeas(); loadDrafts()
+    }
+    const timer = window.setInterval(refreshVisibleData, 5 * 60 * 1000)
+    document.addEventListener('visibilitychange', refreshVisibleData)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshVisibleData)
+    }
+  }, [loadContents, loadBrief, loadNotes, loadTopics, loadIdeas, loadDrafts])
 
   // ---- 快速分析 ----
   const toggleSelect = (c) => {
@@ -483,7 +501,8 @@ export default function WorkbenchPage() {
   // 资讯页右栏：没选中内容时默认收起（UI 改造：空面板别白占 20% 屏），选中即自动展开。
   // 只作用于 feed（素材/主题页右栏有「问素材库/知识体系」入口，仍默认展开）。
   useEffect(() => {
-    if (page === 'feed') setRightCollapsed(selectedItems.length === 0)
+    if (page === 'overview') setRightCollapsed(true)
+    else if (page === 'feed') setRightCollapsed(selectedItems.length === 0)
   }, [page, selectedItems.length])
 
   // ---- 信源 ----
@@ -820,7 +839,7 @@ export default function WorkbenchPage() {
 
   // ---- 渲染 ----
   const navItem = (n) => (
-    <button key={n.key} className={`wb-nav-item${page === n.key ? ' active' : ''}`} onClick={() => { setPage(n.key); setModal(null); setReturnPage(null) }}>
+    <button key={n.key} className={`wb-nav-item${page === n.key ? ' active' : ''}`} onClick={() => { if (n.key !== 'overview') localStorage.setItem('wb-overview-seen', '1'); setPage(n.key); setModal(null); setReturnPage(null) }}>
       <span className="wb-nav-icon"><n.Icon /></span>
       <span className="wb-nav-label">{n.label}</span>
     </button>
@@ -861,6 +880,7 @@ export default function WorkbenchPage() {
 
         <main className="wb-main">
           <div className={`wb-main-inner${page === 'studio' ? ' studio-wide' : ((page === 'reports' || (page === 'topics' && topicView === 'page')) ? ' narrow' : '')}`} key={page + topicView}>
+            {page === 'overview' && <OverviewView setPage={setPage} setStudioTab={setStudioTab} />}
             {page === 'feed' && <FeedView {...pageProps} />}
             {page === 'notes' && <NotesView {...pageProps} />}
             {page === 'inspirations' && <InspirationsView {...pageProps} />}
