@@ -17,8 +17,8 @@
      - ExitOnForwardFailure：端口占用/转发建不起来时立刻退出，交给 KeepAlive 重来，不留半残进程。
      - 不能带 -f：-f 会让 ssh 自己 daemonize 后立即退出，launchd 会以为任务结束而反复重启。
 
-     注意：~/.ssh/config 里 vultr-paris 走 ProxyCommand（本地代理 127.0.0.1:7897）。
-     代理没起来时隧道连不上，launchd 会按 ThrottleInterval 每 30s 重试，等代理起来自动接上。 -->
+     日常通道走 Tailscale IP，不再借道 ~/.ssh/config 的法国代理。Tailscale 断开时 launchd
+     会按 ThrottleInterval 每 30s 重试；菜单栏恢复 Connected 后会自动接上。 -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.knowledge-workbench.tunnel</string>
@@ -27,12 +27,16 @@
     <string>/usr/bin/ssh</string>
     <string>-N</string>
     <string>-T</string>
+    <string>-o</string><string>ProxyCommand=none</string>
     <string>-o</string><string>ExitOnForwardFailure=yes</string>
+    <string>-o</string><string>ConnectTimeout=8</string>
+    <string>-o</string><string>ConnectionAttempts=5</string>
     <string>-o</string><string>ServerAliveInterval=30</string>
     <string>-o</string><string>ServerAliveCountMax=3</string>
     <string>-o</string><string>BatchMode=yes</string>
+    <string>-o</string><string>StrictHostKeyChecking=accept-new</string>
     <string>-L</string><string>3000:127.0.0.1:3000</string>
-    <string>vultr-paris</string>
+    <string>root@100.82.29.35</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>

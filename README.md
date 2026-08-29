@@ -3,9 +3,7 @@
 > 一个人做内容、为自己边做边搭的工作台，在这里公开记录它长大的过程。**欢迎 ⭐ star 关注、来交流想法。**
 > Reads what you read + your own hard-won experience → collide into judgment → write it → ship it → learn from the results.
 
-> 当前状态：产品主流程已可用，并已完成飞书 AI 黑客松期间的首次 HTTPS 公网部署。现有功能与比赛期间更新见 [CHANGELOG](./CHANGELOG.md)。
-
-**在线体验（建议使用 PC 端 Chrome）**：https://kw-vps.tailbf85a8.ts.net
+> 当前状态：产品主流程已可用，并已完成飞书 AI 黑客松期间的首次生产部署验证。公开实例默认关闭；产品效果见 Demo 视频，现有功能与比赛期间更新见 [CHANGELOG](./CHANGELOG.md)。
 
 ## 一条完整内容流程
 
@@ -20,11 +18,23 @@
 - **适配与发布**：将同一核心判断重组为公众号、小红书、抖音等平台的原生形态，最后发布由人确认。
 - **数据复盘**：自动回收已发布内容的表现，横向对比后反馈下一次选题。
 
-产品内已提供“流程总览”新手导航；早期 HTML Mock 保留在 [`prototype/mock-pages/content-flow-overview.html`](./prototype/mock-pages/content-flow-overview.html)。
+产品内已提供“流程总览”新手导航。
+
+## 飞书 AI 黑客松期间更新
+
+产品主体在比赛前已经存在。本期完成的更新均可从文件和 Git 历史核验：
+
+- **内容实验驾驶舱原型**（08-25）：[打开交互 HTML](./prototype/content-review-dashboard/index.html)，用于探索“证据 → 判断 → 下一轮实验”的复盘界面；尚未接入正式产品（`21d07b3`）。
+- **视频号指标修复**（08-27）：保留“在看”指标，避免导出解析时丢失（`5ad39c2`）。
+- **跨平台复盘口径修复**（08-28）：拒绝分母不同、不可直接比较的互动率，并增加自动化测试（`db8d456`）。
+- **七步流程总览**（08-28）：正式产品新增从发现信息到数据复盘的认知导航（`1f9e528`）。
+- **生产适配与首次部署验证**（08-28）：访问保护、CORS、安全响应头、健康检查、SQLite 一致性备份及 HTTPS 部署验证（`1f9e528`、`f3c040f`）。
+
+完整时间线见 [CHANGELOG](./CHANGELOG.md)，部署与回滚方法见 [DEPLOYMENT](./DEPLOYMENT.md)。
 
 ## 使用方式
 
-- **日常使用**：运行桌面 `KW-知识工作台.command`，优先走 `localhost:3000` SSH 隧道，失败时退回 Tailscale。
+- **日常使用**：保持 Mac 的 Tailscale 为 Connected，双击桌面 `KW-知识工作台.command`，通过 `localhost:3000` 的 Tailscale SSH 隧道访问 VPS 上的真实后端与数据库。
 - **前端开发**：`cd frontend && npm install && npm run dev`，打开 `http://localhost:5173`。
 - **后端开发**：参考 `backend/.env.example` 配置后，`cd backend && npm install && npm run dev`。Mac 本地 SQLite 是旧快照，不在 Mac 跑真实 ingest。
 - **生产部署**：见 [DEPLOYMENT.md](./DEPLOYMENT.md)，包含访问保护、健康检查、SQLite 备份、验收和回滚。

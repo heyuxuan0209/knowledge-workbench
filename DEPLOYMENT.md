@@ -1,10 +1,10 @@
 # 生产部署
 
-## 当前线上拓扑（2026-08-28）
+## 已验证的可选公网拓扑（2026-08-28）
 
 ```text
 公网浏览器
-  → HTTPS · Tailscale Funnel（kw-vps.tailbf85a8.ts.net）
+  → HTTPS · Tailscale Funnel（`https://<device>.<tailnet>.ts.net`）
   → Nginx Basic Auth（127.0.0.1:3443）
   → Express + frontend/dist（127.0.0.1:3000）
   → SQLite（VPS 唯一真相源）
@@ -14,7 +14,7 @@ tailnet 内部调用 / SSH 隧道
   → 同一 Express 服务
 ```
 
-公网不直接开放 3000，也不迁移 SQLite。公网 HTTPS 由 Tailscale Funnel 提供，VPS 自身的 443 仍供 SSH 使用；两者不争抢监听端口。Nginx 只监听本机 3443，公网认证不会打断飞书机器人和会议流程对内部 3000 的调用。
+该拓扑已完成国内外网络验证，但公开入口默认关闭，需要临时演示时才开启。公网不直接开放 3000，也不迁移 SQLite。公网 HTTPS 由 Tailscale Funnel 提供，VPS 自身的 443 仍供 SSH 使用；两者不争抢监听端口。Nginx 只监听本机 3443，公网认证不会打断飞书机器人和会议流程对内部 3000 的调用。
 
 ## 生产配置
 
@@ -25,7 +25,7 @@ NODE_ENV=production
 HOST=0.0.0.0
 PORT=3000
 ACCESS_PROTECTION_ENABLED=false
-ALLOWED_ORIGINS=https://kw-vps.tailbf85a8.ts.net,http://localhost:3000,http://127.0.0.1:3000,http://kw-vps:3000
+ALLOWED_ORIGINS=https://<device>.<tailnet>.ts.net,http://localhost:3000,http://127.0.0.1:3000,http://<tailnet-device>:3000
 DB_PATH=./data/app.db
 ```
 
@@ -36,6 +36,12 @@ Funnel 配置：
 ```bash
 tailscale funnel --bg http://127.0.0.1:3443
 tailscale funnel status
+```
+
+演示结束后关闭：
+
+```bash
+tailscale funnel --https=443 off
 ```
 
 ## 上线前硬检查
