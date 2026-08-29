@@ -25,11 +25,13 @@ NODE_ENV=production
 HOST=0.0.0.0
 PORT=3000
 ACCESS_PROTECTION_ENABLED=false
-ALLOWED_ORIGINS=https://<device>.<tailnet>.ts.net,http://localhost:3000,http://127.0.0.1:3000,http://<tailnet-device>:3000
+ALLOWED_ORIGINS=https://<device>.<tailnet>.ts.net,http://localhost:3000,http://127.0.0.1:3000,http://<tailnet-device>:3000,https://www.youtube.com,https://youtube.com,https://x.com,https://twitter.com,https://www.twitter.com
 DB_PATH=./data/app.db
 ```
 
 `ACCESS_PROTECTION_ENABLED=false` 是有意设计：公网认证由 Nginx 完成，避免破坏内部自动化。Nginx 的口令文件为 `/etc/nginx/kw.htpasswd`，权限必须保持 `root:www-data 0640`。`HOST=0.0.0.0` 用于保留 Tailscale 直连，但 UFW 必须继续把 3000 限定在 `tailscale0`，公网绝不允许直连。
+
+YouTube/X 来源仅用于仓库内“读懂”扩展从对应页面调用 `localhost:3000`；不要用通配符放行任意网站。修改白名单后必须实际发送 OPTIONS 预检，确认允许来源为 204、未知来源为 403。
 
 Funnel 配置：
 
