@@ -31,7 +31,26 @@ if [ "$CODE" = "200" ]; then
   open "$TUNNEL"
   exit 0
 fi
-echo "· 隧道不通（${TUNNEL} 返回 ${CODE:-无响应}），改走 tailnet…"
+echo "· 隧道不通（${TUNNEL} 返回 ${CODE:-无响应}），自动重启…"
+
+# Tailscale 经 DERP 中继偶尔会出现「ssh 进程和本地监听都还在，但转发请求一直挂住」。
+# launchd 的 KeepAlive 看不出这种半死状态；桌面入口在真实接口探测失败后主动 kickstart，
+# 最多等 10 秒恢复。这样浏览器扩展仍能坚持使用 localhost，不会静默退到不能发布的地址。
+TUNNEL_LABEL="gui/$(id -u)/com.knowledge-workbench.tunnel"
+if launchctl print "$TUNNEL_LABEL" >/dev/null 2>&1; then
+  launchctl kickstart -k "$TUNNEL_LABEL" >/dev/null 2>&1
+  for _ in 1 2 3 4 5; do
+    sleep 2
+    CODE=$(probe "$TUNNEL")
+    if [ "$CODE" = "200" ]; then
+      echo "✅ 隧道已自动恢复：${TUNNEL}（一键发布可用）"
+      open "$TUNNEL"
+      exit 0
+    fi
+  done
+fi
+
+echo "· 自动恢复失败，改走 tailnet…"
 
 CODE=$(probe "$TAILNET")
 if [ "$CODE" = "200" ]; then
