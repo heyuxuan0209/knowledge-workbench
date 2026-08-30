@@ -181,7 +181,9 @@ def parse_csv(path):
 # 顺序有意义：同一天同一篇会被后面的源覆盖，所以**越权威的放越后面**。
 # 公众号三个源互补：mp-*.xlsx 只有渠道分布（全号汇总），mp-engage 补点赞/在看/评论，
 # mp-detail 是逐篇权威口径（总阅读人数/总分享人数/阅读后关注/送达/完读率），放最后。
-PARSERS = [('xhs', 'xhs-*.xlsx', parse_xhs),
+# 小红书逐篇明细的规范名固定为 xhs-YYYYMMDD.xlsx。账号级汇总也可能是 xlsx，
+# 但工作表结构不同，不能被当成逐篇数据；用年份前缀收紧匹配，避免 xhs-account-* 误入。
+PARSERS = [('xhs', 'xhs-2*.xlsx', parse_xhs),
            ('公众号', 'mp-2*.xlsx', parse_mp),
            ('公众号', 'mp-engage-*.csv', parse_mp_engage),
            ('公众号', 'mp-detail*.xls', parse_mp_detail),
