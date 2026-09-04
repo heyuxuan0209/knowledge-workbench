@@ -42,8 +42,8 @@
 
 **产品不在本机跑。** 排障前先认清代码跑在哪台机器上——报错路径出现 `/home/bot/...` 就是服务器侧问题，别在 Mac 上查环境（已误判过一轮）。
 
-- **用户入口**：桌面双击 `KW-知识工作台.command`，脚本优先打开 `http://localhost:3000`（常驻 SSH 隧道 → VPS 真后端/真数据），隧道不通才退到 `http://kw-vps:3000`（Tailscale tailnet；VPS tailnet IP `100.82.29.35`）。MultiPost 扩展只允许 https/localhost/127.0.0.1 注入，所以 **一键发布只在 localhost 入口可用**；`kw-vps` 是能看能写但不能一键发布的退路。
-- **后端**：VPS `vultr-paris`（199.247.9.202，法国）systemd `kw-backend.service`，user=bot，repo `/home/bot/projects/knowledge-workbench`。**前端构建产物由它 `express.static` 托管**（`frontend/dist`，`existsSync` 守卫；回滚＝`rm -rf frontend/dist` + 重启）。
+- **用户入口**：桌面双击 `KW-知识工作台.command`，脚本优先打开 `http://localhost:3000`（常驻 SSH 隧道 → VPS 真后端/真数据），隧道不通才退到 `http://kw-vps:3000`（Tailscale tailnet；洛杉矶 VPS tailnet IP `100.114.12.120`）。MultiPost 扩展只允许 https/localhost/127.0.0.1 注入，所以 **一键发布只在 localhost 入口可用**；`kw-vps` 是能看能写但不能一键发布的退路。
+- **后端**：VPS `vultr-lax`（`104.207.154.248`，美国洛杉矶；兼容别名 `vultr-paris` 也指向现生产机）systemd `kw-backend.service`，user=bot，repo `/home/bot/projects/knowledge-workbench`。巴黎回滚机只允许通过 `vultr-paris-rollback` 访问，业务服务保持停用，禁止双端飞书长连接。**前端构建产物由生产 VPS 的 `express.static` 托管**（`frontend/dist`，`existsSync` 守卫；回滚＝`rm -rf frontend/dist` + 重启）。
 - **Mac 访问通道**：ssh 隧道 `localhost:3000`，Mac launchd `com.knowledge-workbench.tunnel` 常驻自动重连（plist 在 `backend/scripts/`）。它是日常主入口，不是 Mac 本地后端。
 - **公网零暴露**：ufw 只放 22/443 + `3000/tcp on tailscale0`。别为了图方便去开公网端口。
 - **本机 5173 的 vite dev 仅开发用**；桌面 `KW-本地开发.command` 会自动避让并恢复常驻隧道。
@@ -68,10 +68,10 @@
 **部署一次改动（用户说「部署一下 / 推吧」时照做）**：
 ```
 git push                                   # 先 fetch 查分叉！本仓多端在写，曾差点冲掉远端 7 个提交
-ssh vultr-paris 'sudo -u bot -H git -C /home/bot/projects/knowledge-workbench pull --ff-only'
+ssh vultr-lax 'sudo -u bot -H git -C /home/bot/projects/knowledge-workbench pull --ff-only'
 # 动了前端就必须 build，否则线上是旧包且【不会报错】：
-ssh vultr-paris 'cd /home/bot/projects/knowledge-workbench/frontend && sudo -u bot -H npm run build'
-ssh vultr-paris 'systemctl restart kw-backend'
+ssh vultr-lax 'cd /home/bot/projects/knowledge-workbench/frontend && sudo -u bot -H npm run build'
+ssh vultr-lax 'systemctl restart kw-backend'
 ```
 VPS 每天 07:00 有 root cron 跑 `backend/scripts/auto-deploy.sh`（ADR-085）：自动拉取→按改动 build/重启→三条自检→**不过就回滚上一版并飞书通知**。但**当天要生效仍需手动部署**（等到第二天太慢），且自检只发现"起不来"、发现不了"能跑但功能坏"，所以改完自己验。
 

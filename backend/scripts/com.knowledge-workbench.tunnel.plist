@@ -36,7 +36,7 @@
     <string>-o</string><string>BatchMode=yes</string>
     <string>-o</string><string>StrictHostKeyChecking=accept-new</string>
     <string>-L</string><string>3000:127.0.0.1:3000</string>
-    <string>root@100.82.29.35</string>
+    <string>root@100.114.12.120</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
