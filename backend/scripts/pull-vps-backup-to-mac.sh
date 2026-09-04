@@ -46,7 +46,8 @@ if [ ! -f "$DEST" ]; then
   LOCAL_SHA=$(/usr/bin/shasum -a 256 "$PART" | /usr/bin/cut -d' ' -f1)
   [ "$REMOTE_SHA" = "$LOCAL_SHA" ]
 
-  /bin/chmod 600 "$PART"
+  # 冷备份不参与任何服务运行，落盘后设为只读，降低被误改的风险。
+  /bin/chmod 400 "$PART"
   /bin/mv "$PART" "$DEST"
   PART=""
 fi
