@@ -44,7 +44,7 @@
 
 - **用户入口**：桌面双击 `KW-知识工作台.command`，脚本优先打开 `http://localhost:3000`（常驻 SSH 隧道 → VPS 真后端/真数据），隧道不通才退到 `http://kw-vps:3000`（Tailscale tailnet；洛杉矶 VPS tailnet IP `100.114.12.120`）。MultiPost 扩展只允许 https/localhost/127.0.0.1 注入，所以 **一键发布只在 localhost 入口可用**；`kw-vps` 是能看能写但不能一键发布的退路。
 - **后端**：VPS `vultr-lax`（`104.207.154.248`，美国洛杉矶；兼容别名 `vultr-paris` 也指向现生产机）systemd `kw-backend.service`，user=bot，repo `/home/bot/projects/knowledge-workbench`。巴黎回滚机只允许通过 `vultr-paris-rollback` 访问，业务服务保持停用，禁止双端飞书长连接。**前端构建产物由生产 VPS 的 `express.static` 托管**（`frontend/dist`，`existsSync` 守卫；回滚＝`rm -rf frontend/dist` + 重启）。
-- **Mac 访问通道**：ssh 隧道 `localhost:3000`，Mac launchd `com.knowledge-workbench.tunnel` 常驻自动重连（plist 在 `backend/scripts/`）。它是日常主入口，不是 Mac 本地后端。
+- **Mac 访问通道**：ssh 隧道 `localhost:3000`，Mac launchd `com.knowledge-workbench.tunnel` 常驻自动重连（plist 在 `backend/scripts/`）；当前经本机 `127.0.0.1:7897` 代理访问洛杉矶公网 SSH 443，不依赖 Mac Tailscale 客户端。它是日常主入口，不是 Mac 本地后端。
 - **公网零暴露**：ufw 只放 22/443 + `3000/tcp on tailscale0`。别为了图方便去开公网端口。
 - **本机 5173 的 vite dev 仅开发用**；桌面 `KW-本地开发.command` 会自动避让并恢复常驻隧道。
 

@@ -33,7 +33,7 @@ if [ "$CODE" = "200" ]; then
 fi
 echo "· 隧道不通（${TUNNEL} 返回 ${CODE:-无响应}），自动重启…"
 
-# Tailscale 经 DERP 中继偶尔会出现「ssh 进程和本地监听都还在，但转发请求一直挂住」。
+# 网络或本机代理切换时可能出现「ssh 进程和本地监听都还在，但转发请求一直挂住」。
 # launchd 的 KeepAlive 看不出这种半死状态；桌面入口在真实接口探测失败后主动 kickstart，
 # 最多等 10 秒恢复。这样浏览器扩展仍能坚持使用 localhost，不会静默退到不能发布的地址。
 TUNNEL_LABEL="gui/$(id -u)/com.knowledge-workbench.tunnel"
@@ -69,6 +69,7 @@ echo "隧道 ${TUNNEL} → ${CODE:-无响应}"
 echo "tailnet ${TAILNET} → $(probe "$TAILNET" || echo 无响应)"
 echo "隧道服务状态：$(launchctl list 2>/dev/null | grep knowledge-workbench.tunnel || echo '未加载')"
 echo "Tailscale：$(tailscale status 2>/dev/null | head -1 || echo '未安装或未运行')"
+echo "本机代理 7897：$(lsof -nP -iTCP:7897 -sTCP:LISTEN 2>/dev/null | tail -1 || echo '未监听')"
 echo "───────────────────────────────"
 echo ""
 read -p "按回车关闭…"
