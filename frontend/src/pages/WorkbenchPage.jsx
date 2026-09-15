@@ -556,7 +556,12 @@ export default function WorkbenchPage() {
       setReport(json.data)
       loadBrief()
       showToast('今日简报已生成')
-    } catch (err) { showToast(`生成失败：${err.message}`) } finally { setGenerating(false) }
+    } catch (err) {
+      const reason = /402|Insufficient Balance/i.test(err.message)
+        ? 'Deepseek API 余额不足；充值后再试，资讯采集仍正常'
+        : err.message
+      showToast(`生成失败：${reason}`)
+    } finally { setGenerating(false) }
   }
 
   // ---- 选题 ----

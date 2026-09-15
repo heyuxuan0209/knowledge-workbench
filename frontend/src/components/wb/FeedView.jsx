@@ -469,7 +469,7 @@ export default function FeedView({
             <IconChevronRight size={13} style={{ transform: briefOpen ? 'rotate(90deg)' : 'none', transition: 'transform .12s', flexShrink: 0 }} />
             今日概览 · {report ? formatDate(report.period_key) : dateLabel}
             {!briefOpen && report && <span style={{ fontSize: 11, color: 'var(--faint)', fontWeight: 400 }}>· 点开看必看/热点/选题</span>}
-            {staleReport && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--amber)', fontWeight: 500 }}>· 显示的是 {formatDate(report.period_key)} 的，点刷新出今天的</span>}
+            {staleReport && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--amber)', fontWeight: 500 }}>· 日报停在 {formatDate(report.period_key)}；资讯仍在更新，可展开重试</span>}
           </div>
           <div className="wb-brief-links">
             {report && briefOpen && (

@@ -2725,6 +2725,7 @@ app.listen(PORT, HOST, () => {
     try {
       const { ensureDailyReport } = await import('./services/report-generation.js');
       const r = await ensureDailyReport();
+      if (!r.success) throw new Error(r.error || '日报补跑未完成');
       console.log(r.skipped ? '[startup] 今日日报已存在，跳过补跑' : `[startup] 已补跑今日日报（${r.data?.period_key}）`);
     } catch (err) {
       console.error('[startup] 日报补跑失败:', err.message);
@@ -2778,6 +2779,7 @@ import('node-cron').then(({ default: cron }) => {
     try {
       const { ensureDailyReport } = await import('./services/report-generation.js');
       const r = await ensureDailyReport({ force: true });
+      if (!r.success) throw new Error(r.error || '日报生成未完成');
       console.log(`[cron] 日报已刷新（${r.data?.period_key}）`);
     } catch (err) {
       console.error('[cron] 日报生成失败:', err.message);
