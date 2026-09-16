@@ -4,6 +4,7 @@ dotenv.config(); // 在导入其他模块前加载环境变量
 import { parseMultipleFeeds, transformRSSItem } from './rss.js';
 import { translateText } from './translation.js';
 import { upsertContents } from '../db/contents.js';
+import { getDatabase } from '../db/init.js';
 import { pathToFileURL } from 'url';
 import { resolve } from 'path';
 
@@ -60,6 +61,42 @@ async function getConfiguredRSSFeeds() {
   return { feeds: [...feeds], sourceMap };
 }
 
+const MAX_NEW_CANDIDATES_PER_RUN = 60;
+const MAX_AUTO_TRANSLATED_RSS_ITEMS = 12;
+
+// RSS 每次都会返回同一批历史条目。LLM 只能处理库里没见过的 ID；否则 33 个 feed 的
+// 300-500 条旧内容会在每天每轮重复做相关性判断、标题翻译和摘要翻译。
+export function takeNewCandidates(items, existingIds, limit = MAX_NEW_CANDIDATES_PER_RUN) {
+  return items
+    .filter(item => !existingIds.has(item.content.id))
+    .sort((a, b) => String(b.content.published_at || b.content.created_at || '')
+      .localeCompare(String(a.content.published_at || a.content.created_at || '')))
+    .slice(0, limit);
+}
+
+function loadExistingIds(items) {
+  if (!items.length) return new Set();
+  const db = getDatabase();
+  const ids = items.map(item => item.content.id);
+  const rows = [];
+  // 留出 SQLite 绑定参数上限余量。
+  for (let i = 0; i < ids.length; i += 400) {
+    const part = ids.slice(i, i + 400);
+    rows.push(...db.prepare(`SELECT id FROM contents WHERE id IN (${part.map(() => '?').join(',')})`).all(...part));
+  }
+  db.close();
+  return new Set(rows.map(row => row.id));
+}
+
+function archiveRejected(items) {
+  if (!items.length) return;
+  const db = getDatabase();
+  const stmt = db.prepare('UPDATE contents SET archived = 1 WHERE id = ?');
+  const tx = db.transaction(rows => rows.forEach(item => stmt.run(item.content.id)));
+  tx(items);
+  db.close();
+}
+
 export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
   console.log('🔄 Starting RSS data sync...');
 
@@ -111,9 +148,16 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
         return src ? { content: t.content, sourceInfo: { displayName: src.displayName, platform: src.platform, handle: src.handle } } : t;
       } catch { return null; }
     }).filter(Boolean);
-    const kept = await filterRelevant(pretransformed.map(({ content }) => ({ id: content.id, title: content.en_title })));
-    const relevantItems = pretransformed.filter(({ content }) => kept.has(content.id));
-    console.log(`🧹 relevance filter: ${relevantItems.length}/${pretransformed.length} kept`);
+    const candidates = takeNewCandidates(pretransformed, loadExistingIds(pretransformed));
+    if (!candidates.length) {
+      console.log(`💸 RSS LLM 跳过：${pretransformed.length} 条均已处理过`);
+      return { success: true, count: 0, fetched: items.length, candidates: 0, feeds: feedsInfo.length };
+    }
+    console.log(`🆕 RSS 仅处理新候选：${candidates.length}/${pretransformed.length}（单轮上限 ${MAX_NEW_CANDIDATES_PER_RUN}）`);
+    const kept = await filterRelevant(candidates.map(({ content }) => ({ id: content.id, title: content.en_title })));
+    const relevantItems = candidates.filter(({ content }) => kept.has(content.id));
+    const rejectedItems = candidates.filter(({ content }) => !kept.has(content.id));
+    console.log(`🧹 relevance filter: ${relevantItems.length}/${candidates.length} kept`);
 
     // 翻译标题 + 摘要——限并发（2026-07-26 修：原来 Promise.all 把几百条一次性并发翻译，
     // 打爆代理/API → "Connection error" → 整批回退英文 → feed 全英文标题。改成每次最多 CONC 条）。
@@ -134,19 +178,27 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
       return { content, sourceInfo };
     };
     const CONC = 6;
-    const transformedItems = new Array(relevantItems.length);
+    // 自动加工只覆盖最新 12 条 RSS 候选；其余保留原标题/摘要，用户点精读时再按需翻译全文。
+    const autoTranslateItems = relevantItems.slice(0, MAX_AUTO_TRANSLATED_RSS_ITEMS);
+    const deferredItems = relevantItems.slice(MAX_AUTO_TRANSLATED_RSS_ITEMS);
+    const transformedItems = new Array(autoTranslateItems.length);
     let cursor = 0;
-    await Promise.all(Array.from({ length: Math.min(CONC, relevantItems.length) }, async () => {
-      while (cursor < relevantItems.length) { const i = cursor++; transformedItems[i] = await translateOne(relevantItems[i]); }
+    await Promise.all(Array.from({ length: Math.min(CONC, autoTranslateItems.length) }, async () => {
+      while (cursor < autoTranslateItems.length) { const i = cursor++; transformedItems[i] = await translateOne(autoTranslateItems[i]); }
     }));
 
     // 批量入库
-    const savedCount = upsertContents(transformedItems);
+    const savedCount = upsertContents([...transformedItems, ...deferredItems, ...rejectedItems]);
+    archiveRejected(rejectedItems);
 
     console.log('✅ RSS sync completed');
     return {
       success: true,
-      count: savedCount,
+      count: relevantItems.length,
+      processed: savedCount,
+      rejected: rejectedItems.length,
+      candidates: candidates.length,
+      autoTranslated: autoTranslateItems.length,
       feeds: feedsInfo.length,
       details: feedsInfo.map(f => `${f.title}: ${items.filter(i => i.feedUrl === f.feedUrl).length} items`)
     };

@@ -11,7 +11,7 @@ function extractJson(text) {
 
 // Feed 内容相关性过滤与摘要（2026-07-14 用户决策）：
 // - 保留口径：AI / 软件工程 / 科技产品与创业 相关；纯社会新闻、生活方式类不入库
-// - 一次 LLM 调用批量判断，控制成本（Deepseek，几十条标题一次 ≈ ¥0.001）
+// - 一次 LLM 调用批量判断，控制成本（Deepseek Flash，无思考模式）
 
 // items: [{ id, title }] → Set<id>（相关的 id 集合）。LLM 失败时保守放行全部（宁多勿漏）。
 //
@@ -36,7 +36,7 @@ export async function filterRelevant(items) {
 只输出 JSON（不要代码块）：{"results": [{"i": 0, "relevant": true}, {"i": 1, "relevant": false}, ...]}
 
 ${list}`,
-  }], 'deepseek', 'deepseek-v4-flash');
+  }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 5000, purpose: 'feed-relevance' });
 
   if (!result.success) {
     console.warn('⚠️ relevance filter LLM failed, keeping all:', result.error);
@@ -80,7 +80,7 @@ ${list}`;
   const map = new Map();
   // 一次重试：瞬时 API 失败/整段没解析出来，不该让整批条目静默丢摘要（漏摘要在同步侧会常驻 null）
   for (let attempt = 0; attempt < 2 && map.size === 0; attempt++) {
-    const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash');
+    const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 3000, purpose: 'feed-summary' });
     if (!result.success) continue;
     const arr = extractJson(result.content)?.summaries;
     if (!Array.isArray(arr)) continue;

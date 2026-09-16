@@ -2,7 +2,7 @@ import { getDatabase } from '../db/init.js';
 import { chat } from './llm.js';
 
 // 内容分类（VISION-V4 UI 改造 2b）：DeepSeek 批量把每条内容归到一个类别，缓存进 contents.category。
-// 文章与 GitHub 项目用不同类目（前端两个 Tab 分别出 chips）。成本≈几厘/批，只分类未分类的、不重算。
+// 文章与 GitHub 项目用不同类目（前端两个 Tab 分别出 chips）。只分类未分类的，不重算。
 
 export const ARTICLE_CATS = ['模型', '产品', '行业', '观点'];
 export const REPO_CATS = ['工具Agent', '模型', '应用', '基建'];
@@ -40,7 +40,7 @@ ${list}
 
 async function classifyGroup(items, cats, defs) {
   if (!items.length) return {};
-  const result = await chat([{ role: 'user', content: buildPrompt(items, cats, defs) }]);
+  const result = await chat([{ role: 'user', content: buildPrompt(items, cats, defs) }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'feed-classification' });
   if (!result.success) throw new Error(`分类 LLM 调用失败: ${result.error}`);
   let parsed;
   try {

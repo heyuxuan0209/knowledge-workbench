@@ -120,7 +120,8 @@ export async function generateDailyReport({ days = 7 } = {}) { // eslint-disable
 
   const verdicts = await fetchVerdicts();
   const prompt = buildPrompt(stories, registeredContents, verdicts);
-  const result = await chat([{ role: 'user', content: prompt }]);
+  // 日报只是从候选里筛 12 条所需的焦点/选题，不需要 Pro 的 high thinking。
+  const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 2500, purpose: 'daily-brief' });
 
   if (!result.success) {
     db.close();

@@ -2194,27 +2194,22 @@ async function syncAllChannels() {
       JSON.stringify({ at: new Date().toISOString() }));
   } catch (err) { console.error('[sync] 写入 last-sync 失败:', err.message); }
 
-  // 摘要兜底（P1 层1）：异步补齐"有正文没摘要"的条目（Anthropic/OpenAI 官网 RSS 常无 description
-  // → 列表只剩光杆标题）。fire-and-forget，不阻塞同步返回；cron 与手动同步都会触发。
-  import('./services/summary-backfill.js')
-    .then(m => m.backfillMissingSummaries({ limit: 10 }))
-    .then(r => r.summarized && console.log(`[sync] 摘要兜底：补 ${r.summarized}/${r.total} 条`))
-    .catch(err => console.error('[sync] 摘要兜底失败:', err.message));
+  // 不再自动抓正文补摘要：用户每天只看精选 12 条，全文翻译/摘要留到点开精读时按需发生。
 
   const total = (channels.aihot?.count || 0) + (channels.rss?.count || 0) + (channels.activeQuery?.inserted || 0);
   return { total, channels };
 }
 
 // 漏跑补偿（2026-07-16：launchd 常驻后，合盖睡眠时 cron 到点不触发——
-// 距上次同步超 12 小时就补跑一轮。启动 20s 后查一次 + 每小时兜底一次）
+// 每天只同步一次；距上次同步超 26 小时才补跑，避免正常的日间空档触发第二轮消费。
 async function catchUpSyncIfStale() {
   try {
     const { readFileSync } = await import('fs');
     const { fileURLToPath } = await import('url');
     const { at } = JSON.parse(readFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)), 'utf-8'));
-    if (Date.now() - new Date(at).getTime() < 12 * 3600 * 1000) return;
+    if (Date.now() - new Date(at).getTime() < 26 * 3600 * 1000) return;
   } catch { /* 无记录 → 视为过期 */ }
-  console.log('[cron] 距上次同步超过 12 小时（睡眠/关机漏跑），开始补偿同步…');
+  console.log('[cron] 距上次同步超过 26 小时（关机/故障漏跑），开始补偿同步…');
   try {
     const { total } = await syncAllChannels();
     console.log(`[cron] 补偿同步完成：+${total} 条`);
@@ -2745,12 +2740,12 @@ app.listen(PORT, HOST, () => {
     .catch(err => console.error('[startup] 飞书私信机器人启动异常:', err.message));
 });
 
-// 定时全渠道同步 + 日报生成：每天 08:10 / 20:10（2026-07-16 反馈 #2/#5 的共同根因：
+// 定时全渠道同步 + 日报生成：每天 08:10 一次。页面只呈现 12 条精选，无需把同一批源加工两遍。
 // 此前同步只在手动刷新时发生，AI HOT 翻页窗口有限，不刷新的日子内容永久错过——
 // DB 实证 7 天里只有 4 天有数据）。node-cron 随 backend 常驻（TCC 已授权、比睡眠的
 // launchd 可靠），同步完顺手生成当天日报，失败只记日志不中断服务。
 import('node-cron').then(({ default: cron }) => {
-  cron.schedule('10 8,20 * * *', async () => {
+  cron.schedule('10 8 * * *', async () => {
     console.log('[cron] scheduled sync-all start');
     try {
       const { total, channels } = await syncAllChannels();
@@ -2785,5 +2780,5 @@ import('node-cron').then(({ default: cron }) => {
       console.error('[cron] 日报生成失败:', err.message);
     }
   });
-  console.log('⏰ 定时同步+日报已注册：每天 08:10 / 20:10');
+  console.log('⏰ 定时同步+日报已注册：每天 08:10');
 }).catch(err => console.error('node-cron 加载失败（定时同步不可用）:', err.message));

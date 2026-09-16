@@ -29,6 +29,13 @@ function qwenClient() {
 }
 const QWEN_MODEL = process.env.QWEN_MODEL || 'qwen3.5-flash';
 
+export function deepseekControls(options = {}) {
+  return {
+    thinking: { type: options.thinking ? 'enabled' : 'disabled' },
+    ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+  };
+}
+
 // Deepseek 模型名（2026-07 改版：deepseek-chat 作废，官方只认 deepseek-v4-pro / deepseek-v4-flash）。
 // 默认走 v4-pro（质量优先，对齐内容北极星）；可用 DEEPSEEK_MODEL 覆盖（如批量任务省钱切 v4-flash）。
 export const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
@@ -51,7 +58,7 @@ function estimateTokens(text) {
 }
 
 // 流式聊天（SSE）
-export async function* streamChat(messages, provider = 'deepseek', model = null) {
+export async function* streamChat(messages, provider = 'deepseek', model = null, options = {}) {
   if (provider === 'deepseek') {
     const modelName = model || DEFAULT_MODEL;
 
@@ -59,7 +66,10 @@ export async function* streamChat(messages, provider = 'deepseek', model = null)
       const stream = await deepseekClient().chat.completions.create({
         model: modelName,
         messages: messages,
-        stream: true
+        stream: true,
+        // DeepSeek V4 默认开启 high thinking。现有调用大多是翻译/分类/摘要，
+        // 不显式关闭会为隐藏思考 token 付费；复杂任务需调用方明确 thinking:true。
+        ...deepseekControls(options)
       });
 
       let fullContent = '';
@@ -124,12 +134,17 @@ export async function chat(messages, provider = 'deepseek', model = null, option
         messages: messages,
         // qwen3.5 默认开思考模式(慢+多花输出钱),杂活一律关掉
         ...(isQwen ? { enable_thinking: false } : {}),
+        ...(!isQwen ? deepseekControls(options) : (options.maxTokens ? { max_tokens: options.maxTokens } : {})),
         ...(options.temperature !== undefined ? { temperature: options.temperature } : {})
       });
 
       const content = response.choices[0]?.message?.content || '';
       const tokens = response.usage?.total_tokens || estimateTokens(content);
       const cost = calculateCost(tokens, provider);
+
+      const usage = response.usage || {};
+      const reasoningTokens = usage.completion_tokens_details?.reasoning_tokens || 0;
+      console.log(`[llm-usage] purpose=${options.purpose || 'unspecified'} provider=${provider} model=${modelName} input=${usage.prompt_tokens || 0} output=${usage.completion_tokens || 0} reasoning=${reasoningTokens}`);
 
       return {
         success: true,

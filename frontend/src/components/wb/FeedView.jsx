@@ -474,7 +474,7 @@ export default function FeedView({
           <div className="wb-brief-links">
             {report && briefOpen && (
               <button className="wb-brief-link" disabled={generating} onClick={generateReport}
-                title="用最新同步的数据重新生成当天日报（Deepseek，约 ¥0.002）">
+                title="用最新同步的数据重新生成当天日报（Deepseek Flash，无思考模式）">
                 {generating ? '刷新中…' : '↻ 刷新'}
               </button>
             )}
@@ -592,7 +592,7 @@ export default function FeedView({
             <button className="wb-btn-primary" disabled={generating} onClick={generateReport}>
               {generating ? '生成中…' : '生成今日概览'}
             </button>
-            <span style={{ fontSize: 12, color: 'var(--sub2)' }}>基于聚类与你关注的信息源提炼焦点与选题（Deepseek，约 ¥0.002）</span>
+            <span style={{ fontSize: 12, color: 'var(--sub2)' }}>基于聚类与你关注的信息源提炼焦点与选题（Deepseek Flash，无思考模式）</span>
           </div>
         )}
         </>}
@@ -636,8 +636,8 @@ export default function FeedView({
           {lastSyncAt === undefined
             ? '同步状态加载中…'
             : lastSyncAt
-              ? <>上次同步 <b style={{ color: 'var(--sub2)', fontWeight: 600 }}>{syncAgo(lastSyncAt)}</b> · 每天 8:10 / 20:10 自动，离线超 12 小时自动补跑</>
-              : '尚未同步 · 每天 8:10 / 20:10 会自动同步，离线超 12 小时自动补跑'}
+              ? <>上次同步 <b style={{ color: 'var(--sub2)', fontWeight: 600 }}>{syncAgo(lastSyncAt)}</b> · 每天 8:10 自动，超过 26 小时未同步会补跑</>
+              : '尚未同步 · 每天 8:10 自动同步，超过 26 小时未同步会补跑'}
         </span>
         <button className="wb-brief-link" disabled={syncing} style={{ flexShrink: 0 }} onClick={syncAllSources}
           title="不用等，立即手动同步一次全部信源">{syncing ? '同步中…' : '手动同步'}</button>
