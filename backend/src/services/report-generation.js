@@ -106,7 +106,24 @@ ${verdicts.length ? verdicts.join('\n') : '（暂无）'}
 - 全部用中文`;
 }
 
-export async function generateDailyReport({ days = 7, background = false } = {}) { // eslint-disable-line no-unused-vars
+let activeDailyReport = null;
+
+// 同一进程内，启动补跑、08:10 定时和页面刷新可能同时抵达。共用同一个 Promise，
+// 避免在报告尚未落库的几十秒窗口内重复聚类、重复付费、再互相覆盖结果。
+export async function generateDailyReport(options = {}) {
+  if (activeDailyReport) {
+    console.log('[daily-report] 已有生成任务进行中，本次复用同一结果');
+    return activeDailyReport;
+  }
+  activeDailyReport = generateDailyReportOnce(options);
+  try {
+    return await activeDailyReport;
+  } finally {
+    activeDailyReport = null;
+  }
+}
+
+async function generateDailyReportOnce({ days = 7, background = false } = {}) { // eslint-disable-line no-unused-vars
   // 先重建聚类（bge-m3 事件簇，默认 30 天窗覆盖跨天事件 + 0.75 阈值）；首轮补嵌入稍慢、之后缓存
   // 自动日报只需为 12 条精选提供候选，向量聚类已足够；逐簇 LLM 复核曾额外触发约 37 次调用。
   await rebuildStories(30, { splitReview: !background });
