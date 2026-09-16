@@ -2758,7 +2758,7 @@ import('node-cron').then(({ default: cron }) => {
     // 同步后给新内容补分类（UI 改造 2b：资讯页 chips），只分未分类的、缓存不重算
     try {
       const { classifyUnclassified } = await import('./services/content-classify.js');
-      const c = await classifyUnclassified();
+      const c = await classifyUnclassified({ limit: 60 });
       console.log(`[cron] 内容分类：+${c.classified} 条`);
     } catch (err) {
       console.error('[cron] 内容分类失败:', err.message);

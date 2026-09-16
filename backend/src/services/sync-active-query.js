@@ -19,6 +19,7 @@ import { resolve } from 'path';
 // 定时（可选）：0 8,20 * * * cd <backend目录> && /usr/local/bin/node src/services/sync-active-query.js
 
 const PER_SOURCE_LIMIT = 5;
+const MAX_AUTO_PROCESSED_ITEMS = 12;
 
 function loadActiveQuerySources() {
   const db = getDatabase();
@@ -119,7 +120,7 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
   }
 
   // 翻译集合 = 缺标题的 + 刚增强出简介的（translateNewItems 内部按字段判空，不重复翻）
-  const translateSet = [...new Set([...toTranslate, ...toEnrich])];
+  const translateSet = [...new Set([...toTranslate, ...toEnrich])].slice(0, MAX_AUTO_PROCESSED_ITEMS);
   await translateNewItems(translateSet);
 
   // 新条目生成完整一句话摘要（2026-07-16 用户反馈：原始描述被硬截断当摘要，
@@ -127,7 +128,7 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
   if (newItems.length) {
     try {
       const { batchSummarize } = await import('./ai-relevance.js');
-      const summaries = await batchSummarize(newItems.map(i => ({
+      const summaries = await batchSummarize(newItems.slice(0, MAX_AUTO_PROCESSED_ITEMS).map(i => ({
         id: i.content.id,
         title: i.content.zh_title || i.content.en_title || '',
         excerpt: i.content.zh_summary || i.content.en_summary || '',
