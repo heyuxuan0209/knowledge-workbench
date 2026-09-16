@@ -65,7 +65,7 @@ function splitIntoChunks(text, maxLength) {
   return chunks;
 }
 
-async function translateChunk(text) {
+async function translateChunk(text, { background = false } = {}) {
   const glossaryHint = Object.entries(GLOSSARY)
     .map(([en, zh]) => `${en} -> ${zh}`)
     .join('\n');
@@ -84,10 +84,10 @@ ${text}
 译文：`;
 
   // 单次重试：翻译量大时（一次 RSS 同步几百条）偶发连接抖动，重试一次再抛
-  let result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'translation' });
+  let result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'translation', background });
   if (!result.success) {
     await new Promise(r => setTimeout(r, 800));
-    result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'translation-retry' });
+    result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'translation-retry', background });
   }
   if (!result.success) {
     throw new Error(`翻译失败: ${result.error}`);
@@ -95,13 +95,13 @@ ${text}
   return result.content.trim();
 }
 
-export async function translateText(text) {
+export async function translateText(text, { background = false } = {}) {
   if (!text || text.trim().length === 0) return '';
 
   const chunks = splitIntoChunks(text, MAX_CHUNK_LENGTH);
   const translated = [];
   for (const chunk of chunks) {
-    translated.push(await translateChunk(chunk));
+    translated.push(await translateChunk(chunk, { background }));
   }
   return translated.join('');
 }

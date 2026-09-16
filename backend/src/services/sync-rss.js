@@ -154,7 +154,7 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
       return { success: true, count: 0, fetched: items.length, candidates: 0, feeds: feedsInfo.length };
     }
     console.log(`🆕 RSS 仅处理新候选：${candidates.length}/${pretransformed.length}（单轮上限 ${MAX_NEW_CANDIDATES_PER_RUN}）`);
-    const kept = await filterRelevant(candidates.map(({ content }) => ({ id: content.id, title: content.en_title })));
+    const kept = await filterRelevant(candidates.map(({ content }) => ({ id: content.id, title: content.en_title })), { background: true });
     const relevantItems = candidates.filter(({ content }) => kept.has(content.id));
     const rejectedItems = candidates.filter(({ content }) => !kept.has(content.id));
     console.log(`🧹 relevance filter: ${relevantItems.length}/${candidates.length} kept`);
@@ -164,8 +164,8 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
     const translateOne = async ({ content, sourceInfo }) => {
       try {
         if (content.original_lang === 'en') {
-          content.zh_title = content.en_title ? await translateText(content.en_title) : null;
-          content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300)) : null;
+          content.zh_title = content.en_title ? await translateText(content.en_title, { background: true }) : null;
+          content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300), { background: true }) : null;
         } else {
           content.zh_title = content.en_title;
           content.zh_summary = content.en_summary;

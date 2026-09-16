@@ -13,10 +13,10 @@ import { resolve } from 'path';
 // 设计约束：
 // - 按源隔离失败：一个源/渠道挂了（上游接口失效、网络）不阻塞其余，结果里如实列出
 // - 只翻译"库里还没有"的新条目（B站中文内容零 LLM 成本；YouTube 标题/GitHub 简介才翻）
-// - 轻量低频：每源每次只拉最新 N 条，适合每日 1-2 次 crontab，不做高频轮询
+// - 轻量低频：每源每次只拉最新 N 条，适合每日一次，不做高频轮询
 //
 // 手动：cd backend && node src/services/sync-active-query.js
-// 定时（可选）：0 8,20 * * * cd <backend目录> && /usr/local/bin/node src/services/sync-active-query.js
+// 定时（可选）：0 8 * * * cd <backend目录> && /usr/local/bin/node src/services/sync-active-query.js
 
 const PER_SOURCE_LIMIT = 5;
 const MAX_AUTO_PROCESSED_ITEMS = 12;
@@ -65,11 +65,11 @@ async function translateNewItems(newItems) {
   for (const { content } of newItems) {
     try {
       if (content.en_title && !content.zh_title) {
-        content.zh_title = await translateText(content.en_title);
+        content.zh_title = await translateText(content.en_title, { background: true });
         content.has_translation = 1;
       }
       if (content.en_summary && !content.zh_summary) {
-        content.zh_summary = await translateText(content.en_summary);
+        content.zh_summary = await translateText(content.en_summary, { background: true });
       }
     } catch (err) {
       // 翻译失败不阻塞入库：en_title 仍可展示；下次同步会作为"待补翻译"重试
@@ -132,7 +132,7 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
         id: i.content.id,
         title: i.content.zh_title || i.content.en_title || '',
         excerpt: i.content.zh_summary || i.content.en_summary || '',
-      })));
+      })), { background: true });
       for (const i of newItems) {
         const s = summaries.get(i.content.id);
         if (s) i.content.zh_summary = s;

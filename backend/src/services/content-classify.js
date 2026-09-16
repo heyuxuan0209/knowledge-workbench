@@ -38,9 +38,9 @@ ${list}
 键是上面的编号，值是类别名，必须覆盖 1 到 ${items.length} 全部。`;
 }
 
-async function classifyGroup(items, cats, defs) {
+async function classifyGroup(items, cats, defs, { background = false } = {}) {
   if (!items.length) return {};
-  const result = await chat([{ role: 'user', content: buildPrompt(items, cats, defs) }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'feed-classification' });
+  const result = await chat([{ role: 'user', content: buildPrompt(items, cats, defs) }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'feed-classification', background });
   if (!result.success) throw new Error(`分类 LLM 调用失败: ${result.error}`);
   let parsed;
   try {
@@ -53,7 +53,7 @@ async function classifyGroup(items, cats, defs) {
 }
 
 // 给未分类的内容批量补类别（同步后调用 + 存量回填）。force=true 时全量重分类。
-export async function classifyUnclassified({ limit = 300, force = false } = {}) {
+export async function classifyUnclassified({ limit = 300, force = false, background = false } = {}) {
   const db = getDatabase();
   const rows = db.prepare(`
     SELECT id, COALESCE(zh_title, en_title) AS title, zh_summary AS summary, source_app
@@ -72,7 +72,7 @@ export async function classifyUnclassified({ limit = 300, force = false } = {}) 
   const BATCH = 20; // 一批 20 条，控制单次 prompt 长度
   for (const [group, cats, defs] of [[arts, ARTICLE_CATS, ARTICLE_DEFS], [repos, REPO_CATS, REPO_DEFS]]) {
     for (let i = 0; i < group.length; i += BATCH) {
-      try { Object.assign(map, await classifyGroup(group.slice(i, i + BATCH), cats, defs)); }
+      try { Object.assign(map, await classifyGroup(group.slice(i, i + BATCH), cats, defs, { background })); }
       catch (err) { console.error('[classify] 批失败:', err.message); }
     }
   }

@@ -24,7 +24,7 @@ export async function syncHackerNewsData(limit = 30) {
     }
 
     // 1. 相关性过滤
-    const kept = await filterRelevant(stories.map(s => ({ id: s.id, title: s.title })));
+    const kept = await filterRelevant(stories.map(s => ({ id: s.id, title: s.title })), { background: true });
     const relevant = stories.filter(s => kept.has(s.id));
     console.log(`🧹 relevance filter: ${relevant.length}/${stories.length} kept`);
     if (relevant.length === 0) return { success: true, count: 0 };
@@ -34,14 +34,15 @@ export async function syncHackerNewsData(limit = 30) {
       relevant.map(s => s.url ? fetchFirstParagraph(s.url) : Promise.resolve(s.text?.replace(/<[^>]+>/g, '').slice(0, 800) || null))
     );
     const summaries = await batchSummarize(
-      relevant.map((s, i) => ({ id: s.id, title: s.title, excerpt: excerpts[i] }))
+      relevant.map((s, i) => ({ id: s.id, title: s.title, excerpt: excerpts[i] })),
+      { background: true },
     );
 
     // 3. 翻译标题 + 组装
     const transformedItems = await Promise.all(
       relevant.map(async (story) => {
         const { content, sourceInfo } = transformHNItem(story);
-        content.zh_title = await translateText(content.en_title);
+        content.zh_title = await translateText(content.en_title, { background: true });
         content.zh_summary = summaries.get(story.id) || null;
         return { content, sourceInfo };
       })

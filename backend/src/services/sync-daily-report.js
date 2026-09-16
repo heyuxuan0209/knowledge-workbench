@@ -11,7 +11,7 @@ import { resolve } from 'path';
 // 注意：每次运行调用一次 Deepseek（约 3-6k tokens，¥0.005 级别）。
 
 if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  generateDailyReport().then(result => {
+  generateDailyReport({ background: true }).then(result => {
     if (result.success) {
       const r = result.data;
       console.log(`\n📰 ${r.period_key} 日报`);

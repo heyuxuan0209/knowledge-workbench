@@ -18,7 +18,7 @@ function extractJson(text) {
 // ⚠️ 配对铁律（2026-07-23 title/summary 错位 bug 定位）：批处理结果**必须靠 LLM 回带的序号 i
 // 显式绑定**，绝不靠数组下标位置对齐。旧实现用 flags[i]/arr[i] 按位置 zip 回来，一旦 LLM
 // 漏一条/合并/重排，后面全体错位一格 → 相邻条目张冠李戴（实证：Bilibili/X 相邻两条互串摘要）。
-export async function filterRelevant(items) {
+export async function filterRelevant(items, { background = false } = {}) {
   if (!items.length) return new Set();
 
   const list = items.map((it, i) => `${i}. ${it.title}`).join('\n');
@@ -36,7 +36,7 @@ export async function filterRelevant(items) {
 只输出 JSON（不要代码块）：{"results": [{"i": 0, "relevant": true}, {"i": 1, "relevant": false}, ...]}
 
 ${list}`,
-  }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 5000, purpose: 'feed-relevance' });
+  }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 5000, purpose: 'feed-relevance', background });
 
   if (!result.success) {
     console.warn('⚠️ relevance filter LLM failed, keeping all:', result.error);
@@ -62,7 +62,7 @@ ${list}`,
 // 批量生成一句话中文摘要。items: [{ id, title, excerpt }] → Map<id, summary>
 // excerpt 为原文首段（可为空，为空则基于标题保守概括并注明）
 // 配对靠 LLM 回带的序号 i 显式绑定（见 filterRelevant 上方铁律），漏判的条目不给摘要、绝不错位。
-export async function batchSummarize(items) {
+export async function batchSummarize(items, { background = false } = {}) {
   if (!items.length) return new Map();
 
   const list = items.map((it, i) =>
@@ -80,7 +80,7 @@ ${list}`;
   const map = new Map();
   // 一次重试：瞬时 API 失败/整段没解析出来，不该让整批条目静默丢摘要（漏摘要在同步侧会常驻 null）
   for (let attempt = 0; attempt < 2 && map.size === 0; attempt++) {
-    const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 3000, purpose: 'feed-summary' });
+    const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 3000, purpose: 'feed-summary', background });
     if (!result.success) continue;
     const arr = extractJson(result.content)?.summaries;
     if (!Array.isArray(arr)) continue;

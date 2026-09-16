@@ -106,9 +106,10 @@ ${verdicts.length ? verdicts.join('\n') : '（暂无）'}
 - 全部用中文`;
 }
 
-export async function generateDailyReport({ days = 7 } = {}) { // eslint-disable-line no-unused-vars
+export async function generateDailyReport({ days = 7, background = false } = {}) { // eslint-disable-line no-unused-vars
   // 先重建聚类（bge-m3 事件簇，默认 30 天窗覆盖跨天事件 + 0.75 阈值）；首轮补嵌入稍慢、之后缓存
-  await rebuildStories();
+  // 自动日报只需为 12 条精选提供候选，向量聚类已足够；逐簇 LLM 复核曾额外触发约 37 次调用。
+  await rebuildStories(30, { splitReview: !background });
 
   const db = getDatabase();
   const { stories, registeredContents } = gatherInputs(db);
@@ -121,7 +122,7 @@ export async function generateDailyReport({ days = 7 } = {}) { // eslint-disable
   const verdicts = await fetchVerdicts();
   const prompt = buildPrompt(stories, registeredContents, verdicts);
   // 日报只是从候选里筛 12 条所需的焦点/选题，不需要 Pro 的 high thinking。
-  const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 2500, purpose: 'daily-brief' });
+  const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 2500, purpose: 'daily-brief', background });
 
   if (!result.success) {
     db.close();
@@ -281,7 +282,7 @@ export function getLatestReport(periodType = 'daily') {
 // 补跑守卫（2026-07-18 修 Bug1：launchd 凌晨 2:30 跑，笔记本睡着没补上 → 当天无新日报 →
 // 页面退回显示昨天的报告）。由 backend 常驻进程（TCC 已授权、比睡眠的 launchd 可靠）在
 // 启动时与每日定时里调用：今天已有报告就跳过（省 LLM 成本），缺了才生成。force 供手动刷新。
-export async function ensureDailyReport({ force = false } = {}) {
+export async function ensureDailyReport({ force = false, background = false } = {}) {
   const key = todayKey();
   if (!force) {
     const latest = getLatestReport('daily');
@@ -289,7 +290,7 @@ export async function ensureDailyReport({ force = false } = {}) {
       return { success: true, skipped: true, reason: 'already-fresh', data: latest };
     }
   }
-  return generateDailyReport();
+  return generateDailyReport({ background });
 }
 
 // 从选题移除一条支撑素材（2026-07-16 反馈：AI 聚合的选题，用户可移走不合适的文章）

@@ -2292,7 +2292,7 @@ app.post('/api/feed/visit', async (req, res) => {
 });
 
 // 同步状态（P0-7 可感知性）：暴露上次同步时间，让资讯页显示"上次同步 x 小时前 · 自动"。
-// 自动同步能力早已在（cron 8:10/20:10 + 离线超 12h 补跑 + 每小时兜底），此前 UI 上一个字都没提。
+// 自动同步能力早已在（每天 8:10 + 离线超 26h 补跑 + 每小时检查），此前 UI 上一个字都没提。
 app.get('/api/sync-status', async (req, res) => {
   try {
     const { readFileSync } = await import('fs');
@@ -2719,7 +2719,7 @@ app.listen(PORT, HOST, () => {
   setTimeout(async () => {
     try {
       const { ensureDailyReport } = await import('./services/report-generation.js');
-      const r = await ensureDailyReport();
+      const r = await ensureDailyReport({ background: true });
       if (!r.success) throw new Error(r.error || '日报补跑未完成');
       console.log(r.skipped ? '[startup] 今日日报已存在，跳过补跑' : `[startup] 已补跑今日日报（${r.data?.period_key}）`);
     } catch (err) {
@@ -2758,7 +2758,7 @@ import('node-cron').then(({ default: cron }) => {
     // 同步后给新内容补分类（UI 改造 2b：资讯页 chips），只分未分类的、缓存不重算
     try {
       const { classifyUnclassified } = await import('./services/content-classify.js');
-      const c = await classifyUnclassified({ limit: 60 });
+      const c = await classifyUnclassified({ limit: 60, background: true });
       console.log(`[cron] 内容分类：+${c.classified} 条`);
     } catch (err) {
       console.error('[cron] 内容分类失败:', err.message);
@@ -2773,7 +2773,7 @@ import('node-cron').then(({ default: cron }) => {
     // 同步后生成/刷新当天日报（force：拿到最新同步的数据重出一份）
     try {
       const { ensureDailyReport } = await import('./services/report-generation.js');
-      const r = await ensureDailyReport({ force: true });
+      const r = await ensureDailyReport({ force: true, background: true });
       if (!r.success) throw new Error(r.error || '日报生成未完成');
       console.log(`[cron] 日报已刷新（${r.data?.period_key}）`);
     } catch (err) {

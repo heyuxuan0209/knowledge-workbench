@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { getDatabase } from '../db/init.js';
 
 // Deepseek API 配置（兼容 OpenAI SDK）。
 // 惰性初始化：ESM import 提升会让模块级 new OpenAI() 先于 CLI 脚本的 dotenv.config()
@@ -39,6 +40,37 @@ export function deepseekControls(options = {}) {
 // Deepseek 模型名（2026-07 改版：deepseek-chat 作废，官方只认 deepseek-v4-pro / deepseek-v4-flash）。
 // 默认走 v4-pro（质量优先，对齐内容北极星）；可用 DEEPSEEK_MODEL 覆盖（如批量任务省钱切 v4-flash）。
 export const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
+
+// 后台任务的最后一道成本保险。单项同步即使将来被改坏、或新增了隐藏 LLM 循环，
+// 也只能消耗当天这点调用额度；交互式精读/写稿不计入，避免影响用户主动使用。
+export const BACKGROUND_DAILY_CALL_LIMIT = Math.max(1, Number.parseInt(process.env.KW_BACKGROUND_LLM_DAILY_CALL_LIMIT || '100', 10) || 100);
+
+export function reserveBackgroundCall(provider, options = {}, {
+  openDatabase = getDatabase,
+  day = new Date().toISOString().slice(0, 10),
+  limit = BACKGROUND_DAILY_CALL_LIMIT,
+} = {}) {
+  if (!options.background || provider !== 'deepseek') return;
+  const key = `llm_background_calls:${day}`;
+  const db = openDatabase();
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    const used = Number.parseInt(db.prepare('SELECT value FROM app_meta WHERE key = ?').get(key)?.value || '0', 10) || 0;
+    if (used >= limit) {
+      db.exec('ROLLBACK');
+      throw new Error(`后台 LLM 当日调用已达上限 ${limit}，已自动熔断`);
+    }
+    db.prepare("INSERT OR REPLACE INTO app_meta(key, value, updated_at) VALUES(?, ?, datetime('now'))")
+      .run(key, String(used + 1));
+    db.exec('COMMIT');
+    return used + 1;
+  } catch (error) {
+    try { db.exec('ROLLBACK'); } catch { /* transaction may already be closed */ }
+    throw error;
+  } finally {
+    db.close();
+  }
+}
 
 // Claude API 配置（备选）
 // TODO: 后续实现 Anthropic SDK
@@ -129,6 +161,7 @@ export async function chat(messages, provider = 'deepseek', model = null, option
     const modelName = model || (isQwen ? QWEN_MODEL : DEFAULT_MODEL);
 
     try {
+      reserveBackgroundCall(provider, options);
       const response = await client.chat.completions.create({
         model: modelName,
         messages: messages,

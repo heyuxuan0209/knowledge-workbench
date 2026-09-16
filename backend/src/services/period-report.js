@@ -189,7 +189,7 @@ ${contentsBlock}
 - id 必须来自方括号里的真实 id，不得编造；全部用中文`;
 }
 
-export async function generatePeriodReport(periodType = 'weekly') {
+export async function generatePeriodReport(periodType = 'weekly', { background = false } = {}) {
   if (!['weekly', 'monthly'].includes(periodType)) {
     throw new Error(`invalid periodType: ${periodType}（日报走 generateDailyReport）`);
   }
@@ -205,7 +205,12 @@ export async function generatePeriodReport(periodType = 'weekly') {
   }
 
   // temperature 0：同样的数据重新生成应得到基本相同的报告（2026-07-16 反馈 #1）
-  const result = await chat([{ role: 'user', content: buildPrompt(periodLabel, inputs) }], 'deepseek', null, { temperature: 0 });
+  const result = await chat([{ role: 'user', content: buildPrompt(periodLabel, inputs) }], 'deepseek', background ? 'deepseek-v4-flash' : null, {
+    temperature: 0,
+    maxTokens: 3500,
+    purpose: `${periodType}-brief`,
+    background,
+  });
   if (!result.success) { db.close(); return { success: false, error: `LLM 调用失败: ${result.error}` }; }
 
   let parsed;

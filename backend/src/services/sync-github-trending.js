@@ -51,7 +51,7 @@ export async function syncGitHubTrending(since = 'daily', limit = 8) {
 items 与序号一一对应。
 
 ${list}`,
-  }]);
+  }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 2500, purpose: 'github-trending', background: true });
 
   let parsed = { items: [], trend: null };
   if (result.success) {

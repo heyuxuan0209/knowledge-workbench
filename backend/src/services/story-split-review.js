@@ -31,7 +31,11 @@ export async function splitReviewCluster(members) {
 
 ${list}`;
 
-  const result = await chat([{ role: 'user', content: prompt }], 'deepseek', null, { temperature: 0 });
+  const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', {
+    temperature: 0,
+    maxTokens: 1200,
+    purpose: 'story-split-review',
+  });
   const fallback = [members.map((_, i) => i)];
   if (!result.success) return fallback;
   try {

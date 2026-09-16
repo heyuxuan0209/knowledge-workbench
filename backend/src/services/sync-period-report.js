@@ -14,7 +14,7 @@ import { resolve } from 'path';
 
 if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const periodType = process.argv[2] === 'monthly' ? 'monthly' : 'weekly';
-  generatePeriodReport(periodType).then(result => {
+  generatePeriodReport(periodType, { background: true }).then(result => {
     if (result.success) {
       const r = result.data;
       console.log(`\n📰 ${r.period_key} ${periodType === 'weekly' ? '周报' : '月报'}`);
