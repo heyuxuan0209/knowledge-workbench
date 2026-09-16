@@ -1000,11 +1000,11 @@ app.post('/api/studio/typeset', async (req, res) => {
 
 // ========== M2 洞察层：日报与选题（ADR-008） ==========
 
-// 生成今日日报（调用 Deepseek，一次约 ¥0.005；同日重跑覆盖旧报告）
+// 生成今日日报；页面手动刷新也按低成本后台路径执行，避免逐故事簇 LLM 复核。
 app.post('/api/reports/generate', async (req, res) => {
   try {
     const { generateDailyReport } = await import('./services/report-generation.js');
-    const result = await generateDailyReport();
+    const result = await generateDailyReport({ background: true });
     res.status(result.success ? 200 : 422).json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
