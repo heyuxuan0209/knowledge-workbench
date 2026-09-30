@@ -1,4 +1,5 @@
 import { getDatabase } from '../db/init.js';
+import { presentCuratedCandidate, rankCuratedCandidates } from './curation-policy.js';
 
 // 精选（第三刀·「全部」视图顶部）：从干净池子（archived=0）按**可解释信号**挑主条。
 // 哲学（同 must-read）：不做自动学习/负优化，只用透明信号排序 + 用户显式 mute 过滤。每条带「为什么入选」。
@@ -9,14 +10,6 @@ function readMutes(db) {
   try { const m = JSON.parse(r?.value || '{}'); return { sources: new Set(m.sources || []), contents: new Set(m.contents || []), categories: new Set(m.categories || []) }; }
   catch { return { sources: new Set(), contents: new Set(), categories: new Set() }; }
 }
-const isOff = t => t === 'T1' || t === 'T1.5';
-function freshness(created) {
-  const t = new Date(/[zZ+]/.test(created || '') ? created : (created || '').replace(' ', 'T') + 'Z').getTime();
-  if (!t) return 0;
-  const days = (Date.now() - t) / 864e5;
-  if (days < 2) return 18; if (days < 5) return 12; if (days < 10) return 6; return 0;
-}
-
 // 精选打分：多源同报 > 官方一手 / 你登记的源，叠加新鲜度。信号可解释、可在返回的 why 里看到。
 export function getCurated(limit = 12) {
   const db = getDatabase();
@@ -34,34 +27,7 @@ export function getCurated(limit = 12) {
   `).all();
   db.close();
 
-  const scored = [];
-  for (const c of rows) {
-    if (mutes.contents.has(c.id)) continue;
-    if (c.source_id && mutes.sources.has(c.source_id)) continue;
-    if (c.category && mutes.categories.has(c.category)) continue;
-    let score = freshness(c.created_at), why = 'AI 精选';
-    if (c.sc && c.sc > 1) { score += 28 + c.sc * 2; why = `${c.sc} 源同报 · 今日热点`; }
-    else if (isOff(c.tier)) { score += 18; why = '官方一手'; }
-    if (c.reg) { score += 22; if (!(c.sc > 1)) why = '你关注的一手源新作'; }
-    scored.push({ c, score, why });
-  }
-  scored.sort((a, b) => b.score - a.score);
-
-  // 每源最多 1 条：精选要多样，不能被单个源刷屏（否则成了"某人专场"）
-  const top = [], seenSrc = new Set();
-  for (const it of scored) {
-    const k = it.c.source_id || it.c.src || it.c.id;
-    if (seenSrc.has(k)) continue;
-    seenSrc.add(k); top.push(it);
-    if (top.length >= limit) break;
-  }
-
-  return top.map(({ c, why }) => ({
-    id: c.id, title: c.title, summary: (c.summ || '').slice(0, 220), src: c.src || 'AI HOT',
-    sourceId: c.source_id, category: c.category, url: c.url, permalink: c.permalink, why,
-    badge: c.sc > 1 ? { t: `${c.sc} 源同报`, cls: 'cl' } : (isOff(c.tier) ? { t: '官方一手', cls: 'of' } : (c.reg ? { t: '你登记的源', cls: 'rg' } : null)),
-    pub: (c.published_at || c.created_at || '').slice(0, 10),
-  }));
+  return rankCuratedCandidates(rows, { limit, mutes }).map(presentCuratedCandidate);
 }
 
 // 需求3·「N 源同报」可点看是哪些源：给 content_id（事件簇主条）→ 返回该事件全部成员（源+标题+链接）。

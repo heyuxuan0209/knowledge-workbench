@@ -1,0 +1,93 @@
+const isOfficial = tier => tier === 'T1' || tier === 'T1.5';
+
+export function sourceKey(candidate) {
+  return candidate.source_id || candidate.src || candidate.id;
+}
+
+export function freshnessScore(created, now = Date.now()) {
+  const normalized = /[zZ+]/.test(created || '')
+    ? created
+    : (created || '').replace(' ', 'T') + 'Z';
+  const timestamp = new Date(normalized).getTime();
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return 0;
+  const days = (now - timestamp) / 864e5;
+  if (days < 2) return 18;
+  if (days < 5) return 12;
+  if (days < 10) return 6;
+  return 0;
+}
+
+function normalizeMutes(mutes = {}) {
+  const asSet = value => value instanceof Set ? value : new Set(value || []);
+  return {
+    sources: asSet(mutes.sources),
+    contents: asSet(mutes.contents),
+    categories: asSet(mutes.categories),
+  };
+}
+
+export function explainCandidate(candidate, { now = Date.now() } = {}) {
+  let score = freshnessScore(candidate.created_at, now);
+  let why = 'AI 精选';
+  if (candidate.sc && candidate.sc > 1) {
+    score += 28 + candidate.sc * 2;
+    why = `${candidate.sc} 源同报 · 今日热点`;
+  } else if (isOfficial(candidate.tier)) {
+    score += 18;
+    why = '官方一手';
+  }
+  if (candidate.reg) {
+    score += 22;
+    if (!(candidate.sc > 1)) why = '你关注的一手源新作';
+  }
+  return { candidate, score, why };
+}
+
+// 线上精选与离线评测共用这一份透明策略，避免“评测一套、生产一套”。
+export function rankCuratedCandidates(rows, {
+  limit = 12,
+  mutes = {},
+  now = Date.now(),
+} = {}) {
+  const normalizedMutes = normalizeMutes(mutes);
+  const scored = [];
+  for (const candidate of rows) {
+    if (normalizedMutes.contents.has(candidate.id)) continue;
+    if (candidate.source_id && normalizedMutes.sources.has(candidate.source_id)) continue;
+    if (candidate.category && normalizedMutes.categories.has(candidate.category)) continue;
+    scored.push(explainCandidate(candidate, { now }));
+  }
+  // Node 的 Array#sort 是稳定排序；同分时保留 SQL 的 created_at 倒序。
+  scored.sort((a, b) => b.score - a.score);
+
+  const selected = [];
+  const seenSources = new Set();
+  for (const item of scored) {
+    const key = sourceKey(item.candidate);
+    if (seenSources.has(key)) continue;
+    seenSources.add(key);
+    selected.push(item);
+    if (selected.length >= limit) break;
+  }
+  return selected;
+}
+
+export function presentCuratedCandidate({ candidate: c, why }) {
+  return {
+    id: c.id,
+    title: c.title,
+    summary: (c.summ || '').slice(0, 220),
+    src: c.src || 'AI HOT',
+    sourceId: c.source_id,
+    category: c.category,
+    url: c.url,
+    permalink: c.permalink,
+    why,
+    badge: c.sc > 1
+      ? { t: `${c.sc} 源同报`, cls: 'cl' }
+      : (isOfficial(c.tier)
+          ? { t: '官方一手', cls: 'of' }
+          : (c.reg ? { t: '你登记的源', cls: 'rg' } : null)),
+    pub: (c.published_at || c.created_at || '').slice(0, 10),
+  };
+}

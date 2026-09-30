@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { freshnessScore, rankCuratedCandidates } from './curation-policy.js';
+
+const NOW = new Date('2026-09-29T12:00:00Z').getTime();
+
+test('freshnessScore 使用固定时间锚点并兼容 SQLite 时间', () => {
+  assert.equal(freshnessScore('2026-09-29 00:00:00', NOW), 18);
+  assert.equal(freshnessScore('2026-09-25T12:00:01Z', NOW), 12);
+  assert.equal(freshnessScore('2026-09-20T12:00:01Z', NOW), 6);
+  assert.equal(freshnessScore('not-a-date', NOW), 0);
+});
+
+test('透明信号排序、理由和每源一条规则保持不变', () => {
+  const rows = [
+    { id: 'multi', source_id: 's1', created_at: '2026-09-20T12:00:01Z', sc: 3 },
+    { id: 'same-source', source_id: 's1', created_at: '2026-09-29T00:00:00Z', reg: 1 },
+    { id: 'registered', source_id: 's2', created_at: '2026-09-29T00:00:00Z', reg: 1 },
+    { id: 'official', source_id: 's3', created_at: '2026-09-29T00:00:00Z', tier: 'T1' },
+  ];
+  const ranked = rankCuratedCandidates(rows, { limit: 3, now: NOW });
+  assert.deepEqual(ranked.map(item => item.candidate.id), ['multi', 'registered', 'official']);
+  assert.deepEqual(ranked.map(item => item.score), [40, 40, 36]);
+  assert.deepEqual(ranked.map(item => item.why), ['3 源同报 · 今日热点', '你关注的一手源新作', '官方一手']);
+});
+
+test('显式 mute 在排序前过滤且可接受数组或 Set', () => {
+  const rows = [
+    { id: 'a', source_id: 's1', category: '模型', created_at: '2026-09-29T00:00:00Z' },
+    { id: 'b', source_id: 's2', category: '产品', created_at: '2026-09-29T00:00:00Z' },
+    { id: 'c', source_id: 's3', category: '行业', created_at: '2026-09-29T00:00:00Z' },
+  ];
+  const ranked = rankCuratedCandidates(rows, {
+    now: NOW,
+    mutes: { sources: ['s1'], contents: new Set(['b']) },
+  });
+  assert.deepEqual(ranked.map(item => item.candidate.id), ['c']);
+});
