@@ -6,6 +6,8 @@ import { setGlobalDispatcher, EnvHttpProxyAgent } from 'undici';
 import { createAccessProtection, createCorsOptions, securityHeaders } from './middleware/production-security.js';
 
 dotenv.config();
+const { migrateM30 } = await import('./db/migrate-m30.js');
+migrateM30(); // 幂等：先建单信源运行账本，避免首次打开信源页才触发 schema 写入。
 
 // 出网代理根治（2026-07-17）：Node fetch（undici）默认忽略 HTTP(S)_PROXY，且 launchd
 // 常驻进程没有 shell 环境——代理只能来自 .env。不配则行为不变（直连）。
@@ -2186,18 +2188,27 @@ async function syncAllChannels() {
   await run('activeQuery', async () => (await import('./services/sync-active-query.js')).syncActiveQuery());
   await run('x', async () => (await import('./services/sync-x.js')).syncX());  // 第4件：X 直连（未配 cookies 时优雅跳过）
 
-  // 记录同步时间（漏跑补偿的判断依据，见下方 catchUpSyncIfStale）
+  const { summarizeChannelStatuses } = await import('./services/sync-status.js');
+  const summary = summarizeChannelStatuses(channels);
+
+  // 记录同步时间与真实结果（漏跑补偿 + UI 可感知）。部分失败不能再伪装成全绿。
   try {
-    const { writeFileSync } = await import('fs');
+    const { readFileSync, writeFileSync } = await import('fs');
     const { fileURLToPath } = await import('url');
-    writeFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)),
-      JSON.stringify({ at: new Date().toISOString() }));
+    const statePath = fileURLToPath(new URL('../data/last-sync.json', import.meta.url));
+    let previous = {};
+    try { previous = JSON.parse(readFileSync(statePath, 'utf-8')); } catch { /* 首次运行 */ }
+    const attemptedAt = new Date().toISOString();
+    const lastSuccessfulAt = summary.status === 'failure'
+      ? (previous.lastSuccessfulAt || previous.at || null)
+      : attemptedAt;
+    writeFileSync(statePath, JSON.stringify({ at: attemptedAt, lastSuccessfulAt, ...summary }));
   } catch (err) { console.error('[sync] 写入 last-sync 失败:', err.message); }
 
   // 不再自动抓正文补摘要：用户每天只看精选 12 条，全文翻译/摘要留到点开精读时按需发生。
 
   const total = (channels.aihot?.count || 0) + (channels.rss?.count || 0) + (channels.activeQuery?.inserted || 0);
-  return { total, channels };
+  return { total, status: summary.status, channelStatuses: summary.channels, channels };
 }
 
 // 漏跑补偿（2026-07-16：launchd 常驻后，合盖睡眠时 cron 到点不触发——
@@ -2206,8 +2217,9 @@ async function catchUpSyncIfStale() {
   try {
     const { readFileSync } = await import('fs');
     const { fileURLToPath } = await import('url');
-    const { at } = JSON.parse(readFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)), 'utf-8'));
-    if (Date.now() - new Date(at).getTime() < 26 * 3600 * 1000) return;
+    const state = JSON.parse(readFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)), 'utf-8'));
+    const healthyAt = state.lastSuccessfulAt || state.at; // 兼容旧文件
+    if (Date.now() - new Date(healthyAt).getTime() < 26 * 3600 * 1000) return;
   } catch { /* 无记录 → 视为过期 */ }
   console.log('[cron] 距上次同步超过 26 小时（关机/故障漏跑），开始补偿同步…');
   try {
@@ -2297,8 +2309,8 @@ app.get('/api/sync-status', async (req, res) => {
   try {
     const { readFileSync } = await import('fs');
     const { fileURLToPath } = await import('url');
-    const { at } = JSON.parse(readFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)), 'utf-8'));
-    res.json({ success: true, data: { lastSyncAt: at || null } });
+    const state = JSON.parse(readFileSync(fileURLToPath(new URL('../data/last-sync.json', import.meta.url)), 'utf-8'));
+    res.json({ success: true, data: { lastSyncAt: state.at || null, status: state.status || 'unknown', channels: state.channels || {} } });
   } catch {
     res.json({ success: true, data: { lastSyncAt: null } }); // 无记录 → 前端显示"尚未同步"
   }

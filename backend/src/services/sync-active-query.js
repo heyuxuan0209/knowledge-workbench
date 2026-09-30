@@ -7,6 +7,7 @@ import { translateText } from './translation.js';
 import { CHANNEL_ADAPTERS } from './active-query-channels.js';
 import { pathToFileURL } from 'url';
 import { resolve } from 'path';
+import { classifyFetchError, recordSourceFetchRun } from './source-health.js';
 
 // active-query 执行器（ADR-014）：遍历登记源里 track_mode='active-query' 的平台身份，
 // 逐源调渠道适配器拉最新内容 → 翻译新条目 → upsert 入 Feed。
@@ -24,7 +25,7 @@ const MAX_AUTO_PROCESSED_ITEMS = 12;
 function loadActiveQuerySources() {
   const db = getDatabase();
   const rows = db.prepare(`
-    SELECT sp.platform, sp.handle, s.display_name, s.id AS source_id
+    SELECT sp.id AS source_platform_id, sp.platform, sp.handle, s.display_name, s.id AS source_id
     FROM source_platforms sp
     JOIN sources s ON sp.source_id = s.id
     WHERE sp.track_mode = 'active-query'
@@ -82,7 +83,7 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
   const sources = loadActiveQuerySources();
   if (sources.length === 0) {
     console.log('ℹ️  没有 active-query 登记源（在信源页登记 B站 UP 主 / YouTube 频道 / GitHub 用户后再跑）');
-    return { success: true, sources: 0, fetched: 0, inserted: 0, skipped: [], failed: [] };
+    return { success: true, status: 'skipped', sources: 0, fetched: 0, inserted: 0, skipped: [], failed: [] };
   }
 
   console.log(`🔄 active-query: ${sources.length} 个登记源`);
@@ -95,15 +96,44 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
     if (!adapter) {
       // 登录态渠道（X 等）第一期不接：如实记录跳过原因，不静默（ADR-014 范围声明）
       skipped.push({ source: src.display_name, platform: src.platform, reason: '登录态渠道未解锁（需用户授权后接入）' });
+      // X 有独立的 sync-x 执行器，实际结果由那里记；其他无适配器平台才记“暂不支持”。
+      if (src.platform !== 'X') recordSourceFetchRun({
+        sourceId: src.source_id,
+        sourcePlatformId: src.source_platform_id,
+        channel: 'active-query',
+        status: 'unsupported',
+        error: '当前没有可用的采集适配器',
+      });
       continue;
     }
+    const startedMs = Date.now();
+    const startedAt = new Date(startedMs).toISOString();
     try {
       const items = await adapter({ handle: src.handle, displayName: src.display_name }, limit);
       console.log(`  ✓ ${src.platform}/${src.display_name}: ${items.length} 条`);
       allItems.push(...items);
+      recordSourceFetchRun({
+        sourceId: src.source_id,
+        sourcePlatformId: src.source_platform_id,
+        channel: 'active-query',
+        status: items.length ? 'success' : 'empty',
+        itemCount: items.length,
+        startedAt,
+        durationMs: Date.now() - startedMs,
+      });
     } catch (err) {
       console.error(`  ✗ ${src.platform}/${src.display_name}: ${err.message}`);
       failed.push({ source: src.display_name, platform: src.platform, error: err.message.slice(0, 200) });
+      recordSourceFetchRun({
+        sourceId: src.source_id,
+        sourcePlatformId: src.source_platform_id,
+        channel: 'active-query',
+        status: 'failure',
+        startedAt,
+        durationMs: Date.now() - startedMs,
+        errorKind: classifyFetchError(err),
+        error: err.message,
+      });
     }
   }
 
@@ -147,6 +177,9 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
 
   const result = {
     success: failed.length < sources.length, // 全军覆没才算失败
+    status: failed.length
+      ? (failed.length + skipped.length >= sources.length ? 'failure' : 'partial')
+      : (skipped.length === sources.length ? 'skipped' : 'success'),
     sources: sources.length,
     fetched: allItems.length,
     inserted: newItems.length,

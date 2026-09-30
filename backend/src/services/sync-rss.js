@@ -7,6 +7,7 @@ import { upsertContents } from '../db/contents.js';
 import { getDatabase } from '../db/init.js';
 import { pathToFileURL } from 'url';
 import { resolve } from 'path';
+import { classifyFetchError, recordSourceFetchRun } from './source-health.js';
 
 // RSS 数据同步服务（对标 sync-aihot.js / sync-hackernews.js）
 //
@@ -34,7 +35,8 @@ async function getConfiguredRSSFeeds() {
     const { getDatabase } = await import('../db/init.js');
     const db = getDatabase();
     const rows = db.prepare(`
-      SELECT sp.handle AS feed_url, sp.platform, sp.platform_metadata, s.display_name, s.registered_by_user, s.trust_tier
+      SELECT sp.id AS source_platform_id, sp.handle AS feed_url, sp.platform, sp.platform_metadata,
+             s.id AS source_id, s.display_name, s.registered_by_user, s.trust_tier
       FROM source_platforms sp
       JOIN sources s ON sp.source_id = s.id
       WHERE sp.track_mode = 'active-rss' AND s.status = 'active'
@@ -48,7 +50,15 @@ async function getConfiguredRSSFeeds() {
         // handle 用登记时的 row.feed_url（findOrCreateSource 按 platform+handle 精确匹配才 link 得上）
         // registered + tier：T2 及以下的登记优质源（个人 builder，更新慢）豁免时间窗；
         // T1 官方大源（Anthropic/OpenAI/Google）更新快、历史存量大，不豁免、照砍老内容
-        sourceMap.set(url, { platform: row.platform, handle: row.feed_url, displayName: row.display_name, registered: !!row.registered_by_user, tier: row.trust_tier });
+        sourceMap.set(url, {
+          sourceId: row.source_id,
+          sourcePlatformId: row.source_platform_id,
+          platform: row.platform,
+          handle: row.feed_url,
+          displayName: row.display_name,
+          registered: !!row.registered_by_user,
+          tier: row.trust_tier,
+        });
       }
     }
   } catch (error) {
@@ -107,17 +117,38 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
 
   if (feeds.length === 0) {
     console.log('⚠️  No RSS feeds configured. Set RSS_FEEDS in .env or pass feedUrls parameter.');
-    return { success: false, count: 0, message: 'No RSS feeds configured' };
+    return { success: true, status: 'skipped', count: 0, message: 'No RSS feeds configured' };
   }
 
   console.log(`📡 Syncing from ${feeds.length} RSS feed(s): ${feeds.slice(0, 3).join(', ')}${feeds.length > 3 ? '...' : ''}`);
 
   try {
-    const { items, feedsInfo } = await parseMultipleFeeds(feeds);
+    const { items, feedsInfo, feedResults } = await parseMultipleFeeds(feeds);
+    for (const result of feedResults) {
+      const source = sourceMap.get(result.feedUrl);
+      if (!source) continue; // 环境变量/临时 feed 没有 source 身份，不伪造健康记录
+      recordSourceFetchRun({
+        sourceId: source.sourceId,
+        sourcePlatformId: source.sourcePlatformId,
+        channel: 'rss',
+        status: result.success ? (result.itemCount > 0 ? 'success' : 'empty') : 'failure',
+        itemCount: result.itemCount,
+        startedAt: result.startedAt,
+        finishedAt: result.finishedAt,
+        durationMs: result.durationMs,
+        errorKind: result.success ? null : classifyFetchError(result.error),
+        error: result.error,
+      });
+    }
+    const failedFeeds = feedResults.filter(result => !result.success);
 
     if (items.length === 0) {
-      console.log('⚠️  No items fetched from RSS feeds');
-      return { success: false, count: 0 };
+      if (feedsInfo.length > 0) {
+        console.log('ℹ️  RSS feeds checked successfully, no items returned');
+        return { success: true, status: failedFeeds.length ? 'partial' : 'success', count: 0, feeds: feedsInfo.length, failedFeeds: failedFeeds.length };
+      }
+      console.log('⚠️  No RSS feed could be fetched');
+      return { success: false, status: 'failure', count: 0, feeds: 0, failedFeeds: failedFeeds.length };
     }
 
     console.log(`📥 Fetched ${items.length} items from ${feedsInfo.length} feed(s)`);
@@ -151,7 +182,7 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
     const candidates = takeNewCandidates(pretransformed, loadExistingIds(pretransformed));
     if (!candidates.length) {
       console.log(`💸 RSS LLM 跳过：${pretransformed.length} 条均已处理过`);
-      return { success: true, count: 0, fetched: items.length, candidates: 0, feeds: feedsInfo.length };
+      return { success: true, status: failedFeeds.length ? 'partial' : 'success', count: 0, fetched: items.length, candidates: 0, feeds: feedsInfo.length, failedFeeds: failedFeeds.length };
     }
     console.log(`🆕 RSS 仅处理新候选：${candidates.length}/${pretransformed.length}（单轮上限 ${MAX_NEW_CANDIDATES_PER_RUN}）`);
     const kept = await filterRelevant(candidates.map(({ content }) => ({ id: content.id, title: content.en_title })), { background: true });
@@ -194,17 +225,19 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
     console.log('✅ RSS sync completed');
     return {
       success: true,
+      status: failedFeeds.length ? 'partial' : 'success',
       count: relevantItems.length,
       processed: savedCount,
       rejected: rejectedItems.length,
       candidates: candidates.length,
       autoTranslated: autoTranslateItems.length,
       feeds: feedsInfo.length,
+      failedFeeds: failedFeeds.length,
       details: feedsInfo.map(f => `${f.title}: ${items.filter(i => i.feedUrl === f.feedUrl).length} items`)
     };
   } catch (error) {
     console.error('❌ RSS sync failed:', error.message);
-    return { success: false, error: error.message, count: 0 };
+    return { success: false, status: 'failure', error: error.message, count: 0 };
   }
 }
 

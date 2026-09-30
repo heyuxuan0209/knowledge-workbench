@@ -516,7 +516,8 @@ export default function WorkbenchPage() {
       const json = await api('/api/sync-all', { method: 'POST' })
       const ch = json.data.channels || {}
       const skipped = ch.activeQuery?.skipped?.length || 0
-      showToast(`同步完成：AI HOT ${ch.aihot?.count ?? 0} 条 · RSS ${ch.rss?.count ?? 0} 条 · 主动查询新增 ${ch.activeQuery?.inserted ?? 0} 条${skipped ? `；${skipped} 个源暂不支持直接抓取（见信源页说明）` : ''}`)
+      const resultLabel = json.data.status === 'partial' ? '同步完成，但有部分信源失败' : (json.data.status === 'failure' ? '同步失败' : '同步完成')
+      showToast(`${resultLabel}：AI HOT ${ch.aihot?.count ?? 0} 条 · RSS ${ch.rss?.count ?? 0} 条 · 主动查询新增 ${ch.activeQuery?.inserted ?? 0} 条${skipped ? `；${skipped} 个源暂不支持直接抓取（见信源页说明）` : ''}`)
       loadContents(); loadSources(); loadBrief()
     } catch (err) { showToast(`同步失败：${err.message}`) } finally { setSyncing(false) }
   }

@@ -32,6 +32,24 @@ const GROUPS = [
   { key: 'other', label: '其他', match: () => true },
 ]
 
+const HEALTH_STYLE = {
+  healthy: { color: '#3f7350', background: 'rgba(63,115,80,.10)' },
+  empty: { color: '#3f7350', background: 'rgba(63,115,80,.10)' },
+  failure: { color: '#a24b3f', background: 'rgba(162,75,63,.11)' },
+  stale: { color: '#a9791f', background: 'rgba(169,121,31,.11)' },
+  pending: { color: 'var(--sub2)', background: 'var(--surface)' },
+  unsupported: { color: 'var(--faint)', background: 'var(--surface)' },
+  passive: { color: 'var(--faint)', background: 'var(--surface)' },
+}
+
+function healthTitle(health) {
+  if (!health) return ''
+  const parts = [health.label]
+  if (health.lastAttemptAt) parts.push(`最后检查：${new Date(health.lastAttemptAt).toLocaleString('zh-CN')}`)
+  if (health.detail) parts.push(`原因：${health.detail}`)
+  return parts.join('\n')
+}
+
 export default function SourcesView({ sources, loadSources, loadNotes, showToast, setModal, syncing, syncAllSources }) {
   const [input, setInput] = useState('')
   const [identifying, setIdentifying] = useState(false)
@@ -152,6 +170,8 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
   const sourceCard = (s) => {
     const note = (s.platforms || []).map(sourceModeNote).find(Boolean)
     const p0 = s.platforms?.[0]
+    const health = s.health || { status: 'pending', label: '尚无运行记录' }
+    const healthStyle = HEALTH_STYLE[health.status] || HEALTH_STYLE.pending
     return (
       <div key={s.id} className="wb-scard">
         <div className="wb-scard-name">{s.display_name}</div>
@@ -162,6 +182,10 @@ export default function SourcesView({ sources, loadSources, loadNotes, showToast
               {PLAT_ICON[p.platform] || ''}{p.platform} · {modeOf(p.track_mode).cn}
             </span>
           ))}
+          <span className="wb-pill" title={healthTitle(health)}
+            style={{ ...healthStyle, borderRadius: 6 }}>
+            {health.status === 'failure' ? '● ' : (health.status === 'stale' ? '◐ ' : '○ ')}{health.label}
+          </span>
         </div>
         <div className="wb-scard-foot">
           <span className="wb-src-count">{s.content_count} 条进 Feed</span>

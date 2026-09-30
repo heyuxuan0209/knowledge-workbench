@@ -75,6 +75,26 @@ CREATE TABLE IF NOT EXISTS source_platforms (
 CREATE INDEX IF NOT EXISTS idx_source_platforms_source_id ON source_platforms(source_id);
 CREATE INDEX IF NOT EXISTS idx_source_platforms_track_mode ON source_platforms(track_mode);
 
+-- 每个采集身份的运行事实（M30）：成功、空更新、失败、暂不支持分开记，避免全局同步时间掩盖坏源。
+CREATE TABLE IF NOT EXISTS source_fetch_runs (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id          TEXT NOT NULL,
+    source_platform_id INTEGER,
+    channel            TEXT NOT NULL,
+    status             TEXT NOT NULL CHECK (status IN ('success', 'empty', 'failure', 'unsupported')),
+    item_count         INTEGER NOT NULL DEFAULT 0,
+    started_at         TEXT NOT NULL,
+    finished_at        TEXT NOT NULL,
+    duration_ms        INTEGER NOT NULL DEFAULT 0,
+    error_kind         TEXT,
+    error_message      TEXT,
+    FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_platform_id) REFERENCES source_platforms(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_sfr_source_finished ON source_fetch_runs(source_id, finished_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sfr_platform_finished ON source_fetch_runs(source_platform_id, finished_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sfr_status_finished ON source_fetch_runs(status, finished_at DESC);
+
 -- ============================================================
 -- 3. Topics — 研究主题（Mode 2 主战场）
 --    列表排序按"最近活跃"，不按演进阶段分组（WIREFRAMES.md 第2节）

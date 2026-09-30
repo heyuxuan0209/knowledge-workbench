@@ -4,6 +4,7 @@ import { getDatabase } from '../db/init.js';
 import { randomUUID } from 'crypto';
 import { upsertContents } from '../db/contents.js';
 import { classifyTrustTier } from './trust-tier.js';
+import { classifyFetchError, recordSourceFetchRun } from './source-health.js';
 
 const pexec = promisify(execFile);
 
@@ -60,7 +61,7 @@ export function seedOfficialXAccounts() {
 export function getXRosterScored() {
   const db = getDatabase();
   const rows = db.prepare(`
-    SELECT s.id, s.display_name name, sp.handle, sp.last_query_at,
+    SELECT s.id, s.display_name name, sp.id AS source_platform_id, sp.handle, sp.last_query_at,
       (SELECT COUNT(*) FROM contents c WHERE c.source_id=s.id AND datetime(COALESCE(c.published_at,c.created_at))>datetime('now','-30 days')) AS freq30,
       (SELECT COUNT(*) FROM contents c WHERE c.source_id=s.id AND c.starred=1) AS stars,
       (SELECT COUNT(*) FROM contents c WHERE c.source_id=s.id AND c.user_read_status='read') AS reads
@@ -145,19 +146,57 @@ export async function syncX({ limit = PER_ACCOUNT } = {}) {
   seedOfficialXAccounts();
   const plan = planXSchedule();
   const roster = plan.today;
-  if (!roster.length) return { accounts: 0, inserted: 0, skipped: [], plan };
+  if (!roster.length) return { success: true, status: 'skipped', accounts: 0, inserted: 0, skipped: [], plan };
   const db = getDatabase();
   const stamp = db.prepare("UPDATE source_platforms SET last_query_at=datetime('now') WHERE source_id=? AND platform='X' AND handle=? COLLATE NOCASE");
-  const items = []; const skipped = [];
+  const items = []; const skipped = []; const failed = [];
   for (const src of roster) {
-    try { items.push(...await queryX(src.handle, limit)); }
-    catch (err) { skipped.push({ handle: src.handle, reason: (err.stderr || err.message || '').toString().slice(0, 120) }); }
+    const startedMs = Date.now();
+    const startedAt = new Date(startedMs).toISOString();
+    try {
+      const fetched = await queryX(src.handle, limit);
+      items.push(...fetched);
+      recordSourceFetchRun({
+        sourceId: src.id,
+        sourcePlatformId: src.source_platform_id,
+        channel: 'x',
+        status: fetched.length ? 'success' : 'empty',
+        itemCount: fetched.length,
+        startedAt,
+        durationMs: Date.now() - startedMs,
+      });
+    } catch (err) {
+      const reason = (err.stderr || err.message || '').toString().slice(0, 120);
+      const errorKind = classifyFetchError(err.stderr || err);
+      const unavailable = errorKind === 'auth' || /enoent|not found|command failed.*tw/i.test(reason);
+      (unavailable ? skipped : failed).push({ handle: src.handle, reason });
+      recordSourceFetchRun({
+        sourceId: src.id,
+        sourcePlatformId: src.source_platform_id,
+        channel: 'x',
+        status: unavailable ? 'unsupported' : 'failure',
+        startedAt,
+        durationMs: Date.now() - startedMs,
+        errorKind,
+        error: reason,
+      });
+    }
     try { stamp.run(src.id, src.handle); } catch { /* 别名/边角源 stamp 失败不阻塞 */ }
     await new Promise(r => setTimeout(r, 1500)); // 温和节奏
   }
   db.close();
   const inserted = items.length ? upsertContents(items) : 0;
   if (skipped.length === roster.length) console.log(`[sync-x] 当日计划 ${roster.length} 源全跳过（多半未配 X 采集通道 cookies）· 必拉 ${plan.mustCount} + 轮换 ${plan.rotationPerDay}（池 ${plan.rotationPoolSize}，每 ${plan.cycleDays} 天一轮）`);
-  else console.log(`[sync-x] 当日 ${roster.length} 源（必拉 ${plan.mustCount} + 轮换 ${plan.rotationPerDay}）· 入库 ${inserted} 条 · 跳过 ${skipped.length}`);
-  return { accounts: roster.length, inserted, skipped, plan };
+  else console.log(`[sync-x] 当日 ${roster.length} 源（必拉 ${plan.mustCount} + 轮换 ${plan.rotationPerDay}）· 入库 ${inserted} 条 · 跳过 ${skipped.length} · 失败 ${failed.length}`);
+  return {
+    success: failed.length < roster.length,
+    status: failed.length
+      ? (failed.length + skipped.length === roster.length ? 'failure' : 'partial')
+      : (skipped.length === roster.length ? 'skipped' : 'success'),
+    accounts: roster.length,
+    inserted,
+    skipped,
+    failed,
+    plan,
+  };
 }

@@ -266,7 +266,7 @@ export default function FeedView({
   const [feedMarks, setFeedMarks] = useState({})        // 行内动作留痕小标：id→'read'|'star'|'idea'
   const [iouStars, setIouStars] = useState([])          // ★挂账（「以后再看」）待清单，按挂账时间升序
   // 同步状态可感知（P0-7）：自动同步能力早已在，此前 UI 上没提过。undefined=加载中，null=从未同步
-  const [lastSyncAt, setLastSyncAt] = useState(undefined)
+  const [syncState, setSyncState] = useState(undefined)
   useEffect(() => {
     api('/api/contents/categories').then(j => setArtCatCounts(j.data || {})).catch(() => {})
     api('/api/must-read').then(j => setMustRead(j.data || [])).catch(() => {})
@@ -288,7 +288,7 @@ export default function FeedView({
   // 上次同步时间：进页面拉一次；每次同步完成（syncing true→false）再拉一次刷新
   useEffect(() => {
     if (syncing) return
-    api('/api/sync-status').then(j => setLastSyncAt(j.data?.lastSyncAt ?? null)).catch(() => {})
+    api('/api/sync-status').then(j => setSyncState(j.data || { lastSyncAt: null })).catch(() => {})
   }, [syncing])
   useEffect(() => {
     if (!hasFilter) { setFiltered(null); return }
@@ -633,10 +633,10 @@ export default function FeedView({
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '0 2px 12px', fontSize: 11.5, color: 'var(--faint)', lineHeight: 1.5 }}>
         <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}><IconRefresh size={12} /></span>
         <span style={{ minWidth: 0 }}>
-          {lastSyncAt === undefined
+          {syncState === undefined
             ? '同步状态加载中…'
-            : lastSyncAt
-              ? <>上次同步 <b style={{ color: 'var(--sub2)', fontWeight: 600 }}>{syncAgo(lastSyncAt)}</b> · 每天 8:10 自动，超过 26 小时未同步会补跑</>
+            : syncState.lastSyncAt
+              ? <>上次同步 <b style={{ color: syncState.status === 'partial' || syncState.status === 'failure' ? '#a24b3f' : 'var(--sub2)', fontWeight: 600 }}>{syncAgo(syncState.lastSyncAt)}{syncState.status === 'partial' ? ' · 部分信源失败' : (syncState.status === 'failure' ? ' · 同步失败' : '')}</b> · 每天 8:10 自动，超过 26 小时未同步会补跑</>
               : '尚未同步 · 每天 8:10 自动同步，超过 26 小时未同步会补跑'}
         </span>
         <button className="wb-brief-link" disabled={syncing} style={{ flexShrink: 0 }} onClick={syncAllSources}

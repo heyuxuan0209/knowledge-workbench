@@ -11,6 +11,7 @@
     "test:security": "node --test src/middleware/production-security.test.js",
     "test:cost-guard": "node --test src/services/llm.test.js src/services/sync-rss.test.js",
     "test:curation-bench": "node --test src/services/curation-policy.test.js src/services/curation-bench.test.js",
+    "test:source-health": "node --test src/services/source-health.test.js src/services/sync-status.test.js src/services/rss-health.test.js",
     "eval:curation": "node scripts/eval-curation-bench.mjs",
     "backup:db": "node scripts/backup-db.mjs",
     "test:export-parsers": "node --test scripts/platform-export/parsers.test.mjs",

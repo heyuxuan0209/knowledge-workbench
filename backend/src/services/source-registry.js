@@ -1,6 +1,7 @@
 import { getDatabase } from '../db/init.js';
 import { randomUUID } from 'crypto';
 import { classifyTrustTier } from './trust-tier.js';
+import { attachSourceHealth } from './source-health.js';
 
 // 优质源登记处（ADR-007）：丢入 X 链接 / YouTube 链接 / 网页链接 / 公众号名称 → 自动识别身份 → 登记。
 // 登记后的效果只有两个：该源内容进 Feed + 高权重排序（getContents 加权）。不是订阅系统。
@@ -466,6 +467,7 @@ export function listSources({ registeredOnly = false } = {}) {
   for (const row of rows) {
     row.platforms = platformStmt.all(row.id);
   }
+  attachSourceHealth(db, rows);
   db.close();
   return rows;
 }

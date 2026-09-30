@@ -23,6 +23,8 @@ const parser = new Parser({
 // 用 fetch 拉取 + parseString，而不是 parser.parseURL：parseURL 底层是 http 模块，
 // 不经过全局代理 dispatcher（server.js），被墙 feed（Google 系等）会一直超时
 export async function parseFeed(feedUrl) {
+  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
   try {
     const res = await fetch(feedUrl, {
       signal: AbortSignal.timeout(15000),
@@ -39,14 +41,20 @@ export async function parseFeed(feedUrl) {
         link: feed.link,
         feedUrl: feedUrl
       },
-      items: feed.items || []
+      items: feed.items || [],
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedMs,
     };
   } catch (error) {
     console.error(`Failed to parse RSS feed ${feedUrl}:`, error.message);
     return {
       success: false,
       error: error.message,
-      items: []
+      items: [],
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedMs,
     };
   }
 }
@@ -59,6 +67,7 @@ export async function parseMultipleFeeds(feedUrls) {
 
   const allItems = [];
   const feedsInfo = [];
+  const feedResults = [];
 
   results.forEach((result, index) => {
     if (result.status === 'fulfilled' && result.value.success) {
@@ -68,12 +77,17 @@ export async function parseMultipleFeeds(feedUrls) {
         feedTitle: result.value.feedInfo.title
       })));
       feedsInfo.push(result.value.feedInfo);
+      feedResults.push({ feedUrl: feedUrls[index], ...result.value, itemCount: result.value.items.length });
     } else {
       console.error(`Failed to parse feed ${feedUrls[index]}`);
+      const value = result.status === 'fulfilled'
+        ? result.value
+        : { success: false, error: result.reason?.message || String(result.reason) };
+      feedResults.push({ feedUrl: feedUrls[index], ...value, itemCount: 0 });
     }
   });
 
-  return { items: allItems, feedsInfo };
+  return { items: allItems, feedsInfo, feedResults };
 }
 
 // 将 RSS item 转换成统一的 Content 模型（与 aihot.js/hackernews.js 保持一致）
