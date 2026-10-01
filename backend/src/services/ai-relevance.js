@@ -79,9 +79,19 @@ ${list}`;
 
   const map = new Map();
   // 一次重试：瞬时 API 失败/整段没解析出来，不该让整批条目静默丢摘要（漏摘要在同步侧会常驻 null）
+  let previousReceiptId = null;
   for (let attempt = 0; attempt < 2 && map.size === 0; attempt++) {
-    const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 3000, purpose: 'feed-summary', background });
-    if (!result.success) continue;
+    const result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', {
+      maxTokens: 3000,
+      purpose: attempt === 0 ? 'feed-summary' : 'feed-summary-retry',
+      background,
+      retryOf: previousReceiptId,
+    });
+    if (!result.success) {
+      if (result.uncertain) break; // 结果未知时不盲重试，避免同一批摘要重复付费
+      previousReceiptId = result.receiptId;
+      continue;
+    }
     const arr = extractJson(result.content)?.summaries;
     if (!Array.isArray(arr)) continue;
     for (const e of arr) {

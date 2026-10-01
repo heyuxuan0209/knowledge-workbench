@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { getDatabase } from '../db/init.js';
+import { beginLlmReceipt, completeLlmReceipt, failLlmReceipt, markLlmReceiptDispatched } from './llm-receipts.js';
 
 // Deepseek API 配置（兼容 OpenAI SDK）。
 // 惰性初始化：ESM import 提升会让模块级 new OpenAI() 先于 CLI 脚本的 dotenv.config()
@@ -50,7 +51,7 @@ export function reserveBackgroundCall(provider, options = {}, {
   day = new Date().toISOString().slice(0, 10),
   limit = BACKGROUND_DAILY_CALL_LIMIT,
 } = {}) {
-  if (!options.background || provider !== 'deepseek') return;
+  if (!options.background || !['deepseek', 'qwen'].includes(provider)) return;
   const key = `llm_background_calls:${day}`;
   const db = openDatabase();
   try {
@@ -76,10 +77,19 @@ export function reserveBackgroundCall(provider, options = {}, {
 // TODO: 后续实现 Anthropic SDK
 
 // 计算成本（粗估，仅用于日志）。qwen3.5-flash 约 ¥0.2/M 输入,deepseek-v4-pro 约 ¥3/M 输入。
-function calculateCost(tokens, provider = 'deepseek') {
+export function calculateCost(tokens, provider = 'deepseek') {
   if (provider === 'qwen') return (tokens / 1_000_000) * 0.5;   // qwen flash 混合估
   if (provider === 'deepseek') return (tokens / 1_000_000) * 3.0; // v4-pro 混合估
   return 0;
+}
+
+export function inferCallPurpose(stack = new Error().stack || '') {
+  for (const line of stack.split('\n')) {
+    const service = line.match(/\/services\/([^/]+)\.js/);
+    if (service && !['llm', 'llm-receipts'].includes(service[1])) return service[1];
+    if (/\/server\.js/.test(line)) return 'api-chat';
+  }
+  return 'unspecified';
 }
 
 // 统计 tokens（简单估算：中文 ~1.5 tokens/字，英文 ~0.75 tokens/词）
@@ -93,8 +103,18 @@ function estimateTokens(text) {
 export async function* streamChat(messages, provider = 'deepseek', model = null, options = {}) {
   if (provider === 'deepseek') {
     const modelName = model || DEFAULT_MODEL;
+    const purpose = options.purpose || inferCallPurpose();
+    const receipt = beginLlmReceipt({
+      messages, provider, model: modelName, purpose, background: !!options.background,
+      logicalKey: options.logicalKey, retryOf: options.retryOf,
+    });
+    let dispatched = false;
+    let settled = false;
 
     try {
+      reserveBackgroundCall(provider, options);
+      markLlmReceiptDispatched(receipt);
+      dispatched = true;
       const stream = await deepseekClient().chat.completions.create({
         model: modelName,
         messages: messages,
@@ -124,18 +144,35 @@ export async function* streamChat(messages, provider = 'deepseek', model = null,
       totalTokens = inputTokens + outputTokens;
 
       const cost = calculateCost(totalTokens, provider);
+      completeLlmReceipt(receipt, {
+        outputChars: fullContent.length,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        tokenSource: 'estimated',
+        costYuanEstimate: cost,
+      });
+      settled = true;
 
       yield {
         type: 'done',
         tokens: totalTokens,
         cost: cost,
-        content: fullContent
+        content: fullContent,
+        receiptId: receipt?.id || null,
+        costEstimated: true,
       };
     } catch (error) {
+      const failure = failLlmReceipt(receipt, error, { dispatched });
+      settled = true;
       yield {
         type: 'error',
-        error: error.message
+        error: error.message,
+        uncertain: failure.status === 'unknown',
+        receiptId: receipt?.id || null,
       };
+    } finally {
+      if (!settled) failLlmReceipt(receipt, new Error('stream consumer disconnected before completion'), { dispatched: true });
     }
   } else if (provider === 'claude') {
     // TODO: 实现 Claude API
@@ -157,11 +194,19 @@ export async function* streamChat(messages, provider = 'deepseek', model = null,
 export async function chat(messages, provider = 'deepseek', model = null, options = {}) {
   if (provider === 'deepseek' || provider === 'qwen') {
     const isQwen = provider === 'qwen';
-    const client = isQwen ? qwenClient() : deepseekClient();
     const modelName = model || (isQwen ? QWEN_MODEL : DEFAULT_MODEL);
+    const purpose = options.purpose || inferCallPurpose();
+    const receipt = beginLlmReceipt({
+      messages, provider, model: modelName, purpose, background: !!options.background,
+      logicalKey: options.logicalKey, retryOf: options.retryOf,
+    });
+    let dispatched = false;
 
     try {
       reserveBackgroundCall(provider, options);
+      const client = isQwen ? qwenClient() : deepseekClient();
+      markLlmReceiptDispatched(receipt);
+      dispatched = true;
       const response = await client.chat.completions.create({
         model: modelName,
         messages: messages,
@@ -172,23 +217,42 @@ export async function chat(messages, provider = 'deepseek', model = null, option
       });
 
       const content = response.choices[0]?.message?.content || '';
-      const tokens = response.usage?.total_tokens || estimateTokens(content);
+      const estimatedInputTokens = estimateTokens(messages.map(message => message.content || '').join('\n'));
+      const estimatedOutputTokens = estimateTokens(content);
+      const inputTokens = response.usage?.prompt_tokens || estimatedInputTokens;
+      const outputTokens = response.usage?.completion_tokens || estimatedOutputTokens;
+      const tokens = response.usage?.total_tokens || inputTokens + outputTokens;
       const cost = calculateCost(tokens, provider);
 
       const usage = response.usage || {};
       const reasoningTokens = usage.completion_tokens_details?.reasoning_tokens || 0;
-      console.log(`[llm-usage] purpose=${options.purpose || 'unspecified'} provider=${provider} model=${modelName} input=${usage.prompt_tokens || 0} output=${usage.completion_tokens || 0} reasoning=${reasoningTokens}`);
+      completeLlmReceipt(receipt, {
+        providerRequestId: response.id || null,
+        outputChars: content.length,
+        inputTokens,
+        outputTokens,
+        reasoningTokens,
+        totalTokens: tokens,
+        tokenSource: response.usage ? 'provider' : 'estimated',
+        costYuanEstimate: cost,
+      });
+      console.log(`[llm-usage] purpose=${purpose} provider=${provider} model=${modelName} input=${inputTokens} output=${outputTokens} reasoning=${reasoningTokens} receipt=${receipt?.id || 'unavailable'}`);
 
       return {
         success: true,
         content,
         tokens,
-        cost
+        cost,
+        costEstimated: true,
+        receiptId: receipt?.id || null,
       };
     } catch (error) {
+      const failure = failLlmReceipt(receipt, error, { dispatched });
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        uncertain: failure.status === 'unknown',
+        receiptId: receipt?.id || null,
       };
     }
   } else {

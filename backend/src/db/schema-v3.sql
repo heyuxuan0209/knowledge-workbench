@@ -95,6 +95,39 @@ CREATE INDEX IF NOT EXISTS idx_sfr_source_finished ON source_fetch_runs(source_i
 CREATE INDEX IF NOT EXISTS idx_sfr_platform_finished ON source_fetch_runs(source_platform_id, finished_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sfr_status_finished ON source_fetch_runs(status, finished_at DESC);
 
+-- LLM 调用凭证（M31）：不存正文，只存可核账的用途、状态、usage 与估算费用。
+CREATE TABLE IF NOT EXISTS llm_call_receipts (
+    id                   TEXT PRIMARY KEY,
+    logical_key          TEXT,
+    retry_of             TEXT,
+    provider             TEXT NOT NULL,
+    model                TEXT NOT NULL,
+    purpose              TEXT NOT NULL,
+    background           INTEGER NOT NULL DEFAULT 0,
+    status               TEXT NOT NULL CHECK (status IN ('reserved', 'succeeded', 'failed', 'unknown', 'blocked')),
+    request_fingerprint  TEXT NOT NULL,
+    provider_request_id  TEXT,
+    input_chars          INTEGER NOT NULL DEFAULT 0,
+    output_chars         INTEGER NOT NULL DEFAULT 0,
+    input_tokens         INTEGER NOT NULL DEFAULT 0,
+    output_tokens        INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens     INTEGER NOT NULL DEFAULT 0,
+    total_tokens         INTEGER NOT NULL DEFAULT 0,
+    token_source         TEXT NOT NULL DEFAULT 'unknown',
+    cost_yuan_estimate   REAL NOT NULL DEFAULT 0,
+    error_kind           TEXT,
+    error_message        TEXT,
+    started_at           TEXT NOT NULL,
+    dispatched_at        TEXT,
+    finished_at          TEXT,
+    duration_ms          INTEGER,
+    FOREIGN KEY (retry_of) REFERENCES llm_call_receipts(id)
+);
+CREATE INDEX IF NOT EXISTS idx_lcr_started ON llm_call_receipts(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lcr_purpose_started ON llm_call_receipts(purpose, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lcr_status_started ON llm_call_receipts(status, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lcr_logical_key ON llm_call_receipts(logical_key, started_at DESC);
+
 -- ============================================================
 -- 3. Topics — 研究主题（Mode 2 主战场）
 --    列表排序按"最近活跃"，不按演进阶段分组（WIREFRAMES.md 第2节）

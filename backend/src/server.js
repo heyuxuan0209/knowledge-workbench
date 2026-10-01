@@ -8,6 +8,8 @@ import { createAccessProtection, createCorsOptions, securityHeaders } from './mi
 dotenv.config();
 const { migrateM30 } = await import('./db/migrate-m30.js');
 migrateM30(); // 幂等：先建单信源运行账本，避免首次打开信源页才触发 schema 写入。
+const { migrateM31 } = await import('./db/migrate-m31.js');
+migrateM31(); // 幂等：所有模型调用在业务逻辑返回前先落凭证。
 
 // 出网代理根治（2026-07-17）：Node fetch（undici）默认忽略 HTTP(S)_PROXY，且 launchd
 // 常驻进程没有 shell 环境——代理只能来自 .env。不配则行为不变（直连）。
@@ -333,7 +335,7 @@ app.post('/api/chat/ephemeral', async (req, res) => {
 
     const { streamChat } = await import('./services/llm.js');
 
-    for await (const chunk of streamChat(contextInjectedMessages, 'deepseek')) {
+    for await (const chunk of streamChat(contextInjectedMessages, 'deepseek', null, { purpose: 'ephemeral-analysis' })) {
       if (chunk.type === 'content') {
         res.write(`data: ${JSON.stringify({ type: 'content', content: chunk.content })}\n\n`);
       } else if (chunk.type === 'done') {
@@ -2631,7 +2633,7 @@ app.post('/api/llm/chat', async (req, res) => {
     let totalTokens = 0;
     let totalCost = 0;
 
-    for await (const chunk of streamChat(messages, provider)) {
+    for await (const chunk of streamChat(messages, provider, null, { purpose: 'workspace-chat' })) {
       if (chunk.type === 'content') {
         fullResponse += chunk.content;
         res.write(`data: ${JSON.stringify({ type: 'content', content: chunk.content })}\n\n`);
@@ -2675,6 +2677,18 @@ app.get('/api/stats/cost', async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// AI 花费账单：统一 LLM 入口的调用凭证，不保存 prompt/response 正文；金额明确为估算。
+app.get('/api/stats/llm-calls', async (req, res) => {
+  try {
+    const { getLlmCallReport } = await import('./services/llm-receipts.js');
+    const days = Math.max(1, Math.min(90, Number(req.query.days) || 30));
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    res.json({ success: true, data: getLlmCallReport({ days, limit }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

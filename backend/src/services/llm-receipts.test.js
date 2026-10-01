@@ -1,0 +1,141 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  beginLlmReceipt,
+  classifyLlmError,
+  completeLlmReceipt,
+  failLlmReceipt,
+  fingerprintMessages,
+  getLlmCallReport,
+  markLlmReceiptDispatched,
+} from './llm-receipts.js';
+
+function setup() {
+  const dbPath = join(mkdtempSync(join(tmpdir(), 'kw-llm-receipts-')), 'receipts.db');
+  return {
+    dbPath,
+    controls: { openDatabase: () => new DatabaseSync(dbPath) },
+  };
+}
+
+test('receipt stores accounting metadata without prompt or response text', () => {
+  const { dbPath, controls } = setup();
+  const messages = [{ role: 'user', content: '这是私密 prompt' }];
+  const receipt = beginLlmReceipt({
+    messages,
+    provider: 'deepseek',
+    model: 'deepseek-v4-flash',
+    purpose: 'translation',
+    background: true,
+    startedAt: '2026-09-30T08:00:00.000Z',
+  }, controls);
+
+  assert.ok(receipt.id);
+  assert.equal(completeLlmReceipt(receipt, {
+    providerRequestId: 'req-1',
+    outputChars: 12,
+    inputTokens: 20,
+    outputTokens: 8,
+    totalTokens: 28,
+    tokenSource: 'provider',
+    costYuanEstimate: 0.000084,
+    finishedAt: '2026-09-30T08:00:01.250Z',
+  }, controls), true);
+
+  const db = new DatabaseSync(dbPath);
+  const row = db.prepare('SELECT * FROM llm_call_receipts WHERE id=?').get(receipt.id);
+  const columns = db.prepare('PRAGMA table_info(llm_call_receipts)').all().map(column => column.name);
+  db.close();
+
+  assert.equal(row.status, 'succeeded');
+  assert.equal(row.duration_ms, 1250);
+  assert.equal(row.request_fingerprint, fingerprintMessages(messages));
+  assert.equal(row.total_tokens, 28);
+  assert.equal(columns.includes('prompt'), false);
+  assert.equal(columns.includes('response'), false);
+  assert.equal(JSON.stringify(row).includes('这是私密 prompt'), false);
+});
+
+test('failures distinguish provider rejection, budget block, and uncertain transport outcome', () => {
+  assert.deepEqual(classifyLlmError(new Error('HTTP 402 insufficient balance'), { dispatched: true }), {
+    status: 'failed', kind: 'provider_rejected',
+  });
+  assert.deepEqual(classifyLlmError(new Error('当日调用已达上限 200'), { dispatched: false }), {
+    status: 'blocked', kind: 'budget',
+  });
+  assert.deepEqual(classifyLlmError(new Error('socket disconnected'), { dispatched: true }), {
+    status: 'unknown', kind: 'transport',
+  });
+});
+
+test('receipt failure cannot break the business call when its database is unavailable', () => {
+  const unavailable = { openDatabase: () => { throw new Error('disk unavailable'); } };
+  assert.equal(beginLlmReceipt({
+    messages: [{ role: 'user', content: 'hello' }], provider: 'qwen', model: 'qwen', purpose: 'test',
+  }, unavailable), null);
+});
+
+test('report aggregates today by purpose and keeps recent problem evidence', () => {
+  const { dbPath, controls } = setup();
+  const success = beginLlmReceipt({
+    messages: [{ role: 'user', content: 'a' }], provider: 'qwen', model: 'qwen3.5-flash',
+    purpose: 'feed-summary', startedAt: '2026-09-30T18:00:00.000Z',
+  }, controls);
+  completeLlmReceipt(success, {
+    totalTokens: 100, tokenSource: 'provider', costYuanEstimate: 0.01,
+    finishedAt: '2026-09-30T18:00:01.000Z',
+  }, controls);
+
+  const uncertain = beginLlmReceipt({
+    messages: [{ role: 'user', content: 'b' }], provider: 'deepseek', model: 'deepseek-v4-flash',
+    purpose: 'translation', startedAt: '2026-09-30T19:00:00.000Z',
+  }, controls);
+  markLlmReceiptDispatched(uncertain, { dispatchedAt: '2026-09-30T19:00:00.100Z' }, controls);
+  failLlmReceipt(uncertain, new Error('network timeout'), {
+    dispatched: true, finishedAt: '2026-09-30T19:00:03.000Z',
+  }, controls);
+
+  const report = getLlmCallReport({
+    days: 30, limit: 10, now: new Date('2026-09-30T20:00:00.000Z'),
+  }, controls);
+  const db = new DatabaseSync(dbPath);
+  const uncertainRow = db.prepare('SELECT status, error_kind FROM llm_call_receipts WHERE id=?').get(uncertain.id);
+  db.close();
+
+  assert.equal(report.today.calls, 2);
+  assert.equal(report.today.succeeded, 1);
+  assert.equal(report.today.unknown, 1);
+  assert.equal(report.today.total_tokens, 100);
+  assert.equal(report.byPurpose.length, 2);
+  assert.equal(report.recent.length, 2);
+  assert.deepEqual({ ...uncertainRow }, { status: 'unknown', error_kind: 'transport' });
+});
+
+test('stale reserved receipts are reconciled after a process interruption', () => {
+  const { dbPath, controls } = setup();
+  const beforeDispatch = beginLlmReceipt({
+    messages: [], provider: 'qwen', model: 'qwen', purpose: 'before-dispatch',
+    startedAt: '2026-09-30T17:00:00.000Z',
+  }, controls);
+  const afterDispatch = beginLlmReceipt({
+    messages: [], provider: 'deepseek', model: 'deepseek', purpose: 'after-dispatch',
+    startedAt: '2026-09-30T17:01:00.000Z',
+  }, controls);
+  markLlmReceiptDispatched(afterDispatch, { dispatchedAt: '2026-09-30T17:01:00.100Z' }, controls);
+
+  getLlmCallReport({ now: new Date('2026-09-30T18:00:00.000Z') }, controls);
+  const db = new DatabaseSync(dbPath);
+  const rows = db.prepare('SELECT id, status, error_kind FROM llm_call_receipts ORDER BY started_at').all();
+  db.close();
+
+  assert.deepEqual(rows.map(row => ({ status: row.status, kind: row.error_kind })), [
+    { status: 'failed', kind: 'process_interrupted' },
+    { status: 'unknown', kind: 'process_interrupted' },
+  ]);
+  assert.equal(rows[0].id, beforeDispatch.id);
+  assert.equal(rows[1].id, afterDispatch.id);
+});

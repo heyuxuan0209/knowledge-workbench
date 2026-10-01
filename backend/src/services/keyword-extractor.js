@@ -1,13 +1,8 @@
-import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import { chat } from './llm.js';
 
 // 加载环境变量
 dotenv.config();
-
-const deepseekClient = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || '',
-  baseURL: 'https://api.deepseek.com'
-});
 
 // 使用 Deepseek 提取关键词
 export async function extractKeywords(title, summary) {
@@ -17,23 +12,23 @@ export async function extractKeywords(title, summary) {
   }
 
   try {
-    const response = await deepseekClient.chat.completions.create({
-      model: 'deepseek-v4-flash', // 关键词提取=杂活，走便宜款（ADR-071 分级；deepseek-chat 已作废）
-      messages: [
-        {
-          role: 'system',
-          content: '你是一个关键词提取专家。从文章标题和摘要中提取 3-5 个最重要的关键词，用逗号分隔。只返回关键词，不要其他内容。'
-        },
-        {
-          role: 'user',
-          content: `标题：${title}\n摘要：${summary}`
-        }
-      ],
+    const result = await chat([
+      {
+        role: 'system',
+        content: '你是一个关键词提取专家。从文章标题和摘要中提取 3-5 个最重要的关键词，用逗号分隔。只返回关键词，不要其他内容。'
+      },
+      {
+        role: 'user',
+        content: `标题：${title}\n摘要：${summary}`
+      }
+    ], 'deepseek', 'deepseek-v4-flash', {
       temperature: 0.3,
-      max_tokens: 50
+      maxTokens: 50,
+      purpose: 'keyword-extraction',
+      background: true,
     });
-
-    const keywords = response.choices[0]?.message?.content?.trim();
+    if (!result.success) throw new Error(result.error);
+    const keywords = result.content?.trim();
     return keywords || null;
   } catch (error) {
     console.error('Failed to extract keywords:', error.message);

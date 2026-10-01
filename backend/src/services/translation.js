@@ -85,9 +85,11 @@ ${text}
 
   // 单次重试：翻译量大时（一次 RSS 同步几百条）偶发连接抖动，重试一次再抛
   let result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'translation', background });
-  if (!result.success) {
+  if (!result.success && !result.uncertain) {
     await new Promise(r => setTimeout(r, 800));
-    result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'translation-retry', background });
+    result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', {
+      maxTokens: 1500, purpose: 'translation-retry', background, retryOf: result.receiptId,
+    });
   }
   if (!result.success) {
     throw new Error(`翻译失败: ${result.error}`);

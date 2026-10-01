@@ -9,7 +9,7 @@
     "dev": "node --watch src/server.js",
     "init-db": "node src/db/init.js",
     "test:security": "node --test src/middleware/production-security.test.js",
-    "test:cost-guard": "node --test src/services/llm.test.js src/services/sync-rss.test.js",
+    "test:cost-guard": "node --test src/services/llm.test.js src/services/llm-receipts.test.js src/services/sync-rss.test.js",
     "test:curation-bench": "node --test src/services/curation-policy.test.js src/services/curation-bench.test.js",
     "test:source-health": "node --test src/services/source-health.test.js src/services/sync-status.test.js src/services/rss-health.test.js",
     "eval:curation": "node scripts/eval-curation-bench.mjs",
