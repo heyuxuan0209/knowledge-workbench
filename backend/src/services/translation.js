@@ -32,6 +32,9 @@ const MAX_CHUNK_LENGTH = 3000; // 字符数，留出安全余量避免超出 con
 // 会跳过绝大多数十几分钟的正常长度视频。调到 30000（约可覆盖 40-50 分钟的视频转录），
 // 仍远低于 Deepseek 64k tokens 的 context window，成本和延迟随长度线性增长、可接受。
 const MAX_TRANSCRIPT_LENGTH_FOR_SEGMENTATION = 30000;
+export const LONG_VIDEO_THRESHOLD = 20000;
+const LONG_VIDEO_CHUNK_LENGTH = 18000;
+const LONG_VIDEO_CONCURRENCY = 3;
 
 export function detectLanguage(text) {
   if (!text || text.trim().length === 0) return 'unknown';
@@ -45,7 +48,7 @@ export function detectLanguage(text) {
 }
 
 // 按句子/换行边界切分长文本，避免把一句话硬切断影响翻译质量
-function splitIntoChunks(text, maxLength) {
+export function splitIntoChunks(text, maxLength) {
   if (text.length <= maxLength) return [text];
 
   const sentences = text.split(/(?<=[。！？.!?\n])/);
@@ -63,6 +66,142 @@ function splitIntoChunks(text, maxLength) {
   if (current) chunks.push(current);
 
   return chunks;
+}
+
+function formatClock(totalSeconds) {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return null;
+  const seconds = Math.round(totalSeconds);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return h > 0
+    ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// 长视频不能再沿用“截前 2 万字”的短文策略。这里先按字幕片段边界切块，保留每块
+// 的真实起止时间；yt-dlp 字幕没有结构化时间戳时，才按全文位置和视频总时长估算。
+export function buildLongVideoChunks(ingested, maxLength = LONG_VIDEO_CHUNK_LENGTH) {
+  const transcript = Array.isArray(ingested.transcript)
+    ? ingested.transcript.filter(seg => String(seg?.text || '').trim())
+    : [];
+  if (transcript.length) {
+    const chunks = [];
+    let current = [];
+    let chars = 0;
+    const flush = () => {
+      if (!current.length) return;
+      const first = current[0];
+      const last = current[current.length - 1];
+      chunks.push({
+        text: current.map(seg => seg.text).join(' '),
+        startSeconds: Number(first.offset || 0) / 1000,
+        endSeconds: (Number(last.offset || 0) + Number(last.duration || 0)) / 1000,
+      });
+      current = [];
+      chars = 0;
+    };
+    for (const segment of transcript) {
+      const text = String(segment.text || '').trim();
+      if (current.length && chars + text.length + 1 > maxLength) flush();
+      current.push({ ...segment, text });
+      chars += text.length + 1;
+    }
+    flush();
+    return chunks;
+  }
+
+  const textChunks = splitIntoChunks(ingested.body || '', maxLength);
+  const duration = Number(ingested.metadata?.durationSeconds);
+  const totalChars = Math.max(1, textChunks.reduce((sum, text) => sum + text.length, 0));
+  let consumed = 0;
+  return textChunks.map(text => {
+    const startRatio = consumed / totalChars;
+    consumed += text.length;
+    const endRatio = consumed / totalChars;
+    return {
+      text,
+      startSeconds: Number.isFinite(duration) ? duration * startRatio : null,
+      endSeconds: Number.isFinite(duration) ? duration * endRatio : null,
+    };
+  });
+}
+
+async function defaultLongVideoSectionSummary(chunk, index, total, context) {
+  const range = chunk.startSeconds != null && chunk.endSeconds != null
+    ? `${formatClock(chunk.startSeconds)}–${formatClock(chunk.endSeconds)}`
+    : `第 ${index + 1}/${total} 段`;
+  const prompt = `你正在处理一条长视频的完整字幕。这是按时间顺序切出的 ${range}（共 ${total} 段中的第 ${index + 1} 段）。
+
+请把这一段压缩成中文“内容档案”，供下一阶段据此写完整精读。要求：
+1. 覆盖本段所有实质主题和明显的主题转折，不只总结开头
+2. 保留关键定义、论证链、案例、步骤、数字、人物/产品名和限制条件
+3. 叙事按原顺序；字幕含糊处标“存疑”，不要补充外部知识
+4. 不写空泛评价，不重复任务说明；用 4–10 个有信息量的要点
+5. 开头保留时间范围：## ${range}
+
+字幕：
+${chunk.text}`;
+  const options = {
+    maxTokens: 1400,
+    purpose: 'long-video-section-summary',
+    contexts: [{ ...context, target: `section_${index + 1}` }],
+  };
+  let result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', options);
+  if (!result.success && !result.uncertain) {
+    result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', {
+      ...options, purpose: 'long-video-section-summary-retry', retryOf: result.receiptId,
+    });
+  }
+  if (!result.success) throw new Error(`长视频第 ${index + 1}/${total} 段压缩失败：${result.error}`);
+  return result.content.trim();
+}
+
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await worker(items[index], index);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
+
+// Map-reduce 的 map 阶段：用若干带时间范围的中文内容档案替代 20k 硬截断。
+// reduce 阶段由现有“即时分析”精读 Prompt 完成，这样不会多生成一遍最终稿。
+export async function summarizeLongVideo(ingested, { summarizeSection = defaultLongVideoSectionSummary } = {}) {
+  const chunks = buildLongVideoChunks(ingested);
+  if (!chunks.length) throw new Error('长视频字幕为空，无法生成全片覆盖摘要');
+  const context = {
+    kind: 'youtube',
+    id: ingested.metadata?.sourceUrl || null,
+    label: ingested.title || 'YouTube 长视频',
+    url: ingested.metadata?.sourceUrl || null,
+  };
+  const sections = await mapWithConcurrency(chunks, LONG_VIDEO_CONCURRENCY,
+    (chunk, index) => summarizeSection(chunk, index, chunks.length, context));
+  const last = chunks[chunks.length - 1];
+  const coverageEndSeconds = Number.isFinite(last.endSeconds) ? last.endSeconds : null;
+  const coverageLabel = coverageEndSeconds != null ? `00:00–${formatClock(coverageEndSeconds)}` : '完整字幕首尾';
+  const partial = Boolean(ingested.sourceTruncated);
+  const coverageStatement = partial
+    ? `【覆盖范围声明】原视频没有可用字幕，本次只取得 ${coverageLabel} 的音频转写；以下 ${chunks.length} 段已覆盖这部分材料，但不代表全片。`
+    : `【全片覆盖说明】以下内容由完整字幕分成 ${chunks.length} 段逐段压缩，覆盖 ${coverageLabel}，不是只截取前段。最终精读必须综合所有分段。`;
+  return {
+    zhBody: [
+      coverageStatement,
+      ...sections,
+    ].join('\n\n'),
+    coverage: {
+      mode: partial ? 'partial-transcript-map-reduce' : 'full-transcript-map-reduce',
+      sectionCount: chunks.length,
+      sourceChars: (ingested.body || '').length,
+      coverageEndSeconds,
+    },
+  };
 }
 
 async function translateChunk(text, { background = false, contexts = [] } = {}) {
@@ -181,6 +320,29 @@ export async function translateContent(ingested) {
   }
 
   const lang = detectLanguage(ingested.body);
+
+  if (ingested.type === 'youtube' && ingested.body.length > LONG_VIDEO_THRESHOLD) {
+    const context = {
+      kind: 'youtube', id: ingested.metadata?.sourceUrl || null,
+      label: ingested.title || 'YouTube 长视频', url: ingested.metadata?.sourceUrl || null,
+    };
+    const [{ zhBody, coverage }, zhTitle] = await Promise.all([
+      summarizeLongVideo(ingested),
+      lang === 'zh' || !ingested.title
+        ? Promise.resolve(ingested.title || null)
+        : translateText(ingested.title, { contexts: [{ ...context, target: 'zh_title' }] }),
+    ]);
+    return {
+      originalLang: lang,
+      hasTranslation: lang !== 'zh',
+      zhTitle,
+      zhBody,
+      zhChapters: [],
+      enTitle: lang === 'zh' ? null : (ingested.title || null),
+      enBody: null,
+      coverage,
+    };
+  }
 
   if (lang === 'zh') {
     return {

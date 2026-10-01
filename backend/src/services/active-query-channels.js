@@ -151,6 +151,7 @@ export async function fetchYoutubeDetail(videoId) {
       title: d.title || null,
       channel: d.channel || d.uploader || null,
       description: (d.description || '').trim().slice(0, 500) || null,
+      durationSeconds: Number.isFinite(Number(d.duration)) ? Number(d.duration) : null,
       publishedAt: d.timestamp
         ? new Date(d.timestamp * 1000).toISOString()
         : (d.upload_date ? `${d.upload_date.slice(0, 4)}-${d.upload_date.slice(4, 6)}-${d.upload_date.slice(6, 8)}T00:00:00Z` : null),

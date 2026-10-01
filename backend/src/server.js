@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import { setGlobalDispatcher, EnvHttpProxyAgent } from 'undici';
 import { createAccessProtection, createCorsOptions, securityHeaders } from './middleware/production-security.js';
 
+const INGEST_PIPELINE_VERSION = 2;
+
 dotenv.config();
 const { migrateM30 } = await import('./db/migrate-m30.js');
 migrateM30(); // 幂等：先建单信源运行账本，避免首次打开信源页才触发 schema 写入。
@@ -177,7 +179,9 @@ app.post('/api/content/ingest', async (req, res) => {
     if (isUrl && !refresh) {
       const { getIngestCache } = await import('./db/ingest-cache.js');
       const cached = getIngestCache(input);
-      if (cached) {
+      const staleYoutubeCache = cached?.type === 'youtube'
+        && cached.ingestPipelineVersion !== INGEST_PIPELINE_VERSION;
+      if (cached && !staleYoutubeCache) {
         return res.json({ success: true, data: { ...cached, fromCache: true } });
       }
     }
@@ -192,10 +196,10 @@ app.post('/api/content/ingest', async (req, res) => {
       });
     }
 
-    // 长视频/长文保护：全文翻译按 20k 字符截断（2 小时视频字幕 10 万+字符，
-    // 全翻要数分钟且费用高；前段已足够支撑解读，后续 M5 做分段/按需翻译）
+    // 长文保护仍保留 20k；长 YouTube 已在 translateContent 内走“全字幕分段压缩”，
+    // 不能先截断，否则会制造“完整解读”实际只覆盖开头的假象。
     let truncated = false;
-    if (ingested.body && ingested.body.length > 20000) {
+    if (ingested.type !== 'youtube' && ingested.body && ingested.body.length > 20000) {
       ingested.body = ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）';
       if (Array.isArray(ingested.transcript)) {
         let acc = 0;
@@ -213,7 +217,16 @@ app.post('/api/content/ingest', async (req, res) => {
       translation = await translateContent(ingested);
     }
 
-    const data = { ...ingested, ...translation, truncated };
+    // 长视频返回给浏览器的是全片分段档案，不再携带数百 KB 原字幕/时间轴；原字幕已经
+    // 被逐段消费，保留 coverage 事实即可，避免后续每轮对话请求膨胀。
+    const compactLongVideo = translation.coverage?.mode?.endsWith('transcript-map-reduce');
+    const data = {
+      ...ingested,
+      ...(compactLongVideo ? { body: null, transcript: [] } : {}),
+      ...translation,
+      truncated,
+      ingestPipelineVersion: INGEST_PIPELINE_VERSION,
+    };
 
     // 写缓存：仅 URL 类、且真花了力气（视频/音频/网页抓取）。飞书文档是你自己的、随时会改，不缓存。
     if (isUrl && ingested.type !== 'feishu') {

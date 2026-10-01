@@ -374,6 +374,7 @@ function youtubeMetadata(detail, input) {
     author: detail.channel,
     publishedAt: detail.publishedAt?.slice(0, 10) || null,
     platform: 'YouTube',
+    durationSeconds: detail.durationSeconds || null,
     sourceUrl: input,
   } : { platform: 'YouTube', sourceUrl: input };
 }
@@ -467,6 +468,7 @@ export async function ingestYoutube(input, deps = {}) {
           : asr.truncated
             ? `该视频没有可用字幕，已语音转写前 ${Math.round((asr.maxSeconds || 2400) / 60)} 分钟，可能存在少量听写误差`
             : '该视频没有可用字幕，正文由语音转写生成，可能存在少量听写误差',
+        sourceTruncated: Boolean(asr.truncated),
         transcriptEngine: asr.engine || asr.source || 'asr',
         fetchStatus: 'success',
         fetchError: null,

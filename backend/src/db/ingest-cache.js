@@ -100,7 +100,8 @@ export function setIngestCache(url, payload, engine = null) {
   const key = normalizeUrlKey(url);
   db.prepare(`INSERT INTO ingest_cache (url_key, url, payload, engine, used_at)
     VALUES (?, ?, ?, ?, datetime('now'))
-    ON CONFLICT(url_key) DO UPDATE SET payload = excluded.payload, engine = excluded.engine, used_at = datetime('now')`)
+    ON CONFLICT(url_key) DO UPDATE SET payload = excluded.payload, engine = excluded.engine,
+      interpretation = NULL, used_at = datetime('now')`)
     .run(key, String(url), JSON.stringify(payload), engine);
   db.close();
 }
