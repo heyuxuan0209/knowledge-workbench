@@ -231,7 +231,12 @@ app.post('/api/content/ingest', async (req, res) => {
     // 写缓存：仅 URL 类、且真花了力气（视频/音频/网页抓取）。飞书文档是你自己的、随时会改，不缓存。
     if (isUrl && ingested.type !== 'feishu') {
       import('./db/ingest-cache.js')
-        .then(({ setIngestCache }) => setIngestCache(input, data, ingested.transcriptEngine || null))
+        .then(({ setIngestCache }) => setIngestCache(
+          input,
+          data,
+          ingested.transcriptEngine || null,
+          { body: ingested.body, transcript: ingested.transcript },
+        ))
         .catch(err => console.warn('[ingest-cache] 写缓存失败（不影响返回）:', err.message));
     }
 
@@ -257,14 +262,23 @@ app.post('/api/content/interpretation-cache', async (req, res) => {
   }
 });
 
-// 插件「转发飞书」（ADR-067）：把当前解读推给用户本人私信（手机同步可见）
+// 插件「转发飞书」：视频走“视频解读”三层交付（群卡片 + 文档 + 原链接）；
+// 其他内容仍走笔记助手私信。视频通道失败时不允许静默回退笔记助手。
 app.post('/api/feishu/push-digest', async (req, res) => {
   try {
-    const { text } = req.body || {};
+    const { text, url, title, interpretation, contentType } = req.body || {};
+    if (contentType === 'video') {
+      if (!url || !interpretation?.trim()) {
+        return res.status(400).json({ success: false, error: '视频发送需要 url 和 interpretation' });
+      }
+      const { deliverVideoDigest } = await import('./services/feishu-video-delivery.js');
+      const data = await deliverVideoDigest({ url, title, interpretation });
+      return res.json({ success: true, data });
+    }
     if (!text?.trim()) return res.status(400).json({ success: false, error: 'text is required' });
     const { sendToOwner } = await import('./services/feishu-bot.js');
     await sendToOwner(text.slice(0, 9000));
-    res.json({ success: true });
+    res.json({ success: true, data: { target: 'note' } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

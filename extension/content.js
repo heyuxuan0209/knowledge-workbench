@@ -162,6 +162,8 @@ async function openPanel(url, srcLabel) {
     return;
   }
   const d = res.data; state.data = d;
+  const video = d.type === 'youtube' || d.type === 'video' || /YouTube|B站视频/i.test(d.metadata?.platform || '');
+  ui.fwd.textContent = video ? '✈ 发到「视频解读」' : '✈ 转发到笔记助手';
 
   const m = d.metadata || {};
   const srcBits = [m.author, m.platform, m.publishedAt, d.note].filter(Boolean).join(' · ');
@@ -280,24 +282,30 @@ async function saveNote() {
   }
 }
 
-// 转发到飞书（ADR-067）：解读推给用户本人私信，手机上也能看/继续在飞书里追问
+// 转发到飞书：视频发到「视频解读」卡片 + 完整文档；其他内容进笔记助手。
 async function pushToFeishu() {
   if (!state?.data || state.streaming) return;
   const d = state.data, m = d.metadata || {};
   const interp = state.chat.find(x => x.role === 'assistant')?.content || (d.zhBody || d.body || '').slice(0, 3000);
+  const video = d.type === 'youtube' || d.type === 'video' || /YouTube|B站视频/i.test(m.platform || '');
   const text = [`📖 ${d.zhTitle || d.title || state.url}`,
     [m.author, m.platform].filter(Boolean).join(' · ') || null,
     state.url, '', interp].filter(x => x !== null).join('\n');
   const old = ui.fwd.textContent;
-  ui.fwd.textContent = '发送中…';
+  ui.fwd.textContent = video ? '正在生成完整文档并发卡片…' : '发送中…';
   try {
     const r = await fetch(`${KW}/api/feishu/push-digest`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(video ? {
+        contentType: 'video',
+        url: state.url,
+        title: d.zhTitle || d.title || state.url,
+        interpretation: interp,
+      } : { contentType: 'note', text }),
     });
     const res = await r.json();
     if (!res.success) throw new Error(res.error || '发送失败');
-    ui.fwd.textContent = '✓ 已发到你的飞书';
+    ui.fwd.textContent = video ? '✓ 已发到「视频解读」' : '✓ 已发到笔记助手';
   } catch (e) {
     ui.fwd.textContent = `发送失败：${e.message.slice(0, 18)}`;
     setTimeout(() => { ui.fwd.textContent = old; }, 2500);

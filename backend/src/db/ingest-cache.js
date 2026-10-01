@@ -21,6 +21,10 @@ function ensureTable(db) {
   // 已存在的旧表补列（首版没有 interpretation，这里幂等补上）
   const cols = db.prepare('PRAGMA table_info(ingest_cache)').all().map(c => c.name);
   if (!cols.includes('interpretation')) db.exec('ALTER TABLE ingest_cache ADD COLUMN interpretation TEXT');
+  // 长视频返回浏览器时会丢掉数百 KB 的原字幕，但“发到视频解读”需要用它
+  // 生成完整飞书文档。单独存在服务端列里，避免 getIngestCache() 把大文本回传给插件。
+  if (!cols.includes('source_body')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_body TEXT');
+  if (!cols.includes('source_transcript')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_transcript TEXT');
   ready = true;
 }
 
@@ -94,15 +98,46 @@ export function setCachedInterpretation(url, interpretation) {
 }
 
 // 写缓存（upsert）。engine 从 payload.transcriptEngine 或调用方传入，仅诊断。
-export function setIngestCache(url, payload, engine = null) {
+export function setIngestCache(url, payload, engine = null, source = null) {
   const db = getDatabase();
   ensureTable(db);
   const key = normalizeUrlKey(url);
-  db.prepare(`INSERT INTO ingest_cache (url_key, url, payload, engine, used_at)
-    VALUES (?, ?, ?, ?, datetime('now'))
+  const sourceBody = source?.body ?? null;
+  const sourceTranscript = Array.isArray(source?.transcript) ? JSON.stringify(source.transcript) : null;
+  db.prepare(`INSERT INTO ingest_cache (url_key, url, payload, engine, source_body, source_transcript, used_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(url_key) DO UPDATE SET payload = excluded.payload, engine = excluded.engine,
+      source_body = COALESCE(excluded.source_body, ingest_cache.source_body),
+      source_transcript = COALESCE(excluded.source_transcript, ingest_cache.source_transcript),
       interpretation = NULL, used_at = datetime('now')`)
-    .run(key, String(url), JSON.stringify(payload), engine);
+    .run(key, String(url), JSON.stringify(payload), engine, sourceBody, sourceTranscript);
+  db.close();
+}
+
+// 飞书视频交付专用：只在服务端取原字幕，不经通用 ingest API 返回浏览器。
+export function getIngestSource(url) {
+  const db = getDatabase();
+  ensureTable(db);
+  const row = db.prepare('SELECT source_body, source_transcript FROM ingest_cache WHERE url_key = ?')
+    .get(normalizeUrlKey(url));
+  db.close();
+  if (!row?.source_body) return null;
+  let transcript = [];
+  try { transcript = row.source_transcript ? JSON.parse(row.source_transcript) : []; } catch { transcript = []; }
+  return { body: row.source_body, transcript };
+}
+
+// 旧缓存没有 source_body 时，发送链路只补原字幕，不清掉已有解读。
+export function setIngestSource(url, source) {
+  if (!source?.body?.trim()) return;
+  const db = getDatabase();
+  ensureTable(db);
+  db.prepare(`UPDATE ingest_cache SET source_body = ?, source_transcript = ?, used_at = datetime('now')
+    WHERE url_key = ?`).run(
+    source.body,
+    Array.isArray(source.transcript) ? JSON.stringify(source.transcript) : null,
+    normalizeUrlKey(url),
+  );
   db.close();
 }
 

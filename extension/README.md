@@ -25,7 +25,7 @@
 
 - **Mac App**：拷贝链接 → 点「读懂.app」（在 `~/Applications/`，可拖进 Dock / Spotlight 搜"读懂"）→ 自动打开 KW 工作台开始解读。源码 `mac-launcher/dudong.applescript`，改后 `osacompile -o ~/Applications/"读懂.app" extension/mac-launcher/dudong.applescript` 重编译。想进系统分享菜单：快捷指令 App 新建 →「接收 URL」→「打开 URL：`http://localhost:5173/?analyze=[快捷指令输入]`」→ 勾选"在共享工作表中显示"。
 - **iPhone / 任意设备**：把链接直接发给飞书「KW 笔记助手」私信 → 机器人解读后回复；可追问、回「全文」拿完整中文稿、回一句感想立为灵感（ADR-066 同款分流）。
-- 插件面板里的「✈ 转发到飞书」会把当前解读推到你的飞书私信（手机同步可见）。
+- 插件面板的飞书出口按内容分流：YouTube / X 视频 / B 站视频发到「视频解读」群机器人，交付摘要卡片、原视频链接和完整飞书文档；其他内容仍发到「KW 笔记助手」私信。视频通道失败时会直接报错，不会偷偷改发笔记助手。
 
 ## 已知边界（v0.2）
 
