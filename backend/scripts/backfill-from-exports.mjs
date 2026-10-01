@@ -132,6 +132,7 @@ async function fetchRecords() {
   do {
     const r = await feishuFetch(`/open-apis/bitable/v1/apps/${APP}/tables/${TABLE}/records`, {
       query: { page_size: 100, ...(page ? { page_token: page } : {}) },
+      preferUser: true,
     });
     items.push(...(r.items || []));
     page = r.has_more ? r.page_token : null;
@@ -140,7 +141,10 @@ async function fetchRecords() {
 }
 
 async function fetchFieldNames() {
-  const r = await feishuFetch(`/open-apis/bitable/v1/apps/${APP}/tables/${TABLE}/fields`, { query: { page_size: 200 } });
+  const r = await feishuFetch(`/open-apis/bitable/v1/apps/${APP}/tables/${TABLE}/fields`, {
+    query: { page_size: 200 },
+    preferUser: true,
+  });
   return new Set(r.items.map((f) => f.field_name));
 }
 
@@ -304,6 +308,7 @@ const main = async () => {
     else {
       await feishuFetch(`/open-apis/bitable/v1/apps/${APP}/tables/${TABLE}/records/${rec.record_id}`, {
         method: 'PUT', body: { fields },
+        preferUser: true,
       });
       log(`  ✅ ${desc}`);
     }

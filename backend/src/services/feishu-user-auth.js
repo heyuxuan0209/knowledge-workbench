@@ -7,6 +7,8 @@ import { feishuBase } from './feishu-auth.js';
 // 令牌存 app_meta（本地 DB、gitignore）；access ~2h、refresh ~30d，自动续期。私信机器人仍用应用身份，不受影响。
 
 const KEY = 'feishu_user_token';
+const oauthAppId = () => process.env.FEISHU_OAUTH_APP_ID || process.env.FEISHU_APP_ID;
+const oauthAppSecret = () => process.env.FEISHU_OAUTH_APP_SECRET || process.env.FEISHU_APP_SECRET;
 
 function load() {
   const db = getDatabase();
@@ -36,11 +38,11 @@ export function redirectUri() {
 // 授权页在 accounts.feishu.cn（不在 open.feishu.cn/open-apis 下，那个会 404），且必须带 response_type=code。
 export function authorizeUrl(state = 'kw') {
   const scope = process.env.FEISHU_OAUTH_SCOPE
-    || 'docx:document:readonly drive:drive:readonly wiki:wiki:readonly offline_access';
+    || 'docx:document:readonly drive:drive:readonly wiki:wiki:readonly base:field:read base:record:retrieve base:record:update offline_access';
   const accountsBase = process.env.FEISHU_ACCOUNTS_BASE
     || (feishuBase().includes('larksuite') ? 'https://accounts.larksuite.com' : 'https://accounts.feishu.cn');
   const u = new URL(accountsBase + '/open-apis/authen/v1/authorize');
-  u.searchParams.set('client_id', process.env.FEISHU_APP_ID);
+  u.searchParams.set('client_id', oauthAppId());
   u.searchParams.set('redirect_uri', redirectUri());
   u.searchParams.set('scope', scope);
   u.searchParams.set('response_type', 'code');
@@ -74,8 +76,8 @@ function store(d) {
 export async function exchangeCode(code) {
   const d = await tokenRequest({
     grant_type: 'authorization_code',
-    client_id: process.env.FEISHU_APP_ID,
-    client_secret: process.env.FEISHU_APP_SECRET,
+    client_id: oauthAppId(),
+    client_secret: oauthAppSecret(),
     code,
     redirect_uri: redirectUri(),
   });
@@ -93,8 +95,8 @@ export async function getUserAccessTokenIfConnected() {
   try {
     const d = await tokenRequest({
       grant_type: 'refresh_token',
-      client_id: process.env.FEISHU_APP_ID,
-      client_secret: process.env.FEISHU_APP_SECRET,
+      client_id: oauthAppId(),
+      client_secret: oauthAppSecret(),
       refresh_token: t.refresh_token,
     });
     if (!d.access_token) return null;
