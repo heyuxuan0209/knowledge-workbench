@@ -2692,6 +2692,22 @@ app.get('/api/stats/llm-calls', async (req, res) => {
   }
 });
 
+app.get('/api/stats/llm-call-events', async (req, res) => {
+  try {
+    const { listLlmCallReceipts } = await import('./services/llm-receipts.js');
+    const data = listLlmCallReceipts({
+      scope: req.query.scope,
+      status: req.query.status,
+      purpose: req.query.purpose || null,
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/stats/llm-calls/:id', async (req, res) => {
   try {
     const { getLlmCallReceipt } = await import('./services/llm-receipts.js');

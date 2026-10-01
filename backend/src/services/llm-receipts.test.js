@@ -12,6 +12,7 @@ import {
   fingerprintMessages,
   getLlmCallReceipt,
   getLlmCallReport,
+  listLlmCallReceipts,
   markLlmReceiptDispatched,
   normalizeLlmContexts,
   reviewLlmCallReceipt,
@@ -175,6 +176,43 @@ test('an abnormal receipt can be reviewed and reopened without changing accounti
   assert.equal(reopened.reviewed_at, null);
   assert.equal(reopened.review_note, null);
   assert.equal(reopened.status, 'failed');
+});
+
+test('anomaly list supports complete status, purpose, scope, and pagination filters', () => {
+  const { controls } = setup();
+  const createFailure = ({ purpose, startedAt, message, dispatched = true }) => {
+    const receipt = beginLlmReceipt({
+      messages: [], provider: 'deepseek', model: 'deepseek', purpose, startedAt,
+      contexts: [{ kind: 'content', id: `${purpose}-${startedAt}`, label: purpose }],
+    }, controls);
+    failLlmReceipt(receipt, new Error(message), {
+      dispatched, finishedAt: new Date(new Date(startedAt).getTime() + 1000).toISOString(),
+    }, controls);
+    return receipt;
+  };
+  createFailure({ purpose: 'translation', startedAt: '2026-09-30T18:00:00.000Z', message: 'HTTP 402 insufficient balance' });
+  createFailure({ purpose: 'feed-summary', startedAt: '2026-09-30T19:00:00.000Z', message: 'network timeout' });
+  createFailure({ purpose: 'feed-summary', startedAt: '2026-09-30T19:30:00.000Z', message: '当日调用已达上限', dispatched: false });
+  createFailure({ purpose: 'translation', startedAt: '2026-08-01T18:00:00.000Z', message: 'HTTP 402 insufficient balance' });
+
+  const now = new Date('2026-09-30T20:00:00.000Z');
+  const all = listLlmCallReceipts({ now, scope: 'today', pageSize: 2 }, controls);
+  assert.equal(all.total, 3);
+  assert.equal(all.items.length, 2);
+  assert.equal(all.pages, 2);
+  assert.deepEqual(all.statusCounts, { blocked: 1, failed: 1, unknown: 1 });
+  assert.deepEqual(all.purposes.map(row => [row.purpose, row.count]), [['feed-summary', 2], ['translation', 1]]);
+
+  const failed = listLlmCallReceipts({ now, scope: 'today', status: 'failed' }, controls);
+  assert.equal(failed.total, 1);
+  assert.equal(failed.items[0].purpose, 'translation');
+
+  const summaries = listLlmCallReceipts({ now, scope: 'today', purpose: 'feed-summary' }, controls);
+  assert.equal(summaries.total, 2);
+  assert.deepEqual(new Set(summaries.items.map(item => item.status)), new Set(['unknown', 'blocked']));
+
+  const period = listLlmCallReceipts({ now, scope: '30d' }, controls);
+  assert.equal(period.total, 3);
 });
 
 test('stale reserved receipts are reconciled after a process interruption', () => {

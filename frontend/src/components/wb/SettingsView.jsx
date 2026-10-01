@@ -57,6 +57,7 @@ export default function SettingsView() {
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [showReviewed, setShowReviewed] = useState(false)
+  const [anomalyBrowser, setAnomalyBrowser] = useState(null)
 
   const loadLedger = () => {
     api('/api/stats/llm-calls?days=30&limit=12')
@@ -78,6 +79,28 @@ export default function SettingsView() {
     }
   }
 
+  const loadAnomalies = async changes => {
+    const next = {
+      scope: 'today', status: 'all', purpose: '', page: 1,
+      ...(anomalyBrowser || {}), ...changes, open: true, loading: true,
+    }
+    setAnomalyBrowser(next)
+    const query = new URLSearchParams({
+      scope: next.scope,
+      status: next.status,
+      page: String(next.page),
+      pageSize: '20',
+    })
+    if (next.purpose) query.set('purpose', next.purpose)
+    try {
+      const json = await api(`/api/stats/llm-call-events?${query}`)
+      setAnomalyBrowser({ ...next, loading: false, data: json.data })
+    } catch (err) {
+      setError(err.message)
+      setAnomalyBrowser({ ...next, loading: false, data: { items: [], total: 0, pages: 1, statusCounts: {}, purposes: [] } })
+    }
+  }
+
   const markReviewed = async reviewed => {
     if (!detail) return
     const json = await api(`/api/stats/llm-calls/${detail.id}/review`, {
@@ -85,6 +108,7 @@ export default function SettingsView() {
     })
     setDetail(json.data)
     loadLedger()
+    if (anomalyBrowser?.open) loadAnomalies({})
     if (reviewed && !showReviewed) setDetail(null)
   }
 
@@ -113,14 +137,17 @@ export default function SettingsView() {
         {ledger && <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, margin: '14px 0 18px' }}>
             {[
-              ['今日调用', today.calls || 0],
-              ['成功', today.succeeded || 0],
-              ['失败／不确定', (today.failed || 0) + (today.unknown || 0)],
-              ['今日估算', money(today.cost_yuan_estimate)],
-            ].map(([label, value]) => <div key={label} style={{ border: '1px solid var(--line10)', borderRadius: 9, padding: '11px 12px', background: 'var(--surface)' }}>
-              <div style={{ color: 'var(--faint)', fontSize: 11 }}>{label}</div>
-              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 3 }}>{value}</div>
-            </div>)}
+              { label: '今日调用', value: today.calls || 0 },
+              { label: '成功', value: today.succeeded || 0 },
+              { label: '今日异常', value: (today.failed || 0) + (today.unknown || 0) + (today.blocked || 0), onClick: () => loadAnomalies({ scope: 'today', status: 'all', purpose: '', page: 1 }) },
+              { label: '今日估算', value: money(today.cost_yuan_estimate) },
+            ].map(card => {
+              const Tag = card.onClick ? 'button' : 'div'
+              return <Tag type={card.onClick ? 'button' : undefined} key={card.label} onClick={card.onClick} style={{ border: '1px solid var(--line10)', borderRadius: 9, padding: '11px 12px', background: 'var(--surface)', textAlign: 'left', cursor: card.onClick ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                <div style={{ color: 'var(--faint)', fontSize: 11 }}>{card.label}{card.onClick ? ' ›' : ''}</div>
+                <div style={{ fontSize: 19, fontWeight: 700, marginTop: 3 }}>{card.value}</div>
+              </Tag>
+            })}
           </div>
 
           <div style={{ color: 'var(--sub2)', fontSize: 11.5, margin: '-7px 0 17px' }}>
@@ -140,9 +167,12 @@ export default function SettingsView() {
           {(ledger.recent || []).length > 0 && <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '18px 0 7px' }}>
               <div style={{ fontSize: 12, fontWeight: 700 }}>待处理异常</div>
-              {(ledger.recent || []).some(item => item.reviewed_at) && <button type="button" onClick={() => setShowReviewed(value => !value)} style={{ border: 0, background: 'none', color: 'var(--accent)', fontSize: 11.5, cursor: 'pointer' }}>
-                {showReviewed ? '隐藏已处理' : '显示已处理'}
-              </button>}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button type="button" onClick={() => loadAnomalies({ scope: 'today', status: 'all', purpose: '', page: 1 })} style={{ border: 0, background: 'none', color: 'var(--accent)', fontSize: 11.5, cursor: 'pointer' }}>查看全部</button>
+                {(ledger.recent || []).some(item => item.reviewed_at) && <button type="button" onClick={() => setShowReviewed(value => !value)} style={{ border: 0, background: 'none', color: 'var(--accent)', fontSize: 11.5, cursor: 'pointer' }}>
+                  {showReviewed ? '隐藏已处理' : '显示已处理'}
+                </button>}
+              </div>
             </div>
             {recentProblems.length === 0 && <div style={{ color: 'var(--faint)', fontSize: 12.5, padding: '8px 0' }}>异常都已确认处理。</div>}
             {recentProblems.map(item => {
@@ -159,10 +189,72 @@ export default function SettingsView() {
       </div>
 
       {detailLoading && <div style={{ position: 'fixed', right: 24, bottom: 24, padding: '10px 14px', borderRadius: 8, background: 'var(--ink)', color: 'white', zIndex: 110 }}>正在读取调用详情…</div>}
+      {anomalyBrowser?.open && (() => {
+        const data = anomalyBrowser.data || { items: [], total: 0, pages: 1, statusCounts: {}, purposes: [] }
+        const counts = data.statusCounts || {}
+        const tabs = [
+          ['all', '全部异常', Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0)],
+          ['failed', '明确失败', counts.failed || 0],
+          ['unknown', '结果不确定', counts.unknown || 0],
+          ['blocked', '已拦截', counts.blocked || 0],
+          ['reserved', '进行中', counts.reserved || 0],
+        ]
+        return <div onClick={() => setAnomalyBrowser(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(28,26,22,.18)', zIndex: 115, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={event => event.stopPropagation()} style={{ width: 'min(660px,94vw)', height: '100%', background: 'var(--surface)', borderLeft: '1px solid var(--line10)', boxShadow: '-12px 0 40px rgba(0,0,0,.08)', padding: '24px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>AI 调用异常明细</div>
+                <div style={{ color: 'var(--sub2)', fontSize: 12, marginTop: 4 }}>共 {data.total || 0} 条，点击查看原因和关联内容</div>
+              </div>
+              <button type="button" onClick={() => setAnomalyBrowser(null)} style={{ border: 0, background: 'none', fontSize: 24, color: 'var(--faint)', cursor: 'pointer' }}>×</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
+              {['today', '30d'].map(scope => <button type="button" key={scope} onClick={() => loadAnomalies({ scope, page: 1 })} style={{ border: '1px solid var(--line10)', borderRadius: 8, padding: '6px 10px', background: anomalyBrowser.scope === scope ? 'var(--accent)' : 'transparent', color: anomalyBrowser.scope === scope ? 'white' : 'var(--sub)', cursor: 'pointer' }}>
+                {scope === 'today' ? '今天' : '近 30 天'}
+              </button>)}
+              <select value={anomalyBrowser.purpose || ''} onChange={event => loadAnomalies({ purpose: event.target.value, page: 1 })} style={{ marginLeft: 'auto', border: '1px solid var(--line10)', borderRadius: 8, padding: '6px 9px', background: 'var(--surface)', color: 'var(--ink)' }}>
+                <option value="">全部任务</option>
+                {(data.purposes || []).map(row => <option key={row.purpose} value={row.purpose}>{purposeName(row.purpose)}（{row.count}）</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: 5, marginTop: 12, flexWrap: 'wrap' }}>
+              {tabs.map(([value, label, count]) => <button type="button" key={value} onClick={() => loadAnomalies({ status: value, page: 1 })} style={{ border: 0, borderRadius: 16, padding: '6px 10px', background: anomalyBrowser.status === value ? 'rgba(61,90,128,.14)' : 'transparent', color: anomalyBrowser.status === value ? 'var(--accent)' : 'var(--sub2)', fontWeight: anomalyBrowser.status === value ? 700 : 400, cursor: 'pointer' }}>
+                {label} {count}
+              </button>)}
+            </div>
+
+            {anomalyBrowser.loading
+              ? <div style={{ color: 'var(--faint)', padding: '28px 0' }}>正在读取明细…</div>
+              : (data.items || []).length === 0
+                ? <div style={{ color: 'var(--faint)', padding: '28px 0' }}>这个筛选条件下没有异常记录。</div>
+                : <div style={{ marginTop: 10 }}>{data.items.map(item => {
+                    const status = STATUS[item.status] || { label: item.status, color: 'var(--sub2)' }
+                    return <button type="button" key={item.id} onClick={() => openDetail(item.id)} style={{ width: '100%', display: 'grid', gridTemplateColumns: '92px 1fr 125px 18px', gap: 10, alignItems: 'center', padding: '12px 0', border: 0, borderTop: '1px solid var(--line08)', background: 'none', textAlign: 'left', cursor: 'pointer', opacity: item.reviewed_at ? 0.58 : 1 }}>
+                      <span style={{ color: status.color, fontWeight: 700, fontSize: 12 }}>{status.label}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <b style={{ fontSize: 12.5 }}>{purposeName(item.purpose)}</b>
+                        <span style={{ color: 'var(--sub2)', fontSize: 11.5 }}>{item.context_count ? ` · ${item.context_count} 条内容` : ' · 无内容引用'}{item.reviewed_at ? ' · 已处理' : ''}</span>
+                        {item.error_message && <div style={{ color: 'var(--faint)', fontSize: 11, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.error_message}</div>}
+                      </span>
+                      <span style={{ color: 'var(--faint)', fontSize: 11.5, textAlign: 'right' }}>{new Date(item.started_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      <span style={{ color: 'var(--faint)' }}>›</span>
+                    </button>
+                  })}</div>}
+
+            {(data.pages || 1) > 1 && <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 18 }}>
+              <button type="button" disabled={(data.page || 1) <= 1} onClick={() => loadAnomalies({ page: (data.page || 1) - 1 })}>上一页</button>
+              <span style={{ fontSize: 12, color: 'var(--sub2)' }}>{data.page || 1} / {data.pages}</span>
+              <button type="button" disabled={(data.page || 1) >= data.pages} onClick={() => loadAnomalies({ page: (data.page || 1) + 1 })}>下一页</button>
+            </div>}
+          </div>
+        </div>
+      })()}
       {detail && (() => {
         const status = STATUS[detail.status] || { label: detail.status, color: 'var(--sub2)' }
         const guide = ACTION_GUIDE[detail.status] || ACTION_GUIDE.failed
-        return <div onClick={() => setDetail(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(28,26,22,.18)', zIndex: 120, display: 'flex', justifyContent: 'flex-end' }}>
+        return <div onClick={() => setDetail(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(28,26,22,.18)', zIndex: 130, display: 'flex', justifyContent: 'flex-end' }}>
           <div onClick={event => event.stopPropagation()} style={{ width: 'min(520px,92vw)', height: '100%', background: 'var(--surface)', borderLeft: '1px solid var(--line10)', boxShadow: '-12px 0 40px rgba(0,0,0,.08)', padding: '24px', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
               <div>

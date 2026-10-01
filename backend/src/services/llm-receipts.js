@@ -216,33 +216,115 @@ function aggregate(db, where, params) {
       SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) failed,
       SUM(CASE WHEN status='unknown' THEN 1 ELSE 0 END) unknown,
       SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) blocked,
+      SUM(CASE WHEN status='reserved' THEN 1 ELSE 0 END) reserved,
       COALESCE(SUM(total_tokens), 0) total_tokens,
       COALESCE(SUM(cost_yuan_estimate), 0) cost_yuan_estimate
     FROM llm_call_receipts WHERE ${where}
   `).get(...params);
 }
 
+function localDayRange(now) {
+  const timezoneOffsetMinutes = -now.getTimezoneOffset();
+  const localNow = new Date(now.getTime() + timezoneOffsetMinutes * 60_000);
+  const localDay = localNow.toISOString().slice(0, 10);
+  const startMs = new Date(`${localDay}T00:00:00.000Z`).getTime() - timezoneOffsetMinutes * 60_000;
+  return { start: new Date(startMs).toISOString(), end: new Date(startMs + 864e5).toISOString() };
+}
+
+function reconcileStaleReceipts(db, now) {
+  const staleBefore = new Date(now.getTime() - 10 * 60_000).toISOString();
+  db.prepare(`
+    UPDATE llm_call_receipts SET
+      status=CASE WHEN dispatched_at IS NULL THEN 'failed' ELSE 'unknown' END,
+      error_kind='process_interrupted',
+      error_message=CASE WHEN dispatched_at IS NULL
+        THEN '调用凭证已创建，但请求未发出前进程中断'
+        ELSE '请求发出后进程中断，供应商是否完成未知'
+      END,
+      finished_at=?, duration_ms=MAX(0, CAST((julianday(?) - julianday(started_at)) * 86400000 AS INTEGER))
+    WHERE status='reserved' AND started_at<?
+  `).run(now.toISOString(), now.toISOString(), staleBefore);
+}
+
+function summarizeReceiptRows(rows) {
+  return rows.map(row => {
+    const contexts = parseContexts(row.context_json);
+    const { context_json, ...summary } = row;
+    return { ...summary, context_count: contexts.length, context_preview: contexts.slice(0, 2) };
+  });
+}
+
+export function listLlmCallReceipts({
+  scope = 'today',
+  status = 'all',
+  purpose = null,
+  page = 1,
+  pageSize = 20,
+  now = new Date(),
+} = {}, { openDatabase = getDatabase } = {}) {
+  return withDb(openDatabase, db => {
+    reconcileStaleReceipts(db, now);
+    const allowedStatuses = new Set(['failed', 'unknown', 'blocked', 'reserved']);
+    const safeStatus = allowedStatuses.has(status) ? status : 'all';
+    const safeScope = scope === '30d' ? '30d' : 'today';
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePageSize = Math.max(1, Math.min(100, Number(pageSize) || 20));
+    const range = safeScope === 'today'
+      ? localDayRange(now)
+      : { start: new Date(now.getTime() - 30 * 864e5).toISOString(), end: now.toISOString() };
+
+    const baseClauses = ['started_at>=?', 'started_at<?', "status IN ('failed','unknown','blocked','reserved')"];
+    const baseParams = [range.start, range.end];
+    if (purpose) {
+      baseClauses.push('purpose=?');
+      baseParams.push(String(purpose).slice(0, 100));
+    }
+    const itemClauses = [...baseClauses];
+    const itemParams = [...baseParams];
+    if (safeStatus !== 'all') {
+      itemClauses.push('status=?');
+      itemParams.push(safeStatus);
+    }
+
+    const where = itemClauses.join(' AND ');
+    const total = db.prepare(`SELECT COUNT(*) count FROM llm_call_receipts WHERE ${where}`).get(...itemParams).count;
+    const rows = db.prepare(`
+      SELECT id, purpose, provider, model, status, total_tokens, cost_yuan_estimate,
+             error_kind, error_message, started_at, duration_ms, retry_of, reviewed_at, context_json
+      FROM llm_call_receipts WHERE ${where}
+      ORDER BY started_at DESC LIMIT ? OFFSET ?
+    `).all(...itemParams, safePageSize, (safePage - 1) * safePageSize);
+    const statusCounts = Object.fromEntries(db.prepare(`
+      SELECT status, COUNT(*) count FROM llm_call_receipts
+      WHERE ${baseClauses.join(' AND ')} GROUP BY status
+    `).all(...baseParams).map(row => [row.status, row.count]));
+    const purposes = db.prepare(`
+      SELECT purpose, COUNT(*) count FROM llm_call_receipts
+      WHERE started_at>=? AND started_at<? AND status IN ('failed','unknown','blocked','reserved')
+      GROUP BY purpose ORDER BY count DESC, purpose
+    `).all(range.start, range.end);
+
+    return {
+      items: summarizeReceiptRows(rows),
+      total,
+      page: safePage,
+      pageSize: safePageSize,
+      pages: Math.max(1, Math.ceil(total / safePageSize)),
+      scope: safeScope,
+      status: safeStatus,
+      purpose: purpose || null,
+      statusCounts,
+      purposes,
+    };
+  }, { items: [], total: 0, page: 1, pageSize: 20, pages: 1, statusCounts: {}, purposes: [] });
+}
+
 export function getLlmCallReport({ days = 30, limit = 20, now = new Date() } = {}, { openDatabase = getDatabase } = {}) {
   return withDb(openDatabase, db => {
-    const staleBefore = new Date(now.getTime() - 10 * 60_000).toISOString();
-    db.prepare(`
-      UPDATE llm_call_receipts SET
-        status=CASE WHEN dispatched_at IS NULL THEN 'failed' ELSE 'unknown' END,
-        error_kind='process_interrupted',
-        error_message=CASE WHEN dispatched_at IS NULL
-          THEN '调用凭证已创建，但请求未发出前进程中断'
-          ELSE '请求发出后进程中断，供应商是否完成未知'
-        END,
-        finished_at=?, duration_ms=MAX(0, CAST((julianday(?) - julianday(started_at)) * 86400000 AS INTEGER))
-      WHERE status='reserved' AND started_at<?
-    `).run(now.toISOString(), now.toISOString(), staleBefore);
-    const timezoneOffsetMinutes = -now.getTimezoneOffset();
-    const localNow = new Date(now.getTime() + timezoneOffsetMinutes * 60_000);
-    const localDay = localNow.toISOString().slice(0, 10);
-    const dayStart = new Date(`${localDay}T00:00:00.000Z`).getTime() - timezoneOffsetMinutes * 60_000;
-    const dayEnd = dayStart + 864e5;
+    reconcileStaleReceipts(db, now);
+    const dayRange = localDayRange(now);
     const since = new Date(now.getTime() - Math.max(1, days) * 864e5).toISOString();
-    const todayStats = aggregate(db, 'started_at>=? AND started_at<?', [new Date(dayStart).toISOString(), new Date(dayEnd).toISOString()]);
+    const todayStats = aggregate(db, 'started_at>=? AND started_at<?', [dayRange.start, dayRange.end]);
     const periodStats = aggregate(db, 'started_at>=?', [since]);
     const byPurpose = db.prepare(`
       SELECT purpose, COUNT(*) calls,
@@ -252,7 +334,7 @@ export function getLlmCallReport({ days = 30, limit = 20, now = new Date() } = {
         COALESCE(SUM(cost_yuan_estimate), 0) cost_yuan_estimate
       FROM llm_call_receipts WHERE started_at>=? AND started_at<?
       GROUP BY purpose ORDER BY cost_yuan_estimate DESC, calls DESC
-    `).all(new Date(dayStart).toISOString(), new Date(dayEnd).toISOString());
+    `).all(dayRange.start, dayRange.end);
     const recent = db.prepare(`
       SELECT id, purpose, provider, model, status, total_tokens, cost_yuan_estimate,
              error_kind, error_message, started_at, duration_ms, retry_of, reviewed_at, context_json
@@ -264,11 +346,7 @@ export function getLlmCallReport({ days = 30, limit = 20, now = new Date() } = {
       today: todayStats,
       period: { days, ...periodStats },
       byPurpose,
-      recent: recent.map(row => {
-        const contexts = parseContexts(row.context_json);
-        const { context_json, ...summary } = row;
-        return { ...summary, context_count: contexts.length, context_preview: contexts.slice(0, 2) };
-      }),
+      recent: summarizeReceiptRows(recent),
     };
   }, { today: {}, period: { days }, byPurpose: [], recent: [] });
 }
