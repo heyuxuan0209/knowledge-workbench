@@ -33,6 +33,31 @@ DB_PATH=./data/app.db
 
 YouTube/X 来源仅用于仓库内“读懂”扩展从对应页面调用 `localhost:3000`；不要用通配符放行任意网站。修改白名单后必须实际发送 OPTIONS 预检，确认允许来源为 204、未知来源为 403。
 
+### YouTube 无字幕视频
+
+生产 VPS 的数据中心 IP 容易被 YouTube 要求登录/人机验证。日常 SSH 隧道同时将 Mac 代理反向转发到 VPS 回环口：
+
+```text
+VPS 127.0.0.1:17897 → SSH RemoteForward → Mac 127.0.0.1:7897
+```
+
+VPS `backend/.env` 配置：
+
+```dotenv
+YOUTUBE_PROXY_URL=http://127.0.0.1:17897
+```
+
+此端口只允许绑定 VPS 回环地址，禁止暴露到公网或 tailnet。即时分析的完整回退链为：`youtube-transcript → yt-dlp 字幕 → yt-dlp 音频 → Groq Whisper → 本地 faster-whisper`。代理隧道不通时，`yt-dlp` 会再尝试 VPS 直连。
+
+首次部署或重建 VPS 时，以 `bot` 用户安装独立 ASR 环境并预热模型：
+
+```bash
+ssh vultr-lax 'apt-get update && apt-get install -y ffmpeg'
+ssh vultr-lax 'sudo -u bot -H bash -s' < backend/scripts/provision-youtube-ingest.sh
+```
+
+运行时优先使用 `backend/.venv-asr/bin/python3`；该环境不存在时才回退系统 `python3`。`ffmpeg` 用于让无字幕长视频只下载需要分析的前 40 分钟；语音音轨限制为 64kbps，40 分钟约 19MB，可落在 Groq 25MB 限制内。
+
 Funnel 配置：
 
 ```bash

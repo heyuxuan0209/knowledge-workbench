@@ -3,14 +3,15 @@ import { promisify } from 'util';
 import { homedir, tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import { mkdir, readdir, rm } from 'fs/promises';
 
 const pexec = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ASR 管道（M5 最小版前移，ADR-015；云通道 ADR-064）：无字幕视频的"全文解读"兜底。
-// 音频获取（免 ffmpeg：bili audio --no-split 出完整 m4a，yt-dlp bestaudio 不转码，
-// faster-whisper 内置 PyAV 直接解码）→ 转写：配了 GROQ_API_KEY 时优先 Groq 云端
+// 音频获取（B 站出完整 m4a；YouTube 用 ffmpeg 只截需要分析的低码率音频段）
+// → 转写：配了 GROQ_API_KEY 时优先 Groq 云端
 // whisper-large-v3-turbo（约 $0.02/小时音频且有免费额度，1 小时音频几十秒转完，本地
 // CPU 要 20 分钟）；无 key / 文件超限 / 调用失败自动降级 scripts/transcribe.py 本地
 // 转写（零 API 费、内容不出本机；首次调用会下载 whisper small 模型 ~460MB）。
@@ -20,6 +21,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PIP_BIN = join(homedir(), 'Library/Python/3.10/bin');
 const CLI_ENV = { ...process.env, PATH: `${PIP_BIN}:${process.env.PATH || ''}` };
+const PROVISIONED_PYTHON = join(__dirname, '../../.venv-asr/bin/python3');
+const ASR_PYTHON = process.env.ASR_PYTHON || (existsSync(PROVISIONED_PYTHON) ? PROVISIONED_PYTHON : 'python3');
 // 字幕优先后，ASR 只是"无字幕视频"的兜底，故上限放宽到 40 分钟（覆盖绝大多数演讲/播客）；
 // 「转写全程」按需补全时用 FULL 档（3 小时，实际取视频真实时长）。small int8 约 3.2× 实时。
 export const MAX_AUDIO_SECONDS = 2400;      // 兜底自动转写：40 分钟
@@ -27,6 +30,9 @@ export const FULL_AUDIO_SECONDS = 10800;    // 「转写全程」：3 小时（�
 const DOWNLOAD_TIMEOUT = 5 * 60000;
 const TRANSCRIBE_TIMEOUT = 15 * 60000;
 const DIARIZE_TIMEOUT = 25 * 60000; // 分离管道（whisperX+pyannote）CPU 上明显更慢
+// 只用于元数据探测失败时的最后兜底；正常路径会根据视频 language
+// 和实际字幕列表只下载一条原始语言轨。不得使用 * 通配自动翻译字幕。
+export const YOUTUBE_SUB_LANGS = 'en-orig,en,zh-Hans,zh-Hant,zh';
 
 // Node 内置 fetch（undici）不读 HTTP_PROXY 环境变量（content-ingestion.js 同款坑），
 // 走代理必须显式注入 ProxyAgent；只影响单次请求，不污染进程。
@@ -77,7 +83,7 @@ async function runTranscriber(audioFile, { diarize = false, maxSeconds = MAX_AUD
   const timeout = Math.max(TRANSCRIBE_TIMEOUT, Math.ceil(maxSeconds / 60) * 60000);
   if (diarize && process.env.HF_TOKEN) {
     try {
-      const { stdout } = await pexec('python3', [
+      const { stdout } = await pexec(ASR_PYTHON, [
         join(__dirname, '../../scripts/transcribe-diarize.py'), audioFile, '--max-seconds', String(maxSeconds),
       ], { env: CLI_ENV, timeout: Math.max(DIARIZE_TIMEOUT, timeout), maxBuffer: 64 * 1024 * 1024 });
       const result = JSON.parse(stdout);
@@ -95,7 +101,7 @@ async function runTranscriber(audioFile, { diarize = false, maxSeconds = MAX_AUD
       console.log(`[asr] Groq 云转写失败（${(err.message || '').slice(0, 150)}），降级本地 whisper`);
     }
   }
-  const { stdout } = await pexec('python3', [
+  const { stdout } = await pexec(ASR_PYTHON, [
     join(__dirname, '../../scripts/transcribe.py'), audioFile, '--max-seconds', String(maxSeconds),
   ], { env: CLI_ENV, timeout, maxBuffer: 64 * 1024 * 1024 });
   const result = JSON.parse(stdout);
@@ -118,10 +124,77 @@ async function findAudioFile(dir) {
 
 // 下载带单次重试：B站对高频 IP 会临时限速（实测同一视频几秒 vs 卡死超时），
 // 隔 5 秒重试一次能消化大部分瞬时限速；错误信息截短（CLI 的进度输出别混进降级提示）
+function withoutProxyArgs(args) {
+  const proxyAt = args.indexOf('--proxy');
+  if (proxyAt < 0) return args;
+  return args.filter((_arg, index) => index !== proxyAt && index !== proxyAt + 1);
+}
+
+export function selectCaptionLanguageFromMetadata(metadata = {}) {
+  const manual = metadata.subtitles || {};
+  const automatic = metadata.automatic_captions || {};
+  const original = metadata.language || null;
+  const usable = (collection, key) => key && key !== 'live_chat' && Array.isArray(collection[key]) && collection[key].length > 0;
+
+  // 准确性优先级：原语言人工字幕 > 原语言自动字幕 > 常用语言人工字幕
+  // > 常用语言自动字幕 > 任意可用轨。只选一条，避免翻译轨 429 拖垮原始轨。
+  const originalKeys = original ? [`${original}-orig`, original] : [];
+  for (const key of originalKeys) if (usable(manual, key)) return key;
+  for (const key of originalKeys) if (usable(automatic, key)) return key;
+
+  // 部分 YouTube 视频的顶层 language 为 null，但字幕键仍明确给出 en-orig 等原轨。
+  // 必须先选它，否则会误选 zh-Hans 自动翻译轨并触发 429。
+  const markedOriginal = Object.keys(automatic).find(key => key.endsWith('-orig') && usable(automatic, key));
+  if (markedOriginal) return markedOriginal;
+
+  const preferred = ['zh-Hans', 'zh-Hant', 'zh', 'en-orig', 'en'];
+  for (const key of preferred) if (usable(manual, key)) return key;
+  for (const key of preferred) if (usable(automatic, key)) return key;
+
+  return Object.keys(manual).find(key => usable(manual, key))
+    || Object.keys(automatic).find(key => usable(automatic, key))
+    || null;
+}
+
+function ytDlpInstallBroken(error) {
+  const raw = `${error?.message || ''}\n${error?.stderr || ''}`;
+  return error?.code === 'ENOENT' || /bad interpreter|No such file or directory/i.test(raw);
+}
+
+async function execYtDlpOnce(args, options) {
+  const runtimeArgs = args.includes('--js-runtimes') ? args : ['--js-runtimes', 'node', ...args];
+  try {
+    return await pexec('yt-dlp', runtimeArgs, options);
+  } catch (error) {
+    // Homebrew Python 升级后 yt-dlp 的 shebang 可能仍指向已删除的旧 Python。
+    // python -m 是同一套参数的可恢复路径，不应让所有 YouTube 转写因此全挂。
+    if (!ytDlpInstallBroken(error)) throw error;
+    return pexec(ASR_PYTHON, ['-m', 'yt_dlp', ...runtimeArgs], options);
+  }
+}
+
+async function execYtDlp(args, options) {
+  try {
+    return await execYtDlpOnce(args, options);
+  } catch (proxyError) {
+    // 生产优先经 Mac 反向隧道出口，避开 YouTube 对数据中心 IP 的风控。
+    // 若本机代理/隧道暂时不可用，去掉 --proxy 再试 VPS 直连，避免单出口故障。
+    const directArgs = withoutProxyArgs(args);
+    if (directArgs.length === args.length) throw proxyError;
+    try {
+      return await execYtDlpOnce(directArgs, options);
+    } catch (directError) {
+      directError.proxyError = proxyError;
+      throw directError;
+    }
+  }
+}
+
 async function execWithRetry(cmd, args) {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await pexec(cmd, args, { env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 4 * 1024 * 1024 });
+      const options = { env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 4 * 1024 * 1024 };
+      return cmd === 'yt-dlp' ? await execYtDlp(args, options) : await pexec(cmd, args, options);
     } catch (err) {
       if (attempt >= 1) {
         // 截取要挑对行：yt-dlp 的 stderr 常常先吐几行 WARNING（如"No supported JavaScript
@@ -140,14 +213,40 @@ async function execWithRetry(cmd, args) {
   }
 }
 
-async function downloadAudio(url, workDir) {
+let ffmpegAvailable;
+async function hasFfmpeg() {
+  if (ffmpegAvailable != null) return ffmpegAvailable;
+  try {
+    await pexec('ffmpeg', ['-version'], { env: CLI_ENV, timeout: 5000 });
+    ffmpegAvailable = true;
+  } catch {
+    ffmpegAvailable = false;
+  }
+  return ffmpegAvailable;
+}
+
+export function buildYoutubeAudioArgs(url, workDir, maxSeconds, canClip = true) {
+  const args = [
+    // 语音 ASR 不需要高码率。64kbps × 40 分钟约 19MB，可稳定落在 Groq 25MB 内。
+    '-f', 'bestaudio[abr<=64]/worstaudio/bestaudio',
+    '-o', join(workDir, 'audio.%(ext)s'), '--no-playlist',
+  ];
+  // yt-dlp 截取时间段需 ffmpeg。没安装时仍能退回整段下载，不让功能硬崩。
+  if (canClip && Number.isFinite(maxSeconds) && maxSeconds > 0) {
+    args.push('--download-sections', `*0-${maxSeconds}`);
+  }
+  args.push(url);
+  if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
+  return args;
+}
+
+async function downloadAudio(url, workDir, { maxSeconds = MAX_AUDIO_SECONDS } = {}) {
   if (/bilibili\.com|b23\.tv/.test(url)) {
     const bv = url.match(/BV[a-zA-Z0-9]+/)?.[0];
     if (!bv) throw new Error('无法从 B站 链接解析出 BV 号');
     await execWithRetry('bili', ['audio', bv, '--no-split', '-o', workDir]);
   } else if (/youtube\.com|youtu\.be/.test(url)) {
-    const args = ['-f', 'bestaudio', '-o', join(workDir, 'audio.%(ext)s'), '--no-playlist', url];
-    if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
+    const args = buildYoutubeAudioArgs(url, workDir, maxSeconds, await hasFfmpeg());
     await execWithRetry('yt-dlp', args);
   } else if (/(^|\/\/|\.)(x|twitter)\.com\//.test(url)) {
     // X 推文视频（ADR-064）：yt-dlp 原生支持公开推文，无需登录；X 视频多为音画合流的
@@ -211,26 +310,43 @@ function parseSubtitles(raw) {
 
 // yt-dlp 拉字幕（含自动字幕），YouTube/B站 通吃。命中返回纯文本，无字幕返回 null。
 async function fetchCaptions(url, workDir) {
+  let selectedLanguage = null;
+  let sourceDuration = null;
+  try {
+    const metadataArgs = ['--dump-single-json', '--skip-download', '--no-playlist', url];
+    if (process.env.YOUTUBE_PROXY_URL) metadataArgs.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
+    const { stdout } = await execYtDlp(metadataArgs, {
+      env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 16 * 1024 * 1024,
+    });
+    const metadata = JSON.parse(stdout);
+    selectedLanguage = selectCaptionLanguageFromMetadata(metadata);
+    sourceDuration = Number.isFinite(Number(metadata.duration)) ? Number(metadata.duration) : null;
+  } catch (err) {
+    console.log(`[asr] 字幕轨探测失败（${(err.message || '').slice(0, 160)}），改用精确语言兜底`);
+  }
+
   const args = [
     '--skip-download', '--write-subs', '--write-auto-subs',
-    '--sub-langs', 'zh-Hans,zh-Hant,zh,en,en-orig,en.*,zh.*',
+    // 禁止 en.*/zh.* 通配：它会把几十种自动翻译字幕全拉下来，实测容易触发 429。
+    '--sub-langs', selectedLanguage || YOUTUBE_SUB_LANGS,
     '--sub-format', 'vtt/srt/best', '--no-playlist',
     '-o', join(workDir, 'sub.%(ext)s'), url,
   ];
   if (process.env.YOUTUBE_PROXY_URL) args.unshift('--proxy', process.env.YOUTUBE_PROXY_URL);
   try {
-    await pexec('yt-dlp', args, { env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 8 * 1024 * 1024 });
+    await execYtDlp(args, { env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 8 * 1024 * 1024 });
   } catch (err) {
-    console.log(`[asr] 字幕拉取失败（${(err.stderr || err.message || '').toString().slice(0, 120)}）`);
-    return null;
+    const raw = (err.stderr || err.message || '').toString().trim();
+    const errorLine = raw.split('\n').find(line => /^\s*ERROR[: ]/i.test(line));
+    console.log(`[asr] 字幕拉取未完全成功（${(errorLine || raw).slice(0, 200)}），检查是否已落下可用字幕`);
   }
   const files = (await readdir(workDir)).filter(f => /\.(vtt|srt)$/i.test(f));
-  if (!files.length) return null;
+  if (!files.length) return { text: null, sourceDuration };
   // 优先中文字幕（含自动），其次英文
   const pick = files.sort((a, b) => (/(zh|Hans|Hant)/i.test(b) ? 1 : 0) - (/(zh|Hans|Hant)/i.test(a) ? 1 : 0))[0];
   const { readFile } = await import('fs/promises');
   const text = parseSubtitles(await readFile(join(workDir, pick), 'utf-8'));
-  return text.length >= 40 ? text : null;
+  return { text: text.length >= 40 ? text : null, sourceDuration };
 }
 
 // 视频取全文 → { text, source:'captions'|'asr', truncated, language }。
@@ -240,13 +356,16 @@ export async function transcribeVideo(url, { full = false } = {}) {
   await mkdir(workDir, { recursive: true });
 
   try {
-    const captions = await fetchCaptions(url, workDir).catch(() => null);
-    if (captions) return { text: captions, source: 'captions', truncated: false, language: null };
+    const captionResult = await fetchCaptions(url, workDir).catch(() => ({ text: null, sourceDuration: null }));
+    if (captionResult.text) return { text: captionResult.text, source: 'captions', truncated: false, language: null };
 
-    const audioFile = await downloadAudio(url, workDir);
     const maxSeconds = full ? FULL_AUDIO_SECONDS : MAX_AUDIO_SECONDS;
+    const audioFile = await downloadAudio(url, workDir, { maxSeconds });
     const asr = await runTranscriber(audioFile, { diarize: false, maxSeconds }); // 视频多为单人口播，不做分离
-    return { ...asr, source: 'asr' };
+    const truncated = Boolean(asr.truncated)
+      || (captionResult.sourceDuration != null && captionResult.sourceDuration > maxSeconds)
+      || (captionResult.sourceDuration == null && Number(asr.duration) >= maxSeconds - 2);
+    return { ...asr, truncated, source: 'asr', maxSeconds };
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }

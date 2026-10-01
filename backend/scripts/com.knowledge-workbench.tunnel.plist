@@ -18,7 +18,10 @@
      - 不能带 -f：-f 会让 ssh 自己 daemonize 后立即退出，launchd 会以为任务结束而反复重启。
 
      日常通道走洛杉矶公网 SSH 443，并复用本机 127.0.0.1:7897 代理；不依赖
-     Tailscale 客户端是否运行。代理暂时不可用时，launchd 每 30s 自动重试。 -->
+     Tailscale 客户端是否运行。代理暂时不可用时，launchd 每 30s 自动重试。
+
+     -R 把 Mac 的 7897 只映射到 VPS 回环口 17897：无字幕 YouTube 的 yt-dlp 由 Mac
+     出口下载音频，避开数据中心 IP 的人机验证。只绑 127.0.0.1，不向公网/tailnet 暴露代理。 -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.knowledge-workbench.tunnel</string>
@@ -37,6 +40,7 @@
     <string>-o</string><string>StrictHostKeyChecking=accept-new</string>
     <string>-p</string><string>443</string>
     <string>-L</string><string>3000:127.0.0.1:3000</string>
+    <string>-R</string><string>127.0.0.1:17897:127.0.0.1:7897</string>
     <string>root@104.207.154.248</string>
   </array>
   <key>EnvironmentVariables</key>

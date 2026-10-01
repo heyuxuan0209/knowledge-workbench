@@ -414,7 +414,10 @@ export default function WorkbenchPage() {
 
   // ---- 万能收口：粘贴链接/文字 → 摄入 → 进入解读 ----
   const acquire = async (input) => {
-    showToast('正在识别并抓取内容…')
+    const isYoutube = /(?:youtube\.com|youtu\.be)/i.test(input)
+    showToast(isYoutube
+      ? '正在获取 YouTube 字幕；若无字幕会自动转写音频，可能需要几分钟…'
+      : '正在识别并抓取内容…')
     try {
       const json = await api('/api/content/ingest', { method: 'POST', body: { input } })
       if (!json.success) throw new Error(json.data?.fetchError || json.error || '摄入失败')

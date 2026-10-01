@@ -11,9 +11,8 @@ import { JSDOM } from 'jsdom';
 
 // Mode 1 即兴分析的入口：把用户丢进来的任意输入（YouTube 链接/网页链接/纯文本）
 // 归一成统一格式，供后续翻译/对话/摘要流水线使用。
-// 范围（对应 docs/HANDOFF-TO-NEW-ARCHITECTURE.md §6、docs/DECISION-NOTEBOOKLM-APPROACH.md）：
-// - 有字幕的 YouTube：提取字幕
-// - 无字幕的 YouTube：Phase 1 不做 Whisper 后备，直接返回失败状态，前端据此提示用户
+// 范围：
+// - YouTube：youtube-transcript → yt-dlp 原语言字幕 → Groq/本地 Whisper 多级回退
 // - 静态 HTML 网页：readability 提取正文
 // - 动态渲染网页（SPA）：readability 拿不到内容时同样返回失败状态，不引入 Puppeteer
 // - 纯文本：直接透传
@@ -369,7 +368,47 @@ function extractYoutubeVideoId(input) {
   return url.searchParams.get('v');
 }
 
-async function ingestYoutube(input) {
+function youtubeMetadata(detail, input) {
+  return detail ? {
+    originalTitle: detail.title,
+    author: detail.channel,
+    publishedAt: detail.publishedAt?.slice(0, 10) || null,
+    platform: 'YouTube',
+    sourceUrl: input,
+  } : { platform: 'YouTube', sourceUrl: input };
+}
+
+function normalizeAsrSegments(segments = []) {
+  return segments.map((segment) => ({
+    text: segment.text || '',
+    offset: Math.round(Number(segment.offset ?? segment.start ?? 0) * (segment.offset == null ? 1000 : 1)),
+    duration: segment.duration != null
+      ? Math.round(Number(segment.duration))
+      : Math.max(0, Math.round((Number(segment.end ?? segment.start ?? 0) - Number(segment.start ?? 0)) * 1000)),
+  })).filter(segment => segment.text.trim());
+}
+
+function isYoutubeContentError(error) {
+  return error instanceof YoutubeTranscriptDisabledError
+    || error instanceof YoutubeTranscriptNotAvailableError
+    || error instanceof YoutubeTranscriptNotAvailableLanguageError
+    || error instanceof YoutubeTranscriptVideoUnavailableError
+    || error instanceof YoutubeTranscriptTooManyRequestError;
+}
+
+async function fetchYoutubeTranscript(videoId, proxyFetch) {
+  if (!proxyFetch) return YoutubeTranscript.fetchTranscript(videoId);
+  try {
+    return await YoutubeTranscript.fetchTranscript(videoId, { fetch: proxyFetch });
+  } catch (error) {
+    // 反向隧道/Mac 代理暂时不通时，再试一次 VPS 直连；“没字幕”这类内容结果
+    // 不重试，避免对同一个确定结果多打一次 YouTube 内部接口。
+    if (isYoutubeContentError(error)) throw error;
+    return YoutubeTranscript.fetchTranscript(videoId);
+  }
+}
+
+export async function ingestYoutube(input, deps = {}) {
   const videoId = extractYoutubeVideoId(input);
   if (!videoId) {
     return {
@@ -390,14 +429,14 @@ async function ingestYoutube(input) {
     proxyFetch = (url, opts = {}) => fetch(url, { ...opts, dispatcher });
   }
 
+  const fetchTranscript = deps.fetchTranscript || ((id) => fetchYoutubeTranscript(id, proxyFetch));
+  const fetchDetail = deps.fetchDetail || ((id) => import('./active-query-channels.js').then(m => m.fetchYoutubeDetail(id)));
+  const transcribeVideo = deps.transcribeVideo || ((url) => import('./asr.js').then(m => m.transcribeVideo(url)));
+  // 元数据与正文并行。无论最后来自字幕还是 ASR，都不能让模型从语音猜人名。
+  const detailPromise = Promise.resolve().then(() => fetchDetail(videoId)).catch(() => null);
+
   try {
-    // 字幕与官方元数据并行取。元数据（标题/频道/日期）是即时分析输入管道的
-    // 必备件（HANDOFF-2026-07-15）：只喂纯字幕时模型会从语音猜人名/自称无链接。
-    // yt-dlp 元数据失败不阻塞字幕主流程（metadata 为 null 时材料块如实标"未知"）
-    const [transcript, detail] = await Promise.all([
-      YoutubeTranscript.fetchTranscript(videoId, proxyFetch ? { fetch: proxyFetch } : undefined),
-      import('./active-query-channels.js').then(m => m.fetchYoutubeDetail(videoId)).catch(() => null),
-    ]);
+    const [transcript, detail] = await Promise.all([fetchTranscript(videoId), detailPromise]);
     const body = transcript.map(t => t.text).join(' ');
 
     return {
@@ -405,39 +444,68 @@ async function ingestYoutube(input) {
       body,
       type: 'youtube',
       transcript, // 保留带时间戳的原始片段，供 zh_chapters 分段使用（翻译流水线阶段处理）
-      metadata: detail ? {
-        originalTitle: detail.title,
-        author: detail.channel,
-        publishedAt: detail.publishedAt?.slice(0, 10) || null,
-        platform: 'YouTube',
-      } : { platform: 'YouTube' },
+      metadata: youtubeMetadata(detail, input),
+      transcriptEngine: 'youtube-transcript',
       fetchStatus: 'success',
       fetchError: null
     };
-  } catch (error) {
-    return {
-      title: null,
-      body: null,
-      type: 'youtube',
-      fetchStatus: 'failed',
-      fetchError: classifyYoutubeError(error)
-    };
+  } catch (subtitleError) {
+    // 粘贴链接的“即时分析”原来到这里就直接失败，而资讯卡“读全文”
+    // 早已有 ASR 回退，造成同一条 YouTube 不同入口能力不一致。此处收口为同一条链：
+    // youtube-transcript → yt-dlp 字幕 → 音频 → Groq Whisper → 本地 faster-whisper。
+    const detail = await detailPromise;
+    try {
+      const asr = await transcribeVideo(input);
+      return {
+        title: detail?.title || null,
+        body: asr.text,
+        type: 'youtube',
+        transcript: normalizeAsrSegments(asr.segments),
+        metadata: youtubeMetadata(detail, input),
+        note: asr.source === 'captions'
+          ? null
+          : asr.truncated
+            ? `该视频没有可用字幕，已语音转写前 ${Math.round((asr.maxSeconds || 2400) / 60)} 分钟，可能存在少量听写误差`
+            : '该视频没有可用字幕，正文由语音转写生成，可能存在少量听写误差',
+        transcriptEngine: asr.engine || asr.source || 'asr',
+        fetchStatus: 'success',
+        fetchError: null,
+      };
+    } catch (asrError) {
+      return {
+        title: detail?.title || null,
+        body: null,
+        type: 'youtube',
+        metadata: youtubeMetadata(detail, input),
+        fetchStatus: 'failed',
+        fetchError: classifyYoutubePipelineError(subtitleError, asrError),
+      };
+    }
   }
+}
+
+function classifyYoutubePipelineError(subtitleError, asrError) {
+  const subtitleReason = classifyYoutubeError(subtitleError);
+  const rawAsr = String(asrError?.message || asrError || '未知错误');
+  if (/not a bot|sign in to confirm|cookies|HTTP Error 403|Forbidden/i.test(rawAsr)) {
+    return `字幕获取失败（${subtitleReason}）；YouTube 又拦截了当前音频下载出口（要求登录/人机验证）。请确认 Mac→VPS 反向代理隧道正常后重试。`;
+  }
+  return `字幕获取失败（${subtitleReason}）；音频转写也失败（${rawAsr.slice(0, 240)}）。`;
 }
 
 // youtube-transcript 底层调用的是 YouTube 未公开的内部接口（逆向工程），会随 YouTube
 // 改版随时失效，且已知会针对性拒绝云服务商 IP 段（AWS/GCP/Azure 等）的请求。
 // 这里区分「视频确实没字幕」「网络/风控层面失败」两类原因，避免把网络问题误报成
 // 「没字幕」——这两种失败对用户来说需要完全不同的应对方式。
-function classifyYoutubeError(error) {
+export function classifyYoutubeError(error) {
   if (error instanceof YoutubeTranscriptDisabledError) {
-    return '该视频已禁用字幕功能，暂不支持自动转录，请尝试直接粘贴文字稿';
+    return '该视频已禁用字幕功能';
   }
   if (error instanceof YoutubeTranscriptNotAvailableError) {
-    return '该视频没有可用字幕，暂不支持自动转录，请尝试直接粘贴文字稿';
+    return '该视频没有可用字幕';
   }
   if (error instanceof YoutubeTranscriptNotAvailableLanguageError) {
-    return `该视频没有匹配语言的字幕（${error.message}），暂不支持自动转录`;
+    return `该视频没有匹配语言的字幕（${error.message}）`;
   }
   if (error instanceof YoutubeTranscriptVideoUnavailableError) {
     return '视频不存在或已被删除/设为私享';
