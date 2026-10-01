@@ -32,6 +32,12 @@ const FETCHABLE_TYPES = ['article', 'paper', 'repo'];
 // 曾把本可成功的 Jina 兜底掐死在半路、静默退化成摘要
 const FETCH_TIMEOUT_MS = 40000;
 
+function contentContexts(content) {
+  return [{
+    kind: 'content', id: content.id, label: content.zh_title || content.en_title || content.url || '未命名内容', url: content.url || null, target: 'zh_body',
+  }];
+}
+
 async function withTimeout(promise, ms) {
   return Promise.race([
     promise,
@@ -84,7 +90,7 @@ export async function resolveContentBody(content, { full = false } = {}) {
         const ingested = await ingest(content.url);
         if (ingested.fetchStatus !== 'success') throw new Error(ingested.fetchError);
         const raw = ingested.body.length > 20000 ? ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）' : ingested.body;
-        const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw);
+        const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw, { contexts: contentContexts(content) });
         persistZhBody(content.id, ingested.body, zhBody);
         // 声明已由 ingestXiaoyuzhou 内嵌在正文里，但**不能因此就说这是全文**：
         // 2026-08-08 实测，只拿到 shownotes 时这里仍返回 isFullText:true，前端的降级警告条
@@ -112,7 +118,7 @@ export async function resolveContentBody(content, { full = false } = {}) {
         const ingested = await withTimeout(ingest(content.url), 30000);
         if (ingested.fetchStatus !== 'success') throw new Error(ingested.fetchError);
         const raw = ingested.body.length > VIDEO_BODY_CAP ? ingested.body.slice(0, VIDEO_BODY_CAP) : ingested.body;
-        const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw);
+        const zhBody = detectLanguage(raw) === 'zh' ? raw : await translateText(raw, { contexts: contentContexts(content) });
         persistZhBody(content.id, ingested.body, zhBody);
         return { body: zhBody, isFullText: true, note: null };
       } catch (subtitleError) {
@@ -128,7 +134,9 @@ export async function resolveContentBody(content, { full = false } = {}) {
         const raw = asr.text.length > VIDEO_BODY_CAP ? asr.text.slice(0, VIDEO_BODY_CAP) : asr.text;
         // 中文转写走排版（加标点分段，不改字词）；英文走翻译（翻译天然重排）；字幕已是文本，也走同款
         const { formatTranscript } = await import('./translation.js');
-        const zhBody = detectLanguage(raw) === 'zh' ? await formatTranscript(raw) : await translateText(raw);
+        const zhBody = detectLanguage(raw) === 'zh'
+          ? await formatTranscript(raw, { contexts: contentContexts(content) })
+          : await translateText(raw, { contexts: contentContexts(content) });
         persistZhBody(content.id, asr.text, zhBody);
         const capMin = Math.round((full ? FULL_AUDIO_SECONDS : MAX_AUDIO_SECONDS) / 60);
         const truncated = asr.source === 'asr' && asr.truncated;
@@ -193,7 +201,7 @@ export async function resolveContentBody(content, { full = false } = {}) {
     // 超长原文截断后再翻译（README/长文动辄上万字，全文翻译又慢又贵，8k 字已足够支撑解读）
     const rawBody = ingested.body.length > 8000 ? ingested.body.slice(0, 8000) + '\n…（原文过长已截断）' : ingested.body;
     const lang = detectLanguage(rawBody);
-    const zhBody = lang === 'zh' ? rawBody : await translateText(rawBody);
+    const zhBody = lang === 'zh' ? rawBody : await translateText(rawBody, { contexts: contentContexts(content) });
 
     // 回写缓存：contents 表存在此记录时保存译文，下一轮直接命中上面的 zh_body 分支
     persistZhBody(content.id, ingested.body, zhBody);

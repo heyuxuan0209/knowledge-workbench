@@ -65,7 +65,7 @@ function splitIntoChunks(text, maxLength) {
   return chunks;
 }
 
-async function translateChunk(text, { background = false } = {}) {
+async function translateChunk(text, { background = false, contexts = [] } = {}) {
   const glossaryHint = Object.entries(GLOSSARY)
     .map(([en, zh]) => `${en} -> ${zh}`)
     .join('\n');
@@ -84,11 +84,13 @@ ${text}
 译文：`;
 
   // 单次重试：翻译量大时（一次 RSS 同步几百条）偶发连接抖动，重试一次再抛
-  let result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 1500, purpose: 'translation', background });
+  let result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', {
+    maxTokens: 1500, purpose: 'translation', background, contexts,
+  });
   if (!result.success && !result.uncertain) {
     await new Promise(r => setTimeout(r, 800));
     result = await chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', {
-      maxTokens: 1500, purpose: 'translation-retry', background, retryOf: result.receiptId,
+      maxTokens: 1500, purpose: 'translation-retry', background, retryOf: result.receiptId, contexts,
     });
   }
   if (!result.success) {
@@ -97,13 +99,13 @@ ${text}
   return result.content.trim();
 }
 
-export async function translateText(text, { background = false } = {}) {
+export async function translateText(text, { background = false, contexts = [] } = {}) {
   if (!text || text.trim().length === 0) return '';
 
   const chunks = splitIntoChunks(text, MAX_CHUNK_LENGTH);
   const translated = [];
   for (const chunk of chunks) {
-    translated.push(await translateChunk(chunk, { background }));
+    translated.push(await translateChunk(chunk, { background, contexts }));
   }
   return translated.join('');
 }
@@ -111,7 +113,7 @@ export async function translateText(text, { background = false } = {}) {
 // ASR 转写排版（2026-07-16 用户反馈：B站等转写无标点难读）：加标点、按语义分段，
 // 严禁增删改字词（同音字听写错误保留原样，由解读层按上下文理解）。
 // 分块处理，失败返回原文不阻塞。
-export async function formatTranscript(text) {
+export async function formatTranscript(text, { contexts = [] } = {}) {
   if (!text || text.trim().length === 0) return text;
   const chunks = splitIntoChunks(text, MAX_CHUNK_LENGTH);
   const formatted = [];
@@ -120,7 +122,7 @@ export async function formatTranscript(text) {
       const result = await chat([{
         role: 'user',
         content: `为下面的语音转写文本添加标点符号并按语义分段（空行分隔段落）。硬约束：不得增加、删除或改动任何字词——包括明显的同音字错误也保留原样；只输出排版后的文本。\n\n${chunk}`,
-      }]);
+      }], 'deepseek', null, { purpose: 'transcript-formatting', contexts });
       formatted.push(result.success ? result.content.trim() : chunk);
     } catch {
       formatted.push(chunk);
@@ -192,9 +194,15 @@ export async function translateContent(ingested) {
     };
   }
 
+  const context = {
+    kind: ingested.type || 'content',
+    id: ingested.metadata?.sourceUrl || null,
+    label: ingested.title || '用户导入内容',
+    url: ingested.metadata?.sourceUrl || null,
+  };
   const [zhTitle, zhBody] = await Promise.all([
-    ingested.title ? translateText(ingested.title) : Promise.resolve(null),
-    translateText(ingested.body)
+    ingested.title ? translateText(ingested.title, { contexts: [{ ...context, target: 'zh_title' }] }) : Promise.resolve(null),
+    translateText(ingested.body, { contexts: [{ ...context, target: 'zh_body' }] })
   ]);
 
   let zhChapters = [];

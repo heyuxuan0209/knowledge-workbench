@@ -9,6 +9,12 @@ function extractJson(text) {
   try { return JSON.parse(text.slice(s, e + 1)); } catch { return null; }
 }
 
+function itemContexts(items, target) {
+  return items.map(item => ({
+    kind: 'content', id: item.id, label: item.title || '未命名资讯', url: item.url || null, target,
+  }));
+}
+
 // Feed 内容相关性过滤与摘要（2026-07-14 用户决策）：
 // - 保留口径：AI / 软件工程 / 科技产品与创业 相关；纯社会新闻、生活方式类不入库
 // - 一次 LLM 调用批量判断，控制成本（Deepseek Flash，无思考模式）
@@ -36,7 +42,9 @@ export async function filterRelevant(items, { background = false } = {}) {
 只输出 JSON（不要代码块）：{"results": [{"i": 0, "relevant": true}, {"i": 1, "relevant": false}, ...]}
 
 ${list}`,
-  }], 'deepseek', 'deepseek-v4-flash', { maxTokens: 5000, purpose: 'feed-relevance', background });
+  }], 'deepseek', 'deepseek-v4-flash', {
+    maxTokens: 5000, purpose: 'feed-relevance', background, contexts: itemContexts(items, 'relevance'),
+  });
 
   if (!result.success) {
     console.warn('⚠️ relevance filter LLM failed, keeping all:', result.error);
@@ -86,6 +94,7 @@ ${list}`;
       purpose: attempt === 0 ? 'feed-summary' : 'feed-summary-retry',
       background,
       retryOf: previousReceiptId,
+      contexts: itemContexts(items, 'zh_summary'),
     });
     if (!result.success) {
       if (result.uncertain) break; // 结果未知时不盲重试，避免同一批摘要重复付费

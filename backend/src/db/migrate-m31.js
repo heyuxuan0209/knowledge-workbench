@@ -19,6 +19,7 @@ export const LLM_CALL_RECEIPTS_SCHEMA = `
     background           INTEGER NOT NULL DEFAULT 0,
     status               TEXT NOT NULL CHECK (status IN ('reserved', 'succeeded', 'failed', 'unknown', 'blocked')),
     request_fingerprint  TEXT NOT NULL,
+    context_json         TEXT NOT NULL DEFAULT '[]',
     provider_request_id  TEXT,
     input_chars          INTEGER NOT NULL DEFAULT 0,
     output_chars         INTEGER NOT NULL DEFAULT 0,
@@ -34,6 +35,8 @@ export const LLM_CALL_RECEIPTS_SCHEMA = `
     dispatched_at        TEXT,
     finished_at          TEXT,
     duration_ms          INTEGER,
+    reviewed_at          TEXT,
+    review_note          TEXT,
     FOREIGN KEY (retry_of) REFERENCES llm_call_receipts(id)
   );
   CREATE INDEX IF NOT EXISTS idx_lcr_started ON llm_call_receipts(started_at DESC);
@@ -48,6 +51,9 @@ export function migrateM31() {
   db.exec(LLM_CALL_RECEIPTS_SCHEMA);
   const columns = new Set(db.prepare('PRAGMA table_info(llm_call_receipts)').all().map(column => column.name));
   if (!columns.has('dispatched_at')) db.exec('ALTER TABLE llm_call_receipts ADD COLUMN dispatched_at TEXT');
+  if (!columns.has('context_json')) db.exec("ALTER TABLE llm_call_receipts ADD COLUMN context_json TEXT NOT NULL DEFAULT '[]'");
+  if (!columns.has('reviewed_at')) db.exec('ALTER TABLE llm_call_receipts ADD COLUMN reviewed_at TEXT');
+  if (!columns.has('review_note')) db.exec('ALTER TABLE llm_call_receipts ADD COLUMN review_note TEXT');
   console.log(existed
     ? '✅ M31 migration skipped: llm_call_receipts 已存在'
     : '✅ M31 migration done: 新建 LLM 调用凭证表');

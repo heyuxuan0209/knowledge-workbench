@@ -27,7 +27,7 @@ export async function cleanupFeed() {
   if (rows.length === 0) { db.close(); return { deleted: 0, summarized: 0 }; }
 
   // 1. 相关性判断 → 删除无关
-  const kept = await filterRelevant(rows.map(r => ({ id: r.id, title: r.title })));
+  const kept = await filterRelevant(rows.map(r => ({ id: r.id, title: r.title, url: r.url })));
   const toDelete = rows.filter(r => !kept.has(r.id));
   const delStmt = db.prepare('DELETE FROM contents WHERE id = ?');
   for (const r of toDelete) delStmt.run(r.id);
@@ -44,7 +44,7 @@ export async function cleanupFeed() {
     const batch = needSummary.slice(i, i + 12);
     const excerpts = await Promise.all(batch.map(r => r.url ? fetchFirstParagraph(r.url, 8000) : null));
     const summaries = await batchSummarize(
-      batch.map((r, j) => ({ id: r.id, title: r.title, excerpt: excerpts[j] }))
+      batch.map((r, j) => ({ id: r.id, title: r.title, excerpt: excerpts[j], url: r.url }))
     );
     for (const r of batch) {
       const s = summaries.get(r.id);

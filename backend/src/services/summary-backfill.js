@@ -59,7 +59,7 @@ export async function backfillMissingSummaries({ limit = 10, ids = null } = {}) 
       });
       if (res.isFullText && res.body) excerpt = res.body.replace(/\s+/g, ' ').trim().slice(0, 800);
     } catch { /* 抓取失败 → 交给标题兜底 */ }
-    withBody.push({ id: r.id, title: r.zh_title || r.en_title || '', excerpt });
+    withBody.push({ id: r.id, title: r.zh_title || r.en_title || '', excerpt, url: r.url });
   }
 
   // 拿真正文让模型写摘要（真正文喂进去通常 ≥50，抓不到正文的退化为标题概括）。

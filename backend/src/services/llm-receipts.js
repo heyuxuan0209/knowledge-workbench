@@ -25,6 +25,53 @@ export function fingerprintMessages(messages) {
   return createHash('sha256').update(normalized).digest('hex');
 }
 
+export function normalizeLlmContexts(contexts = []) {
+  const values = Array.isArray(contexts) ? contexts : [contexts];
+  return values.filter(Boolean).slice(0, 50).map(context => ({
+    kind: String(context.kind || 'content').slice(0, 40),
+    id: context.id == null ? null : String(context.id).slice(0, 160),
+    label: String(context.label || context.title || '未命名内容').slice(0, 240),
+    url: context.url ? String(context.url).slice(0, 1500) : null,
+    target: context.target ? String(context.target).slice(0, 60) : null,
+  }));
+}
+
+function parseContexts(value) {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function enrichContexts(db, contexts) {
+  const hasContents = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='contents'").get();
+  if (!hasContents) return contexts;
+  const findContent = db.prepare('SELECT id, en_title, zh_title, en_summary, zh_summary, zh_body, url FROM contents WHERE id=?');
+  return contexts.map(context => {
+    if (context.kind !== 'content' || !context.id) return context;
+    const content = findContent.get(context.id);
+    if (!content) return { ...context, result_present: false };
+    const value = context.target === 'zh_title' ? content.zh_title
+      : context.target === 'zh_summary' ? content.zh_summary
+        : context.target === 'zh_body' ? content.zh_body
+          : null;
+    const original = context.target === 'zh_title' ? content.en_title
+      : context.target === 'zh_summary' ? content.en_summary
+        : null;
+    const resultPresent = context.target && context.target !== 'relevance'
+      ? Boolean(value) && (!original || String(value).trim() !== String(original).trim())
+      : null;
+    return {
+      ...context,
+      url: context.url || content.url || null,
+      result_present: resultPresent,
+      result_preview: resultPresent ? String(value).replace(/\s+/g, ' ').slice(0, 160) : null,
+    };
+  });
+}
+
 export function classifyLlmError(error, { dispatched = false } = {}) {
   const message = String(error?.message || error || '');
   const lower = message.toLowerCase();
@@ -48,6 +95,7 @@ export function beginLlmReceipt({
   background = false,
   logicalKey = null,
   retryOf = null,
+  contexts = [],
   startedAt = new Date().toISOString(),
 }, { openDatabase = getDatabase } = {}) {
   const id = randomUUID();
@@ -55,9 +103,12 @@ export function beginLlmReceipt({
   return withDb(openDatabase, db => {
     db.prepare(`
       INSERT INTO llm_call_receipts
-        (id, logical_key, retry_of, provider, model, purpose, background, status, request_fingerprint, input_chars, started_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?)
-    `).run(id, logicalKey, retryOf, provider, model, purpose, background ? 1 : 0, fingerprintMessages(messages), inputChars, startedAt);
+        (id, logical_key, retry_of, provider, model, purpose, background, status, request_fingerprint, context_json, input_chars, started_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?)
+    `).run(
+      id, logicalKey, retryOf, provider, model, purpose, background ? 1 : 0,
+      fingerprintMessages(messages), JSON.stringify(normalizeLlmContexts(contexts)), inputChars, startedAt,
+    );
     return { id, startedAt };
   });
 }
@@ -119,6 +170,45 @@ export function failLlmReceipt(receipt, error, { dispatched = false, finishedAt 
   return classified;
 }
 
+export function getLlmCallReceipt(id, { openDatabase = getDatabase } = {}) {
+  return withDb(openDatabase, db => {
+    const row = db.prepare(`
+      SELECT id, logical_key, retry_of, provider, model, purpose, background, status,
+             request_fingerprint, context_json, provider_request_id,
+             input_chars, output_chars, input_tokens, output_tokens, reasoning_tokens, total_tokens,
+             token_source, cost_yuan_estimate, error_kind, error_message,
+             started_at, dispatched_at, finished_at, duration_ms, reviewed_at, review_note
+      FROM llm_call_receipts WHERE id=?
+    `).get(id);
+    return row ? { ...row, contexts: enrichContexts(db, parseContexts(row.context_json)), context_json: undefined } : null;
+  });
+}
+
+export function reviewLlmCallReceipt(id, {
+  reviewed = true,
+  note = null,
+  reviewedAt = new Date().toISOString(),
+} = {}, { openDatabase = getDatabase } = {}) {
+  return withDb(openDatabase, db => {
+    const result = db.prepare(`
+      UPDATE llm_call_receipts SET reviewed_at=?, review_note=? WHERE id=?
+    `).run(reviewed ? reviewedAt : null, reviewed ? String(note || '').slice(0, 500) || null : null, id);
+    return result.changes > 0 ? getLlmCallReceiptFromDb(db, id) : null;
+  });
+}
+
+function getLlmCallReceiptFromDb(db, id) {
+  const row = db.prepare(`
+    SELECT id, logical_key, retry_of, provider, model, purpose, background, status,
+           request_fingerprint, context_json, provider_request_id,
+           input_chars, output_chars, input_tokens, output_tokens, reasoning_tokens, total_tokens,
+           token_source, cost_yuan_estimate, error_kind, error_message,
+           started_at, dispatched_at, finished_at, duration_ms, reviewed_at, review_note
+    FROM llm_call_receipts WHERE id=?
+  `).get(id);
+  return row ? { ...row, contexts: enrichContexts(db, parseContexts(row.context_json)), context_json: undefined } : null;
+}
+
 function aggregate(db, where, params) {
   return db.prepare(`
     SELECT COUNT(*) calls,
@@ -165,9 +255,20 @@ export function getLlmCallReport({ days = 30, limit = 20, now = new Date() } = {
     `).all(new Date(dayStart).toISOString(), new Date(dayEnd).toISOString());
     const recent = db.prepare(`
       SELECT id, purpose, provider, model, status, total_tokens, cost_yuan_estimate,
-             error_kind, error_message, started_at, duration_ms, retry_of
-      FROM llm_call_receipts ORDER BY started_at DESC LIMIT ?
+             error_kind, error_message, started_at, duration_ms, retry_of, reviewed_at, context_json
+      FROM llm_call_receipts
+      WHERE status!='succeeded'
+      ORDER BY started_at DESC LIMIT ?
     `).all(Math.max(1, Math.min(100, limit)));
-    return { today: todayStats, period: { days, ...periodStats }, byPurpose, recent };
+    return {
+      today: todayStats,
+      period: { days, ...periodStats },
+      byPurpose,
+      recent: recent.map(row => {
+        const contexts = parseContexts(row.context_json);
+        const { context_json, ...summary } = row;
+        return { ...summary, context_count: contexts.length, context_preview: contexts.slice(0, 2) };
+      }),
+    };
   }, { today: {}, period: { days }, byPurpose: [], recent: [] });
 }

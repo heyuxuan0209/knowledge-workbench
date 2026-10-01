@@ -106,7 +106,7 @@ export async function* streamChat(messages, provider = 'deepseek', model = null,
     const purpose = options.purpose || inferCallPurpose();
     const receipt = beginLlmReceipt({
       messages, provider, model: modelName, purpose, background: !!options.background,
-      logicalKey: options.logicalKey, retryOf: options.retryOf,
+      logicalKey: options.logicalKey, retryOf: options.retryOf, contexts: options.contexts,
     });
     let dispatched = false;
     let settled = false;
@@ -198,7 +198,7 @@ export async function chat(messages, provider = 'deepseek', model = null, option
     const purpose = options.purpose || inferCallPurpose();
     const receipt = beginLlmReceipt({
       messages, provider, model: modelName, purpose, background: !!options.background,
-      logicalKey: options.logicalKey, retryOf: options.retryOf,
+      logicalKey: options.logicalKey, retryOf: options.retryOf, contexts: options.contexts,
     });
     let dispatched = false;
 

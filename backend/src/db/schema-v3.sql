@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS llm_call_receipts (
     background           INTEGER NOT NULL DEFAULT 0,
     status               TEXT NOT NULL CHECK (status IN ('reserved', 'succeeded', 'failed', 'unknown', 'blocked')),
     request_fingerprint  TEXT NOT NULL,
+    context_json         TEXT NOT NULL DEFAULT '[]',
     provider_request_id  TEXT,
     input_chars          INTEGER NOT NULL DEFAULT 0,
     output_chars         INTEGER NOT NULL DEFAULT 0,
@@ -121,6 +122,8 @@ CREATE TABLE IF NOT EXISTS llm_call_receipts (
     dispatched_at        TEXT,
     finished_at          TEXT,
     duration_ms          INTEGER,
+    reviewed_at          TEXT,
+    review_note          TEXT,
     FOREIGN KEY (retry_of) REFERENCES llm_call_receipts(id)
 );
 CREATE INDEX IF NOT EXISTS idx_lcr_started ON llm_call_receipts(started_at DESC);

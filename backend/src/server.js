@@ -2692,6 +2692,31 @@ app.get('/api/stats/llm-calls', async (req, res) => {
   }
 });
 
+app.get('/api/stats/llm-calls/:id', async (req, res) => {
+  try {
+    const { getLlmCallReceipt } = await import('./services/llm-receipts.js');
+    const receipt = getLlmCallReceipt(req.params.id);
+    if (!receipt) return res.status(404).json({ success: false, error: '调用记录不存在' });
+    res.json({ success: true, data: receipt });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/stats/llm-calls/:id/review', async (req, res) => {
+  try {
+    const { reviewLlmCallReceipt } = await import('./services/llm-receipts.js');
+    const receipt = reviewLlmCallReceipt(req.params.id, {
+      reviewed: req.body?.reviewed !== false,
+      note: req.body?.note || null,
+    });
+    if (!receipt) return res.status(404).json({ success: false, error: '调用记录不存在' });
+    res.json({ success: true, data: receipt });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== 前端静态托管（ADR-082）==========
 // 迁云后前端只活在 Mac 的 Vite dev server 上，服务器 GET / 是 404——产品只有半个身子在线上，
 // 关掉本机那个终端创作台就没了。有 frontend/dist 就托管，没有则行为完全不变（本地开发照旧 5173 代理）。

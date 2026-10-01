@@ -10,8 +10,11 @@ import {
   completeLlmReceipt,
   failLlmReceipt,
   fingerprintMessages,
+  getLlmCallReceipt,
   getLlmCallReport,
   markLlmReceiptDispatched,
+  normalizeLlmContexts,
+  reviewLlmCallReceipt,
 } from './llm-receipts.js';
 
 function setup() {
@@ -31,6 +34,7 @@ test('receipt stores accounting metadata without prompt or response text', () =>
     model: 'deepseek-v4-flash',
     purpose: 'translation',
     background: true,
+    contexts: [{ kind: 'content', id: 'story-1', label: '私密文章标题', url: 'https://example.com/story', target: 'zh_summary' }],
     startedAt: '2026-09-30T08:00:00.000Z',
   }, controls);
 
@@ -49,6 +53,8 @@ test('receipt stores accounting metadata without prompt or response text', () =>
   const db = new DatabaseSync(dbPath);
   const row = db.prepare('SELECT * FROM llm_call_receipts WHERE id=?').get(receipt.id);
   const columns = db.prepare('PRAGMA table_info(llm_call_receipts)').all().map(column => column.name);
+  db.exec('CREATE TABLE contents (id TEXT PRIMARY KEY, en_title TEXT, zh_title TEXT, en_summary TEXT, zh_summary TEXT, zh_body TEXT, url TEXT)');
+  db.prepare('INSERT INTO contents (id, en_summary, zh_summary, url) VALUES (?, ?, ?, ?)').run('story-1', 'English summary', '已经落库的中文摘要', 'https://example.com/story');
   db.close();
 
   assert.equal(row.status, 'succeeded');
@@ -58,6 +64,38 @@ test('receipt stores accounting metadata without prompt or response text', () =>
   assert.equal(columns.includes('prompt'), false);
   assert.equal(columns.includes('response'), false);
   assert.equal(JSON.stringify(row).includes('这是私密 prompt'), false);
+  const detail = getLlmCallReceipt(receipt.id, controls);
+  assert.deepEqual(detail.contexts, [{
+    kind: 'content', id: 'story-1', label: '私密文章标题', url: 'https://example.com/story', target: 'zh_summary',
+    result_present: true, result_preview: '已经落库的中文摘要',
+  }]);
+});
+
+test('business contexts are bounded and contain references rather than content bodies', () => {
+  const contexts = normalizeLlmContexts([
+    { kind: 'content', id: 42, title: 'A'.repeat(300), url: 'https://example.com/a' },
+    ...Array.from({ length: 60 }, (_, index) => ({ id: index, label: `item-${index}` })),
+  ]);
+  assert.equal(contexts.length, 50);
+  assert.equal(contexts[0].id, '42');
+  assert.equal(contexts[0].label.length, 240);
+  assert.equal(Object.hasOwn(contexts[0], 'body'), false);
+});
+
+test('an English fallback copied into zh_title is not mistaken for a completed translation', () => {
+  const { dbPath, controls } = setup();
+  const receipt = beginLlmReceipt({
+    messages: [], provider: 'deepseek', model: 'deepseek', purpose: 'translation',
+    contexts: [{ kind: 'content', id: 'story-2', label: 'English title', target: 'zh_title' }],
+  }, controls);
+  const db = new DatabaseSync(dbPath);
+  db.exec('CREATE TABLE contents (id TEXT PRIMARY KEY, en_title TEXT, zh_title TEXT, en_summary TEXT, zh_summary TEXT, zh_body TEXT, url TEXT)');
+  db.prepare('INSERT INTO contents (id, en_title, zh_title) VALUES (?, ?, ?)').run('story-2', 'English title', 'English title');
+  db.close();
+
+  const detail = getLlmCallReceipt(receipt.id, controls);
+  assert.equal(detail.contexts[0].result_present, false);
+  assert.equal(detail.contexts[0].result_preview, null);
 });
 
 test('failures distinguish provider rejection, budget block, and uncertain transport outcome', () => {
@@ -111,8 +149,32 @@ test('report aggregates today by purpose and keeps recent problem evidence', () 
   assert.equal(report.today.unknown, 1);
   assert.equal(report.today.total_tokens, 100);
   assert.equal(report.byPurpose.length, 2);
-  assert.equal(report.recent.length, 2);
+  assert.equal(report.recent.length, 1);
+  assert.equal(report.recent[0].context_count, 0);
   assert.deepEqual({ ...uncertainRow }, { status: 'unknown', error_kind: 'transport' });
+});
+
+test('an abnormal receipt can be reviewed and reopened without changing accounting facts', () => {
+  const { controls } = setup();
+  const receipt = beginLlmReceipt({
+    messages: [], provider: 'deepseek', model: 'deepseek', purpose: 'translation',
+    startedAt: '2026-09-30T18:00:00.000Z',
+  }, controls);
+  failLlmReceipt(receipt, new Error('HTTP 402 insufficient balance'), {
+    dispatched: true, finishedAt: '2026-09-30T18:00:01.000Z',
+  }, controls);
+
+  const reviewed = reviewLlmCallReceipt(receipt.id, {
+    reviewed: true, note: '已确认余额问题', reviewedAt: '2026-09-30T18:05:00.000Z',
+  }, controls);
+  assert.equal(reviewed.reviewed_at, '2026-09-30T18:05:00.000Z');
+  assert.equal(reviewed.review_note, '已确认余额问题');
+  assert.equal(reviewed.status, 'failed');
+
+  const reopened = reviewLlmCallReceipt(receipt.id, { reviewed: false }, controls);
+  assert.equal(reopened.reviewed_at, null);
+  assert.equal(reopened.review_note, null);
+  assert.equal(reopened.status, 'failed');
 });
 
 test('stale reserved receipts are reconciled after a process interruption', () => {

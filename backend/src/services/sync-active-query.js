@@ -65,12 +65,17 @@ function partitionItems(items) {
 async function translateNewItems(newItems) {
   for (const { content } of newItems) {
     try {
+      const context = { kind: 'content', id: content.id, label: content.en_title, url: content.url };
       if (content.en_title && !content.zh_title) {
-        content.zh_title = await translateText(content.en_title, { background: true });
+        content.zh_title = await translateText(content.en_title, {
+          background: true, contexts: [{ ...context, target: 'zh_title' }],
+        });
         content.has_translation = 1;
       }
       if (content.en_summary && !content.zh_summary) {
-        content.zh_summary = await translateText(content.en_summary, { background: true });
+        content.zh_summary = await translateText(content.en_summary, {
+          background: true, contexts: [{ ...context, target: 'zh_summary' }],
+        });
       }
     } catch (err) {
       // 翻译失败不阻塞入库：en_title 仍可展示；下次同步会作为"待补翻译"重试
@@ -162,6 +167,7 @@ export async function syncActiveQuery({ limit = PER_SOURCE_LIMIT } = {}) {
         id: i.content.id,
         title: i.content.zh_title || i.content.en_title || '',
         excerpt: i.content.zh_summary || i.content.en_summary || '',
+        url: i.content.url,
       })), { background: true });
       for (const i of newItems) {
         const s = summaries.get(i.content.id);

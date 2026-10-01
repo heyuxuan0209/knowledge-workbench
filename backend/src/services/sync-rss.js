@@ -185,7 +185,9 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
       return { success: true, status: failedFeeds.length ? 'partial' : 'success', count: 0, fetched: items.length, candidates: 0, feeds: feedsInfo.length, failedFeeds: failedFeeds.length };
     }
     console.log(`🆕 RSS 仅处理新候选：${candidates.length}/${pretransformed.length}（单轮上限 ${MAX_NEW_CANDIDATES_PER_RUN}）`);
-    const kept = await filterRelevant(candidates.map(({ content }) => ({ id: content.id, title: content.en_title })), { background: true });
+    const kept = await filterRelevant(candidates.map(({ content }) => ({
+      id: content.id, title: content.en_title, url: content.url,
+    })), { background: true });
     const relevantItems = candidates.filter(({ content }) => kept.has(content.id));
     const rejectedItems = candidates.filter(({ content }) => !kept.has(content.id));
     console.log(`🧹 relevance filter: ${relevantItems.length}/${candidates.length} kept`);
@@ -194,9 +196,14 @@ export async function syncRSSData(feedUrls = null, limitPerFeed = 20) {
     // 打爆代理/API → "Connection error" → 整批回退英文 → feed 全英文标题。改成每次最多 CONC 条）。
     const translateOne = async ({ content, sourceInfo }) => {
       try {
+        const context = { kind: 'content', id: content.id, label: content.en_title, url: content.url };
         if (content.original_lang === 'en') {
-          content.zh_title = content.en_title ? await translateText(content.en_title, { background: true }) : null;
-          content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300), { background: true }) : null;
+          content.zh_title = content.en_title ? await translateText(content.en_title, {
+            background: true, contexts: [{ ...context, target: 'zh_title' }],
+          }) : null;
+          content.zh_summary = content.en_summary ? await translateText(content.en_summary.slice(0, 300), {
+            background: true, contexts: [{ ...context, target: 'zh_summary' }],
+          }) : null;
         } else {
           content.zh_title = content.en_title;
           content.zh_summary = content.en_summary;
