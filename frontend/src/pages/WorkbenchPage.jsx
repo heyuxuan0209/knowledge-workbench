@@ -407,7 +407,22 @@ export default function WorkbenchPage() {
       url: sourceUrl,
       metadata: d.metadata || null,
     }
-    setSelectedItems(prev => [...prev.filter(x => x.id !== 'paste'), { id: 'paste', title: `[${label}] ${title}`, adHoc }])
+    const nextItems = [...selectedItems.filter(x => x.id !== 'paste'), { id: 'paste', title: `[${label}] ${title}`, adHoc }]
+    setSelectedItems(nextItems)
+    const cached = d.cachedInterpretation?.trim()
+    if (cached) {
+      // ADR-076 的解读缓存此前只在后端读出，前端却丢掉了字段，导致重开同一链接仍重复
+      // 调模型。缓存稿与本次 ingest payload 同版本；长视频管道升级时后端会同时清旧稿。
+      chatContextRef.current = `items:${nextItems.map(x => x.id).join(',')}`
+      chatHistory.current = []
+      setChat([{ role: 'ai', text: cached, pending: false }])
+      setDegraded([])
+      showToast('已打开缓存中的完整解读')
+    } else {
+      chatContextRef.current = null
+      chatHistory.current = []
+      setChat([])
+    }
     setRightCollapsed(false)
     setTimeout(() => setAnalysisMode('chat'), 0)
   }
