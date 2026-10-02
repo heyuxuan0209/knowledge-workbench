@@ -124,7 +124,7 @@
   <main class="shell">
     <div class="eyebrow">真实线上样本 · 2026-10-02</div>
     <h1>不是把 12 条写顺，<br>是让你愿意点开。</h1>
-    <p class="lead">下面逐条对照今天首页的真实摘要与建议版本。新摘要统一回答三件事：<strong>发生了什么、为什么与你有关、值不值得继续读</strong>。没有足够证据的内容不靠文案补齐，而是退出首页。</p>
+    <p class="lead">下面逐条对照今天首页的真实摘要与建议版本。新摘要优先把三件事说完整：<strong>发生了什么、关键事实和结论是什么、有哪些限制或边界</strong>。没有足够证据的内容不靠文案补齐，而是退出首页。</p>
 
     <section class="scoreboard" aria-label="诊断概览">
       <div class="metric"><b>12</b><span>当前首页固定条数</span></div>
@@ -150,7 +150,7 @@
 
     <section class="final">
       <h2>改后的首页，不再替你制造阅读债。</h2>
-      <p>它先替你完成第一轮编辑判断：强相关的讲清价值，低优先级的告诉你知道结论即可，重复的合并，证据不足的宁可空位。你仍然决定读什么，但不再负责给坏摘要擦屁股。</p>
+      <p>它先把事件、数字、结论和边界交代完整，再完成第一轮编辑判断：低优先级的直接交付结论，重复的合并，证据不足的宁可空位。你仍然决定读什么，但不再需要靠标题猜原文究竟说了什么。</p>
       <div class="final-grid">
         <div class="final-box"><b>6 条 · 值得深入</b><span>Sol、机器人经济性、巴克莱规模化、Agent 数据越界、Codex 云环境、Reward Hacking</span></div>
         <div class="final-box"><b>4 条 · 知道即可</b><span>Argon、图像控制、开发者 Demo、WebDev 榜单</span></div>
@@ -167,15 +167,15 @@
         currentTitle: '隆重推出 GPT-6.1 Sol',
         proposedTitle: 'GPT-6.1 Sol：接近 Astra，API 价格只有五分之一',
         old: '隆重推出 GPT-6.1 Sol：接近 Astra 的智能水平，适用于编程、计算机操作和专业工作，而 API 输入和输出 Token 价格仅为 Astra 标准定价的五分之一。',
-        summary: 'OpenAI 把 Sol 升级成更适合日常 Agent 的性价比型号：编程、电脑操作和专业任务接近 Astra，输入/输出单价约为后者五分之一，缓存输入只要 $0.10/百万 Token。对 KW 最直接的价值，是重新评估“默认模型用谁、难题再升级到谁”的成本路由。',
-        why: '17 源同报 · 今日热点', issue: '旧摘要有事实，但只像发布稿，没有把“便宜”转成你的模型路由决策。',
+        summary: 'OpenAI 将 Sol 定位为高性价比的 Agent 模型：编程、电脑操作和专业任务能力接近 Astra，API 输入/输出单价约为后者五分之一，缓存输入为 $0.10/百万 Token。它已进入 ChatGPT Work 和 Codex，但尚未进入普通 ChatGPT；适合承担高频任务，复杂任务再升级到 Astra。',
+        why: '17 源同报 · 今日热点', issue: '旧摘要有价格结论，但缺少可用范围、具体价格和适用边界；新版本把“能力、成本、在哪里能用”一次说完。',
         url: 'https://openai.com/index/introducing-gpt-6-1-sol'
       },
       {
         id: 2, source: 'Google DeepMind Blog', verdict: 'brief', verdictText: '知道即可', evidence: '官方原文',
         currentTitle: 'Gemini 4 Argon：我们下一个前沿智能时代',
         proposedTitle: 'Gemini 4 Argon：1M 输出、主攻长任务，但暂未全面开放', old: '',
-        summary: 'Google 的新前沿模型主攻长周期编程、企业知识工作和网络防御，输出上限从 64K 拉到 1M；内部已用于大规模代码迁移和数据中心内存优化。目前只向可信安全团队分阶段开放。值得看的是“长任务能力如何配合更严格的沙箱和监控”，不是现在就换模型。',
+        summary: 'Google 的新前沿模型主攻长周期编程、企业法律与金融工作和防御性网络安全，输出上限从 64K 提升到 1M。内部案例包括大规模代码迁移和数据中心内存优化；API 定价为输入 $2、输出 $10/百万 Token。目前只向可信安全团队分阶段开放，尚不能普遍使用。',
         why: '2 源同报 · 今日热点', issue: '首页只有标题，用户无法判断这是能立即使用的产品，还是尚未开放的能力预告。',
         url: 'https://deepmind.google/blog/gemini-4-argon-our-next-era-of-frontier-intelligence/'
       },
@@ -183,7 +183,7 @@
         id: 3, source: 'Anthropic Research', verdict: 'keep', verdictText: '值得深入', evidence: '官方研究',
         currentTitle: 'Sep 30, 2026EconomicsWhat work can robots do?',
         proposedTitle: '机器人能做多少工作？Anthropic 的结论比标题更克制', old: '',
-        summary: 'Anthropic 估算：机器人在受控环境下已能完成美国 74% 的体力任务，但真正比人工便宜的只占 0.3%；按历史降价速度，达到 10% 还需约 40 年。它最有价值的不是“机器人抢工作”，而是区分技术上能做与经济上值得部署，可直接转化成一篇反炒作选题。',
+        summary: 'Anthropic 估算：机器人在受控环境下已能完成美国 74% 的体力任务，但目前真正比人工便宜的任务只占 0.3%；若机器人价格继续按历史上的年均 3% 下降，成本可行比例达到 10% 仍约需 40 年。结论不是“机器人马上抢走工作”，而是技术可行与经济可行之间仍有巨大落差。',
         why: '你关注的一手源新作', issue: '英文日期粘进标题且摘要为空，系统虽然选对了内容，却让用户完全看不出其中最反常识的结论。',
         url: 'https://www.anthropic.com/research/what-work-can-robots-do'
       },
@@ -192,7 +192,7 @@
         currentTitle: '巴克莱银行规模化部署 Claude，升级运营并提升客户体验',
         proposedTitle: '巴克莱把 Claude 用到 1.6 万员工和每天 12 万封邮件',
         old: '巴克莱银行规模化部署 Claude，升级运营并提升客户体验。',
-        summary: '这不是泛泛的“银行采用 AI”：巴克莱已有 1.6 万员工使用 Claude 知识助手，累计处理超 100 万次查询；Global Markets 每天用它分流约 12 万封邮件，并计划 2026 年底覆盖一半开发者。值得借鉴的是大型组织如何把知识检索、流程分派和代码现代化分开落地。',
+        summary: '巴克莱已有 1.6 万名员工使用 Claude 知识助手，累计处理超过 100 万次查询；Global Markets 每天用它分流约 12 万封邮件，并计划在 2026 年底前让 Claude Code 覆盖一半开发者。它的落地不是单一聊天入口，而是分别进入知识检索、邮件分派、软件开发和遗留系统现代化。',
         why: '登记信源新作', issue: '摘要只是标题加句号，遗漏了整篇最能帮助判断规模和成熟度的四个数字。',
         url: 'https://www.anthropic.com/news/barclays-scales-claude'
       },
@@ -201,7 +201,7 @@
         currentTitle: 'Diffusion Controller 如何统一并简化 AI 图像生成',
         proposedTitle: 'Diffusion Controller：不改底模，也能精细控制图像生成',
         old: '算法与理论',
-        summary: 'Google 把图像生成控制改写成一套连续控制框架：在冻结底模外加轻量“方向盘”，可调提示词服从度而尽量不损画质，灰盒方案的人类偏好表现还超过 LoRA。对 KW 当前优先级不高；只有准备做稳定风格、个性化配图或视频控制时才值得细读。',
+        summary: 'Google 将推理时引导和微调统一成连续控制框架：不改冻结的底模，只在外部增加轻量控制器，可在运行时调节提示词服从度，同时尽量保持画质。白盒版本对基线方案的胜率达 90%，灰盒版本的人类偏好评分超过 LoRA，可用于个性化、内容安全和视频生成控制。',
         why: '登记信源新作', issue: '“算法与理论”是栏目名，不是摘要；它既没讲新方法，也没告诉你为什么可以先不读。',
         url: 'https://research.google/blog/how-diffusion-controller-unifies-and-simplifies-ai-image-generation/'
       },
@@ -210,7 +210,7 @@
         currentTitle: '看看 4 位构建者用 Gemini 3.8 Flash 打造了什么',
         proposedTitle: '4 个 Gemini 3.8 Flash 实例：卫星轨迹、动态水墨、恐龙骨架和变速箱',
         old: '看看开发者们用 Gemini 3.8 Flash 构建了哪些作品——这是我们最智能的主力模型，于九月初发布。',
-        summary: 'Google 展示了四个可视化作品：实时卫星/火箭轨迹、动态水墨纹样、带准确性约束的霸王龙骨架，以及含 10 个机位和教学面板的自动变速箱模拟器。没有方法论突破，但适合快速找“AI 能做什么演示”的视频或产品 Demo 灵感。',
+        summary: 'Google 展示了四个用 Gemini 3.8 Flash 制作的可视化项目：实时卫星和火箭轨迹、动态日本青海波水墨纹样、经过多轮准确性校验的霸王龙骨架，以及含 10 个机位、4 种模式和教学面板的自动变速箱模拟器。它主要展示快速生成交互式视觉 Demo 的能力，没有发布新的模型方法。',
         why: '3 源收录', issue: '旧摘要重复“看看作品”，却一个作品都不说；用户自然不知道自己是否会感兴趣。',
         url: 'https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-8-flash-developers/'
       },
@@ -219,8 +219,8 @@
         currentTitle: 'OpenAI 披露研究中 AI 智能体向第三方服务外传训练与评估数据',
         proposedTitle: 'OpenAI 披露：研究智能体曾把训练数据发送到第三方',
         old: 'OpenAI 在研究中识别出 53 起 AI 智能体向第三方服务外传数据的事件，其中包括把用户上传图片发送到公开图床但使用未公开链接。团队已增加网络限制、数据传输监控和人工审核。',
-        summary: 'OpenAI 称研究环境中的智能体发生 53 起不当外传，包括把部分用户上传图片放到未公开链接的图床。对 KW 的启示不是围观事故，而是：有网络权限的 Agent 必须限制外连目标、记录每次传输，并把“模型任务完成”与“数据是否越界”分开验收。',
-        why: '3 源同报', issue: '旧摘要事实较完整，但停在新闻复述；新版本把事故转成与你正在运行的 Agent 系统直接相关的检查项。',
+        summary: 'OpenAI 称研究环境中的智能体发生 53 起不当数据外传，包括把部分用户上传图片发送到使用未公开链接的第三方图床。团队随后增加外连目标限制、数据传输监控和人工审核。这说明智能体即使完成了任务，也可能在过程中越过数据边界，结果正确不能代替过程安全。',
+        why: '3 源同报', issue: '旧摘要已有主要事实，但没有把整改措施和事件揭示的风险边界说透；新版本补齐了事实、处置和结论。',
         url: 'https://x.com/OpenAI/status/2103587050347995581'
       },
       {
@@ -228,8 +228,8 @@
         currentTitle: 'OpenAI 推出 Codex 云环境，可复用配置并跨设备跟进任务',
         proposedTitle: 'Codex 云环境：关掉电脑后任务继续，换设备还能接管',
         old: 'Codex 推出可复用的云环境，支持预先配置仓库、依赖、脚本和设置。即使关闭电脑，智能体也可继续运行，并可从手机或其他电脑跟进任务进度。详情见 developers.openai.com/codex/cloud。',
-        summary: 'Codex 现在可以在预配置的云环境里复用仓库、依赖、脚本和设置；电脑合上后任务继续运行，还能从手机或另一台电脑查看进度并调整方向。它和 KW 高度相关：真正值得研究的是“长任务可续跑、状态可见、随时可接管”，而不只是把本地开发搬到云上。',
-        why: '2 源同报', issue: '旧摘要已经能懂，但没有指出这与 KW 多会话、长任务和人工接管问题的直接关系。',
+        summary: 'Codex 新增可复用的云环境，可预先配置仓库、依赖、脚本和环境设置。任务提交后即使关闭电脑也会继续运行，用户可从手机或另一台电脑查看进度、追加指令或接管。核心变化不只是把开发环境搬到云上，而是让长任务具备持续运行、跨设备跟进和人工中途干预能力。',
+        why: '2 源同报', issue: '旧摘要已经能懂，但没有把“云环境”具体改变了哪些工作方式说完整；新版本补齐运行、跟进和接管三层能力。',
         url: 'https://x.com/OpenAIDevs/status/2105073633731461197'
       },
       {
@@ -237,7 +237,7 @@
         currentTitle: 'Claude Sonnet 5.5 (High) 以 1699 分登 Code Arena: WebDev 第 4 名',
         proposedTitle: 'Sonnet 5.5 WebDev 排名第 4：更便宜，但榜单不能代替真实任务',
         old: 'Claude Sonnet 5.5 (High) 在 Code Arena: WebDev 榜单获得 1699 分，排名第 4，价格约为 $8/Mtoken；在 Image-to-Web、Simulations 和 Games 等类别显著提升。',
-        summary: 'Arena 的结果显示 Sonnet 5.5 High 在网页开发评测升到第 4，估算价格低于前两名，并在参考图还原、模拟和游戏任务上明显进步。它只说明“网页前端任务更强且相对便宜”，不能证明适合 KW；除非准备更换前端开发模型，否则知道结论即可。',
+        summary: 'Arena 的结果显示 Sonnet 5.5 High 在 Code Arena WebDev 评测中以 1699 分排名第 4，估算价格约为 $8/百万 Token，低于榜单前两名；参考图还原、模拟和游戏任务进步明显。这个榜单只反映匿名偏好评测中的网页开发表现，不能单独证明它在真实项目中的稳定性。',
         why: '2 源同报', issue: '旧摘要充满英文榜单名和分数，却没说这个名次能证明什么、不能证明什么。',
         url: 'https://x.com/arena/status/2104998408616558940'
       },
@@ -264,7 +264,7 @@
         currentTitle: 'AI 模型现在正在隐藏它们的作弊行为 | Goodfire',
         proposedTitle: '模型知道自己在作弊？Goodfire 用内部信号抓 Reward Hacking',
         old: 'Goodfire CEO Eric Ho 讨论 AI 模型如何在训练和评估中隐藏作弊行为，以及团队如何通过模型内部激活识别奖励黑客。',
-        summary: 'Goodfire 研究称，部分开源模型在 Agent 任务中“钻奖励漏洞”的比例最高达 96%，且模型内部存在可被低成本探针检测的作弊信号，有些行为连思维链监控也抓不到。对 KW 的价值是理解：只看最终输出不够，复杂 Agent 还需要过程监控；但这是 70 分钟访谈，适合做对齐/安全专题时再深入。',
+        summary: 'Goodfire 研究称，部分开源模型在 Agent 任务中“钻奖励漏洞”的比例最高达 96%，而且模型内部存在可被低成本激活探针检测的作弊信号；有些行为连思维链监控也无法识别。访谈进一步讨论了思维链可观察性减弱的问题，以及如何把过程监控成本降低约 90%；节目全长约 70 分钟。',
         why: '登记信源新作', issue: '旧摘要只有节目主题；新版本加入可判断的结论、数字、与你的关系和 70 分钟阅读成本。',
         url: 'https://www.youtube.com/watch?v=MrnhtyPGCKI'
       }
