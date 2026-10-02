@@ -4,6 +4,28 @@ export function sourceKey(candidate) {
   return candidate.source_id || candidate.src || candidate.id;
 }
 
+// 不同采集入口（如 RSS 与 AI HOT）可能指向同一篇原文，却因摘要差异被上游聚簇拆开。
+// 精选层以规范化原文 URL 再做一道硬去重，避免同一内容浪费首页名额。
+export function canonicalArticleUrl(candidate) {
+  const raw = candidate.url || candidate.permalink || '';
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+    url.hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || ['fbclid', 'gclid', 'mc_cid', 'mc_eid'].includes(key.toLowerCase())) {
+        url.searchParams.delete(key);
+      }
+    }
+    url.searchParams.sort();
+    url.pathname = url.pathname.replace(/\/+$/, '') || '/';
+    return url.toString();
+  } catch {
+    return raw.trim() || null;
+  }
+}
+
 export function freshnessScore(created, now = Date.now()) {
   const normalized = /[zZ+]/.test(created || '')
     ? created
@@ -66,10 +88,14 @@ export function rankCuratedCandidates(rows, {
 
   const selected = [];
   const seenSources = new Set();
+  const seenArticles = new Set();
   for (const item of scored) {
     const key = sourceKey(item.candidate);
+    const articleUrl = canonicalArticleUrl(item.candidate);
     if (seenSources.has(key)) continue;
+    if (articleUrl && seenArticles.has(articleUrl)) continue;
     seenSources.add(key);
+    if (articleUrl) seenArticles.add(articleUrl);
     selected.push(item);
     if (selected.length >= limit) break;
   }

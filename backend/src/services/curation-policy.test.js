@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshnessScore, rankCuratedCandidates } from './curation-policy.js';
+import { canonicalArticleUrl, freshnessScore, rankCuratedCandidates } from './curation-policy.js';
 
 const NOW = new Date('2026-09-29T12:00:00Z').getTime();
 
@@ -46,4 +46,24 @@ test('事件簇非主条和证据不足条目不占精选名额', () => {
   ];
   const ranked = rankCuratedCandidates(rows, { limit: 12, now: NOW });
   assert.deepEqual(ranked.map(item => item.candidate.id), ['primary', 'brief']);
+});
+
+test('不同采集源指向同一原文时只占一个精选位', () => {
+  const rows = [
+    { id: 'rss', source_id: 'deepmind-rss', created_at: '2026-09-29T00:00:00Z', reg: 1,
+      url: 'https://www.deepmind.google/blog/gemini-4-argon/?utm_source=rss' },
+    { id: 'aihot', source_id: null, src: 'AI HOT', created_at: '2026-09-29T00:00:00Z', sc: 3,
+      url: 'https://deepmind.google/blog/gemini-4-argon' },
+    { id: 'replacement', source_id: 'anthropic', created_at: '2026-09-29T00:00:00Z', tier: 'T1',
+      url: 'https://anthropic.com/news/example' },
+  ];
+  const ranked = rankCuratedCandidates(rows, { limit: 3, now: NOW });
+  assert.deepEqual(ranked.map(item => item.candidate.id), ['aihot', 'replacement']);
+});
+
+test('原文 URL 去掉跟踪参数、www 和末尾斜杠', () => {
+  assert.equal(
+    canonicalArticleUrl({ url: 'https://WWW.Example.com/post/?utm_source=rss&b=2&a=1#part' }),
+    'https://example.com/post?a=1&b=2',
+  );
 });
