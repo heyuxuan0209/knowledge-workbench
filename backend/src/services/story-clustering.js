@@ -70,28 +70,119 @@ async function ensureContentEmbeddings(db, contents) {
   return byId;
 }
 
-// 贪心向量聚类。threshold 0.80：bge-m3 归一化余弦下，"同一事件不同来源"通常 ≥0.8，
-// 相关但不同事件在 0.5-0.7，据此分开（素材查重用 0.85，事件簇取略低）。质心=成员均值重归一化。
-export function clusterByVectors(contents, byId, threshold = 0.80) {
+const EVENT_WINDOW_MS = 7 * 24 * 3600 * 1000;
+
+function contentTime(content) {
+  const ts = new Date(content.published_at || content.created_at || 0).getTime();
+  return Number.isFinite(ts) && ts > 0 ? ts : null;
+}
+
+// 模型号是事件身份里的强锚点。同一家公司的不同版本语义极近，但通常不是同一件发布。
+// 这里只在两边都明确写出型号且发生冲突时否决；缺型号时不猜，避免杀掉措辞简略的同事件报道。
+export function extractModelRefs(title = '') {
+  const refs = [];
+  const text = String(title).toLowerCase().replace(/[：:，,（）()]/g, ' ');
+  const re = /\b(gpt|chatgpt|claude|gemini|grok|llama|deepseek|qwen|kimi|glm|mistral|minimax|doubao|seedance|sora|veo|imagen)(?:[\s_-]+([a-z]+))?[\s_-]*(\d+(?:\.\d+)*)(?:[\s_-]+([a-z]+))?/g;
+  for (const m of text.matchAll(re)) {
+    refs.push({ family: m[1], version: m[3], variant: m[2] || m[4] || '' });
+  }
+  return refs;
+}
+
+export function eventTitlesCompatible(a = '', b = '') {
+  const left = extractModelRefs(a), right = extractModelRefs(b);
+  const sharedFamilies = new Set(left.map(x => x.family).filter(f => right.some(y => y.family === f)));
+  for (const family of sharedFamilies) {
+    const compatible = left.filter(x => x.family === family).some(x =>
+      right.filter(y => y.family === family).some(y =>
+        x.version === y.version && (!x.variant || !y.variant || x.variant === y.variant)
+      )
+    );
+    if (!compatible) return false;
+  }
+  return true;
+}
+
+export function canonicalizeContentUrl(raw = '') {
+  try {
+    const u = new URL(raw);
+    u.hash = '';
+    u.hostname = u.hostname.toLowerCase().replace(/^www\./, '');
+    for (const key of [...u.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || ['fbclid', 'gclid', 'mc_cid', 'mc_eid'].includes(key.toLowerCase())) u.searchParams.delete(key);
+    }
+    u.searchParams.sort();
+    u.pathname = u.pathname.replace(/\/+$/, '') || '/';
+    return u.toString();
+  } catch { return String(raw || '').trim(); }
+}
+
+export function dedupeMembersByCanonicalUrl(members = []) {
+  const seen = new Set();
+  return members.filter(m => {
+    const key = canonicalizeContentUrl(m.url || m.permalink || '') || `id:${m.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function countDistinctPublishers(members = []) {
+  const ids = new Set();
+  for (const m of dedupeMembersByCanonicalUrl(members)) {
+    if (m.source_id) { ids.add(`source:${m.source_id}`); continue; }
+    try { ids.add(`host:${new URL(m.url || m.permalink).hostname.replace(/^www\./, '').toLowerCase()}`); }
+    catch { ids.add(`content:${m.id}`); }
+  }
+  return ids.size;
+}
+
+function fitsEventIdentity(content, cluster, byContent, byId, threshold, maxSpanMs) {
+  const anchor = byContent.get(cluster.anchorId);
+  if (!anchor || !eventTitlesCompatible(anchor.zh_title || anchor.en_title, content.zh_title || content.en_title)) return false;
+
+  const ts = contentTime(content);
+  if (ts != null && cluster.minTime != null && cluster.maxTime != null) {
+    if (Math.max(cluster.maxTime, ts) - Math.min(cluster.minTime, ts) > maxSpanMs) return false;
+  }
+
+  // 防止“滚雪球”：候选不能只像不断变宽的质心，也必须仍然像最初的事件主条。
+  const anchorVec = byId.get(cluster.anchorId);
+  const v = byId.get(content.id);
+  const anchorFloor = Math.max(0.70, threshold - 0.04);
+  return !anchorVec || !v || vecCosine(anchorVec, v) >= anchorFloor;
+}
+
+// 贪心向量聚类：向量负责召回，事件身份约束负责阻止“同主体不同事件”滚成一个大簇。
+// 默认事件跨度 7 天；30 天以上的演进关系属于“主题追踪”，不属于“同一事件多源同报”。
+export function clusterByVectors(contents, byId, threshold = 0.80, { maxSpanMs = EVENT_WINDOW_MS } = {}) {
   const sorted = [...contents].sort((a, b) => (b.external_score || 0) - (a.external_score || 0));
-  const clusters = []; // { memberIds:[], centroid:[number], n }
+  const byContent = new Map(contents.map(c => [c.id, c]));
+  const clusters = []; // { memberIds:[], centroid:[number], n, anchorId, minTime, maxTime }
   for (const content of sorted) {
     const v = byId.get(content.id);
     if (!v) continue;
     let best = null, bestSim = threshold;
     for (const cl of clusters) {
+      if (!fitsEventIdentity(content, cl, byContent, byId, threshold, maxSpanMs)) continue;
       const sim = vecCosine(v, cl.centroid);
       if (sim > bestSim) { best = cl; bestSim = sim; }
     }
     if (best) {
       best.memberIds.push(content.id);
+      const ts = contentTime(content);
+      if (ts != null) {
+        best.minTime = best.minTime == null ? ts : Math.min(best.minTime, ts);
+        best.maxTime = best.maxTime == null ? ts : Math.max(best.maxTime, ts);
+      }
       const cen = best.centroid, n = best.n;
       for (let k = 0; k < cen.length; k++) cen[k] = (cen[k] * n + v[k]) / (n + 1); // 增量均值
       let nrm = 0; for (const x of cen) nrm += x * x; nrm = Math.sqrt(nrm) || 1;
       for (let k = 0; k < cen.length; k++) cen[k] /= nrm; // 重归一化，保持点积=余弦
       best.n = n + 1;
     } else {
-      clusters.push({ memberIds: [content.id], centroid: v.slice(), n: 1 });
+      const ts = contentTime(content);
+      clusters.push({ memberIds: [content.id], centroid: v.slice(), n: 1, anchorId: content.id, minTime: ts, maxTime: ts });
     }
   }
 
@@ -104,10 +195,19 @@ export function clusterByVectors(contents, byId, threshold = 0.80) {
   const leftover = [];
   for (const s of singles) {
     const v = byId.get(s.memberIds[0]);
+    const content = byContent.get(s.memberIds[0]);
     let best = null, bestSim = threshold;
-    for (const c of multi) { const sim = vecCosine(v, c.centroid); if (sim > bestSim) { best = c; bestSim = sim; } }
+    for (const c of multi) {
+      if (!fitsEventIdentity(content, c, byContent, byId, threshold, maxSpanMs)) continue;
+      const sim = vecCosine(v, c.centroid); if (sim > bestSim) { best = c; bestSim = sim; }
+    }
     if (best) {
       best.memberIds.push(s.memberIds[0]);
+      const ts = contentTime(content);
+      if (ts != null) {
+        best.minTime = best.minTime == null ? ts : Math.min(best.minTime, ts);
+        best.maxTime = best.maxTime == null ? ts : Math.max(best.maxTime, ts);
+      }
       const cen = best.centroid, n = best.n;
       for (let k = 0; k < cen.length; k++) cen[k] = (cen[k] * n + v[k]) / (n + 1);
       let nrm = 0; for (const x of cen) nrm += x * x; nrm = Math.sqrt(nrm) || 1;
@@ -150,14 +250,14 @@ function heatScore(members, now) {
   const ageHours = Math.max(0, (now - freshest) / 3600000);
   const freshness = Math.exp(-ageHours / 48); // 48h 半衰
   const avgScore = members.reduce((s, m) => s + (m.external_score || 0), 0) / members.length;
-  return Math.round((members.length * 10 * freshness + avgScore / 10) * 10) / 10;
+  return Math.round((countDistinctPublishers(members) * 10 * freshness + avgScore / 10) * 10) / 10;
 }
 
 // 重建近 N 天的 stories（全删重建：聚类是派生数据，无需增量维护）。
 // 异步：需要给内容补 bge-m3 向量（增量，首轮较慢、之后缓存秒级）。
 // 阈值默认 0.75：P1 返工三档 dump（docs/p1-cluster-dump-*.md）实测 0.75 命中金标准 8/8
 // 且反例零合并（0.80=5/8、0.85=2/8），暂定 0.75，待设计窗口最终裁决。
-export async function rebuildStories(days = 30, { threshold = 0.75, splitReview = true } = {}) {
+export async function rebuildStories(days = 7, { threshold = 0.75, splitReview = true } = {}) {
   const db = getDatabase();
   const contents = db.prepare(`
     SELECT c.id, c.zh_title, c.en_title, c.zh_summary, c.url, c.source_app, c.published_at, c.created_at,
@@ -222,7 +322,7 @@ export async function rebuildStories(days = 30, { threshold = 0.75, splitReview 
         rep.id,                                    // 主条落库（primary_content_id）
         JSON.stringify(cluster.centroid),
         heatScore(members, now),
-        members.length,
+        countDistinctPublishers(members),
         times[0],
         times[times.length - 1]
       );
@@ -251,7 +351,7 @@ export function getStories(limit = 10) {
   `).all(limit);
 
   const memberStmt = db.prepare(`
-    SELECT c.id, c.zh_title, c.en_title, c.url, c.source_app, c.external_score, c.published_at, c.content_type,
+    SELECT c.id, c.zh_title, c.en_title, c.url, c.source_id, c.source_app, c.external_score, c.published_at, c.content_type,
            s.display_name AS source_display_name, COALESCE(s.trust_tier, 'T2') AS trust_tier
     FROM story_contents sc
     JOIN contents c ON sc.content_id = c.id
@@ -259,7 +359,8 @@ export function getStories(limit = 10) {
     WHERE sc.story_id = ?
   `);
   for (const story of stories) {
-    const members = memberStmt.all(story.id);
+    const rawMembers = memberStmt.all(story.id);
+    const members = dedupeMembersByCanonicalUrl(rawMembers);
     for (const m of members) m.trust_tier = effectiveTier(m.trust_tier, m.url); // 官方 RSS 补 T1
     // 落库的主条排最前（primary_content_id 为准），其余按信任档/热度
     const pid = story.primary_content_id;
@@ -269,6 +370,8 @@ export function getStories(limit = 10) {
       (b.external_score || 0) - (a.external_score || 0)
     );
     story.members = members;
+    story.record_count = rawMembers.length;
+    story.source_count = countDistinctPublishers(members);
   }
   db.close();
   return stories;

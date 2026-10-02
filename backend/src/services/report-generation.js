@@ -124,9 +124,9 @@ export async function generateDailyReport(options = {}) {
 }
 
 async function generateDailyReportOnce({ days = 7, background = false } = {}) { // eslint-disable-line no-unused-vars
-  // 先重建聚类（bge-m3 事件簇，默认 30 天窗覆盖跨天事件 + 0.75 阈值）；首轮补嵌入稍慢、之后缓存
-  // 自动日报只需为 12 条精选提供候选，向量聚类已足够；逐簇 LLM 复核曾额外触发约 37 次调用。
-  await rebuildStories(30, { splitReview: !background });
+  // 资讯事件只看近 7 天；更长时间的演进关系属于“主题追踪”，不冒充“同一事件多源同报”。
+  // 自动日报用确定性的时间/型号/锚点约束保精度；手动刷新仍可追加 LLM 拆分复核。
+  await rebuildStories(7, { splitReview: !background });
 
   const db = getDatabase();
   const { stories, registeredContents } = gatherInputs(db);

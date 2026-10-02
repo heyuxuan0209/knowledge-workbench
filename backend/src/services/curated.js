@@ -1,5 +1,6 @@
 import { getDatabase } from '../db/init.js';
 import { presentCuratedCandidate, rankCuratedCandidates } from './curation-policy.js';
+import { countDistinctPublishers, dedupeMembersByCanonicalUrl } from './story-clustering.js';
 
 // 精选（第三刀·「全部」视图顶部）：从干净池子（archived=0）按**可解释信号**挑主条。
 // 哲学（同 must-read）：不做自动学习/负优化，只用透明信号排序 + 用户显式 mute 过滤。每条带「为什么入选」。
@@ -18,9 +19,7 @@ export function getCurated(limit = 12) {
     SELECT c.id, COALESCE(c.zh_title, c.en_title) title, c.zh_summary summ, c.url, c.permalink,
            c.published_at, c.created_at, c.category, c.source_id, c.source_app,
            s.display_name src, s.registered_by_user reg, s.trust_tier tier,
-           (SELECT COUNT(DISTINCT c2.source_id) FROM stories st JOIN story_contents sc2 ON sc2.story_id = st.id
-              JOIN contents c2 ON c2.id = sc2.content_id
-              WHERE st.primary_content_id = c.id AND c2.archived = 0 AND c2.source_id IS NOT NULL) sc
+           COALESCE((SELECT st.source_count FROM stories st WHERE st.primary_content_id = c.id LIMIT 1), 0) sc
     FROM contents c LEFT JOIN sources s ON s.id = c.source_id
     WHERE c.archived = 0 AND c.source_app != 'github_trending' AND COALESCE(c.zh_title, c.en_title) IS NOT NULL
     ORDER BY julianday(c.created_at) DESC LIMIT 250
@@ -37,23 +36,24 @@ export function getStoryMembers(contentId) {
     || db.prepare('SELECT id AS story_id FROM stories WHERE primary_content_id=?').get(contentId);
   if (!row) { db.close(); return []; }
   const mem = db.prepare(`
-    SELECT c.id, COALESCE(s.display_name, c.source_app, '未知源') src, s.trust_tier tier,
+    SELECT c.id, c.source_id, COALESCE(s.display_name, c.source_app, '未知源') src, s.trust_tier tier,
            COALESCE(c.zh_title, c.en_title) title, c.url, c.permalink
     FROM story_contents sc JOIN contents c ON c.id = sc.content_id LEFT JOIN sources s ON s.id = c.source_id
     WHERE sc.story_id = ?
     ORDER BY CASE s.trust_tier WHEN 'T1' THEN 0 WHEN 'T1.5' THEN 1 ELSE 2 END, c.id`).all(row.story_id);
   db.close();
-  return mem.map(m => ({ id: m.id, src: m.src, tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink }));
+  return dedupeMembersByCanonicalUrl(mem).map(m => ({ id: m.id, src: m.src, tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink }));
 }
 
 // 需求2·话题卡：同一事件的活跃成员（各源+标题+摘要），distinct 源数（不算同源多条）。
 function storyAliveMembers(db, storyId) {
-  return db.prepare(`
+  const members = db.prepare(`
     SELECT c.id, COALESCE(s.display_name, c.source_app, '未知源') src, s.trust_tier tier, c.source_id,
            COALESCE(c.zh_title, c.en_title) title, c.zh_summary summ, c.url, c.permalink
     FROM story_contents sc JOIN contents c ON c.id = sc.content_id LEFT JOIN sources s ON s.id = c.source_id
     WHERE sc.story_id = ? AND c.archived = 0
     ORDER BY CASE s.trust_tier WHEN 'T1' THEN 0 WHEN 'T1.5' THEN 1 ELSE 2 END, c.id`).all(storyId);
+  return dedupeMembersByCanonicalUrl(members);
 }
 
 // 生成事件簇「AI 综合总结」（每簇一次、缓存到 stories.digest）：综合各源，给整体图景不逐条复述。
@@ -74,19 +74,18 @@ ${list}`;
 export async function getTopicCards({ ensure = false } = {}) {
   const db = getDatabase();
   const stories = db.prepare(`
-    SELECT st.id, st.headline, st.digest, st.primary_content_id,
-           (SELECT COUNT(DISTINCT c.source_id) FROM story_contents sc JOIN contents c ON c.id=sc.content_id
-            WHERE sc.story_id=st.id AND c.archived=0 AND c.source_id IS NOT NULL) dsrc
+    SELECT st.id, st.headline, st.digest, st.primary_content_id
     FROM stories st ORDER BY st.last_updated_at DESC`).all();
   const cards = [];
   for (const st of stories) {
-    if (st.dsrc <= 1) continue; // 同源多条不算多源、不成话题卡
     const members = storyAliveMembers(db, st.id);
+    const sourceCount = countDistinctPublishers(members);
+    if (sourceCount <= 1) continue; // 同源多条不算多源、不成话题卡
     if (members.length < 2) continue;
     let digest = st.digest;
     if (!digest && ensure) digest = await ensureStoryDigest(db, st, members);
     cards.push({
-      id: st.id, headline: st.headline, digest, sourceCount: st.dsrc,
+      id: st.id, headline: st.headline, digest, sourceCount,
       members: members.map(m => ({ id: m.id, src: m.src, tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink })),
     });
   }
