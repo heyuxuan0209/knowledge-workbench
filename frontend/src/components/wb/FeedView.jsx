@@ -704,7 +704,7 @@ export default function FeedView({
                 <div key={tc.id} className="tc-card">
                   <div className="tc-h" style={{ cursor: 'pointer' }} onClick={() => tc.members[0] && openReaderById(tc.members[0].id)}>{tc.headline}</div>
                   {tc.digest && <div className="tc-d">{tc.digest}</div>}
-                  <span className="tc-src" onClick={() => setOpenTopic(o => ({ ...o, [tc.id]: !o[tc.id] }))}>{tc.sourceCount} 个源报道了这件事 {openTopic[tc.id] ? '▴' : '▾'}</span>
+                  <span className="tc-src" onClick={() => setOpenTopic(o => ({ ...o, [tc.id]: !o[tc.id] }))}>{tc.sourceCount} 个来源{tc.members.length !== tc.sourceCount ? ` · ${tc.members.length} 篇报道` : ''} {openTopic[tc.id] ? '▴' : '▾'}</span>
                   {openTopic[tc.id] && (
                     <div className="tc-members">
                       {tc.members.map(m => (

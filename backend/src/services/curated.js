@@ -1,6 +1,6 @@
 import { getDatabase } from '../db/init.js';
 import { presentCuratedCandidate, rankCuratedCandidates } from './curation-policy.js';
-import { countDistinctPublishers, dedupeMembersByCanonicalUrl } from './story-clustering.js';
+import { countDistinctPublishers, dedupeMembersByCanonicalUrl, publisherLabelForMember } from './story-clustering.js';
 
 // 精选（第三刀·「全部」视图顶部）：从干净池子（archived=0）按**可解释信号**挑主条。
 // 哲学（同 must-read）：不做自动学习/负优化，只用透明信号排序 + 用户显式 mute 过滤。每条带「为什么入选」。
@@ -42,7 +42,7 @@ export function getStoryMembers(contentId) {
     WHERE sc.story_id = ?
     ORDER BY CASE s.trust_tier WHEN 'T1' THEN 0 WHEN 'T1.5' THEN 1 ELSE 2 END, c.id`).all(row.story_id);
   db.close();
-  return dedupeMembersByCanonicalUrl(mem).map(m => ({ id: m.id, src: m.src, tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink }));
+  return dedupeMembersByCanonicalUrl(mem).map(m => ({ id: m.id, src: publisherLabelForMember(m), tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink }));
 }
 
 // 需求2·话题卡：同一事件的活跃成员（各源+标题+摘要），distinct 源数（不算同源多条）。
@@ -86,7 +86,7 @@ export async function getTopicCards({ ensure = false } = {}) {
     if (!digest && ensure) digest = await ensureStoryDigest(db, st, members);
     cards.push({
       id: st.id, headline: st.headline, digest, sourceCount,
-      members: members.map(m => ({ id: m.id, src: m.src, tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink })),
+      members: members.map(m => ({ id: m.id, src: publisherLabelForMember(m), tier: m.tier, title: (m.title || '').slice(0, 70), url: m.url, permalink: m.permalink })),
     });
   }
   db.close();

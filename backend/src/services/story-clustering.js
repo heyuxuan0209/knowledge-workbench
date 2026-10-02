@@ -117,14 +117,42 @@ export function canonicalizeContentUrl(raw = '') {
   } catch { return String(raw || '').trim(); }
 }
 
+function normalizedFingerprint(text = '') {
+  return String(text).normalize('NFKC').toLowerCase().replace(/[\p{P}\p{S}\s]+/gu, '');
+}
+
 export function dedupeMembersByCanonicalUrl(members = []) {
-  const seen = new Set();
+  const seenUrls = new Set(), seenTitles = new Set(), seenSummaries = new Set();
   return members.filter(m => {
-    const key = canonicalizeContentUrl(m.url || m.permalink || '') || `id:${m.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    const urlKey = canonicalizeContentUrl(m.url || m.permalink || '');
+    const titleKey = normalizedFingerprint(m.title || m.zh_title || m.en_title || '');
+    const summaryKey = normalizedFingerprint(m.summ || m.zh_summary || '');
+    if (urlKey && seenUrls.has(urlKey)) return false;
+    if (titleKey.length >= 12 && seenTitles.has(titleKey)) return false;
+    if (summaryKey.length >= 80 && seenSummaries.has(summaryKey)) return false;
+    if (urlKey) seenUrls.add(urlKey);
+    if (titleKey.length >= 12) seenTitles.add(titleKey);
+    if (summaryKey.length >= 80) seenSummaries.add(summaryKey);
     return true;
   });
+}
+
+const PUBLISHER_LABELS = new Map([
+  ['openai.com', 'OpenAI'], ['anthropic.com', 'Anthropic'],
+  ['artificialanalysis.ai', 'Artificial Analysis'], ['the-decoder.com', 'The Decoder'],
+  ['simonwillison.net', 'Simon Willison'], ['techcrunch.com', 'TechCrunch'],
+  ['theverge.com', 'The Verge'], ['ithome.com', 'IT之家'], ['arxiv.org', 'arXiv'],
+  ['blog.google', 'Google Blog'], ['deepmind.google', 'Google DeepMind'],
+  ['research.google', 'Google Research'], ['github.com', 'GitHub'],
+]);
+
+export function publisherLabelForMember(member = {}) {
+  const stored = member.src || member.source_display_name;
+  if (member.source_id && stored && !['aihot', 'rss', 'unknown', '未知源'].includes(String(stored).toLowerCase())) return stored;
+  try {
+    const host = new URL(member.url || member.permalink).hostname.replace(/^www\./, '').toLowerCase();
+    return PUBLISHER_LABELS.get(host) || host;
+  } catch { return stored || member.source_app || '未知源'; }
 }
 
 export function countDistinctPublishers(members = []) {
@@ -351,7 +379,7 @@ export function getStories(limit = 10) {
   `).all(limit);
 
   const memberStmt = db.prepare(`
-    SELECT c.id, c.zh_title, c.en_title, c.url, c.source_id, c.source_app, c.external_score, c.published_at, c.content_type,
+    SELECT c.id, c.zh_title, c.en_title, c.zh_summary, c.url, c.source_id, c.source_app, c.external_score, c.published_at, c.content_type,
            s.display_name AS source_display_name, COALESCE(s.trust_tier, 'T2') AS trust_tier
     FROM story_contents sc
     JOIN contents c ON sc.content_id = c.id

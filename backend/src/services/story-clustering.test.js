@@ -4,7 +4,9 @@ import {
   canonicalizeContentUrl,
   clusterByVectors,
   countDistinctPublishers,
+  dedupeMembersByCanonicalUrl,
   eventTitlesCompatible,
+  publisherLabelForMember,
 } from './story-clustering.js';
 
 const vec = degrees => {
@@ -54,4 +56,19 @@ test('展示层按标准化原文 URL 去掉跨渠道重复记录', () => {
     { id: 'other', source_id: 'media', url: 'https://media.test/report' },
   ];
   assert.equal(countDistinctPublishers(members), 2);
+});
+
+test('不同网址但标题或长摘要相同的跨站稿只展示一次', () => {
+  const members = [
+    { id: 'google', title: 'Gemini 4 Argon：我们下一个前沿智能时代', url: 'https://blog.google/a' },
+    { id: 'deepmind', title: 'Gemini 4 Argon: 我们下一个前沿智能时代', url: 'https://deepmind.google/b' },
+    { id: 'analysis', title: 'Gemini 4 Argon 第三方评测', url: 'https://example.com/c' },
+  ];
+  assert.deepEqual(dedupeMembersByCanonicalUrl(members).map(m => m.id), ['google', 'analysis']);
+});
+
+test('无 Source 身份的 AI HOT 内容显示原始媒体而非采集渠道', () => {
+  assert.equal(publisherLabelForMember({ source_id: null, src: 'aihot', url: 'https://artificialanalysis.ai/articles/x' }), 'Artificial Analysis');
+  assert.equal(publisherLabelForMember({ source_id: null, src: 'aihot', url: 'https://example.news/x' }), 'example.news');
+  assert.equal(publisherLabelForMember({ source_id: 's1', src: 'Arena', url: 'https://x.com/arena/status/1' }), 'Arena');
 });
