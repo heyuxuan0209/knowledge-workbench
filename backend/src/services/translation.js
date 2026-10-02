@@ -1,4 +1,5 @@
 import { chat } from './llm.js';
+import { deriveVideoSourceState, isVideoContent } from './video-content.js';
 
 // 多语言摄入流水线（架构文档 §8）。范围（Phase 1）：
 // - 语言检测（简单启发式：中文字符占比）
@@ -176,9 +177,9 @@ export async function summarizeLongVideo(ingested, { summarizeSection = defaultL
   const chunks = buildLongVideoChunks(ingested);
   if (!chunks.length) throw new Error('长视频字幕为空，无法生成全片覆盖摘要');
   const context = {
-    kind: 'youtube',
+    kind: ingested.type || 'video',
     id: ingested.metadata?.sourceUrl || null,
-    label: ingested.title || 'YouTube 长视频',
+    label: ingested.title || '长视频',
     url: ingested.metadata?.sourceUrl || null,
   };
   const sections = await mapWithConcurrency(chunks, LONG_VIDEO_CONCURRENCY,
@@ -186,7 +187,7 @@ export async function summarizeLongVideo(ingested, { summarizeSection = defaultL
   const last = chunks[chunks.length - 1];
   const coverageEndSeconds = Number.isFinite(last.endSeconds) ? last.endSeconds : null;
   const coverageLabel = coverageEndSeconds != null ? `00:00–${formatClock(coverageEndSeconds)}` : '完整字幕首尾';
-  const partial = Boolean(ingested.sourceTruncated);
+  const partial = deriveVideoSourceState(ingested) !== 'full';
   const coverageStatement = partial
     ? `【覆盖范围声明】原视频没有可用字幕，本次只取得 ${coverageLabel} 的音频转写；以下 ${chunks.length} 段已覆盖这部分材料，但不代表全片。`
     : `【全片覆盖说明】以下内容由完整字幕分成 ${chunks.length} 段逐段压缩，覆盖 ${coverageLabel}，不是只截取前段。最终精读必须综合所有分段。`;
@@ -326,10 +327,10 @@ export async function translateContent(ingested) {
 
   const lang = detectLanguage(ingested.body);
 
-  if (ingested.type === 'youtube' && ingested.body.length > LONG_VIDEO_THRESHOLD) {
+  if (isVideoContent(ingested, ingested.metadata?.sourceUrl) && ingested.body.length > LONG_VIDEO_THRESHOLD) {
     const context = {
-      kind: 'youtube', id: ingested.metadata?.sourceUrl || null,
-      label: ingested.title || 'YouTube 长视频', url: ingested.metadata?.sourceUrl || null,
+      kind: ingested.type || 'video', id: ingested.metadata?.sourceUrl || null,
+      label: ingested.title || '长视频', url: ingested.metadata?.sourceUrl || null,
     };
     const [{ zhBody, coverage }, zhTitle] = await Promise.all([
       summarizeLongVideo(ingested),

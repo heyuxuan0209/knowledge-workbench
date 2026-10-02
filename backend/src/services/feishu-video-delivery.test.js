@@ -40,6 +40,22 @@ test('完整文档同时包含卡片解读、全片精读和逐段全文中译',
   assert.match(markdown, /7xTGNNLPyMI/);
 });
 
+test('材料不完整时卡片和文档不再声称是完整解读', () => {
+  const partialCard = JSON.stringify(buildVideoCard({
+    title: '部分视频', interpretation: '摘要', sourceUrl: URL, docUrl: DOC_URL,
+    sourceStatus: 'partial', hasFullTranslation: false,
+  }));
+  assert.match(partialCard, /打开部分解读/);
+  assert.doesNotMatch(partialCard, /打开完整解读/);
+
+  const failedDocument = buildVideoDocument({
+    title: '失败视频', sourceUrl: URL, interpretation: '摘要', deepRead: '仅推文文字',
+    transcriptText: '仅推文文字', transcriptLabel: '现有文字材料', sourceStatus: 'failed',
+  });
+  assert.match(failedDocument, /现有材料解读（未取得视频转写）/);
+  assert.doesNotMatch(failedDocument, /## 全片精读/);
+});
+
 test('同一视频重复发送复用已有飞书文档，不重复建档', async () => {
   const oldWebhook = process.env.FEISHU_VIDEO_WEBHOOK;
   const oldSecret = process.env.FEISHU_VIDEO_WEBHOOK_SECRET;
@@ -163,3 +179,60 @@ test('全文中译失败时明示降级，仍保留原文转写且不改发笔�
   }
 });
 
+test('发送部分视频前补转全程，并用全片材料重生成精读和卡片摘要', async () => {
+  const oldWebhook = process.env.FEISHU_VIDEO_WEBHOOK;
+  process.env.FEISHU_VIDEO_WEBHOOK = 'https://open.feishu.cn/open-apis/bot/v2/hook/test';
+  let savedSource = null;
+  let document = '';
+  let cardBody = '';
+  let ingestOptions = null;
+  const deps = {
+    getIngestCache: () => ({
+      type: 'video', originalLang: 'zh', zhBody: '旧的前段精读', sourceStatus: 'partial',
+      metadata: { platform: 'B站视频', sourceUrl: 'https://b23.tv/test' },
+    }),
+    getIngestSource: () => ({ body: '旧的前段转写', transcript: [], status: 'partial', fullAttempted: false }),
+    setIngestSource: (_url, source) => { savedSource = source; },
+    getVideoDelivery: () => null,
+    saveVideoDelivery: (_url, patch) => ({
+      source_hash: patch.sourceHash, translated_body: patch.translatedBody,
+      translation_status: patch.translationStatus, doc_token: patch.docToken,
+      doc_url: patch.docUrl, document_hash: patch.documentHash,
+    }),
+    ingest: async (_url, options) => {
+      ingestOptions = options;
+      return {
+        type: 'video', body: '完整视频转写，包含结尾结论。', transcript: [], originalLang: 'zh',
+        sourceStatus: 'full', fetchStatus: 'success',
+        metadata: { platform: 'B站视频', sourceUrl: 'https://b23.tv/test', durationSeconds: 10800 },
+      };
+    },
+    translateContent: async () => ({ zhBody: '重新生成的全片精读，包含结尾结论。', originalLang: 'zh' }),
+    chat: async () => ({ success: true, content: '【摘要】\n重新生成的全片摘要' }),
+    translateText: async (text) => text,
+    createDocFromMarkdown: async ({ markdown }) => {
+      document = markdown;
+      return { url: DOC_URL, token: 'doc-token' };
+    },
+    updateDocFromMarkdown: async () => {},
+    fetch: async (_url, options) => {
+      cardBody = options.body;
+      return { status: 200, json: async () => ({ code: 0 }) };
+    },
+  };
+  try {
+    const result = await deliverVideoDigest({
+      url: 'https://b23.tv/test', title: '长视频', interpretation: '【摘要】\n旧摘要',
+    }, deps);
+    assert.deepEqual(ingestOptions, { fullVideo: true });
+    assert.equal(savedSource.status, 'full');
+    assert.equal(savedSource.fullAttempted, true);
+    assert.equal(result.sourceStatus, 'full');
+    assert.match(document, /重新生成的全片精读/);
+    assert.match(cardBody, /重新生成的全片摘要/);
+    assert.match(cardBody, /打开完整解读/);
+  } finally {
+    if (oldWebhook === undefined) delete process.env.FEISHU_VIDEO_WEBHOOK;
+    else process.env.FEISHU_VIDEO_WEBHOOK = oldWebhook;
+  }
+});

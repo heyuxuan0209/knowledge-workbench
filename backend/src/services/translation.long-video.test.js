@@ -73,3 +73,16 @@ test('ASR 只覆盖前段时不得声称已覆盖全片', async () => {
   assert.doesNotMatch(result.zhBody, /全片覆盖说明/);
   assert.equal(result.coverage.mode, 'partial-transcript-map-reduce');
 });
+
+test('B站和 X 视频共用全片分段摘要，不再只对 YouTube 生效', async () => {
+  for (const platform of ['B站视频', 'X']) {
+    const visited = [];
+    const body = Array.from({ length: 10 }, (_, index) => `${platform}-尾段-${index}-${'x'.repeat(30)}`).join(' ');
+    const result = await summarizeLongVideo({
+      type: 'video', body, transcript: [], sourceStatus: 'full',
+      metadata: { platform, sourceUrl: platform === 'X' ? 'https://x.com/a/status/1' : 'https://b23.tv/a', durationSeconds: 7200 },
+    }, { summarizeSection: async (chunk) => { visited.push(chunk.text); return chunk.text; } });
+    assert.equal(visited.join(' ').includes(`${platform}-尾段-9`), true);
+    assert.equal(result.coverage.mode, 'full-transcript-map-reduce');
+  }
+});

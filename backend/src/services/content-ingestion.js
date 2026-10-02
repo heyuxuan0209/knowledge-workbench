@@ -124,17 +124,18 @@ async function proxiedFetch(url, opts = {}) {
 // 带视频再走 yt-dlp 下载音轨转写（asr.js：Groq 云优先、本地 whisper 兜底）。
 // 顺序：本地库（AI HOT 已收录的秒回、零网络）→ FxTwitter+转写 → 失败降级清晰提示
 // （受保护/NSFW/已删推文仍抓不到，如实说，不猜原因）。
-async function ingestX(input) {
+export async function ingestX(input, { fullVideo = false } = {}) {
   const url = input.trim();
   const statusId = url.match(/status(?:es)?\/(\d+)/)?.[1];
   const { getContentByUrlLike } = await import('../db/contents.js');
   const c = statusId ? getContentByUrlLike(statusId) : null;
+  let cachedFallback = null;
   if (c) {
     try {
       const { resolveContentBody } = await import('./content-body-resolver.js');
       const body = ((await resolveContentBody(c)).body || '').trim();
       if (body.length >= 20) {
-        return {
+        cachedFallback = {
           title: c.zh_title || c.en_title || null, body, type: c.content_type || 'tweet', via: 'x-db',
           metadata: {
             originalTitle: c.en_title || null, author: c.source_display_name || null,
@@ -163,6 +164,17 @@ async function ingestX(input) {
     if (!res.ok || !data?.tweet) throw new Error(data?.message || `HTTP ${res.status}`);
     tweet = data.tweet;
   } catch (err) {
+    if (cachedFallback) {
+      const cachedWasVideo = cachedFallback.type === 'video' || cachedFallback.type === 'youtube';
+      return {
+        ...cachedFallback,
+        type: cachedWasVideo ? 'video' : 'tweet',
+        note: cachedWasVideo
+          ? `本地记录显示它是视频，但本次媒体核验失败（${err.message}），无法确认转写是否完整。`
+          : `已读取本地推文文字，但媒体状态核验失败（${err.message}），因此未把它当作视频。`,
+        sourceStatus: cachedWasVideo ? 'failed' : null,
+      };
+    }
     return {
       title: null, body: null, type: 'tweet', fetchStatus: 'failed',
       fetchError: `推文抓取失败（${err.message}）。受保护/NSFW/已删除的推文抓不到；最快：直接把推文文字粘进来。`,
@@ -189,9 +201,9 @@ async function ingestX(input) {
     const durationMin = videos[0].duration ? Math.round(videos[0].duration / 60) : null;
     try {
       const { transcribeVideo } = await import('./asr.js');
-      const asr = await transcribeVideo(url);
+      const asr = await transcribeVideo(url, { full: fullVideo });
       parts.push(`【视频转写${durationMin ? `（时长约 ${durationMin} 分钟）` : ''}${asr.source === 'captions' ? '（来自视频字幕）' : '（语音听写，可能存在少量误差）'}】\n${asr.text}`);
-      if (asr.truncated) note = '视频较长，已转写前 40 分钟';
+      if (asr.truncated) note = `视频较长，已转写前 ${Math.round((asr.maxSeconds || 2400) / 60)} 分钟`;
     } catch (err) {
       parts.push(`【重要声明】这条推文带视频，但音频转写失败（${err.message}），以上仅为推文文字，不代表视频内容。解读时请明确这一局限，不要推测视频细节。`);
       note = '视频转写失败，仅解读了推文文字';
@@ -216,8 +228,11 @@ async function ingestX(input) {
       platform: 'X',
       publishedAt: tweet.created_timestamp ? new Date(tweet.created_timestamp * 1000).toISOString().slice(0, 10) : null,
       sourceUrl: tweet.url || url,
+      durationSeconds: videos[0]?.duration ? Number(videos[0].duration) : null,
     },
     note: note || (!videos.length && !photos.length ? '来源是一条推文，正文≈全文' : null),
+    sourceStatus: videos.length ? (note?.includes('转写失败') ? 'failed' : note ? 'partial' : 'full') : null,
+    sourceTruncated: videos.length ? Boolean(note && !note.includes('转写失败')) : false,
     fetchStatus: 'success', fetchError: null,
   };
 }
@@ -269,11 +284,11 @@ async function ingestWechat(input) {
   }
 }
 
-async function ingestBilibili(input) {
+export async function ingestBilibili(input, { fullVideo = false } = {}) {
   const url = input.trim();
   try {
     const { transcribeVideo } = await import('./asr.js');
-    const asr = await transcribeVideo(url);
+    const asr = await transcribeVideo(url, { full: fullVideo });
     let body = asr.text;
     if (!asr.diarized) {
       try { const { formatTranscript } = await import('./translation.js'); body = await formatTranscript(body); }
@@ -281,9 +296,11 @@ async function ingestBilibili(input) {
     }
     return {
       title: null, body, type: 'video', fetchStatus: 'success', fetchError: null,
-      transcript: asr.segments || null,
-      metadata: { originalTitle: null, author: null, platform: 'B站视频', publishedAt: null },
-      note: asr.truncated ? '视频较长，已转写前 15 分钟' : null,
+      transcript: normalizeAsrSegments(asr.segments),
+      metadata: { originalTitle: null, author: null, platform: 'B站视频', publishedAt: null, sourceUrl: url },
+      note: asr.truncated ? `视频较长，已转写前 ${Math.round((asr.maxSeconds || 2400) / 60)} 分钟` : null,
+      sourceStatus: asr.truncated ? 'partial' : 'full',
+      sourceTruncated: Boolean(asr.truncated),
     };
   } catch (err) {
     return { title: null, body: null, type: 'video', fetchStatus: 'failed', fetchError: `B站视频转写失败：${err.message}` };
@@ -447,6 +464,7 @@ export async function ingestYoutube(input, deps = {}) {
       transcript, // 保留带时间戳的原始片段，供 zh_chapters 分段使用（翻译流水线阶段处理）
       metadata: youtubeMetadata(detail, input),
       transcriptEngine: 'youtube-transcript',
+      sourceStatus: 'full',
       fetchStatus: 'success',
       fetchError: null
     };
@@ -456,7 +474,7 @@ export async function ingestYoutube(input, deps = {}) {
     // youtube-transcript → yt-dlp 字幕 → 音频 → Groq Whisper → 本地 faster-whisper。
     const detail = await detailPromise;
     try {
-      const asr = await transcribeVideo(input);
+      const asr = await transcribeVideo(input, { full: Boolean(deps.fullVideo) });
       return {
         title: detail?.title || null,
         body: asr.text,
@@ -469,6 +487,7 @@ export async function ingestYoutube(input, deps = {}) {
             ? `该视频没有可用字幕，已语音转写前 ${Math.round((asr.maxSeconds || 2400) / 60)} 分钟，可能存在少量听写误差`
             : '该视频没有可用字幕，正文由语音转写生成，可能存在少量听写误差',
         sourceTruncated: Boolean(asr.truncated),
+        sourceStatus: asr.truncated ? 'partial' : 'full',
         transcriptEngine: asr.engine || asr.source || 'asr',
         fetchStatus: 'success',
         fetchError: null,
@@ -675,7 +694,7 @@ function ingestText(input) {
 }
 
 // 统一入口。返回 { title, body, type, fetchStatus, fetchError, inputMethod }
-export async function ingest(input) {
+export async function ingest(input, { fullVideo = false } = {}) {
   if (!input || typeof input !== 'string' || input.trim().length === 0) {
     return {
       title: null,
@@ -700,7 +719,7 @@ export async function ingest(input) {
       return { ...result, inputMethod: 'url_auto' };
 
     case 'x':
-      result = await ingestX(input);
+      result = await ingestX(input, { fullVideo });
       return { ...result, inputMethod: 'url_auto' };
 
     case 'wechat':
@@ -712,11 +731,11 @@ export async function ingest(input) {
       return { ...result, inputMethod: 'url_auto' };
 
     case 'youtube':
-      result = await ingestYoutube(input);
+      result = await ingestYoutube(input, { fullVideo });
       return { ...result, inputMethod: 'url_auto' };
 
     case 'bilibili':
-      result = await ingestBilibili(input);
+      result = await ingestBilibili(input, { fullVideo });
       return { ...result, inputMethod: 'url_auto' };
 
     case 'url':

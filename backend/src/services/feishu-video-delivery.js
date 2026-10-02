@@ -2,10 +2,11 @@ import { createHash, createHmac } from 'crypto';
 import { getIngestCache, getIngestSource, setIngestSource } from '../db/ingest-cache.js';
 import { getVideoDelivery, saveVideoDelivery } from '../db/video-delivery.js';
 import { createDocFromMarkdown, updateDocFromMarkdown } from './feishu-docs.js';
-import { buildLongVideoChunks, detectLanguage, translateText } from './translation.js';
+import { buildLongVideoChunks, detectLanguage, translateContent, translateText } from './translation.js';
 import { ingest } from './content-ingestion.js';
+import { chat } from './llm.js';
+import { deriveVideoSourceState, isVideoContent, videoSourceWarning } from './video-content.js';
 
-const VIDEO_TYPES = new Set(['youtube', 'video']);
 // 长视频全文中译是按需交付；12k/段把 3.5h 字幕控制在约 18 次 Flash 调用，
 // 而不是通用翻译的 3k/段约 72 次。每段仍低于 DeepSeek 上下文与输出上限。
 const DELIVERY_TRANSLATION_CHUNK = 12000;
@@ -38,8 +39,7 @@ async function mapConcurrent(items, limit, worker) {
 }
 
 export function isVideoDigest(data = {}) {
-  return VIDEO_TYPES.has(data.type)
-    || /YouTube|B站视频/i.test(data.metadata?.platform || '');
+  return isVideoContent(data, data.metadata?.sourceUrl);
 }
 
 function safeUrl(raw, label) {
@@ -90,7 +90,7 @@ function clip(text, max) {
 }
 
 export function buildVideoCard({ title, interpretation, sourceUrl, docUrl, outline = [], warning = null,
-  hasFullTranslation = true }) {
+  hasFullTranslation = true, sourceStatus = 'full' }) {
   const source = safeUrl(sourceUrl, '原视频链接');
   const doc = safeUrl(docUrl, '完整解读链接');
   const elements = [{
@@ -107,10 +107,15 @@ export function buildVideoCard({ title, interpretation, sourceUrl, docUrl, outli
         + (more > 0 ? `\n• …另 ${more} 节` : '') } },
     );
   }
+  const docLabel = sourceStatus === 'failed'
+    ? '📄 打开降级解读（仅现有文字）'
+    : sourceStatus === 'partial'
+      ? '📄 打开部分解读（覆盖范围见文档）'
+      : `📄 打开完整解读（精读 + ${hasFullTranslation ? '全文中译' : '原文转写'}）`;
   elements.push(
     { tag: 'hr' },
     { tag: 'div', text: { tag: 'lark_md', content:
-      `[📄 打开完整解读（精读 + ${hasFullTranslation ? '全文中译' : '原文转写'}）](${doc})　　[🔗 看原视频](${source})` } },
+      `[${docLabel}](${doc})　　[🔗 看原视频](${source})` } },
   );
   if (warning) {
     elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: warning }] });
@@ -134,8 +139,11 @@ function outlineFromBody(body) {
 }
 
 export function buildVideoDocument({ title, metadata = {}, sourceUrl, interpretation, deepRead, transcriptText,
-  transcriptLabel, coverageNote, warning = null }) {
+  transcriptLabel, coverageNote, warning = null, sourceStatus = 'full' }) {
   const meta = [metadata.author, metadata.platform, metadata.publishedAt].filter(Boolean).join(' · ');
+  const deepReadLabel = sourceStatus === 'failed'
+    ? '现有材料解读（未取得视频转写）'
+    : sourceStatus === 'partial' ? '部分视频精读' : '全片精读';
   return [
     `# ${title}`,
     meta ? `> ${meta}` : null,
@@ -146,7 +154,7 @@ export function buildVideoDocument({ title, metadata = {}, sourceUrl, interpreta
     '## 卡片解读',
     interpretation,
     '',
-    '## 全片精读',
+    `## ${deepReadLabel}`,
     deepRead,
     '',
     `## ${transcriptLabel}`,
@@ -196,35 +204,79 @@ async function pushWebhook(card, deps) {
   throw new Error(`飞书“视频解读”卡片发送失败(${result.code ?? result.StatusCode ?? response.status})：${result.msg || result.StatusMessage || '未知错误'}`);
 }
 
+async function regenerateDigest(deepRead, deps) {
+  const prompt = `请基于下面这份覆盖全片的中文内容档案，生成飞书视频卡片解读。严格输出三部分：
+【摘要】3句以内；【要点】3-6条；【金句】1-2条。不要补充材料外信息，不要写前言。\n\n${deepRead}`;
+  const result = await deps.chat([{ role: 'user', content: prompt }], 'deepseek', 'deepseek-v4-flash', {
+    maxTokens: 2000,
+    purpose: 'video-delivery-full-digest',
+  });
+  if (!result.success) throw new Error(result.error || '全片卡片解读生成失败');
+  return result.content.trim();
+}
+
 export async function deliverVideoDigest({ url, title, interpretation }, overrides = {}) {
   const sourceUrl = safeUrl(url, '原视频链接');
   const deps = {
     getIngestCache, getIngestSource, setIngestSource, getVideoDelivery, saveVideoDelivery,
-    createDocFromMarkdown, updateDocFromMarkdown, translateText, ingest, fetch,
+    createDocFromMarkdown, updateDocFromMarkdown, translateContent, translateText, chat, ingest, fetch,
     ...overrides,
   };
   let data = deps.getIngestCache(sourceUrl);
   if (!data) throw new Error('没有找到这条视频的解读缓存，请先完成解读再发送');
   if (!isVideoDigest(data)) throw new Error('当前内容不是视频，拒绝发送到“视频解读”');
-  const digest = String(interpretation || data.cachedInterpretation || '').trim();
+  let digest = String(interpretation || data.cachedInterpretation || '').trim();
   if (!digest) throw new Error('解读内容为空，请等解读完成后再发送');
 
   let source = deps.getIngestSource(sourceUrl);
-  if (!source?.body) {
-    const recovered = await deps.ingest(sourceUrl);
-    if (recovered.fetchStatus !== 'success' || !recovered.body) {
+  let sourceState = deriveVideoSourceState(data, source);
+  let recoveryWarning = null;
+  let recoveredFullSource = false;
+  // 即时解读允许先拿前段；真正发飞书时补做一次全程转写。结果（包括失败）写回缓存，
+  // 避免每次点发送都重复跑昂贵 ASR；用户重新解读会重置 fullAttempted。
+  if ((!source?.body || sourceState !== 'full') && !source?.fullAttempted) {
+    const recovered = await deps.ingest(sourceUrl, { fullVideo: true });
+    if (recovered.fetchStatus === 'success' && recovered.body && isVideoDigest(recovered)) {
+      sourceState = deriveVideoSourceState(recovered);
+      source = {
+        body: recovered.body,
+        transcript: recovered.transcript || [],
+        status: sourceState,
+        note: recovered.note || null,
+        durationSeconds: recovered.metadata?.durationSeconds ?? null,
+        fullAttempted: true,
+      };
+      deps.setIngestSource(sourceUrl, source);
+      data = { ...data, ...recovered, cachedInterpretation: data.cachedInterpretation };
+      recoveredFullSource = sourceState === 'full';
+    } else if (!source?.body) {
       throw new Error(`旧缓存缺完整字幕，重新抓取也失败：${recovered.fetchError || '未知原因'}`);
+    } else {
+      source = { ...source, fullAttempted: true };
+      deps.setIngestSource(sourceUrl, source);
+      recoveryWarning = `全程补转失败（${recovered.fetchError || '未知原因'}），保留现有材料。`;
     }
-    if (!isVideoDigest(recovered)) throw new Error('重新抓取的内容不是视频');
-    source = { body: recovered.body, transcript: recovered.transcript || [] };
-    deps.setIngestSource(sourceUrl, source);
-    data = { ...data, sourceTruncated: recovered.sourceTruncated ?? data.sourceTruncated };
   }
+
+  // 一旦由“部分/失败”补成全片，摘要和精读也必须重新基于全片生成；否则只是把完整
+  // 转写附在文档末尾，卡片正文仍会沿用旧的前段结论。
+  if (recoveredFullSource) {
+    try {
+      const fullAnalysis = await deps.translateContent(data);
+      data = { ...data, ...fullAnalysis };
+      digest = await regenerateDigest(fullAnalysis.zhBody || source.body, deps);
+    } catch (error) {
+      recoveryWarning = `已补全视频转写，但全片精读重新生成失败（${error.message}）；卡片摘要仍来自即时解读，完整转写已保存在文档。`;
+    }
+  }
+
+  sourceState = deriveVideoSourceState(data, source);
+  const sourceWarning = videoSourceWarning(sourceState, data, source);
 
   const sourceHash = sha256(source.body);
   let delivery = deps.getVideoDelivery(sourceUrl);
   let translated;
-  let warning = null;
+  let translationWarning = null;
   if (delivery?.source_hash === sourceHash && delivery.translated_body) {
     translated = {
       text: delivery.translated_body,
@@ -240,7 +292,7 @@ export async function deliverVideoDigest({ url, title, interpretation }, overrid
         translationStatus: translated.status,
       });
     } catch (error) {
-      warning = `全文中译生成失败（${error.message}），文档已保留全片精读和原文转写。`;
+      translationWarning = `全文中译生成失败（${error.message}），文档已保留精读和原文转写。`;
       translated = { text: source.body, status: 'translation-failed', label: '原文转写（中译未完成）' };
       delivery = deps.saveVideoDelivery(sourceUrl, {
         sourceHash,
@@ -251,7 +303,8 @@ export async function deliverVideoDigest({ url, title, interpretation }, overrid
   }
 
   const resolvedTitle = String(title || data.zhTitle || data.title || '视频解读').trim();
-  const coverageNote = data.note || (data.coverage?.mode === 'partial-transcript-map-reduce'
+  const warning = [sourceWarning, recoveryWarning, translationWarning].filter(Boolean).join('；') || null;
+  const coverageNote = source?.note || data.note || (data.coverage?.mode === 'partial-transcript-map-reduce'
     ? '本次只取得视频前段转写，不代表全片'
     : data.coverage?.sectionCount
       ? `已按时间顺序覆盖全片，共 ${data.coverage.sectionCount} 段`
@@ -263,9 +316,14 @@ export async function deliverVideoDigest({ url, title, interpretation }, overrid
     interpretation: digest,
     deepRead: data.zhBody || digest,
     transcriptText: translated.text,
-    transcriptLabel: translated.label,
+    transcriptLabel: sourceState === 'failed'
+      ? '现有文字材料（视频转写未取得）'
+      : sourceState === 'partial'
+        ? `${translated.label}（部分覆盖）`
+        : translated.label,
     coverageNote,
     warning,
+    sourceStatus: sourceState,
   });
   const documentHash = sha256(markdown);
 
@@ -298,7 +356,8 @@ export async function deliverVideoDigest({ url, title, interpretation }, overrid
     docUrl,
     outline,
     warning,
-    hasFullTranslation: translated.status !== 'translation-failed',
+    hasFullTranslation: sourceState === 'full' && translated.status !== 'translation-failed',
+    sourceStatus: sourceState,
   });
   await pushWebhook(card, deps);
   return {
@@ -306,6 +365,7 @@ export async function deliverVideoDigest({ url, title, interpretation }, overrid
     docUrl,
     cardSent: true,
     translationStatus: translated.status,
+    sourceStatus: sourceState,
     reusedDocument,
   };
 }

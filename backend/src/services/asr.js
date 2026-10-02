@@ -4,7 +4,7 @@ import { homedir, tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
-import { mkdir, readdir, rm } from 'fs/promises';
+import { mkdir, readdir, rm, stat } from 'fs/promises';
 
 const pexec = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -24,12 +24,16 @@ const CLI_ENV = { ...process.env, PATH: `${PIP_BIN}:${process.env.PATH || ''}` }
 const PROVISIONED_PYTHON = join(__dirname, '../../.venv-asr/bin/python3');
 const ASR_PYTHON = process.env.ASR_PYTHON || (existsSync(PROVISIONED_PYTHON) ? PROVISIONED_PYTHON : 'python3');
 // 字幕优先后，ASR 只是"无字幕视频"的兜底，故上限放宽到 40 分钟（覆盖绝大多数演讲/播客）；
-// 「转写全程」按需补全时用 FULL 档（3 小时，实际取视频真实时长）。small int8 约 3.2× 实时。
+// 「转写全程」按需补全时用 FULL 档。small int8 约 3.2× 实时。
 export const MAX_AUDIO_SECONDS = 2400;      // 兜底自动转写：40 分钟
-export const FULL_AUDIO_SECONDS = 10800;    // 「转写全程」：3 小时（够长视频用）
+export const FULL_AUDIO_SECONDS = Math.max(10800, Number(process.env.FULL_VIDEO_MAX_SECONDS) || 21600);
+// 「发飞书前补全」默认允许 6 小时；可用 FULL_VIDEO_MAX_SECONDS 调大。超过上限仍明确标 partial，
+// 不把前段结果伪装成全片。
 const DOWNLOAD_TIMEOUT = 5 * 60000;
 const TRANSCRIBE_TIMEOUT = 15 * 60000;
 const DIARIZE_TIMEOUT = 25 * 60000; // 分离管道（whisperX+pyannote）CPU 上明显更慢
+const GROQ_FILE_LIMIT = 24 * 1024 * 1024;
+const GROQ_CHUNK_SECONDS = 20 * 60;
 // 只用于元数据探测失败时的最后兜底；正常路径会根据视频 language
 // 和实际字幕列表只下载一条原始语言轨。不得使用 * 通配自动翻译字幕。
 export const YOUTUBE_SUB_LANGS = 'en-orig,en,zh-Hans,zh-Hant,zh';
@@ -49,7 +53,7 @@ async function proxiedFetch(url, opts = {}) {
 async function transcribeViaGroq(audioFile) {
   const { readFile } = await import('fs/promises');
   const buf = await readFile(audioFile);
-  if (buf.length > 24 * 1024 * 1024) {
+  if (buf.length > GROQ_FILE_LIMIT) {
     throw new Error(`音频 ${(buf.length / 1048576).toFixed(0)}MB 超过 Groq 免费档上限（25MB）`);
   }
   const form = new FormData();
@@ -74,13 +78,47 @@ async function transcribeViaGroq(audioFile) {
   };
 }
 
+// 长音频先压成 16kHz 单声道并按 20 分钟切块，每块远低于 Groq 25MB 限制。
+// 顺序调用比并发更慢一点，但能避免免费/低配额度的瞬时限流，是发送链路更稳的选择。
+async function transcribeViaGroqChunks(audioFile, workDir) {
+  const pattern = join(workDir, 'groq-chunk-%03d.mp3');
+  await pexec('ffmpeg', [
+    '-hide_banner', '-loglevel', 'error', '-y', '-i', audioFile,
+    '-vn', '-ac', '1', '-ar', '16000', '-b:a', '32k',
+    '-f', 'segment', '-segment_time', String(GROQ_CHUNK_SECONDS), '-reset_timestamps', '1', pattern,
+  ], { env: CLI_ENV, timeout: DOWNLOAD_TIMEOUT, maxBuffer: 8 * 1024 * 1024 });
+  const chunks = (await readdir(workDir))
+    .filter(name => /^groq-chunk-\d+\.mp3$/.test(name))
+    .sort();
+  if (!chunks.length) throw new Error('长音频切块后没有生成可转写文件');
+
+  const results = [];
+  let offset = 0;
+  for (const name of chunks) {
+    const result = await transcribeViaGroq(join(workDir, name));
+    results.push({ result, offset });
+    offset += Number(result.duration) || GROQ_CHUNK_SECONDS;
+  }
+  return {
+    text: results.map(item => item.result.text).join(' ').trim(),
+    language: results.find(item => item.result.language)?.result.language || null,
+    duration: offset,
+    truncated: false,
+    segments: results.flatMap(item => item.result.segments.map(segment => ({
+      ...segment,
+      start: Number(segment.start || 0) + item.offset,
+      end: Number(segment.end || segment.start || 0) + item.offset,
+    }))),
+  };
+}
+
 // 转写调度（M5 完整版，2026-07-16）：
 // diarize=true 且配了 HF_TOKEN → whisperX 说话人分离管道（transcribe-diarize.py），
 // 输出【说话人A】【说话人B】标签文本；无 token 或分离失败 → 回落普通管道，
 // 渐进增强不硬依赖。播客（访谈居多）默认请求分离，视频口播默认不用。
-async function runTranscriber(audioFile, { diarize = false, maxSeconds = MAX_AUDIO_SECONDS } = {}) {
-  // 上传的会议音频要转全程，故 maxSeconds 可配（默认 15 分钟给链接视频用）；超时按时长放宽
-  const timeout = Math.max(TRANSCRIBE_TIMEOUT, Math.ceil(maxSeconds / 60) * 60000);
+async function runTranscriber(audioFile, { diarize = false, maxSeconds = MAX_AUDIO_SECONDS, cloudChunkDir = null } = {}) {
+  // 本地 small int8 在 CPU 上约 3.2× 实时，给足 4× 时长，避免三小时视频必然超时。
+  const timeout = Math.max(TRANSCRIBE_TIMEOUT, Math.ceil(maxSeconds * 4000));
   if (diarize && process.env.HF_TOKEN) {
     try {
       const { stdout } = await pexec(ASR_PYTHON, [
@@ -96,7 +134,11 @@ async function runTranscriber(audioFile, { diarize = false, maxSeconds = MAX_AUD
   // 普通转写：Groq 云优先（快、近乎免费），失败/超限/无 key → 本地 whisper 兜底，渐进增强不硬依赖
   if (process.env.GROQ_API_KEY) {
     try {
-      return { ...(await transcribeViaGroq(audioFile)), diarized: false, engine: 'groq' };
+      const fileSize = (await stat(audioFile)).size;
+      const result = fileSize > GROQ_FILE_LIMIT && cloudChunkDir
+        ? await transcribeViaGroqChunks(audioFile, cloudChunkDir)
+        : await transcribeViaGroq(audioFile);
+      return { ...result, diarized: false, engine: fileSize > GROQ_FILE_LIMIT ? 'groq-chunked' : 'groq' };
     } catch (err) {
       console.log(`[asr] Groq 云转写失败（${(err.message || '').slice(0, 150)}），降级本地 whisper`);
     }
@@ -361,7 +403,11 @@ export async function transcribeVideo(url, { full = false } = {}) {
 
     const maxSeconds = full ? FULL_AUDIO_SECONDS : MAX_AUDIO_SECONDS;
     const audioFile = await downloadAudio(url, workDir, { maxSeconds });
-    const asr = await runTranscriber(audioFile, { diarize: false, maxSeconds }); // 视频多为单人口播，不做分离
+    const asr = await runTranscriber(audioFile, {
+      diarize: false,
+      maxSeconds,
+      cloudChunkDir: full ? workDir : null,
+    }); // 视频多为单人口播，不做分离；只有明确补全时才启用云端切块
     const truncated = Boolean(asr.truncated)
       || (captionResult.sourceDuration != null && captionResult.sourceDuration > maxSeconds)
       || (captionResult.sourceDuration == null && Number(asr.duration) >= maxSeconds - 2);

@@ -25,6 +25,10 @@ function ensureTable(db) {
   // 生成完整飞书文档。单独存在服务端列里，避免 getIngestCache() 把大文本回传给插件。
   if (!cols.includes('source_body')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_body TEXT');
   if (!cols.includes('source_transcript')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_transcript TEXT');
+  if (!cols.includes('source_status')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_status TEXT');
+  if (!cols.includes('source_note')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_note TEXT');
+  if (!cols.includes('source_duration_seconds')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_duration_seconds REAL');
+  if (!cols.includes('source_full_attempted')) db.exec('ALTER TABLE ingest_cache ADD COLUMN source_full_attempted INTEGER DEFAULT 0');
   ready = true;
 }
 
@@ -104,13 +108,23 @@ export function setIngestCache(url, payload, engine = null, source = null) {
   const key = normalizeUrlKey(url);
   const sourceBody = source?.body ?? null;
   const sourceTranscript = Array.isArray(source?.transcript) ? JSON.stringify(source.transcript) : null;
-  db.prepare(`INSERT INTO ingest_cache (url_key, url, payload, engine, source_body, source_transcript, used_at)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+  db.prepare(`INSERT INTO ingest_cache (
+      url_key, url, payload, engine, source_body, source_transcript,
+      source_status, source_note, source_duration_seconds, source_full_attempted, used_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(url_key) DO UPDATE SET payload = excluded.payload, engine = excluded.engine,
       source_body = COALESCE(excluded.source_body, ingest_cache.source_body),
       source_transcript = COALESCE(excluded.source_transcript, ingest_cache.source_transcript),
+      source_status = COALESCE(excluded.source_status, ingest_cache.source_status),
+      source_note = excluded.source_note,
+      source_duration_seconds = COALESCE(excluded.source_duration_seconds, ingest_cache.source_duration_seconds),
+      source_full_attempted = excluded.source_full_attempted,
       interpretation = NULL, used_at = datetime('now')`)
-    .run(key, String(url), JSON.stringify(payload), engine, sourceBody, sourceTranscript);
+    .run(
+      key, String(url), JSON.stringify(payload), engine, sourceBody, sourceTranscript,
+      source?.status ?? null, source?.note ?? null, source?.durationSeconds ?? null,
+      source?.fullAttempted ? 1 : 0,
+    );
   db.close();
 }
 
@@ -118,13 +132,22 @@ export function setIngestCache(url, payload, engine = null, source = null) {
 export function getIngestSource(url) {
   const db = getDatabase();
   ensureTable(db);
-  const row = db.prepare('SELECT source_body, source_transcript FROM ingest_cache WHERE url_key = ?')
+  const row = db.prepare(`SELECT source_body, source_transcript, source_status, source_note,
+      source_duration_seconds, source_full_attempted
+    FROM ingest_cache WHERE url_key = ?`)
     .get(normalizeUrlKey(url));
   db.close();
   if (!row?.source_body) return null;
   let transcript = [];
   try { transcript = row.source_transcript ? JSON.parse(row.source_transcript) : []; } catch { transcript = []; }
-  return { body: row.source_body, transcript };
+  return {
+    body: row.source_body,
+    transcript,
+    status: row.source_status || null,
+    note: row.source_note || null,
+    durationSeconds: row.source_duration_seconds ?? null,
+    fullAttempted: Boolean(row.source_full_attempted),
+  };
 }
 
 // 旧缓存没有 source_body 时，发送链路只补原字幕，不清掉已有解读。
@@ -132,10 +155,16 @@ export function setIngestSource(url, source) {
   if (!source?.body?.trim()) return;
   const db = getDatabase();
   ensureTable(db);
-  db.prepare(`UPDATE ingest_cache SET source_body = ?, source_transcript = ?, used_at = datetime('now')
+  db.prepare(`UPDATE ingest_cache SET source_body = ?, source_transcript = ?,
+    source_status = ?, source_note = ?, source_duration_seconds = ?, source_full_attempted = ?,
+    used_at = datetime('now')
     WHERE url_key = ?`).run(
     source.body,
     Array.isArray(source.transcript) ? JSON.stringify(source.transcript) : null,
+    source.status ?? null,
+    source.note ?? null,
+    source.durationSeconds ?? null,
+    source.fullAttempted ? 1 : 0,
     normalizeUrlKey(url),
   );
   db.close();

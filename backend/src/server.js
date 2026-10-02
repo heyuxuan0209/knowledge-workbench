@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { setGlobalDispatcher, EnvHttpProxyAgent } from 'undici';
 import { createAccessProtection, createCorsOptions, securityHeaders } from './middleware/production-security.js';
 
-const INGEST_PIPELINE_VERSION = 2;
+const INGEST_PIPELINE_VERSION = 3;
 
 dotenv.config();
 const { migrateM30 } = await import('./db/migrate-m30.js');
@@ -179,9 +179,12 @@ app.post('/api/content/ingest', async (req, res) => {
     if (isUrl && !refresh) {
       const { getIngestCache } = await import('./db/ingest-cache.js');
       const cached = getIngestCache(input);
-      const staleYoutubeCache = cached?.type === 'youtube'
-        && cached.ingestPipelineVersion !== INGEST_PIPELINE_VERSION;
-      if (cached && !staleYoutubeCache) {
+      const { videoPlatformFromUrl } = await import('./services/video-content.js');
+      // v3 修复 X/B站视频误分类、20k 截断和材料完整度。三类视频平台的旧缓存
+      // 都必须重跑一次；X 的旧 payload 可能仍标成 tweet，不能只看 cached.type。
+      const staleVideoCache = videoPlatformFromUrl(input)
+        && cached?.ingestPipelineVersion !== INGEST_PIPELINE_VERSION;
+      if (cached && !staleVideoCache) {
         return res.json({ success: true, data: { ...cached, fromCache: true } });
       }
     }
@@ -196,10 +199,12 @@ app.post('/api/content/ingest', async (req, res) => {
       });
     }
 
-    // 长文保护仍保留 20k；长 YouTube 已在 translateContent 内走“全字幕分段压缩”，
-    // 不能先截断，否则会制造“完整解读”实际只覆盖开头的假象。
+    // 普通长文仍保留 20k 保护；视频统一走“全字幕分段压缩”，不能在这里先截断，
+    // 否则会制造“完整解读”实际只覆盖开头的假象。
     let truncated = false;
-    if (ingested.type !== 'youtube' && ingested.body && ingested.body.length > 20000) {
+    const { isVideoContent } = await import('./services/video-content.js');
+    const videoContent = isVideoContent(ingested, input);
+    if (!videoContent && ingested.body && ingested.body.length > 20000) {
       ingested.body = ingested.body.slice(0, 20000) + '\n…（内容过长，已截取前段解读）';
       if (Array.isArray(ingested.transcript)) {
         let acc = 0;
@@ -235,7 +240,14 @@ app.post('/api/content/ingest', async (req, res) => {
           input,
           data,
           ingested.transcriptEngine || null,
-          { body: ingested.body, transcript: ingested.transcript },
+          {
+            body: ingested.body,
+            transcript: ingested.transcript,
+            status: ingested.sourceStatus || (ingested.sourceTruncated ? 'partial' : 'full'),
+            note: ingested.note || null,
+            durationSeconds: ingested.metadata?.durationSeconds ?? null,
+            fullAttempted: false,
+          },
         ))
         .catch(err => console.warn('[ingest-cache] 写缓存失败（不影响返回）:', err.message));
     }
@@ -267,7 +279,13 @@ app.post('/api/content/interpretation-cache', async (req, res) => {
 app.post('/api/feishu/push-digest', async (req, res) => {
   try {
     const { text, url, title, interpretation, contentType } = req.body || {};
-    if (contentType === 'video') {
+    const { getIngestCache } = await import('./db/ingest-cache.js');
+    const { shouldDeliverAsVideo } = await import('./services/video-content.js');
+    const cached = url ? getIngestCache(url) : null;
+    // contentType 只是兼容旧端的提示，最终由后端缓存/URL 兜底判断，避免旧扩展
+    // 漏传字段时把 YouTube/B站视频静默发给笔记助手。X 是否有视频只能看摄入结果。
+    const videoRequest = shouldDeliverAsVideo({ contentType, url, cached });
+    if (videoRequest) {
       if (!url || !interpretation?.trim()) {
         return res.status(400).json({ success: false, error: '视频发送需要 url 和 interpretation' });
       }
