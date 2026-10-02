@@ -97,11 +97,7 @@ function writeDecision(db, row, decision) {
   );
 }
 
-async function runRefreshCuratedDecisions({ limit = 12, poolSize = 18, background = true } = {}) {
-  const rows = getCuratedCandidateRows();
-  const candidates = rankCuratedCandidates(rows, { limit: Math.max(limit, poolSize) }).map(item => item.candidate);
-  if (!candidates.length) return { generated: 0, excluded: 0, data: [] };
-
+async function generateForCandidates(candidates, { background }) {
   const db = getDatabase();
   const cached = new Map(db.prepare(`
     SELECT content_id, prompt_version, source_updated_at
@@ -115,6 +111,7 @@ async function runRefreshCuratedDecisions({ limit = 12, poolSize = 18, backgroun
     return !hit || hit.prompt_version !== CURATED_DECISION_PROMPT_VERSION
       || String(hit.source_updated_at || '') !== String(row.updated_at || '');
   });
+  if (!stale.length) return { generated: 0, excluded: 0 };
   const enriched = [];
   for (const row of stale) enriched.push(await enrichEvidence(row));
 
@@ -152,7 +149,28 @@ async function runRefreshCuratedDecisions({ limit = 12, poolSize = 18, backgroun
     }
     batchDb.close();
   }
-  return { generated, excluded, data: getCurated(limit) };
+  return { generated, excluded };
+}
+
+async function runRefreshCuratedDecisions({ limit = 12, poolSize = 18, background = true } = {}) {
+  let generated = 0;
+  let excluded = 0;
+  // 淘汰一条后，同一信源的下一条才会变成可选项；最多三轮让递补项也获得摘要。
+  // 每轮只处理没有同版本缓存的候选，不会重复付费。
+  for (let round = 0; round < 3; round++) {
+    const rows = getCuratedCandidateRows();
+    const candidates = rankCuratedCandidates(rows, { limit: Math.max(limit, poolSize) }).map(item => item.candidate);
+    if (!candidates.length) break;
+    const result = await generateForCandidates(candidates, { background });
+    generated += result.generated;
+    excluded += result.excluded;
+    const data = getCurated(limit);
+    if (data.length >= limit && data.every(item => item.decisionSummary)) {
+      return { generated, excluded, rounds: round + 1, data };
+    }
+    if (result.generated === 0) break;
+  }
+  return { generated, excluded, rounds: 3, data: getCurated(limit) };
 }
 
 let activeRefresh = null;
