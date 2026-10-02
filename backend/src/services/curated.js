@@ -15,18 +15,34 @@ function readMutes(db) {
 export function getCurated(limit = 12) {
   const db = getDatabase();
   const mutes = readMutes(db);
-  const rows = db.prepare(`
-    SELECT c.id, COALESCE(c.zh_title, c.en_title) title, c.zh_summary summ, c.url, c.permalink,
-           c.published_at, c.created_at, c.category, c.source_id, c.source_app,
-           s.display_name src, s.registered_by_user reg, s.trust_tier tier,
-           COALESCE((SELECT st.source_count FROM stories st WHERE st.primary_content_id = c.id LIMIT 1), 0) sc
-    FROM contents c LEFT JOIN sources s ON s.id = c.source_id
-    WHERE c.archived = 0 AND c.source_app != 'github_trending' AND COALESCE(c.zh_title, c.en_title) IS NOT NULL
-    ORDER BY julianday(c.created_at) DESC LIMIT 250
-  `).all();
+  const rows = getCuratedCandidateRows(db);
   db.close();
 
   return rankCuratedCandidates(rows, { limit, mutes }).map(presentCuratedCandidate);
+}
+
+export function getCuratedCandidateRows(existingDb = null) {
+  const db = existingDb || getDatabase();
+  const rows = db.prepare(`
+    SELECT c.id, c.content_type, COALESCE(c.zh_title, c.en_title) title, c.en_title,
+           c.zh_summary summ, c.en_summary, c.zh_body, c.raw_full_text, c.raw_transcript, c.raw_readme,
+           c.url, c.permalink, c.published_at, c.created_at, c.updated_at,
+           c.category, c.source_id, c.source_app,
+           s.display_name src, s.registered_by_user reg, s.trust_tier tier,
+           crd.decision_summary, crd.verdict decision_verdict, crd.reason decision_reason, crd.evidence_status,
+           (SELECT stx.primary_content_id FROM story_contents scx
+              JOIN stories stx ON stx.id=scx.story_id
+              JOIN contents primary_content ON primary_content.id=stx.primary_content_id AND primary_content.archived=0
+              WHERE scx.content_id=c.id LIMIT 1) story_primary_id,
+           COALESCE((SELECT st.source_count FROM stories st WHERE st.primary_content_id = c.id LIMIT 1), 0) sc
+    FROM contents c
+    LEFT JOIN sources s ON s.id = c.source_id
+    LEFT JOIN curated_reading_decisions crd ON crd.content_id = c.id
+    WHERE c.archived = 0 AND c.source_app != 'github_trending' AND COALESCE(c.zh_title, c.en_title) IS NOT NULL
+    ORDER BY julianday(c.created_at) DESC LIMIT 250
+  `).all();
+  if (!existingDb) db.close();
+  return rows;
 }
 
 // 需求3·「N 源同报」可点看是哪些源：给 content_id（事件簇主条）→ 返回该事件全部成员（源+标题+链接）。

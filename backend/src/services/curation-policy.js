@@ -55,6 +55,10 @@ export function rankCuratedCandidates(rows, {
     if (normalizedMutes.contents.has(candidate.id)) continue;
     if (candidate.source_id && normalizedMutes.sources.has(candidate.source_id)) continue;
     if (candidate.category && normalizedMutes.categories.has(candidate.category)) continue;
+    // 已成事件簇的非主条不再单独占精选位；主条承载多源事件。
+    if (candidate.story_primary_id && candidate.story_primary_id !== candidate.id) continue;
+    // 阅读层明确判为证据不足/纯宣传的内容不进入首页；未生成的旧数据仍可降级展示。
+    if (candidate.decision_verdict === 'exclude') continue;
     scored.push(explainCandidate(candidate, { now }));
   }
   // Node 的 Array#sort 是稳定排序；同分时保留 SQL 的 created_at 倒序。
@@ -77,6 +81,10 @@ export function presentCuratedCandidate({ candidate: c, why }) {
     id: c.id,
     title: c.title,
     summary: (c.summ || '').slice(0, 220),
+    decisionSummary: c.decision_summary || null,
+    decisionVerdict: c.decision_verdict || null,
+    decisionReason: c.decision_reason || null,
+    evidenceStatus: c.evidence_status || null,
     src: c.src || 'AI HOT',
     sourceId: c.source_id,
     category: c.category,

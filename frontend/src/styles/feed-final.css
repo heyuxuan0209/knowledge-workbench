@@ -57,6 +57,17 @@
 .cf-card .cf-t{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--text);line-height:1.45;margin-bottom:5px;padding-right:24px;cursor:pointer}
 .cf-card .cf-t:hover{color:var(--accent)}
 .cf-card .cf-s{font-size:12.5px;color:var(--sub);line-height:1.6}
+.cf-decision-head{display:flex;align-items:center;gap:7px;margin:8px 0 5px;font-size:11px;color:var(--green);font-weight:600}
+.cf-decision-head em{font-style:normal;font-weight:500;border-radius:10px;padding:1px 7px}
+.cf-decision-head em.deep{color:var(--green);background:rgba(63,115,80,.10)}
+.cf-decision-head em.brief{color:var(--accent);background:rgba(61,90,128,.09)}
+.cf-decision-head i{font-style:normal;font-weight:400;color:var(--faint)}
+.cf-decision{font-size:13px;color:var(--body2);line-height:1.72;padding:9px 11px;background:rgba(63,115,80,.055);border-left:3px solid rgba(63,115,80,.45);border-radius:3px 8px 8px 3px}
+.cf-source-summary{margin-top:6px;color:var(--faint);font-size:11.5px}
+.cf-source-summary summary{cursor:pointer;list-style:none;width:max-content}
+.cf-source-summary summary:hover{color:var(--accent)}
+.cf-source-summary summary::-webkit-details-marker{display:none}
+.cf-source-summary div{margin-top:5px;padding:7px 10px;border-radius:7px;background:var(--surface);color:var(--sub);line-height:1.6}
 .cf-card .cf-f{display:flex;align-items:center;gap:8px;margin-top:9px}
 .cf-why{font-size:11px;color:var(--faint)}
 .cf-star{margin-left:auto;cursor:pointer;color:var(--faint);display:inline-flex}.cf-star:hover{color:var(--amber)}

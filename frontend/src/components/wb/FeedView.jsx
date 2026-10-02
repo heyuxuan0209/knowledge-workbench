@@ -209,6 +209,7 @@ export default function FeedView({
   const [otherOpen, setOtherOpen] = useState(false)   // 组4「其他」默认折叠
   // 第三刀·精选优先（「全部」视图顶部）：可解释信号排序 + 显式 mute，每条带「为什么入选」
   const [curated, setCurated] = useState([])
+  const [decisionRefreshTried, setDecisionRefreshTried] = useState(false)
   const [showAll, setShowAll] = useState(false)         // 「查看全部」展开完整分组列表
   const [curMenu, setCurMenu] = useState(null)          // 哪条打开 × 反馈细选菜单
   const [storyMem, setStoryMem] = useState({})          // 需求3：contentId → 事件簇成员（点「N 源同报」展开看哪些源）
@@ -250,7 +251,20 @@ export default function FeedView({
       </div>
     )
   }
-  const loadCurated = () => api('/api/feed/curated?limit=12').then(j => setCurated(j.data || [])).catch(() => {})
+  const loadCurated = async () => {
+    try {
+      const j = await api('/api/feed/curated?limit=12')
+      const rows = j.data || []
+      setCurated(rows)
+      // 先显示缓存/旧摘要，不让模型生成挡住首屏；缺阅读层时后台补一次，完成后原地替换。
+      if (!decisionRefreshTried && rows.some(row => !row.decisionSummary)) {
+        setDecisionRefreshTried(true)
+        api('/api/feed/curated/refresh-decisions', { method: 'POST', body: { limit: 12, poolSize: 18 } })
+          .then(result => setCurated(result.data?.data || rows))
+          .catch(() => {})
+      }
+    } catch { /* 保留当前列表 */ }
+  }
   // × 负反馈（不看这条 / 少推源 / 这类主题少推）：本地移除 + 落库 mute（显式过滤、可撤销、不调权重）
   const curateMute = async (body, msg) => {
     setCurMenu(null)
@@ -681,7 +695,24 @@ export default function FeedView({
               )}
               <div className="cf-m"><span className="cf-src">{c.src}</span>·<span>{c.pub}</span></div>
               <div className="cf-t" onClick={() => openReaderById(c.id)}>{c.title}</div>
-              {c.summary && <div className="cf-s">{c.summary}</div>}
+              {c.decisionSummary ? (
+                <>
+                  <div className="cf-decision-head">
+                    <span>阅读决策摘要</span>
+                    <em className={c.decisionVerdict === 'deep' ? 'deep' : 'brief'}>
+                      {c.decisionVerdict === 'deep' ? '值得深入' : '知道即可'}
+                    </em>
+                    {c.evidenceStatus && <i>证据：{c.evidenceStatus === 'full' ? '正文' : '来源摘要'}</i>}
+                  </div>
+                  <div className="cf-decision">{c.decisionSummary}</div>
+                  {c.summary && c.summary !== c.decisionSummary && (
+                    <details className="cf-source-summary">
+                      <summary>查看来源原摘要</summary>
+                      <div>{c.summary}</div>
+                    </details>
+                  )}
+                </>
+              ) : (c.summary && <div className="cf-s">{c.summary}</div>)}
               <div className="cf-f">
                 {badgeEl(c, c.badge)}
                 <span className="cf-why">入选：{c.why}</span>

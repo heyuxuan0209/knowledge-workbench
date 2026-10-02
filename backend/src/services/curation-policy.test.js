@@ -36,3 +36,14 @@ test('显式 mute 在排序前过滤且可接受数组或 Set', () => {
   });
   assert.deepEqual(ranked.map(item => item.candidate.id), ['c']);
 });
+
+test('事件簇非主条和证据不足条目不占精选名额', () => {
+  const rows = [
+    { id: 'primary', source_id: 's1', story_primary_id: 'primary', created_at: '2026-09-29T00:00:00Z', sc: 2 },
+    { id: 'duplicate', source_id: 's2', story_primary_id: 'primary', created_at: '2026-09-29T00:00:00Z', reg: 1 },
+    { id: 'unsupported', source_id: 's3', decision_verdict: 'exclude', created_at: '2026-09-29T00:00:00Z', tier: 'T1' },
+    { id: 'brief', source_id: 's4', decision_verdict: 'brief', created_at: '2026-09-29T00:00:00Z', tier: 'T1' },
+  ];
+  const ranked = rankCuratedCandidates(rows, { limit: 12, now: NOW });
+  assert.deepEqual(ranked.map(item => item.candidate.id), ['primary', 'brief']);
+});

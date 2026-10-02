@@ -12,6 +12,8 @@ const { migrateM30 } = await import('./db/migrate-m30.js');
 migrateM30(); // 幂等：先建单信源运行账本，避免首次打开信源页才触发 schema 写入。
 const { migrateM31 } = await import('./db/migrate-m31.js');
 migrateM31(); // 幂等：所有模型调用在业务逻辑返回前先落凭证。
+const { migrateM32 } = await import('./db/migrate-m32.js');
+migrateM32(); // 幂等：缓存精选阅读决策摘要，原始摘要继续保留。
 
 // 出网代理根治（2026-07-17）：Node fetch（undici）默认忽略 HTTP(S)_PROXY，且 launchd
 // 常驻进程没有 shell 环境——代理只能来自 .env。不配则行为不变（直连）。
@@ -25,6 +27,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 // 不改变既有 Tailscale 退路；正式公网切换时在 .env 显式收紧为 127.0.0.1。
 const HOST = process.env.HOST || '0.0.0.0';
+// 接口验收/临时数据库启动时禁止悄悄触发同步、日报、飞书机器人和定时任务。
+const BACKGROUND_JOBS_ENABLED = process.env.KW_DISABLE_BACKGROUND_JOBS !== '1';
 
 // Cloudflare Tunnel / reverse proxy only: trust the local proxy, never arbitrary forwarded headers.
 app.set('trust proxy', 'loopback');
@@ -2252,7 +2256,12 @@ async function syncAllChannels() {
     writeFileSync(statePath, JSON.stringify({ at: attemptedAt, lastSuccessfulAt, ...summary }));
   } catch (err) { console.error('[sync] 写入 last-sync 失败:', err.message); }
 
-  // 不再自动抓正文补摘要：用户每天只看精选 12 条，全文翻译/摘要留到点开精读时按需发生。
+  // 只加工精选候选的小池子：不为全量信源烧正文/模型成本。异步刷新不阻塞同步接口，
+  // 页面先读缓存；缺失时前端也会触发同一个幂等刷新入口。
+  import('./services/curated-decisions.js')
+    .then(({ refreshCuratedDecisions }) => refreshCuratedDecisions({ limit: 12, poolSize: 18, background: true }))
+    .then(r => console.log(`[curated-decisions] 刷新 ${r.generated} 条，排除 ${r.excluded} 条`))
+    .catch(err => console.error('[curated-decisions] 刷新失败:', err.message));
 
   const total = (channels.aihot?.count || 0) + (channels.rss?.count || 0) + (channels.activeQuery?.inserted || 0);
   return { total, status: summary.status, channelStatuses: summary.channels, channels };
@@ -2274,14 +2283,15 @@ async function catchUpSyncIfStale() {
     console.log(`[cron] 补偿同步完成：+${total} 条`);
   } catch (err) { console.error('[cron] 补偿同步失败:', err.message); }
 }
-setTimeout(catchUpSyncIfStale, 20 * 1000);
-setInterval(catchUpSyncIfStale, 3600 * 1000);
+if (BACKGROUND_JOBS_ENABLED) {
+  setTimeout(catchUpSyncIfStale, 20 * 1000);
+  setInterval(catchUpSyncIfStale, 3600 * 1000);
 
-// 灵感库 → bitable 对账（ADR-068 单向）：启动 45s 后跑一次 + 每 10 分钟兜底；
-// 变动路由的 pokeIdeasBitable() 是即时路径（30s 防抖），这里兜住编辑/删除/AI 生成等未挂钩的路径
-setTimeout(() => pokeIdeasBitable(), 45 * 1000);
-setInterval(() => import('./services/feishu-bitable-ideas.js')
-  .then(m => m.reconcileIdeasToBitable()).catch(() => {}), 10 * 60 * 1000);
+  // 灵感库 → bitable 对账（ADR-068 单向）：启动 45s 后跑一次 + 每 10 分钟兜底。
+  setTimeout(() => pokeIdeasBitable(), 45 * 1000);
+  setInterval(() => import('./services/feishu-bitable-ideas.js')
+    .then(m => m.reconcileIdeasToBitable()).catch(() => {}), 10 * 60 * 1000);
+}
 
 app.post('/api/sync-all', async (req, res) => {
   res.json({ success: true, data: await syncAllChannels() });
@@ -2296,6 +2306,16 @@ app.post('/api/sync-all', async (req, res) => {
 app.get('/api/feed/curated', async (req, res) => {
   try { const { getCurated } = await import('./services/curated.js'); res.json({ success: true, data: getCurated(Number(req.query.limit) || 12) }); }
   catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+app.post('/api/feed/curated/refresh-decisions', async (req, res) => {
+  try {
+    const { refreshCuratedDecisions } = await import('./services/curated-decisions.js');
+    res.json({ success: true, data: await refreshCuratedDecisions({
+      limit: Number(req.body?.limit) || 12,
+      poolSize: Number(req.body?.poolSize) || 18,
+      background: true,
+    }) });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 app.get('/api/feed/curate-config', async (req, res) => {
   try { const { getCurateConfig } = await import('./services/curated.js'); res.json({ success: true, data: getCurateConfig() }); }
@@ -2828,7 +2848,7 @@ app.listen(PORT, HOST, () => {
 
   // 启动自检补跑（2026-07-18 修 Bug1）：凌晨 launchd 睡眠错过时，一开机 backend 就把
   // 当天缺的日报补上。延迟 20s 让首次可能的同步先落地；已有当天报告则跳过（不烧 LLM）。
-  setTimeout(async () => {
+  if (BACKGROUND_JOBS_ENABLED) setTimeout(async () => {
     try {
       const { ensureDailyReport } = await import('./services/report-generation.js');
       const r = await ensureDailyReport({ background: true });
@@ -2848,15 +2868,17 @@ app.listen(PORT, HOST, () => {
 
   // 飞书私信机器人（ADR-039）：长连接监听私信 → 捕获进灵感待整理、问句才回。
   // 配了飞书凭证就随 backend 常驻启动；未配置/失败只记日志不中断。
-  import('./services/feishu-bot.js').then(({ startFeishuBot }) => startFeishuBot())
-    .catch(err => console.error('[startup] 飞书私信机器人启动异常:', err.message));
+  if (BACKGROUND_JOBS_ENABLED) {
+    import('./services/feishu-bot.js').then(({ startFeishuBot }) => startFeishuBot())
+      .catch(err => console.error('[startup] 飞书私信机器人启动异常:', err.message));
+  }
 });
 
 // 定时全渠道同步 + 日报生成：每天 08:10 一次。页面只呈现 12 条精选，无需把同一批源加工两遍。
 // 此前同步只在手动刷新时发生，AI HOT 翻页窗口有限，不刷新的日子内容永久错过——
 // DB 实证 7 天里只有 4 天有数据）。node-cron 随 backend 常驻（TCC 已授权、比睡眠的
 // launchd 可靠），同步完顺手生成当天日报，失败只记日志不中断服务。
-import('node-cron').then(({ default: cron }) => {
+if (BACKGROUND_JOBS_ENABLED) import('node-cron').then(({ default: cron }) => {
   cron.schedule('10 8 * * *', async () => {
     console.log('[cron] scheduled sync-all start');
     try {
