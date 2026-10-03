@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   canonicalizeContentUrl,
   clusterByVectors,
+  collapseCanonicalArticles,
   countDistinctPublishers,
   dedupeMembersByCanonicalUrl,
   eventTitlesCompatible,
@@ -56,6 +57,31 @@ test('展示层按标准化原文 URL 去掉跨渠道重复记录', () => {
     { id: 'other', source_id: 'media', url: 'https://media.test/report' },
   ];
   assert.equal(countDistinctPublishers(members), 2);
+});
+
+test('聚簇前将同一原文的多条采集记录折叠为一个文章单元', () => {
+  const contents = [
+    { ...item('aihot', 'Google DeepMind 发布 Gemini 4 Argon', 30, 100), url: 'https://www.deepmind.google/blog/argon/?utm_source=aihot', trust_tier: 'T2', source_app: 'aihot' },
+    { ...item('rss', 'Gemini 4 Argon：我们下一个前沿智能时代', 30, 80), url: 'https://deepmind.google/blog/argon/', trust_tier: 'T1', source_app: 'rss' },
+    { ...item('review', 'Gemini 4 Argon 第三方评测', 30, 70), url: 'https://example.com/argon-review', trust_tier: 'T2', source_app: 'rss' },
+  ];
+  const byId = new Map([['aihot', vec(0)], ['rss', vec(20)], ['review', vec(40)]]);
+  const collapsed = collapseCanonicalArticles(contents, byId);
+
+  assert.deepEqual(collapsed.articleContents.map(c => c.id), ['rss', 'review']);
+  assert.deepEqual(collapsed.memberIdsByArticle.get('rss'), ['aihot', 'rss']);
+  assert.equal(collapsed.articleVectors.size, 2);
+  assert.ok(collapsed.articleVectors.get('rss')[0] < 1);
+  assert.ok(collapsed.articleVectors.get('rss')[0] > 0.9);
+});
+
+test('不同原文即使讲同一模型也不在身份层强制合并', () => {
+  const contents = [
+    { ...item('launch', 'Gemini 4 Argon 发布', 30), url: 'https://deepmind.google/blog/argon', trust_tier: 'T1' },
+    { ...item('benchmark', 'Gemini 4 Argon 评测', 30), url: 'https://analysis.example/argon', trust_tier: 'T2' },
+  ];
+  const collapsed = collapseCanonicalArticles(contents, new Map([['launch', vec(0)], ['benchmark', vec(5)]]));
+  assert.deepEqual(collapsed.articleContents.map(c => c.id), ['launch', 'benchmark']);
 });
 
 test('不同网址但标题或长摘要相同的跨站稿只展示一次', () => {

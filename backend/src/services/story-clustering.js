@@ -2,6 +2,9 @@ import { getDatabase } from '../db/init.js';
 import { randomUUID } from 'crypto';
 import { embedBatch, cosine as vecCosine, MODEL_NAME } from './embeddings.js';
 import { TRUST_RANK, effectiveTier } from './trust-tier.js';
+import { canonicalArticleIdentity, canonicalizeContentUrl } from './content-identity.js';
+
+export { canonicalizeContentUrl };
 
 // Story 聚类（M2 洞察层，ADR-008；P1 层3 升级为 bge-m3 事件簇，ADR-040）：
 // 把近 N 天的 Feed 内容按"讲同一件事"聚成事件簇，主条按信任档选（官方 > 官方号 > KOL），
@@ -103,20 +106,6 @@ export function eventTitlesCompatible(a = '', b = '') {
   return true;
 }
 
-export function canonicalizeContentUrl(raw = '') {
-  try {
-    const u = new URL(raw);
-    u.hash = '';
-    u.hostname = u.hostname.toLowerCase().replace(/^www\./, '');
-    for (const key of [...u.searchParams.keys()]) {
-      if (/^utm_/i.test(key) || ['fbclid', 'gclid', 'mc_cid', 'mc_eid'].includes(key.toLowerCase())) u.searchParams.delete(key);
-    }
-    u.searchParams.sort();
-    u.pathname = u.pathname.replace(/\/+$/, '') || '/';
-    return u.toString();
-  } catch { return String(raw || '').trim(); }
-}
-
 function normalizedFingerprint(text = '') {
   return String(text).normalize('NFKC').toLowerCase().replace(/[\p{P}\p{S}\s]+/gu, '');
 }
@@ -179,6 +168,33 @@ function fitsEventIdentity(content, cluster, byContent, byId, threshold, maxSpan
   const v = byId.get(content.id);
   const anchorFloor = Math.max(0.70, threshold - 0.04);
   return !anchorVec || !v || vecCosine(anchorVec, v) >= anchorFloor;
+}
+
+// 聚簇的输入应该是“独立原文”，不是“采集记录”。
+// RSS / AI HOT 等多个入口指向同一原文时：
+// - 保留全部 content id，后续仍可追溯每个采集源；
+// - 只用一个文章单元参与向量聚簇，向量取各采集记录的归一化均值；
+// - 代表条优先官方一手源，避免聚簇标题被二手改写主导。
+export function collapseCanonicalArticles(contents, byId) {
+  const groups = new Map();
+  for (const content of contents) {
+    const identity = canonicalArticleIdentity(content.url);
+    const key = identity ? `url:${identity}` : `content:${content.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(content);
+  }
+
+  const articleContents = [];
+  const articleVectors = new Map();
+  const memberIdsByArticle = new Map();
+  for (const members of groups.values()) {
+    const representative = pickPrimary(members);
+    articleContents.push(representative);
+    memberIdsByArticle.set(representative.id, members.map(member => member.id));
+    const vectors = members.map(member => byId.get(member.id)).filter(Boolean);
+    if (vectors.length) articleVectors.set(representative.id, meanNormalize(vectors));
+  }
+  return { articleContents, articleVectors, memberIdsByArticle };
 }
 
 // 贪心向量聚类：向量负责召回，事件身份约束负责阻止“同主体不同事件”滚成一个大簇。
@@ -300,7 +316,11 @@ export async function rebuildStories(days = 7, { threshold = 0.75, splitReview =
   for (const c of contents) c.trust_tier = effectiveTier(c.trust_tier, c.url);
 
   const byId = await ensureContentEmbeddings(db, contents);
-  const rawClusters = clusterByVectors(contents, byId, threshold).filter(c => c.memberIds.length >= 2);
+  const { articleContents, articleVectors, memberIdsByArticle } = collapseCanonicalArticles(contents, byId);
+  const collapsedCount = contents.length - articleContents.length;
+  if (collapsedCount) console.log(`  🔗 事件簇：${collapsedCount} 条跨渠道采集记录已合并为原文身份`);
+  const rawClusters = clusterByVectors(articleContents, articleVectors, threshold).filter(c => c.memberIds.length >= 2);
+  const byArticle = new Map(articleContents.map(c => [c.id, c]));
   const byContent = new Map(contents.map(c => [c.id, c]));
   const now = Date.now();
 
@@ -308,7 +328,8 @@ export async function rebuildStories(days = 7, { threshold = 0.75, splitReview =
   let clusters = rawClusters;
   if (splitReview && rawClusters.length) {
     const { splitReviewAll } = await import('./story-split-review.js');
-    const membersPer = rawClusters.map(cl => cl.memberIds.map(id => byContent.get(id)));
+    // LLM 看的也是独立原文单元，不能再把同 URL 的采集记录拆开。
+    const membersPer = rawClusters.map(cl => cl.memberIds.map(id => byArticle.get(id)));
     const groupsPer = await splitReviewAll(membersPer);
     clusters = [];
     let splitCount = 0;
@@ -320,12 +341,18 @@ export async function rebuildStories(days = 7, { threshold = 0.75, splitReview =
       for (const g of groups) {
         if (g.length < 2) continue; // 拆出的单条不成簇（丢弃）
         const gIds = g.map(i => members[i].id);
-        const gVecs = gIds.map(id => byId.get(id)).filter(Boolean);
+        const gVecs = gIds.map(id => articleVectors.get(id)).filter(Boolean);
         clusters.push({ memberIds: gIds, centroid: gVecs.length ? meanNormalize(gVecs) : cl.centroid });
       }
     });
     if (splitCount) console.log(`  ✂️  拆分复核：${splitCount} 个簇被判含多事件、已拆细 → 共 ${clusters.length} 簇`);
   }
+
+  // 智能聚簇和拆分复核都完成后，再将文章单元还原为全部采集记录入库。
+  clusters = clusters.map(cluster => ({
+    ...cluster,
+    memberIds: cluster.memberIds.flatMap(id => memberIdsByArticle.get(id) || [id]),
+  }));
 
   db.exec('BEGIN');
   try {
@@ -366,8 +393,8 @@ export async function rebuildStories(days = 7, { threshold = 0.75, splitReview =
 
   const count = db.prepare('SELECT COUNT(*) c FROM stories').get().c;
   db.close();
-  console.log(`✅ Stories rebuilt (bge-m3, thr=${threshold}): ${count} clusters from ${contents.length} contents (last ${days} days)`);
-  return { stories: count, contents: contents.length };
+  console.log(`✅ Stories rebuilt (bge-m3, thr=${threshold}): ${count} clusters from ${articleContents.length} articles / ${contents.length} records (last ${days} days)`);
+  return { stories: count, articles: articleContents.length, contents: contents.length, collapsed: collapsedCount };
 }
 
 // 近期焦点：stories + 成员内容（标题/来源/信任档），按热度排序。

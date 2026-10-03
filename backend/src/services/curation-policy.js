@@ -1,3 +1,5 @@
+import { canonicalArticleIdentity } from './content-identity.js';
+
 const isOfficial = tier => tier === 'T1' || tier === 'T1.5';
 
 export function sourceKey(candidate) {
@@ -8,22 +10,7 @@ export function sourceKey(candidate) {
 // 精选层以规范化原文 URL 再做一道硬去重，避免同一内容浪费首页名额。
 export function canonicalArticleUrl(candidate) {
   const raw = candidate.url || candidate.permalink || '';
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    url.hash = '';
-    url.hostname = url.hostname.toLowerCase().replace(/^www\./, '');
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^utm_/i.test(key) || ['fbclid', 'gclid', 'mc_cid', 'mc_eid'].includes(key.toLowerCase())) {
-        url.searchParams.delete(key);
-      }
-    }
-    url.searchParams.sort();
-    url.pathname = url.pathname.replace(/\/+$/, '') || '/';
-    return url.toString();
-  } catch {
-    return raw.trim() || null;
-  }
+  return canonicalArticleIdentity(raw);
 }
 
 export function freshnessScore(created, now = Date.now()) {
