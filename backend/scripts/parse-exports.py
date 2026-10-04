@@ -42,12 +42,32 @@ def parse_xhs(path):
         if not r[0]:
             continue
         g = lambda k: num(r[idx[k]]) if k in idx and r[idx[k]] is not None else 0.0
-        out[norm_title(r[0])] = dict(
-            title=str(r[0]), pub=str(r[idx['首次发布时间']]) if '首次发布时间' in idx else '',
+        title = str(r[0])
+        pub = str(r[idx['首次发布时间']]) if '首次发布时间' in idx else ''
+        entry = dict(
+            title=title, pub=pub,
+            content_type=str(r[idx['体裁']]) if '体裁' in idx and r[idx['体裁']] is not None else '',
             exposure=g('曝光'), view=g('观看量'), ctr=g('封面点击率'),
             like=g('点赞'), comment=g('评论'), fav=g('收藏'),
             share=g('分享'), fans=g('涨粉'),
         )
+        base = norm_title(title)
+        if base not in out:
+            out[base] = entry
+            continue
+
+        # 小红书允许同一天用相同标题分别发图文和视频。旧逻辑按标题做 dict key，
+        # 后一条会静默覆盖前一条，随后两条发布记录都会吃到同一份指标。
+        # 只在确实重名时把两条都改成「标题@@发布时间」键；单条仍保留旧键，兼容历史快照。
+        previous = out.pop(base)
+        previous_key = f'{base}@@{norm_title(previous.get("pub"))}'
+        out[previous_key] = previous
+        key = f'{base}@@{norm_title(pub)}'
+        suffix = 2
+        while key in out:
+            key = f'{base}@@{norm_title(pub)}@@{suffix}'
+            suffix += 1
+        out[key] = entry
     return out
 
 

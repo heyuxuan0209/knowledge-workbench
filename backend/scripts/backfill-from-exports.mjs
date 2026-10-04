@@ -160,35 +160,61 @@ async function fetchFieldNames() {
  *  前缀阈值 12 → 8：「你相信AI能一键出片吗」归一化才 10 个字，卡在 12 上直接被判死。
  *  放宽的代价是系列稿（…启动1/…启动2）可能撞前缀，所以前缀候选**多于一条时先用发布日消歧**。 */
 const PREFIX_MIN = 8;
-function lookup(byTitle, key, pubMs) {
+const canonicalForm = (s) => {
+  const v = String(s ?? '').toLowerCase();
+  if (/图文|长文/.test(v)) return '图文';
+  if (/视频/.test(v)) return '视频';
+  return '';
+};
+
+function resolveCandidates(cands, pubMs, form, { requireSameDay = false } = {}) {
+  if (cands.length <= 1) return cands[0] ?? null;
+
+  const day = dayOf(pubMs);
+  const sameDay = cands.filter((v) => day != null && v?.pub && dayOf(pubToMs(v.pub)) === day);
+  if (sameDay.length === 1) return sameDay[0];
+  if (sameDay.length > 1) cands = sameDay;
+  else if (requireSameDay) return null;
+
+  const wantedForm = canonicalForm(form);
+  if (wantedForm) {
+    const sameForm = cands.filter((v) => canonicalForm(v?.content_type) === wantedForm);
+    if (sameForm.length === 1) return sameForm[0];
+    if (sameForm.length > 1) cands = sameForm;
+  }
+
+  // 同标题、同日、同形态仍可能出现多条；表里若有精确发布时间，就选时间最近且唯一的一条。
+  const timed = cands
+    .map((v) => ({ v, gap: Math.abs(pubToMs(v?.pub) - pubMs) }))
+    .filter((x) => Number.isFinite(x.gap))
+    .sort((a, b) => a.gap - b.gap);
+  if (timed.length && (timed.length === 1 || timed[0].gap < timed[1].gap)) return timed[0].v;
+  return null;
+}
+
+function lookup(byTitle, key, pubMs, form) {
   if (byTitle[key]) return byTitle[key];
   const entries = Object.entries(byTitle);
-  const day = dayOf(pubMs);
-  const sameDay = (v) => day != null && v?.pub && dayOf(pubToMs(v.pub)) === day;
 
   if (key.length >= PREFIX_MIN) {
     const head = key.slice(0, PREFIX_MIN);
     const cands = entries
       .filter(([k]) => k.length >= PREFIX_MIN && (k.startsWith(head) || key.startsWith(k.slice(0, PREFIX_MIN))))
       .map(([, v]) => v);
-    if (cands.length === 1) return cands[0];
-    if (cands.length > 1) {
-      const narrowed = cands.filter(sameDay);
-      if (narrowed.length === 1) return narrowed[0];
-    }
+    const resolved = resolveCandidates(cands, pubMs, form);
+    if (resolved) return resolved;
   }
 
-  const byDay = entries.map(([, v]) => v).filter(sameDay);
-  return byDay.length === 1 ? byDay[0] : null;
+  return resolveCandidates(entries.map(([, v]) => v), pubMs, form, { requireSameDay: true });
 }
 
 /** 在该平台的所有快照里，挑第一张「到了第 stage 天之后」且离档位最近的。
  *  只往后不往前——拿第 5.6 天的数填 D7 会把数字记小，宁可等明天那张快照。 */
-function pickSnapshot(snapsOfPlatform, key, pubMs, stage) {
+function pickSnapshot(snapsOfPlatform, key, pubMs, stage, form) {
   let best = null;
   let nearest = null;   // 不满足"已过档位"时用来解释还差多少
   for (const [date, byTitle] of Object.entries(snapsOfPlatform || {})) {
-    const hit = lookup(byTitle, key, pubMs);
+    const hit = lookup(byTitle, key, pubMs, form);
     if (!hit) continue;
     const age = (snapshotTime(date) - pubMs) / 864e5;
     const cand = { date, age, gap: Math.abs(age - stage), data: hit };
@@ -249,7 +275,7 @@ const main = async () => {
       continue;
     }
 
-    const best = pickSnapshot(snapshots[platform], normTitle(title), pubMs, stage);
+    const best = pickSnapshot(snapshots[platform], normTitle(title), pubMs, stage, flat(f['形态']));
     if (!best) { noMatch.push(`${label} — 该平台快照里找不到同名条目`); continue; }
 
     const ageNow = (Date.now() - pubMs) / 864e5;
