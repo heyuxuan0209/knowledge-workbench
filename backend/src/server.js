@@ -796,6 +796,38 @@ app.post('/api/works/:id/releases', async (req, res) => {
   }
 });
 
+app.get('/api/works/:id/releases/compare', async (req, res) => {
+  try {
+    const { from, to } = req.query || {};
+    if (!from || !to || from === to) return res.status(400).json({ success: false, error: '请选择两个不同的 Release' });
+    const { compareReleases } = await import('./db/content-lineage.js');
+    const pair = compareReleases(req.params.id, from, to);
+    const { diffReleaseText } = await import('./services/release-diff.js');
+    res.json({
+      success: true,
+      data: {
+        from: { id: pair.from.id, sequence: pair.from.sequence, title: pair.from.title, createdAt: pair.from.created_at },
+        to: { id: pair.to.id, sequence: pair.to.sequence, title: pair.to.title, createdAt: pair.to.created_at },
+        diff: diffReleaseText(pair.from.content_snapshot, pair.to.content_snapshot),
+      },
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/drafts/:id/restore-release', async (req, res) => {
+  try {
+    const { releaseId } = req.body || {};
+    if (!releaseId) return res.status(400).json({ success: false, error: 'releaseId is required' });
+    const { restoreReleaseToDraft } = await import('./db/content-lineage.js');
+    res.json({ success: true, data: restoreReleaseToDraft({ releaseId, draftId: req.params.id }) });
+  } catch (error) {
+    const status = error.message.startsWith('Draft not found') ? 404 : 400;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
 app.post('/api/releases/:id/relations', async (req, res) => {
   try {
     const { addReleaseRelation } = await import('./db/content-lineage.js');

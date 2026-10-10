@@ -43,10 +43,15 @@ function createReleaseInDb(db, {
   validateRelease({ releaseKind, provenanceStatus, creatorType });
   if (!db.prepare('SELECT id FROM content_works WHERE id = ?').get(workId)) throw new Error(`Work not found: ${workId}`);
   const contentHash = content == null ? null : hashContent(title, content);
-  const duplicate = db.prepare(`SELECT * FROM artifact_releases WHERE work_id = ? AND release_kind = ? AND artifact_type = ? AND COALESCE(artifact_ref_type, '') = COALESCE(?, '') AND COALESCE(artifact_ref, '') = COALESCE(?, '') AND COALESCE(content_hash, '') = COALESCE(?, '') ORDER BY sequence DESC LIMIT 1`).get(workId, releaseKind, artifactType, artifactRefType, artifactRef, contentHash);
-  if (duplicate) return { release: parseRelease(duplicate), action: 'unchanged' };
+  const latest = db.prepare('SELECT * FROM artifact_releases WHERE work_id = ? ORDER BY sequence DESC LIMIT 1').get(workId);
+  const unchanged = latest
+    && latest.release_kind === releaseKind
+    && latest.artifact_type === artifactType
+    && (latest.artifact_ref_type || '') === (artifactRefType || '')
+    && (latest.artifact_ref || '') === (artifactRef || '')
+    && (latest.content_hash || '') === (contentHash || '');
+  if (unchanged) return { release: parseRelease(latest), action: 'unchanged' };
 
-  const latest = db.prepare('SELECT id, sequence FROM artifact_releases WHERE work_id = ? ORDER BY sequence DESC LIMIT 1').get(workId);
   const parentId = parentReleaseId || latest?.id || null;
   if (parentId) {
     const parent = db.prepare('SELECT work_id FROM artifact_releases WHERE id = ?').get(parentId);
@@ -130,4 +135,37 @@ export function getWorkLineage(workId) {
 export function getDraftLineage(draftId) {
   const db = getDatabase(); const draft = db.prepare('SELECT work_id FROM drafts WHERE id = ?').get(draftId); db.close();
   return draft?.work_id ? getWorkLineage(draft.work_id) : null;
+}
+
+export function compareReleases(workId, fromReleaseId, toReleaseId) {
+  const db = getDatabase();
+  const from = db.prepare('SELECT * FROM artifact_releases WHERE id = ? AND work_id = ?').get(fromReleaseId, workId);
+  const to = db.prepare('SELECT * FROM artifact_releases WHERE id = ? AND work_id = ?').get(toReleaseId, workId);
+  db.close();
+  if (!from || !to) throw new Error('两个 Release 必须属于当前作品');
+  return { from, to };
+}
+
+export function restoreReleaseToDraft({ releaseId, draftId, originTool = 'knowledge_workbench', creatorType = 'human' }) {
+  const db = getDatabase(); db.exec('PRAGMA foreign_keys = ON'); db.exec('BEGIN IMMEDIATE');
+  try {
+    const draft = db.prepare('SELECT * FROM drafts WHERE id = ?').get(draftId);
+    const source = db.prepare('SELECT * FROM artifact_releases WHERE id = ?').get(releaseId);
+    if (!draft) throw new Error(`Draft not found: ${draftId}`);
+    if (!source || source.work_id !== draft.work_id) throw new Error('只能恢复当前作品自己的 Release');
+    if (source.content_snapshot == null) throw new Error('这个 Release 没有可恢复的正文快照');
+    db.prepare("UPDATE drafts SET title = ?, body = ?, paragraph_refs = ?, updated_at = datetime('now') WHERE id = ?").run(source.title, source.content_snapshot, source.sources_json || '[]', draftId);
+    const result = createReleaseInDb(db, {
+      workId: draft.work_id, parentReleaseId: draft.latest_release_id || null,
+      releaseKind: 'checkpoint', artifactType: 'draft', artifactRefType: 'draft', artifactRef: draftId,
+      title: source.title, content: source.content_snapshot, originTool, creatorType,
+      provenanceStatus: 'confirmed', sources: parseJson(source.sources_json, []),
+      metadata: { platform: draft.platform, restoredFromReleaseId: releaseId },
+      relations: [{ relationType: 'restored_from', toEntityType: 'release', toEntityId: releaseId }],
+    });
+    db.prepare('UPDATE drafts SET latest_release_id = ? WHERE id = ?').run(result.release.id, draftId);
+    const restoredDraft = db.prepare('SELECT * FROM drafts WHERE id = ?').get(draftId);
+    db.exec('COMMIT'); db.close();
+    return { draft: { ...restoredDraft, paragraph_refs: parseJson(restoredDraft.paragraph_refs, []) }, ...result };
+  } catch (error) { db.exec('ROLLBACK'); db.close(); throw error; }
 }

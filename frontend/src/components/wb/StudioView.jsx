@@ -379,14 +379,50 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [lineageOpen, setLineageOpen] = useState(false)
   const [lineageBusy, setLineageBusy] = useState(false)
   const [lineage, setLineage] = useState(null)
+  const [lineageSelected, setLineageSelected] = useState(new Set())
+  const [lineageDiff, setLineageDiff] = useState(null)
+  const [lineageDiffBusy, setLineageDiffBusy] = useState(false)
   const releaseLabel = { initial: '初始稿', checkpoint: '关键存档', reviewed: '审定稿', platform: '平台稿', feishu_handoff: '飞书交接', published: '发布版' }
   const provenanceLabel = { confirmed: '已确认', inferred: '历史推断' }
   const loadLineage = async () => {
     if (!studio.draftId) return
     setLineageOpen(true); setLineageBusy(true)
-    try { const j = await api(`/api/drafts/${studio.draftId}/lineage`); setLineage(j.data) }
+    try {
+      const j = await api(`/api/drafts/${studio.draftId}/lineage`)
+      setLineage(j.data); setLineageDiff(null)
+      setLineageSelected(new Set((j.data?.releases || []).slice(-2).map(release => release.id)))
+    }
     catch (err) { showToast('版本链加载失败：' + err.message); setLineageOpen(false) }
     setLineageBusy(false)
+  }
+  const toggleLineageRelease = (releaseId) => {
+    setLineageSelected(selected => {
+      const next = new Set(selected)
+      if (next.has(releaseId)) next.delete(releaseId)
+      else if (next.size < 2) next.add(releaseId)
+      else showToast('一次选择两版进行对比')
+      return next
+    })
+  }
+  const compareLineage = async () => {
+    if (lineageSelected.size !== 2 || !lineage?.work?.id) return
+    const ordered = lineage.releases.filter(release => lineageSelected.has(release.id)).sort((a, b) => a.sequence - b.sequence)
+    setLineageDiffBusy(true)
+    try {
+      const j = await api(`/api/works/${lineage.work.id}/releases/compare?from=${encodeURIComponent(ordered[0].id)}&to=${encodeURIComponent(ordered[1].id)}`)
+      setLineageDiff(j.data)
+    } catch (err) { showToast('版本对比失败：' + err.message) }
+    setLineageDiffBusy(false)
+  }
+  const restoreLineageRelease = async (release) => {
+    if (!confirm(`恢复到第 ${release.sequence} 版？\n\n当前内容不会消失，系统会把“恢复后的正文”另存为一个新关键版本。`)) return
+    try {
+      const j = await api(`/api/drafts/${studio.draftId}/restore-release`, { method: 'POST', body: { releaseId: release.id } })
+      const draft = j.data?.draft
+      if (draft) setStudio(current => ({ ...current, draft: draft.body, title: draft.title, paragraphRefs: draft.paragraph_refs || [] }))
+      showToast(`已恢复第 ${release.sequence} 版，并另存为新关键版本`)
+      await loadLineage()
+    } catch (err) { showToast('恢复失败：' + err.message) }
   }
   const saveCheckpoint = async () => {
     if (!studio.draftId) { showToast('先把当前内容存为草稿，系统会建立初始版本'); return }
@@ -496,23 +532,52 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
 
       {lineageOpen && (
         <div className="wb-lineage-backdrop" onMouseDown={() => setLineageOpen(false)}>
-          <section className="wb-lineage-panel" onMouseDown={event => event.stopPropagation()}>
+          <section className={`wb-lineage-panel${lineageDiff ? ' comparing' : ''}`} onMouseDown={event => event.stopPropagation()}>
             <div className="wb-lineage-head">
               <div><b>版本链</b><span>{lineage?.work?.title || studio.title || '当前作品'}</span></div>
               <button onClick={() => setLineageOpen(false)}>×</button>
             </div>
             {lineageBusy ? <div className="wb-lineage-empty">正在读取…</div> : (
               <div className="wb-lineage-list">
+                {(lineage?.releases || []).length > 1 && (
+                  <div className="wb-lineage-toolbar">
+                    <span>勾选任意两版，看具体增删</span>
+                    <button disabled={lineageSelected.size !== 2 || lineageDiffBusy} onClick={compareLineage}>{lineageDiffBusy ? '对比中…' : '比较所选两版'}</button>
+                  </div>
+                )}
                 {(lineage?.releases || []).map((release, index) => (
                   <div className="wb-lineage-item" key={release.id}>
                     <i>{index + 1}</i>
                     <div>
-                      <div className="wb-lineage-title">{releaseLabel[release.release_kind] || release.release_kind}<em>{provenanceLabel[release.provenance_status] || release.provenance_status}</em></div>
+                      <div className="wb-lineage-title">
+                        <input type="checkbox" checked={lineageSelected.has(release.id)} onChange={() => toggleLineageRelease(release.id)} />
+                        {releaseLabel[release.release_kind] || release.release_kind}<em>{provenanceLabel[release.provenance_status] || release.provenance_status}</em>
+                        {release.id === lineage.releases.at(-1)?.id
+                          ? <small>当前</small>
+                          : <button onClick={() => restoreLineageRelease(release)}>恢复此版</button>}
+                      </div>
                       <div className="wb-lineage-meta">{release.origin_tool} · {release.artifact_ref_type}{release.metadata?.platform ? ` · ${release.metadata.platform}` : ''} · {(release.created_at || '').replace('T', ' ').slice(0, 16)}</div>
                     </div>
                   </div>
                 ))}
                 {!lineage?.releases?.length && <div className="wb-lineage-empty">还没有关键版本</div>}
+                {lineageDiff && (
+                  <div className="wb-release-diff">
+                    <div className="wb-release-diff-head">
+                      <b>第 {lineageDiff.from.sequence} 版 → 第 {lineageDiff.to.sequence} 版</b>
+                      <span>新增 {lineageDiff.diff.stats.added} · 删除 {lineageDiff.diff.stats.removed} · 改写 {lineageDiff.diff.stats.changed}</span>
+                    </div>
+                    {lineageDiff.diff.groups.filter(group => group.type !== 'unchanged').map((group, index) => (
+                      <div className={`wb-diff-group ${group.type}`} key={index}>
+                        {group.type === 'changed' ? <>
+                          <div><label>改前</label>{group.before.map((line, i) => <p key={i}>{line}</p>)}</div>
+                          <div><label>改后</label>{group.after.map((line, i) => <p key={i}>{line}</p>)}</div>
+                        </> : <div><label>{group.type === 'added' ? '新增' : '删除'}</label>{group.lines.map((line, i) => <p key={i}>{line}</p>)}</div>}
+                      </div>
+                    ))}
+                    {lineageDiff.diff.stats.added + lineageDiff.diff.stats.removed + lineageDiff.diff.stats.changed === 0 && <div className="wb-lineage-empty">两版正文完全相同</div>}
+                  </div>
+                )}
               </div>
             )}
             <div className="wb-lineage-foot">只记录关键版本，不保存普通问答和每次自动保存。</div>
