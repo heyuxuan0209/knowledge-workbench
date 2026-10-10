@@ -72,6 +72,32 @@ export function createWork({ title = null, kind = 'content' } = {}) {
   const work = db.prepare('SELECT * FROM content_works WHERE id = ?').get(id); db.close(); return work;
 }
 
+export function listWorks({ query = '', limit = 20 } = {}) {
+  const db = getDatabase();
+  const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 20, 1), 100);
+  const needle = String(query || '').trim();
+  const where = needle ? 'WHERE w.id = ? OR w.id LIKE ? OR w.title LIKE ?' : '';
+  const params = needle ? [needle, `${needle}%`, `%${needle}%`, boundedLimit] : [boundedLimit];
+  const rows = db.prepare(`
+    SELECT w.*,
+      COUNT(r.id) AS release_count,
+      MAX(r.sequence) AS latest_sequence,
+      (SELECT id FROM artifact_releases lr WHERE lr.work_id = w.id ORDER BY lr.sequence DESC LIMIT 1) AS latest_release_id,
+      (SELECT metadata_json FROM artifact_releases lr WHERE lr.work_id = w.id ORDER BY lr.sequence DESC LIMIT 1) AS latest_metadata_json
+    FROM content_works w
+    LEFT JOIN artifact_releases r ON r.work_id = w.id
+    ${where}
+    GROUP BY w.id
+    ORDER BY w.updated_at DESC, w.created_at DESC
+    LIMIT ?
+  `).all(...params).map(row => {
+    const { latest_metadata_json, ...work } = row;
+    return { ...work, latest_metadata: parseJson(latest_metadata_json, {}) };
+  });
+  db.close();
+  return rows;
+}
+
 export function createRelease(input) {
   const db = getDatabase(); db.exec('PRAGMA foreign_keys = ON'); db.exec('BEGIN IMMEDIATE');
   try { const result = createReleaseInDb(db, input); db.exec('COMMIT'); db.close(); return result; }
@@ -130,6 +156,31 @@ export function getWorkLineage(workId) {
   const releases = db.prepare('SELECT * FROM artifact_releases WHERE work_id = ? ORDER BY sequence').all(workId).map(parseRelease);
   const relations = releases.length ? db.prepare(`SELECT * FROM artifact_relations WHERE from_release_id IN (${releases.map(() => '?').join(',')}) ORDER BY created_at, id`).all(...releases.map(r => r.id)).map(row => ({ ...row, metadata: parseJson(row.metadata_json, {}) })) : [];
   db.close(); return { work, releases, relations };
+}
+
+export function getRelease(releaseId) {
+  const db = getDatabase();
+  const row = db.prepare('SELECT * FROM artifact_releases WHERE id = ?').get(releaseId);
+  db.close();
+  if (!row) return null;
+  const { sources_json, metadata_json, content_snapshot, ...release } = row;
+  return { ...release, content: content_snapshot, content_length: content_snapshot?.length || 0, sources: parseJson(sources_json, []), metadata: parseJson(metadata_json, {}) };
+}
+
+export function getWorkHandoff(workId) {
+  const db = getDatabase();
+  const work = db.prepare('SELECT * FROM content_works WHERE id = ?').get(workId);
+  if (!work) { db.close(); return null; }
+  const latest = db.prepare('SELECT * FROM artifact_releases WHERE work_id = ? ORDER BY sequence DESC LIMIT 1').get(workId);
+  const draft = db.prepare('SELECT id, platform FROM drafts WHERE work_id = ? ORDER BY updated_at DESC LIMIT 1').get(workId);
+  db.close();
+  return {
+    version: 1,
+    work: { id: work.id, title: work.title, kind: work.kind, updatedAt: work.updated_at },
+    release: latest ? parseRelease(latest) : null,
+    draft: draft || null,
+    platform: parseJson(latest?.metadata_json, {}).platform || draft?.platform || null,
+  };
 }
 
 export function getDraftLineage(draftId) {

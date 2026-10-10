@@ -778,12 +778,54 @@ app.post('/api/works', async (req, res) => {
   }
 });
 
+app.get('/api/works', async (req, res) => {
+  try {
+    const { listWorks } = await import('./db/content-lineage.js');
+    res.json({ success: true, data: listWorks({ query: req.query.query || '', limit: req.query.limit || 20 }) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/releases/:id', async (req, res) => {
+  try {
+    const { getRelease } = await import('./db/content-lineage.js');
+    const release = getRelease(req.params.id);
+    if (!release) return res.status(404).json({ success: false, error: 'Release not found' });
+    res.json({ success: true, data: release });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/works/:id/lineage', async (req, res) => {
   try {
     const { getWorkLineage } = await import('./db/content-lineage.js');
     const lineage = getWorkLineage(req.params.id);
     if (!lineage) return res.status(404).json({ success: false, error: 'Work not found' });
     res.json({ success: true, data: lineage });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/works/:id/handoff', async (req, res) => {
+  try {
+    const { getWorkHandoff } = await import('./db/content-lineage.js');
+    const handoff = getWorkHandoff(req.params.id);
+    if (!handoff) return res.status(404).json({ success: false, error: 'Work not found' });
+    const { listPreferenceCandidates } = await import('./services/editing-insights.js');
+    const confirmedPreferences = listPreferenceCandidates({ status: 'confirmed' }).filter(item => item.scope_type === 'global' || (item.scope_type === 'platform' && item.scope_value === handoff.platform));
+    const command = `kw-content continue ${handoff.work.id}`;
+    const markdown = [
+      'KW-CONTENT-HANDOFF v1',
+      `work_id: ${handoff.work.id}`,
+      `release_id: ${handoff.release?.id || ''}`,
+      `title: ${handoff.work.title || ''}`,
+      `platform: ${handoff.platform || ''}`,
+      `continue: ${command}`,
+    ].join('\n');
+    res.json({ success: true, data: { ...handoff, confirmedPreferences, command, markdown } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

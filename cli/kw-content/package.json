@@ -1,0 +1,12 @@
+{
+  "name": "kw-content-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "kw-content": "./kw-content.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

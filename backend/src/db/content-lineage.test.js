@@ -34,7 +34,7 @@ test('内容血缘：旧稿推断回填，新稿关键版本幂等且可跨工�
     inspect.close();
 
     const { createDraft, updateDraft } = await import('./drafts.js');
-    const { checkpointDraft, createRelease, getDraftLineage, restoreReleaseToDraft } = await import('./content-lineage.js');
+    const { checkpointDraft, createRelease, getDraftLineage, getRelease, getWorkHandoff, listWorks, restoreReleaseToDraft } = await import('./content-lineage.js');
     const master = createDraft({
       platform: 'gzh-long', title: '新作品', body: '第一版正文',
       paragraphRefs: [{ noteId: 'note-2', contentId: 'content-2' }],
@@ -61,6 +61,9 @@ test('内容血缘：旧稿推断回填，新稿关键版本幂等且可跨工�
     assert.equal(lineage.releases[0].content_snapshot, undefined);
     assert.equal(lineage.releases[0].content_length, '第一版正文'.length);
     assert.ok(lineage.relations.some(relation => relation.relation_type === 'revises' && relation.to_entity_id === checkpoint.release.id));
+    assert.equal(getRelease(checkpoint.release.id).content, '第二版正文');
+    assert.equal(getWorkHandoff(master.work_id).release.id, platform.release.id);
+    assert.equal(listWorks({ query: master.work_id })[0].release_count, 3);
 
     const restored = restoreReleaseToDraft({ releaseId: lineage.releases[0].id, draftId: master.id });
     assert.equal(restored.draft.body, '第一版正文');

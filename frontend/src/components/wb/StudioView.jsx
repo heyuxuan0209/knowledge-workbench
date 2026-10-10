@@ -416,6 +416,14 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     } catch (err) { showToast('版本对比失败：' + err.message) }
     setLineageDiffBusy(false)
   }
+  const copyLineageHandoff = async () => {
+    if (!lineage?.work?.id) return
+    try {
+      const j = await api(`/api/works/${lineage.work.id}/handoff`)
+      await navigator.clipboard.writeText(j.data.markdown)
+      showToast('已复制交接卡；粘贴给 Codex 后说“继续这篇”即可')
+    } catch (err) { showToast('交接卡复制失败：' + err.message) }
+  }
   const analyzeLineageEdits = async () => {
     if (!lineageDiff || !lineage?.work?.id) return
     setEditInsightsBusy(true)
@@ -555,7 +563,10 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           <section className={`wb-lineage-panel${lineageDiff ? ' comparing' : ''}`} onMouseDown={event => event.stopPropagation()}>
             <div className="wb-lineage-head">
               <div><b>版本链</b><span>{lineage?.work?.title || studio.title || '当前作品'}</span></div>
-              <button onClick={() => setLineageOpen(false)}>×</button>
+              <div className="wb-lineage-head-actions">
+                {lineage?.work?.id && <button className="wb-lineage-copy" onClick={copyLineageHandoff} title="复制 work_id 和当前 Release，交给 Codex CLI 继续">复制交接卡</button>}
+                <button className="wb-lineage-close" onClick={() => setLineageOpen(false)}>×</button>
+              </div>
             </div>
             {lineageBusy ? <div className="wb-lineage-empty">正在读取…</div> : (
               <div className="wb-lineage-list">
