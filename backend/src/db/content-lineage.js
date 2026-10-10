@@ -7,7 +7,18 @@ const CREATORS = new Set(['human', 'ai', 'human_ai', 'unknown']);
 
 const parseJson = (value, fallback) => { try { return JSON.parse(value); } catch { return fallback; } };
 const hashContent = (title, content) => createHash('sha256').update(`${title || ''}\n${content || ''}`).digest('hex');
-const parseRelease = row => row ? { ...row, sources: parseJson(row.sources_json, []), metadata: parseJson(row.metadata_json, {}) } : null;
+// 时间线只需要版本身份与摘要信息。关键正文仍保存在数据库中，但不随列表接口整篇返回，
+// 避免一打开“版本链”就把多份长文传到浏览器；以后恢复单版时走单独的按 id 读取接口。
+const parseRelease = row => {
+  if (!row) return null;
+  const { sources_json, metadata_json, content_snapshot, ...release } = row;
+  return {
+    ...release,
+    content_length: content_snapshot?.length || 0,
+    sources: parseJson(sources_json, []),
+    metadata: parseJson(metadata_json, {}),
+  };
+};
 
 function validateRelease(input) {
   if (!RELEASE_KINDS.has(input.releaseKind)) throw new Error(`Unsupported releaseKind: ${input.releaseKind}`);
