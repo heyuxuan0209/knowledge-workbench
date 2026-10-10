@@ -446,12 +446,43 @@ CREATE TABLE IF NOT EXISTS drafts (
         CHECK (status IN ('draft', 'final', 'exported')),
     tokens INTEGER DEFAULT 0,
     cost_yuan REAL DEFAULT 0,
+    work_id TEXT,
+    latest_release_id TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_drafts_updated ON drafts(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_drafts_platform ON drafts(platform);
+CREATE INDEX IF NOT EXISTS idx_drafts_work ON drafts(work_id);
+
+-- 7.9 Content Lineage — 跨 KW / CLI / 桌面端的作品与关键版本
+CREATE TABLE IF NOT EXISTS content_works (
+    id TEXT PRIMARY KEY, title TEXT, kind TEXT NOT NULL DEFAULT 'content',
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'published', 'archived')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS artifact_releases (
+    id TEXT PRIMARY KEY, work_id TEXT NOT NULL, sequence INTEGER NOT NULL, parent_release_id TEXT,
+    release_kind TEXT NOT NULL, artifact_type TEXT NOT NULL, artifact_ref_type TEXT NOT NULL DEFAULT 'manual',
+    artifact_ref TEXT, title TEXT, content_hash TEXT, content_snapshot TEXT, origin_tool TEXT NOT NULL DEFAULT 'unknown',
+    origin_account TEXT, creator_type TEXT NOT NULL DEFAULT 'unknown' CHECK (creator_type IN ('human', 'ai', 'human_ai', 'unknown')),
+    provenance_status TEXT NOT NULL DEFAULT 'confirmed' CHECK (provenance_status IN ('confirmed', 'inferred')),
+    sources_json TEXT NOT NULL DEFAULT '[]', metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (work_id) REFERENCES content_works(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_release_id) REFERENCES artifact_releases(id), UNIQUE (work_id, sequence)
+);
+CREATE TABLE IF NOT EXISTS artifact_relations (
+    id TEXT PRIMARY KEY, from_release_id TEXT NOT NULL, relation_type TEXT NOT NULL, to_entity_type TEXT NOT NULL,
+    to_entity_id TEXT NOT NULL, provenance_status TEXT NOT NULL DEFAULT 'confirmed' CHECK (provenance_status IN ('confirmed', 'inferred')),
+    metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (from_release_id) REFERENCES artifact_releases(id) ON DELETE CASCADE,
+    UNIQUE (from_release_id, relation_type, to_entity_type, to_entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_releases_work_sequence ON artifact_releases(work_id, sequence DESC);
+CREATE INDEX IF NOT EXISTS idx_releases_artifact ON artifact_releases(artifact_ref_type, artifact_ref);
+CREATE INDEX IF NOT EXISTS idx_relations_from ON artifact_relations(from_release_id);
+CREATE INDEX IF NOT EXISTS idx_relations_target ON artifact_relations(to_entity_type, to_entity_id);
 
 -- ============================================================
 -- 8. Data Source Configs — 用户手动添加的信源配置

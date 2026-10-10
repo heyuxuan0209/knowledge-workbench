@@ -14,6 +14,8 @@ const { migrateM31 } = await import('./db/migrate-m31.js');
 migrateM31(); // 幂等：所有模型调用在业务逻辑返回前先落凭证。
 const { migrateM32 } = await import('./db/migrate-m32.js');
 migrateM32(); // 幂等：缓存精选阅读决策摘要，原始摘要继续保留。
+const { migrateM33 } = await import('./db/migrate-m33.js');
+migrateM33(); // 幂等：作品—关键 Release—来源关系；存量草稿只做“推断”回填。
 
 // 出网代理根治（2026-07-17）：Node fetch（undici）默认忽略 HTTP(S)_PROXY，且 launchd
 // 常驻进程没有 shell 环境——代理只能来自 .env。不配则行为不变（直连）。
@@ -732,14 +734,76 @@ app.get('/api/drafts', async (req, res) => {
 
 app.post('/api/drafts', async (req, res) => {
   try {
-    const { platform, title, body, paragraphRefs, sourceKind, sourceId, sourceLabel } = req.body;
+    const { platform, title, body, paragraphRefs, sourceKind, sourceId, sourceLabel, lineage } = req.body;
     if (!platform || !body?.trim()) {
       return res.status(400).json({ success: false, error: 'platform and body are required' });
     }
     const { createDraft } = await import('./db/drafts.js');
-    res.json({ success: true, data: createDraft({ platform, title, body, paragraphRefs, sourceKind, sourceId, sourceLabel }) });
+    res.json({ success: true, data: createDraft({ platform, title, body, paragraphRefs, sourceKind, sourceId, sourceLabel, lineage }) });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 关键版本凭证：CLI、桌面端或 KW 都可显式提交。账号不是作品身份，originAccount 只作可选标签。
+app.post('/api/drafts/:id/releases', async (req, res) => {
+  try {
+    const { checkpointDraft } = await import('./db/content-lineage.js');
+    res.json({ success: true, data: checkpointDraft(req.params.id, req.body || {}) });
+  } catch (error) {
+    const status = error.message.startsWith('Draft not found') ? 404 : 400;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/drafts/:id/lineage', async (req, res) => {
+  try {
+    const { getDraftLineage } = await import('./db/content-lineage.js');
+    const lineage = getDraftLineage(req.params.id);
+    if (!lineage) return res.status(404).json({ success: false, error: 'Draft lineage not found' });
+    res.json({ success: true, data: lineage });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/works', async (req, res) => {
+  try {
+    const { createWork } = await import('./db/content-lineage.js');
+    res.json({ success: true, data: createWork(req.body || {}) });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/works/:id/lineage', async (req, res) => {
+  try {
+    const { getWorkLineage } = await import('./db/content-lineage.js');
+    const lineage = getWorkLineage(req.params.id);
+    if (!lineage) return res.status(404).json({ success: false, error: 'Work not found' });
+    res.json({ success: true, data: lineage });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/works/:id/releases', async (req, res) => {
+  try {
+    const { createRelease } = await import('./db/content-lineage.js');
+    res.json({ success: true, data: createRelease({ ...(req.body || {}), workId: req.params.id }) });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/releases/:id/relations', async (req, res) => {
+  try {
+    const { addReleaseRelation } = await import('./db/content-lineage.js');
+    const data = addReleaseRelation({ ...(req.body || {}), fromReleaseId: req.params.id });
+    if (!data) return res.status(400).json({ success: false, error: 'relationType, toEntityType and toEntityId are required' });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 
@@ -817,16 +881,36 @@ app.post('/api/studio/adapt', async (req, res) => {
 // 每个形态用其 platform-form spec + 内建 genre（FORM_GENRE）；gzh-long = 母稿本身直接透传，不耗 LLM。
 app.post('/api/studio/adapt-batch', async (req, res) => {
   try {
-    const { draft, forms, viewpoint } = req.body || {};
+    const { draft, forms, viewpoint, sourceDraftId } = req.body || {};
     if (!draft?.trim()) return res.status(400).json({ success: false, error: '母稿为空——先在②定稿把母稿写好' });
     if (!Array.isArray(forms) || !forms.length) return res.status(400).json({ success: false, error: '至少选一个平台形态' });
     const { adaptDraftToForm } = await import('./services/draft-generation.js');
+    const { getDraft, createDraft } = await import('./db/drafts.js');
+    const sourceDraft = sourceDraftId ? getDraft(sourceDraftId) : null;
+    if (sourceDraftId && !sourceDraft) return res.status(404).json({ success: false, error: '母稿记录不存在' });
     const src = draft.trim();
     const results = [];
     // 顺序执行（各形态一次 LLM 调用），避免并发打满限流；单个失败不拖垮整批
     for (const f of forms) {
       if (f === 'gzh-long') { results.push({ platformForm: f, formLabel: '公众号·长文', genre: '长文体', title: '', body: src, cost: 0, passthrough: true }); continue; }
-      try { results.push(await adaptDraftToForm(src, f, viewpoint || null)); }
+      try {
+        const adapted = await adaptDraftToForm(src, f, viewpoint || null);
+        if (sourceDraft) {
+          const persisted = createDraft({
+            platform: f, title: adapted.title, body: adapted.body, sourceKind: 'manual',
+            sourceLabel: `平台适配｜${sourceDraft.title || sourceDraft.id}`,
+            tokens: adapted.tokens || 0, costYuan: adapted.cost || 0,
+            lineage: {
+              workId: sourceDraft.work_id, parentReleaseId: sourceDraft.latest_release_id,
+              releaseKind: 'platform', originTool: 'knowledge_workbench', creatorType: 'human_ai',
+            },
+          });
+          adapted.draftId = persisted.id;
+          adapted.workId = persisted.work_id;
+          adapted.releaseId = persisted.latest_release_id;
+        }
+        results.push(adapted);
+      }
       catch (e) { results.push({ platformForm: f, error: e.message }); }
     }
     res.json({ success: true, data: results });
@@ -1340,6 +1424,12 @@ app.post('/api/feishu/draft-doc', async (req, res) => {
 
     const hash = createHash('sha256').update(`${title || ''}\n${body || ''}`).digest('hex');
     if (draft.feishu_doc_token && draft.feishu_hash === hash) {
+      const { checkpointDraft } = await import('./db/content-lineage.js');
+      checkpointDraft(draftId, {
+        releaseKind: 'feishu_handoff', artifactType: 'document', artifactRefType: 'feishu_doc',
+        artifactRef: draft.feishu_url, title, content: body, originTool: 'knowledge_workbench',
+        creatorType: 'human_ai', metadata: { feishuDocToken: draft.feishu_doc_token },
+      });
       return res.json({ success: true, data: { url: draft.feishu_url, token: draft.feishu_doc_token, action: 'unchanged' } });
     }
 
@@ -1347,6 +1437,12 @@ app.post('/api/feishu/draft-doc', async (req, res) => {
       try {
         await updateDocFromMarkdown({ documentId: draft.feishu_doc_token, markdown: body });
         setDraftFeishuLink(draftId, { docToken: draft.feishu_doc_token, url: draft.feishu_url, hash });
+        const { checkpointDraft } = await import('./db/content-lineage.js');
+        checkpointDraft(draftId, {
+          releaseKind: 'feishu_handoff', artifactType: 'document', artifactRefType: 'feishu_doc',
+          artifactRef: draft.feishu_url, title, content: body, originTool: 'knowledge_workbench',
+          creatorType: 'human_ai', metadata: { feishuDocToken: draft.feishu_doc_token },
+        });
         return res.json({ success: true, data: { url: draft.feishu_url, token: draft.feishu_doc_token, action: 'updated' } });
       } catch (e) {
         // 文档被用户在飞书里删了/移走了——重建一篇，别让稿子从此发不出去
@@ -1356,6 +1452,12 @@ app.post('/api/feishu/draft-doc', async (req, res) => {
 
     const result = await createDocFromMarkdown({ title, markdown: body, fileExtension: fileExtension || 'md' });
     setDraftFeishuLink(draftId, { docToken: result.token, url: result.url, hash });
+    const { checkpointDraft } = await import('./db/content-lineage.js');
+    checkpointDraft(draftId, {
+      releaseKind: 'feishu_handoff', artifactType: 'document', artifactRefType: 'feishu_doc',
+      artifactRef: result.url, title, content: body, originTool: 'knowledge_workbench',
+      creatorType: 'human_ai', metadata: { feishuDocToken: result.token },
+    });
     res.json({ success: true, data: { ...result, action: 'created' } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
