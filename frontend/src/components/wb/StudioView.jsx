@@ -417,9 +417,14 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setLineageDiffBusy(false)
   }
   const copyLineageHandoff = async () => {
-    if (!lineage?.work?.id) return
     try {
-      const j = await api(`/api/works/${lineage.work.id}/handoff`)
+      let workId = lineage?.work?.id
+      if (!workId && studio.draftId) {
+        const lineageResult = await api(`/api/drafts/${studio.draftId}/lineage`)
+        workId = lineageResult.data?.work?.id
+      }
+      if (!workId) throw new Error('当前草稿还没有作品身份')
+      const j = await api(`/api/works/${workId}/handoff`)
       await navigator.clipboard.writeText(j.data.markdown)
       showToast('已复制交接卡；粘贴给 Codex 后说“继续这篇”即可')
     } catch (err) { showToast('交接卡复制失败：' + err.message) }
@@ -516,6 +521,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           {studio.source || '手选素材（右侧插入）'}
         </span>
         {studio.draftId && <button className="wb-btn-ghost" onClick={loadLineage}>版本链</button>}
+        {studio.draftId && <button className="wb-btn-ghost" onClick={copyLineageHandoff} title="复制作品 ID 和当前关键版，交给 Codex CLI 继续">复制交接卡</button>}
         {drafts?.length > 0 && (
           <div style={{ marginLeft: 'auto', position: 'relative' }}>
             <button className="wb-btn-ghost" onClick={() => setDraftsOpen(o => !o)}>草稿箱（{drafts.length}）</button>
