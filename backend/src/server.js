@@ -885,10 +885,21 @@ app.post('/api/studio/adapt-batch', async (req, res) => {
     if (!draft?.trim()) return res.status(400).json({ success: false, error: '母稿为空——先在②定稿把母稿写好' });
     if (!Array.isArray(forms) || !forms.length) return res.status(400).json({ success: false, error: '至少选一个平台形态' });
     const { adaptDraftToForm } = await import('./services/draft-generation.js');
-    const { getDraft, createDraft } = await import('./db/drafts.js');
+    const { getDraft, createDraft, updateDraft } = await import('./db/drafts.js');
+    const { checkpointDraft } = await import('./db/content-lineage.js');
     const sourceDraft = sourceDraftId ? getDraft(sourceDraftId) : null;
     if (sourceDraftId && !sourceDraft) return res.status(404).json({ success: false, error: '母稿记录不存在' });
     const src = draft.trim();
+    // 出片使用的是编辑器当前正文。若它还没点“保存修改”，先把当前母稿存成关键版，
+    // 再让各平台稿共同从这张父版本分叉，避免血缘指向一份已经过时的母稿。
+    let parentReleaseId = sourceDraft?.latest_release_id || null;
+    if (sourceDraft && sourceDraft.body !== src) {
+      updateDraft(sourceDraft.id, { body: src });
+      parentReleaseId = checkpointDraft(sourceDraft.id, {
+        releaseKind: 'checkpoint', originTool: 'knowledge_workbench', creatorType: 'human_ai',
+        metadata: { reason: 'platform_adaptation_source' },
+      }).release.id;
+    }
     const results = [];
     // 顺序执行（各形态一次 LLM 调用），避免并发打满限流；单个失败不拖垮整批
     for (const f of forms) {
@@ -901,7 +912,7 @@ app.post('/api/studio/adapt-batch', async (req, res) => {
             sourceLabel: `平台适配｜${sourceDraft.title || sourceDraft.id}`,
             tokens: adapted.tokens || 0, costYuan: adapted.cost || 0,
             lineage: {
-              workId: sourceDraft.work_id, parentReleaseId: sourceDraft.latest_release_id,
+              workId: sourceDraft.work_id, parentReleaseId,
               releaseKind: 'platform', originTool: 'knowledge_workbench', creatorType: 'human_ai',
             },
           });

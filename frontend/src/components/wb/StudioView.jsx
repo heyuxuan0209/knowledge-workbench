@@ -275,7 +275,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setAdaptBusy(true)
     showToast(`正在把母稿适配成 ${filmForms.size} 个平台形态（每个约 20 秒）…`)
     try {
-      const json = await api('/api/studio/adapt-batch', { method: 'POST', body: { draft: studio.draft, forms: [...filmForms], viewpoint: studio.viewpoint || null } })
+      const json = await api('/api/studio/adapt-batch', { method: 'POST', body: { draft: studio.draft, forms: [...filmForms], viewpoint: studio.viewpoint || null, sourceDraftId: studio.draftId || null } })
       const map = {}
       for (const r of (json.data || [])) map[r.platformForm] = { ...r, open: false }
       // 第一个非透传的默认展开，方便直接看
@@ -351,7 +351,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     if (!studio.draft.trim()) { showToast('母稿为空'); return }
     setAdapted(a => ({ ...a, [formKey]: { ...a[formKey], reBusy: true } }))
     try {
-      const j = await api('/api/studio/adapt-batch', { method: 'POST', body: { draft: studio.draft, forms: [formKey], viewpoint: studio.viewpoint || null } })
+      const j = await api('/api/studio/adapt-batch', { method: 'POST', body: { draft: studio.draft, forms: [formKey], viewpoint: studio.viewpoint || null, sourceDraftId: studio.draftId || null } })
       const r = (j.data || [])[0]
       if (r) setAdapted(a => ({ ...a, [formKey]: { ...r, open: true } }))
       showToast('已按母稿重出这篇适配稿')
@@ -376,6 +376,27 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   }
   const [draftsOpen, setDraftsOpen] = useState(false)   // 草稿箱面板
   const [selDrafts, setSelDrafts] = useState(new Set()) // 勾选待删的草稿
+  const [lineageOpen, setLineageOpen] = useState(false)
+  const [lineageBusy, setLineageBusy] = useState(false)
+  const [lineage, setLineage] = useState(null)
+  const releaseLabel = { initial: '初始稿', checkpoint: '关键存档', reviewed: '审定稿', platform: '平台稿', feishu_handoff: '飞书交接', published: '发布版' }
+  const provenanceLabel = { confirmed: '已确认', inferred: '历史推断' }
+  const loadLineage = async () => {
+    if (!studio.draftId) return
+    setLineageOpen(true); setLineageBusy(true)
+    try { const j = await api(`/api/drafts/${studio.draftId}/lineage`); setLineage(j.data) }
+    catch (err) { showToast('版本链加载失败：' + err.message); setLineageOpen(false) }
+    setLineageBusy(false)
+  }
+  const saveCheckpoint = async () => {
+    if (!studio.draftId) { showToast('先把当前内容存为草稿，系统会建立初始版本'); return }
+    try {
+      await api(`/api/drafts/${studio.draftId}`, { method: 'PATCH', body: { body: studio.draft, title: studio.title, paragraphRefs: studio.paragraphRefs } })
+      const j = await api(`/api/drafts/${studio.draftId}/releases`, { method: 'POST', body: { releaseKind: 'checkpoint', originTool: 'knowledge_workbench', creatorType: 'human_ai' } })
+      showToast(j.data?.action === 'unchanged' ? '内容没变，沿用上一张关键版本凭证' : '已存为关键版本')
+      if (lineageOpen) await loadLineage()
+    } catch (err) { showToast('关键版本保存失败：' + err.message) }
+  }
   const cardFrame = useRef(null)
   const cardsMode = (studio.platform === 'xhs' && xhsMode === 'cards') || v2Cards
   const postDraftToCards = () => {
@@ -430,6 +451,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
           onClick={() => studio.sourceTopicId && gotoTopic(studio.sourceTopicId)}>
           {studio.source || '手选素材（右侧插入）'}
         </span>
+        {studio.draftId && <button className="wb-btn-ghost" onClick={loadLineage}>版本链</button>}
         {drafts?.length > 0 && (
           <div style={{ marginLeft: 'auto', position: 'relative' }}>
             <button className="wb-btn-ghost" onClick={() => setDraftsOpen(o => !o)}>草稿箱（{drafts.length}）</button>
@@ -471,6 +493,32 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
         )}
       </div>
       <div className="wb-page-sub">选素材 → ②定文体起母稿 → ③出片裂变各平台 · 每段可溯源、发布前一键去标记</div>
+
+      {lineageOpen && (
+        <div className="wb-lineage-backdrop" onMouseDown={() => setLineageOpen(false)}>
+          <section className="wb-lineage-panel" onMouseDown={event => event.stopPropagation()}>
+            <div className="wb-lineage-head">
+              <div><b>版本链</b><span>{lineage?.work?.title || studio.title || '当前作品'}</span></div>
+              <button onClick={() => setLineageOpen(false)}>×</button>
+            </div>
+            {lineageBusy ? <div className="wb-lineage-empty">正在读取…</div> : (
+              <div className="wb-lineage-list">
+                {(lineage?.releases || []).map((release, index) => (
+                  <div className="wb-lineage-item" key={release.id}>
+                    <i>{index + 1}</i>
+                    <div>
+                      <div className="wb-lineage-title">{releaseLabel[release.release_kind] || release.release_kind}<em>{provenanceLabel[release.provenance_status] || release.provenance_status}</em></div>
+                      <div className="wb-lineage-meta">{release.origin_tool} · {release.artifact_ref_type}{release.metadata?.platform ? ` · ${release.metadata.platform}` : ''} · {(release.created_at || '').replace('T', ' ').slice(0, 16)}</div>
+                    </div>
+                  </div>
+                ))}
+                {!lineage?.releases?.length && <div className="wb-lineage-empty">还没有关键版本</div>}
+              </div>
+            )}
+            <div className="wb-lineage-foot">只记录关键版本，不保存普通问答和每次自动保存。</div>
+          </section>
+        </div>
+      )}
 
       {v2Mode && !cardsMode && !videoMode && (
         <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '236px 1fr', border: '1px solid var(--line10)', borderRadius: 12, margin: '10px 0', background: 'var(--surface)', minHeight: 300 }}>
@@ -675,6 +723,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
               <span style={{ fontSize: 11, color: 'var(--sub2)', fontWeight: 600, marginRight: 2 }}>产出</span>
               <button className="wb-btn-outline" disabled={studio.busy || isEmpty} title={reshapeMode ? '把你的稿按上方文体再重塑一版母稿' : '用同样的素材·文体再出一版母稿（起稿请用上方推荐卡「用这个生成母稿」）'} onClick={genDraftV2}>{reshapeMode ? '重塑我的稿' : '重新生成'}</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title={studio.draftId ? '把改动存回当前草稿（不发布）' : '把当前草稿存进草稿箱，之后可继续改（不发布）'} onClick={saveDraft}>{studio.draftId ? '保存修改' : '存草稿'}</button>
+              <button className="wb-btn-ghost" disabled={isEmpty || !studio.draftId} title={studio.draftId ? '保存当前正文，并把它标记为以后可回看的关键版本' : '先存草稿，建立作品和初始版本'} onClick={saveCheckpoint}>存关键版</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="导出发布版：溯源标记转文末来源列表" onClick={exportMd}>导出 Markdown</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="删掉正文里所有 [素材N] 标记（发布前用；先存草稿）" onClick={() => { setStudio(s => ({ ...s, draft: stripRefs(s.draft) })); showToast('已去掉正文里所有 [素材N] 标记') }}>去引用标记</button>
               <button className="wb-btn-ghost" disabled={isEmpty} title="生成几个标题候选" onClick={suggestTitles}>标题候选</button>
