@@ -672,15 +672,33 @@ input, textarea { font-family: inherit; }
 .wb-lineage-empty { padding: 28px 22px; color: var(--sub2); font-size: 13px; }
 .wb-lineage-foot { padding: 13px 22px 18px; border-top: 1px solid var(--line08); color: var(--faint); font-size: 11.5px; }
 .wb-release-diff { margin-top: 4px; padding-top: 18px; border-top: 1px solid var(--line14); }
-.wb-release-diff-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.wb-release-diff-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.wb-release-diff-head > div { display: flex; flex-direction: column; gap: 4px; }
 .wb-release-diff-head b { font-family: var(--serif); font-size: 15px; }
 .wb-release-diff-head span { color: var(--sub2); font-size: 11px; }
+.wb-release-diff-head button { border: 1px solid rgba(61,90,128,.25); border-radius: 7px; padding: 6px 9px; background: rgba(61,90,128,.07); color: var(--accent); font-size: 11.5px; cursor: pointer; white-space: nowrap; }
+.wb-release-diff-head button:disabled { opacity: .45; cursor: default; }
 .wb-diff-group { margin: 9px 0; border: 1px solid var(--line08); border-radius: 8px; overflow: hidden; }
 .wb-diff-group > div { padding: 10px 12px; }
 .wb-diff-group.changed > div:first-child, .wb-diff-group.removed > div { background: rgba(162,75,63,.07); }
 .wb-diff-group.changed > div:last-child, .wb-diff-group.added > div { background: rgba(63,115,80,.08); border-top: 1px solid var(--line08); }
 .wb-diff-group label { display: block; margin-bottom: 5px; color: var(--sub2); font-size: 10px; font-weight: 700; }
 .wb-diff-group p { margin: 5px 0; white-space: pre-wrap; color: var(--body2); font-family: var(--serif); font-size: 12.5px; line-height: 1.65; }
+.wb-edit-insights { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line14); }
+.wb-edit-insights-title { display: flex; align-items: baseline; gap: 9px; margin-bottom: 10px; }
+.wb-edit-insights-title b { font-size: 13.5px; }
+.wb-edit-insights-title span, .wb-edit-insights-rule, .wb-edit-insights-none { color: var(--faint); font-size: 11px; line-height: 1.55; }
+.wb-edit-observation { position: relative; margin: 7px 0; padding: 10px 12px; border: 1px solid var(--line08); border-radius: 8px; background: var(--brief-bg); }
+.wb-edit-observation strong { font-size: 12.5px; font-weight: 600; }
+.wb-edit-observation em { margin-left: 8px; color: var(--sub2); font: normal 10px/1.4 system-ui; }
+.wb-edit-observation p, .wb-preference-candidate p { margin: 5px 0 0; color: var(--sub2); font-size: 11px; line-height: 1.55; }
+.wb-preference-candidate { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 11px 12px; border: 1px solid rgba(61,90,128,.24); border-radius: 9px; background: rgba(61,90,128,.06); }
+.wb-preference-candidate strong { color: var(--accent); font-size: 11.5px; }
+.wb-preference-candidate > div:last-child { display: flex; align-items: center; gap: 6px; }
+.wb-preference-candidate button { border: none; border-radius: 6px; padding: 6px 8px; background: var(--accent); color: #fff; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.wb-preference-candidate button.muted { background: transparent; color: var(--sub2); border: 1px solid var(--line10); }
+.wb-preference-candidate > em { color: var(--green); font: normal 11px/1.4 system-ui; white-space: nowrap; }
+.wb-edit-insights-rule { margin-top: 11px; }
 
 /* ===== 右栏内容 ===== */
 .wb-sel-item {

@@ -484,6 +484,28 @@ CREATE INDEX IF NOT EXISTS idx_releases_artifact ON artifact_releases(artifact_r
 CREATE INDEX IF NOT EXISTS idx_relations_from ON artifact_relations(from_release_id);
 CREATE INDEX IF NOT EXISTS idx_relations_target ON artifact_relations(to_entity_type, to_entity_id);
 
+CREATE TABLE IF NOT EXISTS edit_observations (
+    id TEXT PRIMARY KEY, work_id TEXT NOT NULL, from_release_id TEXT NOT NULL, to_release_id TEXT NOT NULL,
+    preference_key TEXT NOT NULL, summary TEXT NOT NULL, suggested_rule TEXT, evidence_json TEXT NOT NULL DEFAULT '[]',
+    platform TEXT, status TEXT NOT NULL DEFAULT 'observed' CHECK (status IN ('observed', 'dismissed')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (work_id) REFERENCES content_works(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_release_id) REFERENCES artifact_releases(id),
+    FOREIGN KEY (to_release_id) REFERENCES artifact_releases(id),
+    UNIQUE (from_release_id, to_release_id, preference_key)
+);
+CREATE INDEX IF NOT EXISTS idx_edit_observations_work ON edit_observations(work_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_edit_observations_key ON edit_observations(preference_key, platform, status);
+CREATE TABLE IF NOT EXISTS preference_candidates (
+    id TEXT PRIMARY KEY, preference_key TEXT NOT NULL, rule_text TEXT NOT NULL,
+    scope_type TEXT NOT NULL DEFAULT 'platform' CHECK (scope_type IN ('global', 'platform')),
+    scope_value TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate', 'confirmed', 'rejected')),
+    distinct_work_count INTEGER NOT NULL DEFAULT 0, evidence_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (preference_key, scope_type, scope_value)
+);
+CREATE INDEX IF NOT EXISTS idx_preference_candidates_status ON preference_candidates(status, updated_at DESC);
+
 -- ============================================================
 -- 8. Data Source Configs — 用户手动添加的信源配置
 --    对应 WIREFRAMES.md 第5/6/7节的三种添加方式（单账号 / 信源池 / 批量导入）

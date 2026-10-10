@@ -2,6 +2,7 @@ import { getDatabase } from '../db/init.js';
 import { chat } from './llm.js';
 import { createDraft } from '../db/drafts.js';
 import { loadPrompt, render, getPlatform, getGenre, getPlatformForm, getVoice } from './creation-prompts.js';
+import { confirmedPreferenceBlock } from './editing-insights.js';
 
 // ADR-052 P3 声音层（软层·可选）：选了才追加一段口吻规则；作者身份仍由 draft-frame 全局锚定、不被覆盖。
 function voiceBlock(voiceKey) {
@@ -135,7 +136,7 @@ export async function generateFromTopic(topicId, platform = 'long', viewpoint = 
   const spec = getPlatform(platform); // 未知平台在此抛错（附可用清单提示）
   const { topic, body, notes } = gatherTopicMaterials(topicId);
 
-  const result = await chat([{ role: 'user', content: buildPrompt(topic, body, notes, spec.spec, viewpoint) }]);
+  const result = await chat([{ role: 'user', content: buildPrompt(topic, body, notes, `${spec.spec}${confirmedPreferenceBlock(platform)}`, viewpoint) }]);
   if (!result.success) throw new Error(`LLM 调用失败: ${result.error}`);
 
   const text = result.content.trim();
@@ -222,7 +223,7 @@ export async function generateFromTopicV2(topicId, genreKey, platformFormKey, vi
   if (materialsPicked) exemption += `【只用选中素材·ADR-028】本篇只基于下方勾选的 ${selectedNoteIds.length} 条素材创作；**不要引入主题页综述、也不要引入任何未勾选的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】本篇是第一人称亲历文体：[素材N] 溯源只在"引用外部信息/数据"时标，不对你自己的经历强制标注。底线不变：用到外部信息照样必须标、不许编。\n\n`;
   const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
-  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}`;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}${confirmedPreferenceBlock(platformFormKey)}`;
 
   const { topic, body, notes } = gatherTopicMaterials(topicId, selectedNoteIds);
   console.log(`  ↳ 生成用素材：${materialsPicked ? `选中 ${notes.length} 条（跳过主题综述）` : `主题全部 ${notes.length} 条`}`);
@@ -276,7 +277,7 @@ export async function adaptDraftToForm(draftText, platformFormKey, viewpoint = n
   const stanceBlock = viewpoint?.trim()
     ? render(loadPrompt('stance-with.md'), { viewpoint: viewpoint.trim() })
     : loadPrompt('stance-without.md');
-  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}`;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${confirmedPreferenceBlock(platformFormKey)}`;
 
   const prompt = `${composedSpec}\n\n---\n\n${stanceBlock}\n\n---\n\n【母稿】\n${src.slice(0, 8000)}\n\n---\n\n现在把「母稿」适配成一篇符合上面平台形态的成稿。\n**只输出成稿本身**：不要复述文体名/平台名、不要「XX体 · XX版」这类规格性小标题、不要任何前言或解释。第一行直接是成稿的开头。`;
 
@@ -305,7 +306,7 @@ export async function generateFromMaterials(noteIds, genreKey, platformFormKey, 
   let exemption = `【只用选中素材·ADR-028】本篇只基于下方 ${notes.length} 条素材创作；**不要引入任何未提供的内容**。[素材N] 只标你实际引用的这几条。\n\n`;
   if (firstPerson) exemption += `【拼装豁免·ADR-027】第一人称亲历文体：[素材N] 只在引用外部信息时标。底线不变：用到外部信息照样标、不许编。\n\n`;
   const fmtNote = isCardForm(platformFormKey) ? CARD_OUTPUT : CLEAN_OUTPUT;
-  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}`;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}${confirmedPreferenceBlock(platformFormKey)}`;
 
   // 无主题：造一个最小 topic + 空 body，skipOverview=true（不塞综述）
   const result = await chat([{ role: 'user', content: buildPromptV2({ name: '自选素材', description: '' }, {}, notes, composedSpec, viewpoint, true) }]);
@@ -338,7 +339,7 @@ export async function generateFromDraft(draftText, genreKey, platformFormKey, vi
   const stanceBlock = viewpoint?.trim()
     ? render(loadPrompt('stance-with.md'), { viewpoint: viewpoint.trim() })
     : loadPrompt('stance-without.md');
-  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}`;
+  const composedSpec = `${fmtNote}${exemption}【文体骨架】\n${genre.spec}\n\n---\n\n【平台形态】\n${pform.spec}${voiceBlock(voiceKey)}${confirmedPreferenceBlock(platformFormKey)}`;
 
   const prompt = `${composedSpec}\n\n---\n\n${stanceBlock}\n\n---\n\n【作者的草稿】\n${src.slice(0, 8000)}\n\n---\n\n现在按上面的「文体骨架 × 平台形态」，把「作者的草稿」重塑成一篇干净、可直接发布的成稿。\n**只输出成稿本身**：不要复述文体名/平台名、不要加「XX体 · XX版」这类规格性小标题、不要任何前言或解释。第一行直接是成稿的开头（标题或正文首句）。`;
 

@@ -382,6 +382,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
   const [lineageSelected, setLineageSelected] = useState(new Set())
   const [lineageDiff, setLineageDiff] = useState(null)
   const [lineageDiffBusy, setLineageDiffBusy] = useState(false)
+  const [editInsights, setEditInsights] = useState(null)
+  const [editInsightsBusy, setEditInsightsBusy] = useState(false)
   const releaseLabel = { initial: '初始稿', checkpoint: '关键存档', reviewed: '审定稿', platform: '平台稿', feishu_handoff: '飞书交接', published: '发布版' }
   const provenanceLabel = { confirmed: '已确认', inferred: '历史推断' }
   const loadLineage = async () => {
@@ -389,7 +391,7 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setLineageOpen(true); setLineageBusy(true)
     try {
       const j = await api(`/api/drafts/${studio.draftId}/lineage`)
-      setLineage(j.data); setLineageDiff(null)
+      setLineage(j.data); setLineageDiff(null); setEditInsights(null)
       setLineageSelected(new Set((j.data?.releases || []).slice(-2).map(release => release.id)))
     }
     catch (err) { showToast('版本链加载失败：' + err.message); setLineageOpen(false) }
@@ -410,9 +412,27 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
     setLineageDiffBusy(true)
     try {
       const j = await api(`/api/works/${lineage.work.id}/releases/compare?from=${encodeURIComponent(ordered[0].id)}&to=${encodeURIComponent(ordered[1].id)}`)
-      setLineageDiff(j.data)
+      setLineageDiff(j.data); setEditInsights(null)
     } catch (err) { showToast('版本对比失败：' + err.message) }
     setLineageDiffBusy(false)
+  }
+  const analyzeLineageEdits = async () => {
+    if (!lineageDiff || !lineage?.work?.id) return
+    setEditInsightsBusy(true)
+    try {
+      const j = await api(`/api/works/${lineage.work.id}/edit-observations`, { method: 'POST', body: { fromReleaseId: lineageDiff.from.id, toReleaseId: lineageDiff.to.id } })
+      setEditInsights(j.data)
+      if (j.data?.action === 'no_changes') showToast('两版没有文字变化，不需要总结')
+      else showToast(j.data?.action === 'unchanged' ? '已读取这次修改的已有观察' : '已总结这次修改')
+    } catch (err) { showToast('修改总结失败：' + err.message) }
+    setEditInsightsBusy(false)
+  }
+  const decidePreference = async (candidate, status) => {
+    try {
+      const j = await api(`/api/preferences/${candidate.id}`, { method: 'PATCH', body: { status } })
+      setEditInsights(current => ({ ...current, candidates: (current?.candidates || []).map(item => item.id === candidate.id ? j.data : item) }))
+      showToast(status === 'confirmed' ? '已确认：今后 KW 在这个平台形态下生成时会加载这条规则' : '已忽略这条习惯候选')
+    } catch (err) { showToast('处理习惯候选失败：' + err.message) }
   }
   const restoreLineageRelease = async (release) => {
     if (!confirm(`恢复到第 ${release.sequence} 版？\n\n当前内容不会消失，系统会把“恢复后的正文”另存为一个新关键版本。`)) return
@@ -564,8 +584,8 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                 {lineageDiff && (
                   <div className="wb-release-diff">
                     <div className="wb-release-diff-head">
-                      <b>第 {lineageDiff.from.sequence} 版 → 第 {lineageDiff.to.sequence} 版</b>
-                      <span>新增 {lineageDiff.diff.stats.added} · 删除 {lineageDiff.diff.stats.removed} · 改写 {lineageDiff.diff.stats.changed}</span>
+                      <div><b>第 {lineageDiff.from.sequence} 版 → 第 {lineageDiff.to.sequence} 版</b><span>新增 {lineageDiff.diff.stats.added} · 删除 {lineageDiff.diff.stats.removed} · 改写 {lineageDiff.diff.stats.changed}</span></div>
+                      <button disabled={editInsightsBusy} onClick={analyzeLineageEdits} title="调用一次模型，只分析所选两个关键版本的文字差异">{editInsightsBusy ? '总结中…' : '总结这次修改'}</button>
                     </div>
                     {lineageDiff.diff.groups.filter(group => group.type !== 'unchanged').map((group, index) => (
                       <div className={`wb-diff-group ${group.type}`} key={index}>
@@ -576,6 +596,25 @@ export default function StudioView({ studio, setStudio, platforms, genDraft, exp
                       </div>
                     ))}
                     {lineageDiff.diff.stats.added + lineageDiff.diff.stats.removed + lineageDiff.diff.stats.changed === 0 && <div className="wb-lineage-empty">两版正文完全相同</div>}
+                    {editInsights && (
+                      <div className="wb-edit-insights">
+                        <div className="wb-edit-insights-title"><b>这次修改的观察</b><span>只属于本篇，不会自动当成你的习惯</span></div>
+                        {(editInsights.observations || []).map(item => (
+                          <div className="wb-edit-observation" key={item.id}>
+                            <strong>{item.summary}</strong><em>仅本篇观察</em>
+                            {item.evidence?.length > 0 && <p>{item.evidence.join(' → ')}</p>}
+                          </div>
+                        ))}
+                        {!(editInsights.observations || []).length && <div className="wb-edit-insights-none">没有发现足够明确的编辑信号。</div>}
+                        {(editInsights.candidates || []).map(candidate => (
+                          <div className="wb-preference-candidate" key={candidate.id}>
+                            <div><strong>习惯候选 · 已在 {candidate.distinct_work_count} 篇作品重复</strong><p>{candidate.rule_text}</p></div>
+                            {candidate.status === 'candidate' ? <div><button onClick={() => decidePreference(candidate, 'confirmed')}>确认用于此平台</button><button className="muted" onClick={() => decidePreference(candidate, 'rejected')}>忽略</button></div> : <em>{candidate.status === 'confirmed' ? '已确认使用' : '已忽略'}</em>}
+                          </div>
+                        ))}
+                        <div className="wb-edit-insights-rule">同一平台、同类修改跨 3 篇作品重复，才会升级为习惯候选；仍需你确认。</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

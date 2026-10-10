@@ -16,6 +16,8 @@ const { migrateM32 } = await import('./db/migrate-m32.js');
 migrateM32(); // 幂等：缓存精选阅读决策摘要，原始摘要继续保留。
 const { migrateM33 } = await import('./db/migrate-m33.js');
 migrateM33(); // 幂等：作品—关键 Release—来源关系；存量草稿只做“推断”回填。
+const { migrateM34 } = await import('./db/migrate-m34.js');
+migrateM34(); // 幂等：显式编辑观察；跨三篇才形成需人工确认的偏好候选。
 
 // 出网代理根治（2026-07-17）：Node fetch（undici）默认忽略 HTTP(S)_PROXY，且 launchd
 // 常驻进程没有 shell 环境——代理只能来自 .env。不配则行为不变（直连）。
@@ -814,6 +816,40 @@ app.get('/api/works/:id/releases/compare', async (req, res) => {
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
+});
+
+app.post('/api/works/:id/edit-observations', async (req, res) => {
+  try {
+    const { fromReleaseId, toReleaseId } = req.body || {};
+    if (!fromReleaseId || !toReleaseId) return res.status(400).json({ success: false, error: 'fromReleaseId and toReleaseId are required' });
+    const { analyzeEditPair } = await import('./services/editing-insights.js');
+    res.json({ success: true, data: await analyzeEditPair({ workId: req.params.id, fromReleaseId, toReleaseId }) });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/works/:id/edit-observations', async (req, res) => {
+  try {
+    const { listEditObservations } = await import('./services/editing-insights.js');
+    res.json({ success: true, data: listEditObservations(req.params.id) });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.get('/api/preferences', async (req, res) => {
+  try {
+    const { listPreferenceCandidates } = await import('./services/editing-insights.js');
+    res.json({ success: true, data: listPreferenceCandidates({ status: req.query.status || null }) });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.patch('/api/preferences/:id', async (req, res) => {
+  try {
+    const { updatePreferenceCandidate } = await import('./services/editing-insights.js');
+    const data = updatePreferenceCandidate(req.params.id, req.body || {});
+    if (!data) return res.status(404).json({ success: false, error: 'Preference candidate not found' });
+    res.json({ success: true, data });
+  } catch (error) { res.status(400).json({ success: false, error: error.message }); }
 });
 
 app.post('/api/drafts/:id/restore-release', async (req, res) => {
